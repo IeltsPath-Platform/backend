@@ -1,5 +1,12 @@
 package com.ieltspath.learning.infrastructure.persistence;
 
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import com.ieltspath.learning.application.usecase.SubmitPracticeAttemptUseCase;
+import com.ieltspath.learning.application.command.SubmitExerciseCommand;
 import com.ieltspath.learning.application.command.HumanReviewResult;
 import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.port.HumanReviewClient;
@@ -65,6 +72,7 @@ class PracticeEssayToExaminerIntegrationTest {
 
     @Autowired JdbcTemplate jdbc;
     @Autowired SubmitPracticeEssayToExaminerUseCase sendToExaminer;
+    @Autowired SubmitPracticeAttemptUseCase submitAttempt;
     @Autowired ApplyHumanReviewResultUseCase applyResult;
     @MockitoBean HumanReviewClient client;
     @MockitoBean LearningContentClient content;
@@ -212,5 +220,69 @@ class PracticeEssayToExaminerIntegrationTest {
 
         assertEquals(2, count("SELECT count(*) FROM kp_evidence WHERE source = 'human_review'"), "a repeated event adds nothing");
         assertEquals(1, count("SELECT count(*) FROM kp_evidence WHERE source = 'error_trap'"));
+    }
+
+    /** The examiner's result for the sent essay: task response 6.5 and coherence 5.0 (a mean of 6.0 against the pass band 6.0). */
+    private HumanReviewResult examinerResult(UUID submission, String taskBand, String coherenceBand) {
+        return new HumanReviewResult(UUID.randomUUID(), user, review, submission,
+                List.of(new HumanReviewResult.Criterion("taskResponse", new BigDecimal(taskBand)),
+                        new HumanReviewResult.Criterion("coherence", new BigDecimal(coherenceBand))),
+                List.of(new HumanReviewResult.ErrorCount("LINKER_MISUSE", 2)));
+    }
+
+    private SubmitExerciseCommand submission() {
+        return new SubmitExerciseCommand(UUID.randomUUID(), List.of());
+    }
+
+    @Test
+    void anAttemptWaitsWhileTheExaminerHasNotGradedItsEssay() {
+        sendToExaminer.execute(user, attempt, question, UUID.randomUUID(), ESSAY, examiner);
+
+        assertThatThrownBy(() -> submitAttempt.execute(user, attempt, submission()))
+                .isInstanceOfSatisfying(LearningRequestException.class,
+                        exception -> assertEquals("ESSAY_NOT_GRADED", exception.getCode()));
+        assertEquals(0, count("SELECT count(*) FROM kp_evidence WHERE user_id = ?", user));
+    }
+
+    @Test
+    void anAttemptSubmitsOnceTheExaminerHasGradedItsEssayAndCountsTheExaminersPass() {
+        when(content.practiceSetAvailability(anyList(), anyList(), anyInt())).thenAnswer(invocation ->
+                invocation.<List<UUID>>getArgument(0).stream().collect(java.util.stream.Collectors.toMap(p -> p, p -> 3)));
+        var sent = sendToExaminer.execute(user, attempt, question, UUID.randomUUID(), ESSAY, examiner);
+        applyResult.execute(examinerResult(sent.submissionId(), "6.5", "5.0"));
+
+        var submitted = submitAttempt.execute(user, attempt, submission());
+
+        assertTrue(submitted.passed(), "the examiner's mean 6.0 reaches the pass band 6.0");
+        assertTrue(submitted.countedAsEvidence());
+    }
+
+    @Test
+    void examinerFirstThenSubmitWritesNoCriterionEvidenceOrReviewTwice() {
+        when(content.practiceSetAvailability(anyList(), anyList(), anyInt())).thenAnswer(invocation ->
+                invocation.<List<UUID>>getArgument(0).stream().collect(java.util.stream.Collectors.toMap(p -> p, p -> 3)));
+        var sent = sendToExaminer.execute(user, attempt, question, UUID.randomUUID(), ESSAY, examiner);
+        applyResult.execute(examinerResult(sent.submissionId(), "6.5", "5.0"));
+
+        submitAttempt.execute(user, attempt, submission());
+
+        assertEquals(1, count("SELECT count(*) FROM kp_evidence WHERE user_id = ? AND kp_id = ? AND source = 'human_review'",
+                user, coherence), "the examiner's criterion evidence stays the only one");
+        assertEquals(0, count("SELECT count(*) FROM kp_evidence WHERE user_id = ? AND kp_id IN (?, ?) "
+                + "AND source IN ('practice_set', 'lesson_writing')", user, taskResponse, coherence),
+                "the submit writes no AI criterion evidence for the examiner's essay");
+        assertEquals(1, count("SELECT count(*) FROM review_items WHERE user_id = ? AND trigger_kind = 'WRITING_CRITERION'",
+                user), "the examiner's review is the only criterion review");
+    }
+
+    @Test
+    void anAttemptWhoseExaminerMeanIsBelowThePassBandDoesNotPass() {
+        var sent = sendToExaminer.execute(user, attempt, question, UUID.randomUUID(), ESSAY, examiner);
+        applyResult.execute(examinerResult(sent.submissionId(), "5.0", "5.0"));
+
+        var submitted = submitAttempt.execute(user, attempt, submission());
+
+        assertEquals(false, submitted.passed(), "the examiner's mean 5.0 is below the pass band 6.0");
+        assertTrue(submitted.countedAsEvidence());
     }
 }

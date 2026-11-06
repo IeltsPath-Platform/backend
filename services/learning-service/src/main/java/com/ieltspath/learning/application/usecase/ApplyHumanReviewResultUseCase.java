@@ -31,8 +31,10 @@ import com.ieltspath.learning.domain.vo.KnowledgeEvidence;
 import com.ieltspath.learning.domain.vo.PendingReview;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -47,9 +49,11 @@ import java.util.stream.Collectors;
  * Applies an examiner's finished standalone Writing review the way the AI grade is applied: criterion bands become evidence for
  * their knowledge points, and each approved error code becomes a wrong answer on its trap point. The examiner's grade replaces
  * the AI's criterion evidence for the same essay, so the essay is not counted twice. Then the weakest points get optional
- * reviews (never blocking), and the study points are kept for the learner to read. Applying is idempotent per essay, and all of
- * it happens in one transaction under the learner's lock. Every read happens before the first write, so a Content outage leaves
- * nothing half applied.
+ * reviews (never blocking), and the study points are kept for the learner to read. Applying is idempotent per essay.
+ *
+ * <p>Two steps. First every read from Content and the catalog happens with no lock and no transaction, so a slow Content holds
+ * nothing and a Content outage just makes the message retry. Then one short transaction under the learner's lock writes
+ * everything from the data already read; it makes no Content call.
  *
  * <p>An essay of the practice library (free writing, no lesson) is outside the learner's path, as it is when the AI grades it:
  * the learner reads the study points, but nothing is recorded as evidence, no mastery profile changes and no review is made.
@@ -72,6 +76,7 @@ public class ApplyHumanReviewResultUseCase {
     private final ReviewItemRepository reviews;
     private final HumanReviewOutcomeRepository outcomes;
     private final ObjectMapper json;
+    private final TransactionTemplate transaction;
     private final HumanReviewEvidenceRule rule = new HumanReviewEvidenceRule();
     private final int limit;
 
@@ -81,7 +86,7 @@ public class ApplyHumanReviewResultUseCase {
                                          KnowledgeEvidenceRepository evidence, MasteryProfileUpdater profiles,
                                          ErrorTrapReviews errorTrapReviews, WritingCriterionReviews criterionReviews,
                                          ReviewItemRepository reviews, HumanReviewOutcomeRepository outcomes,
-                                         ObjectMapper json,
+                                         ObjectMapper json, PlatformTransactionManager transactionManager,
                                          @Value("${learning.human-review.review-limit:2}") int limit) {
         if (limit < 0) throw new IllegalArgumentException("human-review.review-limit must not be negative");
         this.lock = lock;
@@ -98,6 +103,7 @@ public class ApplyHumanReviewResultUseCase {
         this.reviews = reviews;
         this.outcomes = outcomes;
         this.json = json;
+        this.transaction = new TransactionTemplate(transactionManager);
         this.limit = limit;
     }
 
@@ -105,21 +111,25 @@ public class ApplyHumanReviewResultUseCase {
      * @throws IllegalArgumentException when the essay is not the learner's, or the review is not the one asked for it; the
      *                                  event is then refused rather than retried
      */
-    @Transactional
     public void execute(HumanReviewResult result) {
+        // Applied before: nothing to read and nothing to write, so a redelivered event makes no Content call at all.
+        if (outcomes.studyPointsOf(result.sourceSubmissionId()).isPresent()) return;
+        Reads reads = readContent(result);
+        transaction.executeWithoutResult(status -> apply(result, reads));
+    }
+
+    /** Everything the review needs from Content and the catalog, read before the lock and the transaction. */
+    private record Reads(WritingSubmission essay, Outcome outcome, Set<UUID> known, List<FailedWritingCriterion> failed,
+                         ErrorTrapCatalog.ErrorTraps trapCatalog, Map<UUID, LearningContentClient.KnowledgePoint> details,
+                         BigDecimal overallBand, boolean passed, Map<UUID, Integer> availability,
+                         List<ErrorTrapReviews.PlannedTrap> trapPlan) { }
+
+    private Reads readContent(HumanReviewResult result) {
         UUID learnerId = result.learnerId();
         UUID essayId = result.sourceSubmissionId();
-        UUID reviewSubmissionId = result.reviewSubmissionId();
-        lock.lock(learnerId);
-        if (outcomes.studyPointsOf(essayId).isPresent()) return;
-
         WritingSubmission essay = essays.findOwned(essayId, learnerId)
                 .orElseThrow(() -> new IllegalArgumentException("the source submission is not the learner's essay"));
-        if (requests.findReviewId(essayId).filter(reviewSubmissionId::equals).isEmpty()) {
-            throw new IllegalArgumentException("the review was not asked for this essay");
-        }
 
-        // Reads first: nothing is written until every answer from Content and the catalog is in hand.
         LearningContentClient.Rubric rubric = content.getActiveRubric(essay.prompt().task());
         Map<String, UUID> pointByRubric = new LinkedHashMap<>();
         for (LearningContentClient.RubricCriterion criterion : rubric.criteria()) {
@@ -134,24 +144,55 @@ public class ApplyHumanReviewResultUseCase {
                 trapCatalog.trapKpByCode(), approved);
 
         // Criterion points must be in the learner's catalog. Trap points come from the local error-trap catalog, which is the
-        // authority for them (as for the AI's error evidence), and they are left out of the catalog check: the learner's
-        // catalog query does not list child points.
+        // authority for them (as for the AI's error evidence), and they are left out of the catalog check.
         Set<UUID> criterionPoints = new LinkedHashSet<>(outcome.correctByKnowledgePoint().keySet());
         Set<UUID> known = criterionPoints.isEmpty() ? Set.of() : access.knownKnowledgePoints(learnerId, criterionPoints);
-        Map<UUID, Boolean> judged = new LinkedHashMap<>();
-        outcome.correctByKnowledgePoint().forEach((kp, correct) -> {
-            if (known.contains(kp)) judged.put(kp, correct);
-        });
-        List<TrapOutcome> marked = outcome.traps();
         List<FailedWritingCriterion> failed = outcome.failedCriteria().stream()
                 .filter(f -> known.contains(f.knowledgePointId())).map(f -> f.fromSubmission(essayId)).toList();
+
+        BigDecimal overall = HumanReviewEvidenceRule.overallBand(marks);
+        BigDecimal passBand = essay.prompt().passBand();
+        boolean passed = passBand != null && overall != null && overall.compareTo(passBand) >= 0;
+
+        Map<UUID, Integer> availability = Map.of();
+        List<ErrorTrapReviews.PlannedTrap> trapPlan = List.of();
+        if (!essay.isFree()) {
+            availability = criterionReviews.availabilityOf(learnerId, failed);
+            trapPlan = errorTrapReviews.plan(learnerId, essay.lessonId(), outcome.traps().stream()
+                    .map(t -> new ErrorTrapReviews.MarkedErrorTrap(t.code(), t.trapKnowledgePointId(), t.count())).toList());
+        }
+        return new Reads(essay, outcome, known, failed, trapCatalog, knowledgePointDetails(), overall, passed,
+                availability, trapPlan);
+    }
+
+    /** The writes, under the learner's lock. Makes no Content call: everything it needs was read in {@link #readContent}. */
+    private void apply(HumanReviewResult result, Reads reads) {
+        UUID learnerId = result.learnerId();
+        UUID essayId = result.sourceSubmissionId();
+        UUID reviewSubmissionId = result.reviewSubmissionId();
+        lock.lock(learnerId);
+        if (outcomes.studyPointsOf(essayId).isPresent()) return;
+        if (requests.findReviewId(essayId).filter(reviewSubmissionId::equals).isEmpty()) {
+            throw new IllegalArgumentException("the review was not asked for this essay");
+        }
+
+        WritingSubmission essay = reads.essay();
+        Outcome outcome = reads.outcome();
+        Set<UUID> known = reads.known();
+        List<FailedWritingCriterion> failed = reads.failed();
+        List<TrapOutcome> marked = outcome.traps();
 
         if (essay.isFree()) {
             // Practice outside the course moves no mastery: the learner only reads what to study.
             outcomes.insertIfAbsent(reviewSubmissionId, learnerId, essayId,
-                    studyPoints(learnerId, rubric, marked, trapCatalog, failed).toString());
+                    studyPoints(learnerId, marked, reads, failed).toString(), reads.overallBand(), reads.passed());
             return;
         }
+
+        Map<UUID, Boolean> judged = new LinkedHashMap<>();
+        outcome.correctByKnowledgePoint().forEach((kp, correct) -> {
+            if (known.contains(kp)) judged.put(kp, correct);
+        });
 
         // The examiner's criterion result replaces the AI's for this essay, so one essay is not counted twice.
         List<UUID> aiReferences = aiReferences(essay, learnerId, judged.keySet());
@@ -182,13 +223,13 @@ public class ApplyHumanReviewResultUseCase {
                 .filter(known::contains).filter(point -> !failedPoints.contains(point)).toList());
 
         // Optional reviews: the marked errors first (the examiner has seen them), then the weakest criteria.
-        List<ErrorTrapReviews.MarkedErrorTrap> markedTraps = marked.stream()
-                .map(t -> new ErrorTrapReviews.MarkedErrorTrap(t.code(), t.trapKnowledgePointId(), t.count())).toList();
-        int trapReviews = errorTrapReviews.createForMarkedCodes(learnerId, essay.lessonId(), markedTraps, limit);
-        criterionReviews.create(learnerId, essay.lessonId(), failed, Math.max(0, limit - trapReviews));
+        int trapReviews = errorTrapReviews.createPlanned(learnerId, reads.trapPlan(), limit);
+        criterionReviews.createWithAvailability(learnerId, essay.lessonId(), failed, Math.max(0, limit - trapReviews),
+                reads.availability());
 
-        ArrayNode studyPoints = studyPoints(learnerId, rubric, marked, trapCatalog, failed);
-        outcomes.insertIfAbsent(reviewSubmissionId, learnerId, essayId, studyPoints.toString());
+        ArrayNode studyPoints = studyPoints(learnerId, marked, reads, failed);
+        outcomes.insertIfAbsent(reviewSubmissionId, learnerId, essayId, studyPoints.toString(), reads.overallBand(),
+                reads.passed());
     }
 
     /** The AI's criterion evidence for this essay: lesson essays by their own id, practice essays by the attempt's request. */
@@ -207,19 +248,19 @@ public class ApplyHumanReviewResultUseCase {
 
     /**
      * What the learner reads on the review: each marked error (its grammar point) and each weak criterion, with the review id
-     * when the point now has an optional review. Names come from Content; if Content cannot answer, the names are left out.
+     * when the point now has an optional review. Names come from Content read beforehand; if Content could not answer, the names
+     * are left out.
      */
-    private ArrayNode studyPoints(UUID learnerId, LearningContentClient.Rubric rubric, List<TrapOutcome> marked,
-                                  ErrorTrapCatalog.ErrorTraps trapCatalog, List<FailedWritingCriterion> failed) {
+    private ArrayNode studyPoints(UUID learnerId, List<TrapOutcome> marked, Reads reads, List<FailedWritingCriterion> failed) {
         Map<UUID, UUID> reviewByPoint = new HashMap<>();
         for (PendingReview pending : reviews.findPending(learnerId)) {
             reviewByPoint.putIfAbsent(pending.knowledgePointId(), pending.reviewId());
         }
-        Map<UUID, LearningContentClient.KnowledgePoint> details = knowledgePointDetails();
+        Map<UUID, LearningContentClient.KnowledgePoint> details = reads.details();
 
         ArrayNode points = json.createArrayNode();
         for (TrapOutcome trap : marked) {
-            UUID parent = trapCatalog.parentByTrapKp().get(trap.trapKnowledgePointId());
+            UUID parent = reads.trapCatalog().parentByTrapKp().get(trap.trapKnowledgePointId());
             if (parent == null) continue;
             ObjectNode point = json.createObjectNode().put("kind", "ERROR_CODE").put("errorCode", trap.code())
                     .put("count", trap.count());

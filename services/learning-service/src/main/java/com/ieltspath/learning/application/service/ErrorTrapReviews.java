@@ -161,6 +161,60 @@ public class ErrorTrapReviews {
     /** A trap point an examiner's marking counts against, with how often the examiner marked its error. */
     public record MarkedErrorTrap(String code, UUID trapKnowledgePointId, int count) { }
 
+    /** One marked trap read ahead of the lock: its parent point, the lesson to send the learner to, and whether it has sets. */
+    public record PlannedTrap(UUID trapKnowledgePointId, String code, UUID parent, UUID lessonId, boolean hasTrapSets) { }
+
+    /**
+     * Reads what the reviews of a marking need from Content, before the learner's lock and transaction. Creating them afterwards,
+     * with {@link #createPlanned}, makes no Content call.
+     */
+    public List<PlannedTrap> plan(UUID userId, UUID submissionLessonId, Collection<MarkedErrorTrap> marked) {
+        if (marked == null || marked.isEmpty()) return List.of();
+        ErrorTrapCatalog.ErrorTraps traps = catalog.load();
+        if (traps == null || traps.parentByTrapKp().isEmpty()) return List.of();
+        Set<UUID> excluded = new HashSet<>(attempts.revealedPackageIds(userId));
+        excluded.addAll(reviews.assignedPackageIds(userId));
+        List<UUID> excludedIds = excluded.stream().sorted(Comparator.comparing(UUID::toString)).toList();
+        List<PlannedTrap> planned = new ArrayList<>();
+        for (MarkedErrorTrap mark : marked) {
+            UUID parent = traps.parentByTrapKp().get(mark.trapKnowledgePointId());
+            if (parent == null) continue;
+            UUID lessonId = teachingSubmissionLesson(userId, submissionLessonId, parent);
+            boolean hasTrapSets = false;
+            if (lessonId != null) {
+                try {
+                    List<LearningContentClient.PracticeSet> candidates = content.searchPracticeSets(parent, excludedIds,
+                            MIN_SET_QUESTIONS, 1, lessonId, mark.code());
+                    hasTrapSets = candidates != null
+                            && candidates.stream().anyMatch(set -> set.trapQuestionCount() >= MIN_TRAP_QUESTIONS);
+                } catch (RuntimeException exception) {
+                    log.warn("Skipping marked error review: userId={}, errorCode={}, reason={}",
+                            userId, mark.code(), exception.getMessage());
+                }
+            }
+            planned.add(new PlannedTrap(mark.trapKnowledgePointId(), mark.code(), parent, lessonId, hasTrapSets));
+        }
+        return planned;
+    }
+
+    /** Creates the planned reviews under the learner's lock, from the planned data alone. Returns how many were created. */
+    public int createPlanned(UUID userId, Collection<PlannedTrap> planned, int maxReviews) {
+        if (maxReviews <= 0 || planned.isEmpty()) return 0;
+        Set<UUID> pendingKps = reviews.findPending(userId).stream()
+                .map(PendingReview::knowledgePointId).collect(Collectors.toSet());
+        int created = 0;
+        for (PlannedTrap trap : planned) {
+            if (created >= maxReviews) break;
+            if (!trap.hasTrapSets() || trap.lessonId() == null || pendingKps.contains(trap.parent())) continue;
+            LearningSkill skill = evidence.findMasteryHistories(userId, List.of(trap.parent())).stream()
+                    .map(history -> history.skill()).filter(java.util.Objects::nonNull).findFirst().orElse(null);
+            reviews.insertPending(userId, List.of(new ReviewCandidate(trap.parent(), trap.lessonId(), skill)), false, "ERROR_PATTERN");
+            pendingKps.add(trap.parent());
+            created++;
+        }
+        return created;
+    }
+
     private UUID teachingSubmissionLesson(UUID userId, UUID submissionLessonId, UUID parent) {
         if (submissionLessonId != null) {
             try {

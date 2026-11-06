@@ -1,5 +1,8 @@
 package com.ieltspath.learning.application.service;
 
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.verifyNoInteractions;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.service.ErrorTrapCatalog.ErrorTraps;
 import com.ieltspath.learning.domain.aggregate.MasteryProfile;
@@ -184,5 +187,64 @@ class ErrorTrapReviewsTest {
 
     private PendingReview pending(UUID kp) {
         return new PendingReview(UUID.randomUUID(), lesson, kp, null, true, "PRACTICE");
+    }
+
+    @Test
+    void planReadsTheSetsOfTheParentBeforeAnyLock() {
+        var planned = subject.plan(user, lesson, List.of(new ErrorTrapReviews.MarkedErrorTrap("TFNG_NG_AS_FALSE", trap, 2)));
+
+        assertEquals(List.of(new ErrorTrapReviews.PlannedTrap(trap, "TFNG_NG_AS_FALSE", parent, lesson, true)), planned);
+        verify(content).searchPracticeSets(eq(parent), anyList(), eq(3), eq(1), eq(lesson), eq("TFNG_NG_AS_FALSE"));
+    }
+
+    @Test
+    void aParentWithOnlyOneTrapQuestionIsPlannedWithoutSets() {
+        when(content.searchPracticeSets(eq(parent), anyList(), eq(3), eq(1), eq(lesson), eq("TFNG_NG_AS_FALSE")))
+                .thenReturn(List.of(new LearningContentClient.PracticeSet(UUID.randomUUID(), UUID.randomUUID(),
+                        "ONE_TRAP", 3, 3, null, null, 1)));
+
+        var planned = subject.plan(user, lesson, List.of(new ErrorTrapReviews.MarkedErrorTrap("TFNG_NG_AS_FALSE", trap, 1)));
+
+        assertEquals(false, planned.get(0).hasTrapSets());
+    }
+
+    @Test
+    void aMarkedTrapWithNoLessonIsPlannedWithoutSearching() {
+        when(lessonLocator.teaching(user, parent)).thenReturn(Optional.empty());
+
+        var planned = subject.plan(user, null, List.of(new ErrorTrapReviews.MarkedErrorTrap("TFNG_NG_AS_FALSE", trap, 1)));
+
+        assertEquals(null, planned.get(0).lessonId());
+        verify(content, never()).searchPracticeSets(any(), anyList(), anyInt(), anyInt(), any(), any());
+    }
+
+    @Test
+    void createPlannedMakesNoContentCallAndCreatesTheOptionalReview() {
+        var planned = List.of(new ErrorTrapReviews.PlannedTrap(trap, "TFNG_NG_AS_FALSE", parent, lesson, true));
+
+        assertEquals(1, subject.createPlanned(user, planned, 1));
+
+        verifyNoInteractions(content);
+        verify(reviews).insertPending(eq(user), eq(List.of(new ReviewCandidate(parent, lesson, null))), eq(false), eq("ERROR_PATTERN"));
+    }
+
+    @Test
+    void createPlannedSkipsAParentWithAPendingReviewAndHonoursTheLimit() {
+        when(reviews.findPending(user)).thenReturn(List.of(new PendingReview(UUID.randomUUID(), lesson, parent, null, false,
+                "ERROR_PATTERN")));
+        var planned = List.of(new ErrorTrapReviews.PlannedTrap(trap, "TFNG_NG_AS_FALSE", parent, lesson, true));
+
+        assertEquals(0, subject.createPlanned(user, planned, 1));
+        verify(reviews, never()).insertPending(any(), anyList(), anyBoolean(), anyString());
+    }
+
+    @Test
+    void createPlannedWritesNothingWithoutTrapSetsOrALesson() {
+        var planned = List.of(
+                new ErrorTrapReviews.PlannedTrap(trap, "TFNG_NG_AS_FALSE", parent, lesson, false),
+                new ErrorTrapReviews.PlannedTrap(trap, "TFNG_NG_AS_FALSE", parent, null, true));
+
+        assertEquals(0, subject.createPlanned(user, planned, 2));
+        verify(reviews, never()).insertPending(any(), anyList(), anyBoolean(), anyString());
     }
 }

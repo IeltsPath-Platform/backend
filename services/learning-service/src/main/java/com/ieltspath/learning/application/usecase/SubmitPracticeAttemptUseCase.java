@@ -33,6 +33,7 @@ import com.ieltspath.learning.domain.aggregate.SpeakingSubmission;
 import com.ieltspath.learning.domain.aggregate.WritingSubmission;
 import com.ieltspath.learning.domain.repository.SpeakingSubmissionRepository;
 import com.ieltspath.learning.domain.vo.SpeakingSubmissionStatus;
+import com.ieltspath.learning.domain.repository.HumanReviewOutcomeRepository;
 import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
 import com.ieltspath.learning.domain.repository.PracticeAttemptRepository;
 import com.ieltspath.learning.domain.repository.ReviewItemRepository;
@@ -62,6 +63,7 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -86,6 +88,7 @@ public class SubmitPracticeAttemptUseCase {
     private final ErrorTrapEvidence errorTrapEvidence;
     private final SpeakingSubmissionRepository speaking;
     private final SpeakingPracticeSettings speakingSettings;
+    private final HumanReviewOutcomeRepository outcomes;
     private final ItemGrading grading = new ItemGrading();
     private final LessonHintPolicy hints = new LessonHintPolicy();
     private final PracticeReviewRule reviewRule = new PracticeReviewRule();
@@ -102,7 +105,8 @@ public class SubmitPracticeAttemptUseCase {
                                         FreePracticeSubmission freePractice, GamificationRecorder gamificationRecorder,
                                         HeartsService hearts, WritingCriterionReviews criterionReviews,
                                         ErrorTrapEvidence errorTrapEvidence, SpeakingSubmissionRepository speaking,
-                                        SpeakingPracticeSettings speakingSettings) {
+                                        SpeakingPracticeSettings speakingSettings,
+                                        HumanReviewOutcomeRepository outcomes) {
         this.lock = lock;
         this.access = access;
         this.content = content;
@@ -121,6 +125,7 @@ public class SubmitPracticeAttemptUseCase {
         this.errorTrapEvidence = errorTrapEvidence;
         this.speaking = speaking;
         this.speakingSettings = speakingSettings;
+        this.outcomes = outcomes;
     }
 
     /** Wrong objective answers; essay and recorded items are graded by someone else and never cost a heart. */
@@ -146,9 +151,9 @@ public class SubmitPracticeAttemptUseCase {
         if (attempt.origin() == PracticeOrigin.FREE) return freePractice.submit(userId, attempt, command);
         var lesson = access.require(userId, attempt.lessonId());
         var version = content.getPackageVersion(attempt.packageVersionId());
-        Map<UUID, WritingSubmission> essaysByQuestion = gradedEssays(userId, attempt, version);
+        Map<UUID, GradedEssay> essaysByQuestion = gradedEssays(userId, attempt, version);
         Map<UUID, Boolean> essayPassed = new HashMap<>();
-        essaysByQuestion.forEach((question, essay) -> essayPassed.put(question, Boolean.TRUE.equals(essay.passed())));
+        essaysByQuestion.forEach((question, essay) -> essayPassed.put(question, essay.passed()));
         Map<UUID, SpeakingSubmission> recordedByQuestion = gradedRecordings(userId, attempt, version);
         Map<UUID, Item> itemsByQuestion = new HashMap<>();
         ItemGrading.orderedItems(version).forEach(item -> itemsByQuestion.put(item.questionVersionId(), item));
@@ -188,11 +193,16 @@ public class SubmitPracticeAttemptUseCase {
                 outcomesBySkill.computeIfAbsent(itemSkill, ignored -> new ArrayList<>()).add(outcome);
             }
             itemKps.addAll(kps);
-            WritingSubmission essay = essaysByQuestion.get(item.questionVersionId());
+            GradedEssay essayGrade = essaysByQuestion.get(item.questionVersionId());
+            WritingSubmission essay = essayGrade == null ? null : essayGrade.submission();
             Map<UUID, Boolean> evidenceByKp = new LinkedHashMap<>();
             Set<UUID> spokenTraps = Set.of();
             String errorCode = graded.errorCodes().get(index);
-            if (essay != null) {
+            if (essayGrade != null && essayGrade.byExaminer()) {
+                // The examiner's criterion evidence and reviews were written when the examiner graded the essay. Here only the
+                // question's own points count, on the examiner's pass.
+                for (UUID kp : kps) evidenceByKp.put(kp, grade.correct());
+            } else if (essay != null) {
                 var essayOutcome = writingEvidence.derive(kps, essay.prompt().passBand(), grade.correct(), essay.grade());
                 evidenceByKp.putAll(essayOutcome.correctByKnowledgePoint());
                 criterionOnly.addAll(essayOutcome.criterionKnowledgePoints());
@@ -305,21 +315,32 @@ public class SubmitPracticeAttemptUseCase {
         return response;
     }
 
+    /** An essay the attempt counts: its submission, whether it passed, and whether an examiner (not the AI) graded it. */
+    private record GradedEssay(WritingSubmission submission, boolean passed, boolean byExaminer) { }
+
     /**
-     * The newest submission of each essay of the set, keyed by question; every essay must be GRADED first.
+     * The newest submission of each essay of the set, keyed by question. An essay is ready when the AI has graded it, or when an
+     * examiner has graded it (its result is applied). Otherwise the learner is asked to wait.
      */
-    private Map<UUID, WritingSubmission> gradedEssays(UUID userId, PracticeAttempt attempt, PackageVersion version) {
+    private Map<UUID, GradedEssay> gradedEssays(UUID userId, PracticeAttempt attempt, PackageVersion version) {
         var essayItems = ItemGrading.orderedItems(version).stream().filter(ItemGrading::isEssay).toList();
         if (essayItems.isEmpty()) return Map.of();
         var latest = essays.latestForPractice(userId, attempt.id());
-        Map<UUID, WritingSubmission> graded = new HashMap<>();
+        Map<UUID, GradedEssay> graded = new HashMap<>();
         for (var item : essayItems) {
             var submission = latest.get(item.questionVersionId());
-            if (submission == null || submission.status() != WritingSubmissionStatus.GRADED) {
+            if (submission != null && submission.status() == WritingSubmissionStatus.GRADED) {
+                graded.put(item.questionVersionId(), new GradedEssay(submission, Boolean.TRUE.equals(submission.passed()), false));
+                continue;
+            }
+            var examiner = submission == null || submission.status() != WritingSubmissionStatus.AWAITING_EXAMINER
+                    ? Optional.<HumanReviewOutcomeRepository.ExaminerResult>empty()
+                    : outcomes.resultOf(submission.id());
+            if (examiner.isEmpty()) {
                 throw new LearningRequestException(409, "ESSAY_NOT_GRADED",
                         "Submit every essay of the set and wait for its grade first");
             }
-            graded.put(item.questionVersionId(), submission);
+            graded.put(item.questionVersionId(), new GradedEssay(submission, examiner.get().passed(), true));
         }
         return graded;
     }

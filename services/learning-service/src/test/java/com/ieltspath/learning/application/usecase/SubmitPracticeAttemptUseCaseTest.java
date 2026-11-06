@@ -45,7 +45,8 @@ class SubmitPracticeAttemptUseCaseTest {
     private final SubmitPracticeAttemptUseCase useCase = new SubmitPracticeAttemptUseCase(lock, access, content,
             attempts, reviews, evidence, progress, mistakes, essays, events, mastery, freePractice, gamification,
             hearts, criterionReviews, errorTrapEvidence, speaking,
-            com.ieltspath.learning.application.service.SpeakingSettingsFixture.enabled());
+            com.ieltspath.learning.application.service.SpeakingSettingsFixture.enabled(),
+            mock(com.ieltspath.learning.domain.repository.HumanReviewOutcomeRepository.class));
     private final UUID userId = UUID.randomUUID(), lessonId = UUID.randomUUID(), attemptId = UUID.randomUUID();
     private final UUID packageId = UUID.randomUUID(), versionId = UUID.randomUUID(), essayId = UUID.randomUUID();
     private final UUID ta = UUID.randomUUID(), cc = UUID.randomUUID(), lr = UUID.randomUUID(), gra = UUID.randomUUID();

@@ -52,6 +52,31 @@ public class WritingCriterionReviews {
     }
 
     /** As {@link #create(UUID, UUID, Collection)} with at most {@code maxReviews} new reviews, for callers that share a cap. */
+    /**
+     * The practice sets still unseen for the points of these weak criteria. Read before the learner's lock and transaction, as
+     * {@link #createWithAvailability} needs it: a Content call never runs under the lock.
+     */
+    public Map<UUID, Integer> availabilityOf(UUID userId, Collection<FailedWritingCriterion> failedCriteria) {
+        if (failedCriteria.isEmpty()) return Map.of();
+        List<UUID> pointIds = failedCriteria.stream().map(FailedWritingCriterion::knowledgePointId)
+                .distinct().sorted(Comparator.comparing(UUID::toString)).toList();
+        Set<UUID> excluded = new HashSet<>(attempts.revealedPackageIds(userId));
+        excluded.addAll(reviews.assignedPackageIds(userId));
+        Map<UUID, Integer> available = content.practiceSetAvailability(pointIds,
+                excluded.stream().sorted(Comparator.comparing(UUID::toString)).toList(), MIN_SET_QUESTIONS);
+        return available == null ? Map.of() : available;
+    }
+
+    /** As {@link #create(UUID, UUID, Collection, int)} with the availability read by {@link #availabilityOf}; no Content call. */
+    public void createWithAvailability(UUID userId, UUID lessonId, Collection<FailedWritingCriterion> failedCriteria,
+                                       int maxReviews, Map<UUID, Integer> available) {
+        if (lessonId == null || maxReviews <= 0 || failedCriteria.isEmpty()) return;
+        Set<UUID> pending = reviews.findPending(userId).stream().map(review -> review.knowledgePointId())
+                .collect(Collectors.toSet());
+        List<FailedWritingCriterion> selected = rule.select(failedCriteria, pending, available, maxReviews);
+        reviews.insertCriterionPending(userId, lessonId, LearningSkill.WRITING, WRITING_TRIGGER, selected);
+    }
+
     public void create(UUID userId, UUID lessonId, Collection<FailedWritingCriterion> failedCriteria, int maxReviews) {
         create(userId, lessonId, failedCriteria, maxReviews, LearningSkill.WRITING, WRITING_TRIGGER);
     }

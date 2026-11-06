@@ -24,6 +24,7 @@ import com.ieltspath.learning.domain.vo.FailedWritingCriterion;
 import com.ieltspath.learning.domain.vo.KnowledgeEvidence;
 import com.ieltspath.learning.domain.vo.PendingReview;
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -42,11 +43,16 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -87,7 +93,7 @@ class ApplyHumanReviewResultUseCaseTest {
         outcomes = mock(HumanReviewOutcomeRepository.class);
         json = new ObjectMapper();
         useCase = new ApplyHumanReviewResultUseCase(lock, essays, requests, attempts, content, traps, access, evidence,
-                profiles, errorTrapReviews, criterionReviews, reviews, outcomes, json, 2);
+                profiles, errorTrapReviews, criterionReviews, reviews, outcomes, json, mock(PlatformTransactionManager.class), 2);
 
         WritingSubmission essay = WritingSubmission.start(ESSAY, LEARNER, LESSON, BLOCK, UUID.randomUUID(),
                 "A learner essay of sixty words or so.", 60, prompt(), 3, Instant.parse("2026-11-05T00:00:00Z"));
@@ -153,13 +159,14 @@ class ApplyHumanReviewResultUseCaseTest {
         verify(profiles).rebuild(eq(LEARNER), any(Collection.class));
 
         ArgumentCaptor<Collection<ErrorTrapReviews.MarkedErrorTrap>> marked = captorOf(Collection.class);
-        verify(errorTrapReviews).createForMarkedCodes(eq(LEARNER), eq(LESSON), marked.capture(), eq(2));
+        verify(errorTrapReviews).plan(eq(LEARNER), eq(LESSON), marked.capture());
         assertEquals(List.of(new ErrorTrapReviews.MarkedErrorTrap("LINKER_MISUSE", TRAP_LINKER, 2)), List.copyOf(marked.getValue()));
-        verify(criterionReviews).create(eq(LEARNER), eq(LESSON),
-                eq(List.of(new FailedWritingCriterion(CC, "DEMO_WRITING_CRITERION_CC", new BigDecimal("5.0"), ESSAY))), eq(2));
+        verify(criterionReviews).createWithAvailability(eq(LEARNER), eq(LESSON),
+                eq(List.of(new FailedWritingCriterion(CC, "DEMO_WRITING_CRITERION_CC", new BigDecimal("5.0"), ESSAY))), eq(2),
+                any());
 
         ArgumentCaptor<String> stored = captorOf(String.class);
-        verify(outcomes).insertIfAbsent(eq(REVIEW), eq(LEARNER), eq(ESSAY), stored.capture());
+        verify(outcomes).insertIfAbsent(eq(REVIEW), eq(LEARNER), eq(ESSAY), stored.capture(), any(), anyBoolean());
         JsonNode points = json.readTree(stored.getValue());
         assertEquals("ERROR_CODE", points.get(0).get("kind").asText());
         assertEquals(2, points.get(0).get("count").asInt());
@@ -172,12 +179,12 @@ class ApplyHumanReviewResultUseCaseTest {
     @Test
     void theErrorReviewsTakeTheSharedLimitSoCriterionReviewsGetTheRest() {
         when(evidence.removeWritingEvidence(eq(LEARNER), anyCollection())).thenReturn(Set.of());
-        when(errorTrapReviews.createForMarkedCodes(eq(LEARNER), eq(LESSON), anyCollection(), eq(2))).thenReturn(1);
+        when(errorTrapReviews.createPlanned(eq(LEARNER), anyCollection(), eq(2))).thenReturn(1);
 
         useCase.execute(result(List.of(new HumanReviewResult.Criterion("coherence", new BigDecimal("5.0"))),
                 List.of(new HumanReviewResult.ErrorCount("LINKER_MISUSE", 1))));
 
-        verify(criterionReviews).create(eq(LEARNER), eq(LESSON), any(Collection.class), eq(1));
+        verify(criterionReviews).createWithAvailability(eq(LEARNER), eq(LESSON), any(Collection.class), eq(1), any());
     }
 
     @Test
@@ -192,11 +199,12 @@ class ApplyHumanReviewResultUseCaseTest {
         verify(evidence, never()).removeWritingEvidence(any(), anyCollection());
         verify(evidence, never()).append(any(), anyList());
         verify(profiles, never()).rebuild(any(), any(Collection.class));
-        verify(errorTrapReviews, never()).createForMarkedCodes(any(), any(), anyCollection(), org.mockito.ArgumentMatchers.anyInt());
-        verify(criterionReviews, never()).create(any(), any(), anyCollection(), org.mockito.ArgumentMatchers.anyInt());
+        verify(errorTrapReviews, never()).plan(any(), any(), anyCollection());
+        verify(errorTrapReviews, never()).createPlanned(any(), anyCollection(), anyInt());
+        verify(criterionReviews, never()).createWithAvailability(any(), any(), anyCollection(), anyInt(), any());
 
         ArgumentCaptor<String> stored = captorOf(String.class);
-        verify(outcomes).insertIfAbsent(eq(REVIEW), eq(LEARNER), eq(ESSAY), stored.capture());
+        verify(outcomes).insertIfAbsent(eq(REVIEW), eq(LEARNER), eq(ESSAY), stored.capture(), any(), anyBoolean());
         JsonNode points = json.readTree(stored.getValue());
         assertEquals("ERROR_CODE", points.get(0).get("kind").asText());
         assertEquals(2, points.get(0).get("count").asInt());
@@ -211,10 +219,14 @@ class ApplyHumanReviewResultUseCaseTest {
         useCase.execute(result(List.of(new HumanReviewResult.Criterion("coherence", new BigDecimal("5.0"))),
                 List.of(new HumanReviewResult.ErrorCount("LINKER_MISUSE", 1))));
 
+        verify(content, never()).getActiveRubric(any());
+        verify(lock, never()).lock(any());
+
         verify(evidence, never()).removeWritingEvidence(any(), anyCollection());
         verify(evidence, never()).append(any(), anyList());
-        verify(errorTrapReviews, never()).createForMarkedCodes(any(), any(), anyCollection(), org.mockito.ArgumentMatchers.anyInt());
-        verify(outcomes, never()).insertIfAbsent(any(), any(), any(), any());
+        verify(errorTrapReviews, never()).plan(any(), any(), anyCollection());
+        verify(errorTrapReviews, never()).createPlanned(any(), anyCollection(), anyInt());
+        verify(outcomes, never()).insertIfAbsent(any(), any(), any(), any(), any(), anyBoolean());
     }
 
     @Test
@@ -230,7 +242,7 @@ class ApplyHumanReviewResultUseCaseTest {
                 KnowledgeEvidence.of(TRAP_LINKER, false, EvidenceSource.ERROR_TRAP,
                         LessonEvidenceReference.forHumanReview(REVIEW, TRAP_LINKER)))));
         ArgumentCaptor<String> stored = captorOf(String.class);
-        verify(outcomes).insertIfAbsent(eq(REVIEW), eq(LEARNER), eq(ESSAY), stored.capture());
+        verify(outcomes).insertIfAbsent(eq(REVIEW), eq(LEARNER), eq(ESSAY), stored.capture(), any(), anyBoolean());
         assertFalse(stored.getValue().contains("ERROR_CODE"));
     }
 
@@ -242,9 +254,10 @@ class ApplyHumanReviewResultUseCaseTest {
                 List.of(new HumanReviewResult.Criterion("coherence", new BigDecimal("5.0"))),
                 List.of(new HumanReviewResult.ErrorCount("LINKER_MISUSE", 1)))));
 
+        verify(lock, never()).lock(any());
         verify(evidence, never()).removeWritingEvidence(any(), anyCollection());
         verify(evidence, never()).append(any(), anyList());
-        verify(outcomes, never()).insertIfAbsent(any(), any(), any(), any());
+        verify(outcomes, never()).insertIfAbsent(any(), any(), any(), any(), any(), anyBoolean());
     }
 
     @Test
@@ -277,7 +290,7 @@ class ApplyHumanReviewResultUseCaseTest {
         useCase.execute(result(List.of(), List.of(new HumanReviewResult.ErrorCount("LINKER_MISUSE", 1))));
 
         ArgumentCaptor<String> stored = captorOf(String.class);
-        verify(outcomes).insertIfAbsent(eq(REVIEW), eq(LEARNER), eq(ESSAY), stored.capture());
+        verify(outcomes).insertIfAbsent(eq(REVIEW), eq(LEARNER), eq(ESSAY), stored.capture(), any(), anyBoolean());
         JsonNode point = json.readTree(stored.getValue()).get(0);
         assertEquals(PARENT_LINKER.toString(), point.get("knowledgePointId").asText());
         assertEquals("DEMO_WRITING_LINKING", point.get("code").asText());
@@ -304,5 +317,34 @@ class ApplyHumanReviewResultUseCaseTest {
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static <T> ArgumentCaptor<T> captorOf(Class<?> type) {
         return (ArgumentCaptor) ArgumentCaptor.forClass(type);
+    }
+
+    @Test
+    void everyContentReadHappensBeforeTheLearnerIsLocked() {
+        useCase.execute(result(List.of(new HumanReviewResult.Criterion("coherence", new BigDecimal("5.0"))),
+                List.of(new HumanReviewResult.ErrorCount("LINKER_MISUSE", 1))));
+
+        var order = inOrder(content, lock);
+        order.verify(content).getActiveRubric("TASK_2");
+        order.verify(content).activeErrorTypes();
+        order.verify(lock).lock(LEARNER);
+    }
+
+    @Test
+    void theExaminersOverallBandAndPassAreKeptWithTheReview() {
+        useCase.execute(result(List.of(new HumanReviewResult.Criterion("coherence", new BigDecimal("5.0")),
+                new HumanReviewResult.Criterion("taskResponse", new BigDecimal("6.5"))), List.of()));
+
+        verify(outcomes).insertIfAbsent(eq(REVIEW), eq(LEARNER), eq(ESSAY), anyString(),
+                eq(new BigDecimal("6.0")), eq(true));
+    }
+
+    @Test
+    void aMeanBelowThePassBandIsRecordedAsNotPassed() {
+        useCase.execute(result(List.of(new HumanReviewResult.Criterion("coherence", new BigDecimal("5.0")),
+                new HumanReviewResult.Criterion("taskResponse", new BigDecimal("5.0"))), List.of()));
+
+        verify(outcomes).insertIfAbsent(eq(REVIEW), eq(LEARNER), eq(ESSAY), anyString(),
+                eq(new BigDecimal("5.0")), eq(false));
     }
 }

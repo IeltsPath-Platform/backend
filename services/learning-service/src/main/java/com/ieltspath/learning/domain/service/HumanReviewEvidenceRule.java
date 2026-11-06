@@ -3,12 +3,14 @@ package com.ieltspath.learning.domain.service;
 import com.ieltspath.learning.domain.vo.FailedWritingCriterion;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -21,6 +23,19 @@ import java.util.UUID;
 public final class HumanReviewEvidenceRule {
     /** One criterion band, named as the examiner named it ({@code taskResponse}, {@code coherence}, {@code lexical}, {@code grammar}). */
     public record Mark(String criterion, BigDecimal band) { }
+
+    /**
+     * The examiner's overall band: the mean of the criterion bands rounded to the nearest half band, a quarter or three quarters
+     * rounding up, the same rule as a Speaking test. Null when no criterion has a band.
+     */
+    public static BigDecimal overallBand(Collection<Mark> marks) {
+        List<BigDecimal> bands = marks.stream().map(Mark::band).filter(Objects::nonNull).toList();
+        if (bands.isEmpty()) return null;
+        BigDecimal sum = bands.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal mean = sum.divide(BigDecimal.valueOf(bands.size()), 3, RoundingMode.HALF_UP);
+        return mean.multiply(BigDecimal.valueOf(2)).setScale(0, RoundingMode.HALF_UP)
+                .divide(BigDecimal.valueOf(2), 1, RoundingMode.HALF_UP);
+    }
 
     /** An error code and how often the examiner marked it; at least 1. */
     public record ErrorMark(String code, int count) { }

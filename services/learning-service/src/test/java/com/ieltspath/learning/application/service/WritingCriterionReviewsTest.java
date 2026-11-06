@@ -1,5 +1,7 @@
 package com.ieltspath.learning.application.service;
 
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.times;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.domain.repository.PracticeAttemptRepository;
 import com.ieltspath.learning.domain.repository.ReviewItemRepository;
@@ -8,6 +10,7 @@ import com.ieltspath.learning.domain.vo.FailedWritingCriterion;
 import com.ieltspath.learning.domain.vo.LearningSkill;
 import com.ieltspath.learning.domain.vo.PendingReview;
 import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -123,5 +126,34 @@ class WritingCriterionReviewsTest {
 
     private static FailedWritingCriterion failed(UUID kp, String code, String band) {
         return new FailedWritingCriterion(kp, code, new BigDecimal(band));
+    }
+
+    @Test void availabilityIsReadOnceBeforeTheLockAndCreationMakesNoContentCall() {
+        UUID lr = UUID.randomUUID(), gra = UUID.randomUUID();
+        when(attempts.revealedPackageIds(userId)).thenReturn(Set.of());
+        when(reviews.assignedPackageIds(userId)).thenReturn(List.of());
+        when(content.practiceSetAvailability(anyList(), anyList(), eq(3))).thenReturn(Map.of(lr, 3, gra, 3));
+        var available = service.availabilityOf(userId, List.of(failed(lr, "LR", "5.0"), failed(gra, "GRA", "4.5")));
+        verify(content, times(1)).practiceSetAvailability(anyList(), anyList(), eq(3));
+
+        service.createWithAvailability(userId, lessonId, List.of(failed(lr, "LR", "5.0"), failed(gra, "GRA", "4.5")), 1, available);
+
+        verify(content, times(1)).practiceSetAvailability(anyList(), anyList(), eq(3));
+        verify(reviews).insertCriterionPending(userId, lessonId, LearningSkill.WRITING, "WRITING_CRITERION",
+                List.of(failed(gra, "GRA", "4.5")));
+    }
+
+    @Test void aCriterionWithNoUnseenSetIsNotSelectedWhenAvailabilityIsKnown() {
+        UUID kp = UUID.randomUUID();
+        when(reviews.findPending(userId)).thenReturn(List.of());
+
+        service.createWithAvailability(userId, lessonId, List.of(failed(kp, "LR", "4.0")), 2, Map.of(kp, 0));
+
+        verify(reviews).insertCriterionPending(userId, lessonId, LearningSkill.WRITING, "WRITING_CRITERION", List.of());
+    }
+
+    @Test void noAvailabilityIsReadWhenNothingFailed() {
+        assertEquals(Map.of(), service.availabilityOf(userId, List.of()));
+        verifyNoInteractions(content);
     }
 }

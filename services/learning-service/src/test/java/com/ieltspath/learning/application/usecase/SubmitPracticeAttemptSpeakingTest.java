@@ -82,7 +82,8 @@ class SubmitPracticeAttemptSpeakingTest {
             attempts, reviews, evidence, progress, mock(FirstAttemptMistakes.class),
             mock(WritingSubmissionRepository.class), mock(QuestionEventLog.class), mastery,
             mock(FreePracticeSubmission.class), gamification, hearts, criterionReviews,
-            errorTraps, speaking, SpeakingSettingsFixture.enabled());
+            errorTraps, speaking, SpeakingSettingsFixture.enabled(),
+            mock(com.ieltspath.learning.domain.repository.HumanReviewOutcomeRepository.class));
 
     private final UUID userId = UUID.randomUUID(), lessonId = UUID.randomUUID(), attemptId = UUID.randomUUID();
     private final UUID packageId = UUID.randomUUID(), versionId = UUID.randomUUID(), questionId = UUID.randomUUID();
