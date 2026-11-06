@@ -104,5 +104,36 @@ class AllowedMediaPolicyTest {
                 () -> policy.validate(authorId, null, url));
         assertEquals("Media URL must use HTTPS and an allowed host", ex.getMessage());
     }
-}
 
+    @Test
+    void rejectsAStorageUrlThatUsesDotDotToReachAnotherUsersFolder() {
+        UUID authorId = UUID.randomUUID();
+        UUID otherUser = UUID.randomUUID();
+        String url = SUPABASE_URL + "/storage/v1/object/public/" + BUCKET + "/community/post/" + authorId
+                + "/../" + otherUser + "/photo.jpg";
+        CommunityException ex = assertThrows(CommunityException.class,
+                () -> policy.validate(authorId, List.of(url), null));
+        assertEquals("Image does not belong to the author", ex.getMessage());
+    }
+
+    @Test
+    void rejectsAUrlOf501CharactersAndAcceptsOneOf500() {
+        UUID authorId = UUID.randomUUID();
+        String base = "https://images.unsplash.com/";
+        String at500 = base + "a".repeat(500 - base.length());
+        String at501 = base + "a".repeat(501 - base.length());
+        assertDoesNotThrow(() -> policy.validate(authorId, List.of(at500), null));
+        CommunityException ex = assertThrows(CommunityException.class,
+                () -> policy.validate(authorId, List.of(at501), null));
+        assertEquals("Media URL must use HTTPS and an allowed host", ex.getMessage());
+    }
+
+    @Test
+    void rejectsAUrlWithUserInfoOrANonStandardPort() {
+        UUID authorId = UUID.randomUUID();
+        assertThrows(CommunityException.class,
+                () -> policy.validate(authorId, List.of("https://user@images.unsplash.com/a.png"), null));
+        assertThrows(CommunityException.class,
+                () -> policy.validate(authorId, List.of("https://images.unsplash.com:8443/a.png"), null));
+    }
+}
