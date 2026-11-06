@@ -22,6 +22,11 @@ final class GatewayRequestHeaders {
         return Optional.empty();
     }
 
+    /** True while no HTTP request is being served: a message consumer or a scheduled job. */
+    static boolean outsideRequest() {
+        return RequestContextHolder.getRequestAttributes() == null;
+    }
+
     /** The caller's id when it is short printable ASCII, otherwise a fresh one. */
     static String correlationId() {
         if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes) {

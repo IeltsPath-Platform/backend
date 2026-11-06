@@ -567,6 +567,33 @@ class RestLearningContentClientTest {
     }
 
     @Test
+    void anEventConsumerWithNoRequestCallsContentWithTheWorkerToken() {
+        SecurityContextHolder.clearContext();
+        RequestContextHolder.resetRequestAttributes();
+        RestClient.Builder builder = RestClient.builder().baseUrl(BASE_URL);
+        MockRestServiceServer workerServer = MockRestServiceServer.bindTo(builder).build();
+        var workerClient = new RestLearningContentClient(builder.build(), () -> java.util.Optional.of("worker-token"));
+        workerServer.expect(requestTo(INTERNAL_PATH + "/topic-sequence"))
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer worker-token"))
+                .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
+
+        assertEquals(0, workerClient.getTopicSequence().size());
+        workerServer.verify();
+    }
+
+    @Test
+    void aRequestWithoutAVerifiedJwtNeverFallsBackToTheWorkerToken() {
+        SecurityContextHolder.clearContext();
+        requestWithCorrelation("a-request");
+        var workerClient = new RestLearningContentClient(RestClient.builder().baseUrl(BASE_URL).build(),
+                () -> java.util.Optional.of("worker-token"));
+
+        var exception = assertThrows(LearningRequestException.class, workerClient::getTopicSequence);
+
+        assertEquals(401, exception.getStatus());
+    }
+
+    @Test
     void rejectsRawRequestBearerWithoutVerifiedJwt() {
         SecurityContextHolder.clearContext();
         requestWithCorrelation("raw-request").addHeader(HttpHeaders.AUTHORIZATION, "Bearer raw-request-token");

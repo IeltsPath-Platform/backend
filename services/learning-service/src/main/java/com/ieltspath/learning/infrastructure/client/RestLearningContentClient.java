@@ -34,20 +34,24 @@ public class RestLearningContentClient implements LearningContentClient {
     private static final String INTERNAL_PATH = "/internal/learning-content";
     private final RestClient restClient;
     private final ResilientCall resilientCall;
+    /** The token for a call made outside any request (an event consumer); empty when there is none to offer. */
+    private final java.util.function.Supplier<java.util.Optional<String>> workerToken;
 
     @Autowired
     public RestLearningContentClient(RestClient.Builder builder,
                                      @Value("${learning.content.base-url:http://localhost:8082}") String contentBaseUrl,
-                                     ResilientCall resilientCall) {
+                                     ResilientCall resilientCall, LearningWorkerTokenProvider workerTokens) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(Duration.ofSeconds(2));
         requestFactory.setReadTimeout(Duration.ofSeconds(5));
         restClient = builder.requestFactory(requestFactory).baseUrl(contentBaseUrl).build();
         this.resilientCall = resilientCall;
+        this.workerToken = () -> java.util.Optional.of(workerTokens.token());
     }
 
     RestLearningContentClient(RestClient restClient) {
         this.restClient = restClient;
+        this.workerToken = java.util.Optional::empty;
         RetryConfig retryConfig = RetryConfig.custom().maxAttempts(2).waitDuration(Duration.ofMillis(1))
                 .retryOnException(ResilientCall::isTransientFailure).build();
         this.resilientCall = new ResilientCall(CircuitBreakerRegistry.ofDefaults(),
@@ -57,6 +61,20 @@ public class RestLearningContentClient implements LearningContentClient {
     RestLearningContentClient(RestClient restClient, ResilientCall resilientCall) {
         this.restClient = restClient;
         this.resilientCall = resilientCall;
+        this.workerToken = java.util.Optional::empty;
+    }
+
+    RestLearningContentClient(RestClient restClient, java.util.function.Supplier<java.util.Optional<String>> workerToken) {
+        this(restClient, new ResilientCall(CircuitBreakerRegistry.ofDefaults(),
+                RetryRegistry.of(RetryConfig.custom().maxAttempts(2).waitDuration(Duration.ofMillis(1))
+                        .retryOnException(ResilientCall::isTransientFailure).build()), BulkheadRegistry.ofDefaults()), workerToken);
+    }
+
+    private RestLearningContentClient(RestClient restClient, ResilientCall resilientCall,
+                                      java.util.function.Supplier<java.util.Optional<String>> workerToken) {
+        this.restClient = restClient;
+        this.resilientCall = resilientCall;
+        this.workerToken = workerToken;
     }
 
     @Override
@@ -273,8 +291,11 @@ public class RestLearningContentClient implements LearningContentClient {
     }
 
     private void forwardRequestHeaders(HttpHeaders headers) {
-        headers.setBearerAuth(GatewayRequestHeaders.bearerToken().orElseThrow(
-                () -> new LearningRequestException(401, "UNAUTHORIZED", "Authenticated gateway JWT required")));
+        // A request must carry the learner's verified JWT. Only work with no request at all, such as applying an event, uses
+        // the worker token; an unauthenticated request never does.
+        headers.setBearerAuth(GatewayRequestHeaders.bearerToken()
+                .or(() -> GatewayRequestHeaders.outsideRequest() ? workerToken.get() : java.util.Optional.empty())
+                .orElseThrow(() -> new LearningRequestException(401, "UNAUTHORIZED", "Authenticated gateway JWT required")));
         headers.set(SecurityHeaders.CORRELATION_ID, GatewayRequestHeaders.correlationId());
     }
 
