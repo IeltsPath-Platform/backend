@@ -28,7 +28,7 @@ public class JdbcSpeakingSubmissionRepository implements SpeakingSubmissionRepos
             id, user_id, request_id, package_version_id, scope, status, point_cost, consent_at, failure_code,
             created_at, updated_at, queued_at, result::text AS result_json, overall_band, debit_ledger_entry_id,
             rubric_code, rubric_version, prompt_checksum, prompt_version, grading_attempts, grading_started_at,
-            graded_at, rubric_snapshot::text AS rubric_snapshot_json""";
+            graded_at, rubric_snapshot::text AS rubric_snapshot_json, lesson_id, practice_attempt_id""";
     private static final String RECORDING_COLUMNS = """
             submission_id, question_version_id, section_id, part_no, question_no, attempt, object_key, content_type,
             size_bytes, duration_ms, uploaded_at, question_text""";
@@ -53,6 +53,12 @@ public class JdbcSpeakingSubmissionRepository implements SpeakingSubmissionRepos
     @Override
     public Optional<SpeakingSubmission> findOwned(UUID id, UUID userId) {
         return load("WHERE id = ? AND user_id = ?", id, userId).stream().findFirst();
+    }
+
+    @Override
+    public Optional<SpeakingSubmission> findLatestForAttempt(UUID userId, UUID practiceAttemptId) {
+        return load("WHERE user_id = ? AND practice_attempt_id = ? ORDER BY created_at DESC LIMIT 1", userId,
+                practiceAttemptId).stream().findFirst();
     }
 
     @Override
@@ -171,13 +177,14 @@ public class JdbcSpeakingSubmissionRepository implements SpeakingSubmissionRepos
     private void insert(SpeakingSubmission submission) {
         jdbc.update("""
                 INSERT INTO speaking_submissions (id, user_id, request_id, package_version_id, scope, status,
-                    point_cost, consent_at, failure_code, created_at, updated_at, queued_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    point_cost, consent_at, failure_code, created_at, updated_at, queued_at, lesson_id,
+                    practice_attempt_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, submission.id(), submission.userId(), submission.requestId(), submission.packageVersionId(),
                 submission.scope().name(), submission.status().name(), submission.pointCost(),
                 Timestamp.from(submission.consentAt()), submission.failureCode(),
                 Timestamp.from(submission.createdAt()), Timestamp.from(submission.updatedAt()),
-                timestamp(submission.queuedAt()));
+                timestamp(submission.queuedAt()), submission.lessonId(), submission.practiceAttemptId());
         jdbc.batchUpdate("""
                 INSERT INTO speaking_recordings (submission_id, question_version_id, section_id, part_no, question_no,
                     attempt, object_key, content_type, size_bytes, duration_ms, uploaded_at, question_text)
@@ -261,7 +268,8 @@ public class JdbcSpeakingSubmissionRepository implements SpeakingSubmissionRepos
                 (Integer) resultSet.getObject("rubric_version"), resultSet.getString("prompt_checksum"),
                 resultSet.getString("prompt_version"), resultSet.getInt("grading_attempts"),
                 instant(resultSet, "grading_started_at"), instant(resultSet, "graded_at"),
-                readJson(resultSet.getString("rubric_snapshot_json")));
+                readJson(resultSet.getString("rubric_snapshot_json")), resultSet.getObject("lesson_id", UUID.class),
+                resultSet.getObject("practice_attempt_id", UUID.class));
     }
 
     private static SpeakingRecording recording(ResultSet resultSet) throws SQLException {
@@ -281,12 +289,12 @@ public class JdbcSpeakingSubmissionRepository implements SpeakingSubmissionRepos
                                  Map<String, Object> result, BigDecimal overallBand, UUID debitLedgerEntryId,
                                  String rubricCode, Integer rubricVersion, String promptChecksum, String promptVersion,
                                  int gradingAttempts, Instant gradingStartedAt, Instant gradedAt,
-                                 Map<String, Object> rubricSnapshot) {
+                                 Map<String, Object> rubricSnapshot, UUID lessonId, UUID practiceAttemptId) {
         SpeakingSubmission toAggregate(List<SpeakingRecording> recordings) {
             return SpeakingSubmission.restore(id, userId, requestId, packageVersionId, scope, status, pointCost,
                     consentAt, failureCode, createdAt, updatedAt, queuedAt, recordings, result, overallBand,
                     debitLedgerEntryId, rubricCode, rubricVersion, promptChecksum, promptVersion, gradingAttempts,
-                    gradingStartedAt, gradedAt, rubricSnapshot);
+                    gradingStartedAt, gradedAt, rubricSnapshot).withCourseContext(lessonId, practiceAttemptId);
         }
     }
 }

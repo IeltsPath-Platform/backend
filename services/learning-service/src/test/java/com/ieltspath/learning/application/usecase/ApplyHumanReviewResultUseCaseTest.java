@@ -109,6 +109,26 @@ class ApplyHumanReviewResultUseCaseTest {
     }
 
     @Test
+    void aCriterionTheExaminerFindsWeakIsOfferedForPromotionOfItsWaitingReviewAndAPassedOneIsNot() {
+        useCase.execute(result(List.of(new HumanReviewResult.Criterion("coherence", new BigDecimal("5.0")),
+                new HumanReviewResult.Criterion("taskResponse", new BigDecimal("6.5"))), List.of()));
+
+        ArgumentCaptor<Collection<UUID>> weak = captorOf(Collection.class);
+        verify(reviews).promoteCriterionReviewsToBlocking(eq(LEARNER), weak.capture(), eq(ESSAY));
+        assertEquals(Set.of(CC), new HashSet<>(weak.getValue()));
+    }
+
+    @Test
+    void aCriterionTheExaminerPassesClosesItsOptionalReviewAndAFailedOneIsNotClosed() {
+        useCase.execute(result(List.of(new HumanReviewResult.Criterion("coherence", new BigDecimal("5.0")),
+                new HumanReviewResult.Criterion("taskResponse", new BigDecimal("6.5"))), List.of()));
+
+        ArgumentCaptor<Collection<UUID>> passed = captorOf(Collection.class);
+        verify(reviews).closeOptionalCriterionReviews(eq(LEARNER), passed.capture());
+        assertEquals(Set.of(TR), new HashSet<>(passed.getValue()));
+    }
+
+    @Test
     void theExaminersBandsReplaceTheAiAndTheMarkedErrorIsCountedOnce() throws Exception {
         when(evidence.removeWritingEvidence(eq(LEARNER), anyCollection())).thenReturn(Set.of(CC));
 
@@ -136,7 +156,7 @@ class ApplyHumanReviewResultUseCaseTest {
         verify(errorTrapReviews).createForMarkedCodes(eq(LEARNER), eq(LESSON), marked.capture(), eq(2));
         assertEquals(List.of(new ErrorTrapReviews.MarkedErrorTrap("LINKER_MISUSE", TRAP_LINKER, 2)), List.copyOf(marked.getValue()));
         verify(criterionReviews).create(eq(LEARNER), eq(LESSON),
-                eq(List.of(new FailedWritingCriterion(CC, "DEMO_WRITING_CRITERION_CC", new BigDecimal("5.0")))), eq(2));
+                eq(List.of(new FailedWritingCriterion(CC, "DEMO_WRITING_CRITERION_CC", new BigDecimal("5.0"), ESSAY))), eq(2));
 
         ArgumentCaptor<String> stored = captorOf(String.class);
         verify(outcomes).insertIfAbsent(eq(REVIEW), eq(LEARNER), eq(ESSAY), stored.capture());
@@ -158,6 +178,30 @@ class ApplyHumanReviewResultUseCaseTest {
                 List.of(new HumanReviewResult.ErrorCount("LINKER_MISUSE", 1))));
 
         verify(criterionReviews).create(eq(LEARNER), eq(LESSON), any(Collection.class), eq(1));
+    }
+
+    @Test
+    void anEssayOfThePracticeLibraryShowsStudyPointsButMovesNoMastery() throws Exception {
+        WritingSubmission free = WritingSubmission.startFreeForExaminer(ESSAY, LEARNER, UUID.randomUUID(),
+                "A learner essay of sixty words or so.", 60, prompt(), Instant.parse("2026-11-05T00:00:00Z"));
+        when(essays.findOwned(ESSAY, LEARNER)).thenReturn(Optional.of(free));
+
+        useCase.execute(result(List.of(new HumanReviewResult.Criterion("coherence", new BigDecimal("5.0"))),
+                List.of(new HumanReviewResult.ErrorCount("LINKER_MISUSE", 2))));
+
+        verify(evidence, never()).removeWritingEvidence(any(), anyCollection());
+        verify(evidence, never()).append(any(), anyList());
+        verify(profiles, never()).rebuild(any(), any(Collection.class));
+        verify(errorTrapReviews, never()).createForMarkedCodes(any(), any(), anyCollection(), org.mockito.ArgumentMatchers.anyInt());
+        verify(criterionReviews, never()).create(any(), any(), anyCollection(), org.mockito.ArgumentMatchers.anyInt());
+
+        ArgumentCaptor<String> stored = captorOf(String.class);
+        verify(outcomes).insertIfAbsent(eq(REVIEW), eq(LEARNER), eq(ESSAY), stored.capture());
+        JsonNode points = json.readTree(stored.getValue());
+        assertEquals("ERROR_CODE", points.get(0).get("kind").asText());
+        assertEquals(2, points.get(0).get("count").asInt());
+        assertEquals("CRITERION", points.get(1).get("kind").asText());
+        assertEquals("CC", points.get(1).get("criterionCode").asText());
     }
 
     @Test

@@ -46,6 +46,8 @@ public class SpeakingSubmission {
     private Map<String, Object> rubricSnapshot;
     private Instant updatedAt;
     private Instant queuedAt;
+    private UUID lessonId;
+    private UUID practiceAttemptId;
     private boolean isNew;
 
     private SpeakingSubmission(UUID id, UUID userId, UUID requestId, UUID packageVersionId, SpeakingScope scope,
@@ -119,6 +121,23 @@ public class SpeakingSubmission {
                 failureCode, createdAt, updatedAt, queuedAt, recordings, false, result, overallBand,
                 debitLedgerEntryId, rubricCode, rubricVersion, promptChecksum, promptVersion, gradingAttempts,
                 gradingStartedAt, gradedAt, rubricSnapshot);
+    }
+
+    /** Marks a new submission as the answer to a lesson's practice attempt, the only kind that can reach mastery. */
+    public SpeakingSubmission forPracticeAttempt(UUID lessonId, UUID practiceAttemptId) {
+        if (lessonId == null || practiceAttemptId == null) {
+            throw new IllegalArgumentException("lesson and attempt are required");
+        }
+        this.lessonId = lessonId;
+        this.practiceAttemptId = practiceAttemptId;
+        return this;
+    }
+
+    /** Restores the lesson context of a stored submission; both are null for a free practice. */
+    public SpeakingSubmission withCourseContext(UUID lessonId, UUID practiceAttemptId) {
+        this.lessonId = lessonId;
+        this.practiceAttemptId = practiceAttemptId;
+        return this;
     }
 
     public Optional<SpeakingRecording> recordingFor(UUID questionVersionId) {
@@ -264,6 +283,8 @@ public class SpeakingSubmission {
     public Instant queuedAt() { return queuedAt; }
     public List<SpeakingRecording> recordings() { return List.copyOf(recordings); }
     public boolean isNew() { return isNew; }
+    public UUID lessonId() { return lessonId; }
+    public UUID practiceAttemptId() { return practiceAttemptId; }
 
     private static Map<String, Object> immutableMap(Map<String, Object> value) {
         return value == null ? null : java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(value));

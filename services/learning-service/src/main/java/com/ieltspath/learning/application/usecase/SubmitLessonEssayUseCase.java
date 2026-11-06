@@ -196,7 +196,8 @@ public class SubmitLessonEssayUseCase {
             masteryProfiles.recordEvidence(submission.userId(), essayEvidence, outcome.criterionKnowledgePoints());
             if (submission.previousSubmissionId() == null) {
                 criterionReviews.create(submission.userId(), submission.lessonId(), outcome.failedCriteria().stream()
-                        .filter(criterion -> known.contains(criterion.knowledgePointId())).toList());
+                        .filter(criterion -> known.contains(criterion.knowledgePointId()))
+                        .map(criterion -> criterion.fromSubmission(submission.id())).toList());
             }
         }
         submission.markGraded(ledgerEntryId);

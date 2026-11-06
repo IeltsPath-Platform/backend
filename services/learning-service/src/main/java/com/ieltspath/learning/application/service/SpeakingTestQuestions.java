@@ -31,6 +31,33 @@ public class SpeakingTestQuestions {
 
     public record Resolved(SpeakingScope scope, List<SpeakingRecording> questions) { }
 
+    /**
+     * The recorded answers a lesson's practice set asks for: its items whose answer spec is of type SPEAKING, in the
+     * order of their sections and places. The set's other items (multiple choice) are answered the usual way.
+     */
+    public Resolved resolveSetItems(UUID packageVersionId) {
+        PackageVersion version = content.getPackageVersion(packageVersionId);
+        List<SpeakingRecording> questions = new ArrayList<>();
+        if (version != null && version.sections() != null) {
+            int number = 0;
+            for (Section section : version.sections().stream().sorted(Comparator.comparingInt(Section::sortOrder)).toList()) {
+                if (section.items() == null) continue;
+                for (Item item : section.items().stream().sorted(Comparator.comparingInt(Item::sortOrder)).toList()) {
+                    if (!isRecordedAnswer(item)) continue;
+                    questions.add(SpeakingRecording.expected(item.questionVersionId(), section.sectionId(), 1, ++number,
+                            item.stem()));
+                }
+            }
+        }
+        if (questions.isEmpty()) throw new LearningRequestException(422, "SPEAKING_NO_QUESTIONS", "Nothing to record");
+        return new Resolved(SpeakingScope.FULL, questions);
+    }
+
+    /** Whether the item is answered by a recording rather than by choosing or typing. */
+    public static boolean isRecordedAnswer(Item item) {
+        return ItemGrading.isSpeaking(item);
+    }
+
     public Resolved resolve(UUID packageVersionId, List<UUID> partSectionIds) {
         PackageVersion version = content.getPackageVersion(packageVersionId);
         List<Section> parts = version == null || version.sections() == null ? List.of()

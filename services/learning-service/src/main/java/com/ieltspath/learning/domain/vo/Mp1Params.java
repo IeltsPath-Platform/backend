@@ -29,7 +29,7 @@ public record Mp1Params(int window, int maxPracticeInWindow, double halfLifeDays
                 case DIAGNOSTIC_PROBE -> probe;
                 case LESSON_EXERCISE, PRACTICE_SET, FREE_PRACTICE -> practice;
                 // The bands of a graded Speaking answer are criterion judgments like an essay's, so they weigh the same.
-                case LESSON_WRITING, SPEAKING_PRACTICE -> essay;
+                case LESSON_WRITING, SPEAKING_PRACTICE, LESSON_SPEAKING -> essay;
                 case ERROR_TRAP -> errorTrap;
                 case HUMAN_REVIEW -> humanReview;
             };

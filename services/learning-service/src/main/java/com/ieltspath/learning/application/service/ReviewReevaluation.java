@@ -39,11 +39,6 @@ public class ReviewReevaluation {
         run(userId, consideredKps, wrongKps, true, "ASSESSMENT");
     }
 
-    /** Reviews raised by a test that does not count (a free practice test): optional, they never block. */
-    public void executeOptional(UUID userId, Set<UUID> consideredKps, Set<UUID> wrongKps, String triggerKind) {
-        run(userId, consideredKps, wrongKps, false, triggerKind);
-    }
-
     private void run(UUID userId, Set<UUID> consideredKps, Set<UUID> wrongKps, boolean blocking,
                      String triggerKind) {
         // A review is created below the priority threshold, which Admin can change.

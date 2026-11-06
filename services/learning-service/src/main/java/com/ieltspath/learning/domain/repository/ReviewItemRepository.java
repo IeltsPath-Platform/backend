@@ -1,5 +1,6 @@
 package com.ieltspath.learning.domain.repository;
 
+import com.ieltspath.learning.domain.vo.FailedWritingCriterion;
 import com.ieltspath.learning.domain.aggregate.ReviewItem;
 import com.ieltspath.learning.domain.service.ReviewRule.ReviewCandidate;
 import com.ieltspath.learning.domain.vo.PendingReview;
@@ -53,6 +54,27 @@ public interface ReviewItemRepository {
      * optional. The trigger is kept. Returns the reviews it changed.
      */
     List<PromotedReview> promoteSuggestionsToBlocking(UUID userId, Collection<UUID> knowledgePointIds);
+
+    /**
+     * Makes the examiner's escalation: the learner's optional PENDING {@code WRITING_CRITERION} reviews of these knowledge
+     * points become blocking, but only those raised by an essay other than {@code gradedSubmissionId}. A review with no
+     * recorded essay counts as another essay. Returns the reviews it changed.
+     */
+    List<PromotedReview> promoteCriterionReviewsToBlocking(UUID userId, Collection<UUID> knowledgePointIds,
+                                                           UUID gradedSubmissionId);
+
+    /**
+     * Closes the learner's optional PENDING {@code WRITING_CRITERION} reviews of these points as done: the examiner grades
+     * the criterion at or above the pass band, so the review is no longer needed. Blocking reviews are not closed.
+     */
+    void closeOptionalCriterionReviews(UUID userId, Collection<UUID> knowledgePointIds);
+
+    /**
+     * Starts optional PENDING criterion reviews (trigger {@code WRITING_CRITERION} or {@code SPEAKING_CRITERION}), each
+     * remembering the submission whose grade found the criterion weak. A point with a PENDING review is skipped.
+     */
+    void insertCriterionPending(UUID userId, UUID lessonId, LearningSkill skill, String triggerKind,
+                                Collection<FailedWritingCriterion> criteria);
 
     /** Starts an optional PENDING review; false when the knowledge point already has a PENDING review. */
     boolean insertOptional(UUID userId, UUID reviewId, UUID knowledgePointId, UUID lessonId, LearningSkill skill,

@@ -567,6 +567,8 @@ class LessonWritingIntegrationTest {
         assertTrue(rows.stream().allMatch(row -> Boolean.FALSE.equals(row.get("blocking"))
                 && "WRITING_CRITERION".equals(row.get("trigger_kind")) && "WRITING".equals(row.get("skill"))
                 && LESSON.equals(row.get("lesson_id"))));
+        assertEquals(original.submissionId(), jdbc.queryForObject("SELECT DISTINCT source_submission_id FROM review_items "
+                + "WHERE user_id=?", UUID.class, USER), "each review records the essay whose AI grade raised it");
         submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, requestId, ESSAY);
         assertEquals(2, count("review_items"));
 

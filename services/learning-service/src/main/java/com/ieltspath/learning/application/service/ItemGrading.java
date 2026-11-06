@@ -31,20 +31,20 @@ public final class ItemGrading {
     }
 
     /**
-     * {@code essays} gives whether each essay item passed; the learner answers only the other items. An essay item
+     * {@code essays} gives whether each essay or recorded item passed; the learner answers only the other items. Such an item
      * without an entry cannot be graded here.
      */
     public Graded grade(PackageVersion version, List<SubmitExerciseCommand.Answer> submitted, String subject,
                         Map<UUID, Boolean> essays) {
         List<Item> items = orderedItems(version);
-        List<UUID> objective = items.stream().filter(item -> !isEssay(item)).map(Item::questionVersionId).toList();
+        List<UUID> objective = items.stream().filter(item -> !isOpenAnswer(item)).map(Item::questionVersionId).toList();
         Map<UUID, Object> answers;
         if (!objective.isEmpty() || submitted == null || !submitted.isEmpty()) {
             answers = AnswerSheet.require(objective, submitted == null ? List.of() : submitted);
         } else {
             answers = Map.of();
         }
-        List<AnswerSpecGrader.Grade> grades = items.stream().map(item -> !isEssay(item)
+        List<AnswerSpecGrader.Grade> grades = items.stream().map(item -> !isOpenAnswer(item)
                 ? grader.grade(item.answerSpec(), answers.get(item.questionVersionId()))
                 : essays.containsKey(item.questionVersionId())
                 ? new AnswerSpecGrader.Grade(true, essays.get(item.questionVersionId()), null)
@@ -63,7 +63,7 @@ public final class ItemGrading {
         List<String> errorCodes = new java.util.ArrayList<>(items.size());
         for (int index = 0; index < items.size(); index++) {
             Item item = items.get(index);
-            boolean gradedObjective = !isEssay(item) && grades.get(index).gradable();
+            boolean gradedObjective = !isOpenAnswer(item) && grades.get(index).gradable();
             errorCodes.add(gradedObjective ? errorTagger.tag(item.answerSpec(),
                     answers.get(item.questionVersionId()), grades.get(index).correct()) : null);
         }
@@ -92,6 +92,16 @@ public final class ItemGrading {
         } catch (IllegalArgumentException unknown) {
             return null;
         }
+    }
+
+    /** An item answered by a recording, graded like an essay by someone else than the answer spec. */
+    public static boolean isSpeaking(Item item) {
+        return item.answerSpec() != null && "SPEAKING".equals(item.answerSpec().get("type"));
+    }
+
+    /** An item the learner answers in their own words, an essay or a recording, so the answer sheet has no entry for it. */
+    public static boolean isOpenAnswer(Item item) {
+        return isEssay(item) || isSpeaking(item);
     }
 
     public static boolean isEssay(Item item) {

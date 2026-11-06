@@ -1,5 +1,6 @@
 package com.ieltspath.learning.infrastructure.persistence;
 
+import com.ieltspath.learning.domain.vo.FailedWritingCriterion;
 import com.ieltspath.learning.domain.aggregate.ReviewItem;
 import com.ieltspath.learning.domain.entity.ReviewSet;
 import com.ieltspath.learning.domain.repository.ReviewItemRepository;
@@ -202,6 +203,56 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
                 """, Map.of("userId", userId, "kpIds", knowledgePointIds), (row, index) -> new PromotedReview(
                 row.getObject("id", UUID.class), row.getObject("knowledge_point_id", UUID.class),
                 ReviewStage.valueOf(row.getString("stage"))));
+    }
+
+    @Override
+    public List<PromotedReview> promoteCriterionReviewsToBlocking(UUID userId, Collection<UUID> knowledgePointIds,
+                                                                  UUID gradedSubmissionId) {
+        if (knowledgePointIds.isEmpty()) return List.of();
+        Map<String, Object> params = new HashMap<>();
+        params.put("userId", userId);
+        params.put("kpIds", knowledgePointIds);
+        params.put("submissionId", gradedSubmissionId);
+        // IS DISTINCT FROM keeps a review whose essay is unknown (NULL) promotable, as it was before essays were recorded.
+        return jdbc.query("""
+                UPDATE review_items SET blocking = TRUE
+                WHERE user_id = :userId AND status = 'PENDING' AND blocking = FALSE
+                  AND trigger_kind = 'WRITING_CRITERION' AND knowledge_point_id IN (:kpIds)
+                  AND source_submission_id IS DISTINCT FROM :submissionId
+                RETURNING id, knowledge_point_id, stage
+                """, params, (row, index) -> new PromotedReview(
+                row.getObject("id", UUID.class), row.getObject("knowledge_point_id", UUID.class),
+                ReviewStage.valueOf(row.getString("stage"))));
+    }
+
+    @Override
+    public void closeOptionalCriterionReviews(UUID userId, Collection<UUID> knowledgePointIds) {
+        if (knowledgePointIds.isEmpty()) return;
+        jdbc.update("""
+                UPDATE review_items SET status = 'DONE', done_at = now()
+                WHERE user_id = :userId AND status = 'PENDING' AND blocking = FALSE
+                  AND trigger_kind = 'WRITING_CRITERION' AND knowledge_point_id IN (:kpIds)
+                """, Map.of("userId", userId, "kpIds", knowledgePointIds));
+    }
+
+    @Override
+    public void insertCriterionPending(UUID userId, UUID lessonId, LearningSkill skill, String triggerKind,
+                                       Collection<FailedWritingCriterion> criteria) {
+        if (criteria.isEmpty()) return;
+        jdbc.getJdbcOperations().batchUpdate("""
+                INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status, skill, trigger_kind,
+                                          blocking, source_submission_id)
+                VALUES (?, ?, ?, ?, 'PENDING', ?, ?, FALSE, ?)
+                ON CONFLICT (user_id, knowledge_point_id) WHERE status = 'PENDING' DO NOTHING
+                """, criteria, criteria.size(), (statement, criterion) -> {
+            statement.setObject(1, UUID.randomUUID());
+            statement.setObject(2, userId);
+            statement.setObject(3, criterion.knowledgePointId());
+            statement.setObject(4, lessonId);
+            statement.setString(5, skill.name());
+            statement.setString(6, triggerKind);
+            statement.setObject(7, criterion.sourceSubmissionId());
+        });
     }
 
     @Override

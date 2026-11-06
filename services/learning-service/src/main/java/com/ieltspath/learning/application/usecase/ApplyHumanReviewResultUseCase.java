@@ -50,6 +50,9 @@ import java.util.stream.Collectors;
  * reviews (never blocking), and the study points are kept for the learner to read. Applying is idempotent per essay, and all of
  * it happens in one transaction under the learner's lock. Every read happens before the first write, so a Content outage leaves
  * nothing half applied.
+ *
+ * <p>An essay of the practice library (free writing, no lesson) is outside the learner's path, as it is when the AI grades it:
+ * the learner reads the study points, but nothing is recorded as evidence, no mastery profile changes and no review is made.
  */
 @Service
 public class ApplyHumanReviewResultUseCase {
@@ -141,7 +144,14 @@ public class ApplyHumanReviewResultUseCase {
         });
         List<TrapOutcome> marked = outcome.traps();
         List<FailedWritingCriterion> failed = outcome.failedCriteria().stream()
-                .filter(f -> known.contains(f.knowledgePointId())).toList();
+                .filter(f -> known.contains(f.knowledgePointId())).map(f -> f.fromSubmission(essayId)).toList();
+
+        if (essay.isFree()) {
+            // Practice outside the course moves no mastery: the learner only reads what to study.
+            outcomes.insertIfAbsent(reviewSubmissionId, learnerId, essayId,
+                    studyPoints(learnerId, rubric, marked, trapCatalog, failed).toString());
+            return;
+        }
 
         // The examiner's criterion result replaces the AI's for this essay, so one essay is not counted twice.
         List<UUID> aiReferences = aiReferences(essay, learnerId, judged.keySet());
@@ -158,6 +168,18 @@ public class ApplyHumanReviewResultUseCase {
         Set<UUID> affected = new LinkedHashSet<>(lost);
         appended.forEach(item -> affected.add(item.knowledgePointId()));
         if (!affected.isEmpty()) profiles.rebuild(learnerId, affected);
+
+        // A criterion the examiner finds weak again while an optional review from ANOTHER essay still waits is no longer a
+        // suggestion: that review blocks the lessons of its skill until it is done. A review this same essay raised is not
+        // a second grade, so it stays optional.
+        reviews.promoteCriterionReviewsToBlocking(learnerId,
+                failed.stream().map(FailedWritingCriterion::knowledgePointId).collect(Collectors.toSet()), essayId);
+
+        // A criterion the examiner grades at or above the pass band is no longer weak: its waiting optional Writing review is
+        // closed as done. A blocking review is not closed, because the learner still has to do it.
+        Set<UUID> failedPoints = failed.stream().map(FailedWritingCriterion::knowledgePointId).collect(Collectors.toSet());
+        reviews.closeOptionalCriterionReviews(learnerId, outcome.criterionKnowledgePoints().stream()
+                .filter(known::contains).filter(point -> !failedPoints.contains(point)).toList());
 
         // Optional reviews: the marked errors first (the examiner has seen them), then the weakest criteria.
         List<ErrorTrapReviews.MarkedErrorTrap> markedTraps = marked.stream()

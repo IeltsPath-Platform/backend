@@ -12,7 +12,9 @@ public enum EvidenceSource {
     SPEAKING_PRACTICE("speaking_practice"),
     ERROR_TRAP("error_trap"),
     /** An examiner's band and marked errors on a Writing essay, as applied from a finished standalone review. */
-    HUMAN_REVIEW("human_review");
+    HUMAN_REVIEW("human_review"),
+    /** An AI-graded Speaking answer given in a lesson's practice set, applied when that practice attempt is submitted. */
+    LESSON_SPEAKING("lesson_speaking");
 
     private final String value;
 

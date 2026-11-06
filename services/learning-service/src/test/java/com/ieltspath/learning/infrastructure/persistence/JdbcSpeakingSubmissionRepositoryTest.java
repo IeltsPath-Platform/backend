@@ -164,4 +164,37 @@ class JdbcSpeakingSubmissionRepositoryTest {
         // jsonb prints a space after the colon.
         assertEquals("{\"errorTypes\": []}", repository.findGradingContext(saved.id()).orElseThrow());
     }
+    @Test
+    void aSubmissionOfAPracticeAttemptKeepsItsLessonAndAttemptAndIsFoundAsTheNewestOfThatAttempt() {
+        UUID user = UUID.randomUUID();
+        UUID lesson = UUID.randomUUID();
+        UUID attempt = UUID.randomUUID();
+        SpeakingSubmission older = submission(user, UUID.randomUUID(), UUID.randomUUID()).forPracticeAttempt(lesson, attempt);
+        UUID other = UUID.randomUUID();
+        SpeakingSubmission free = submission(other, UUID.randomUUID(), UUID.randomUUID());
+        repository.save(older);
+        repository.save(free);
+        older.abandon(NOW.plusSeconds(1));
+        repository.save(older);
+        SpeakingSubmission newer = SpeakingSubmission.start(UUID.randomUUID(), user, UUID.randomUUID(), UUID.randomUUID(),
+                SpeakingScope.FULL, 5, NOW.plusSeconds(60), List.of(SpeakingRecording.expected(UUID.randomUUID(),
+                UUID.randomUUID(), 1, 1)), NOW.plusSeconds(60)).forPracticeAttempt(lesson, attempt);
+        repository.save(newer);
+
+        SpeakingSubmission found = repository.findLatestForAttempt(user, attempt).orElseThrow();
+
+        assertEquals(newer.id(), found.id());
+        assertEquals(lesson, found.lessonId());
+        assertEquals(attempt, found.practiceAttemptId());
+        assertNull(repository.findOwned(free.id(), other).orElseThrow().practiceAttemptId());
+        assertTrue(repository.findLatestForAttempt(UUID.randomUUID(), attempt).isEmpty());
+    }
+
+    @Test
+    void aLessonWithoutAnAttemptIsRefusedByTheDatabase() {
+        SpeakingSubmission half = submission(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID())
+                .withCourseContext(UUID.randomUUID(), null);
+
+        assertThrows(DataIntegrityViolationException.class, () -> repository.save(half));
+    }
 }

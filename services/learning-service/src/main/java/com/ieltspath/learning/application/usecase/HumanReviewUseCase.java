@@ -20,8 +20,9 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * A learner with a human-grading credit asks a Mentor to review a graded lesson or Practice essay. The review is feedback
- * only: it writes no evidence, makes no review and changes no gate. The credit is spent once per essay (Access is
+ * A learner with a human-grading credit asks a Mentor to review a lesson or Practice essay, graded by the AI or sent straight
+ * to the examiner. Asking writes nothing to mastery; the finished grade does, when Assessment reports it (see
+ * {@link ApplyHumanReviewResultUseCase}), and it changes no gate. The credit is spent once per essay (Access is
  * idempotent by essay id). It is given back only when this call spent it and Assessment refused the review outright; a
  * timeout or server error may have left the review behind, so the request is repeated (Assessment creates a review once
  * per request id) and, if it still fails, the credit stays with the essay and asking again reuses it. No call holds a

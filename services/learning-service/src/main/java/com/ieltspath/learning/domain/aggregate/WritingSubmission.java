@@ -92,6 +92,18 @@ public final class WritingSubmission {
                 null, null, null, Objects.requireNonNull(now, "now"));
     }
 
+    /**
+     * An essay of a practice attempt that the learner sent to an examiner instead of the AI: AWAITING_EXAMINER from
+     * {@code now}, nothing to grade or charge here. It keeps its lesson, so the examiner's grade counts toward mastery.
+     */
+    public static WritingSubmission startPracticeForExaminer(UUID id, UUID userId, UUID lessonId, UUID practiceAttemptId,
+                                                             UUID requestId, String essayText, int wordCount,
+                                                             EssayPrompt prompt, Instant now) {
+        return new WritingSubmission(id, userId, Objects.requireNonNull(lessonId, "lessonId"), null,
+                Objects.requireNonNull(practiceAttemptId, "practiceAttemptId"), requestId, essayText, wordCount, prompt,
+                0, AWAITING_EXAMINER, null, null, null, null, null, null, Objects.requireNonNull(now, "now"));
+    }
+
     /** A new free-writing essay, answering a prompt of the library outside any lesson; GRADING from {@code now}. */
     public static WritingSubmission startFree(UUID id, UUID userId, UUID requestId, String essayText, int wordCount,
                                               EssayPrompt prompt, int pointCost, Instant now) {

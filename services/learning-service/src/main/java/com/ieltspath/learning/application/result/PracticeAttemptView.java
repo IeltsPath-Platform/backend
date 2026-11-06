@@ -18,8 +18,21 @@ public record PracticeAttemptView(UUID attemptId, UUID packageId, UUID packageVe
 
     public record Audio(String mediaUrl, Integer durationSeconds) {}
 
+    /** {@code recorded} are the items answered by a recording; empty for a set without any. */
     public record Section(UUID sectionId, String title, String skill, String passage, Audio audio,
-                          List<LessonResult.Question> questions, List<Essay> essays) {}
+                          List<LessonResult.Question> questions, List<Essay> essays, List<Recorded> recorded) {
+        public Section(UUID sectionId, String title, String skill, String passage, Audio audio,
+                       List<LessonResult.Question> questions, List<Essay> essays) {
+            this(sectionId, title, skill, passage, audio, questions, essays, List.of());
+        }
+    }
+
+    /**
+     * An item answered by speaking. {@code latestSubmission} is the newest recorded answer of this attempt; its band
+     * appears only once GRADED. The answer spec is never part of the view.
+     */
+    public record Recorded(UUID questionVersionId, int sortOrder, String stem, Integer durationSeconds,
+                           BigDecimal passBand, LessonResult.LatestSubmission latestSubmission) {}
 
     /**
      * {@code sampleAnswer} is the model answer the learner may open while writing; null when Content has none.

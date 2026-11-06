@@ -233,6 +233,27 @@ class SpeakingPracticeUseCasesTest {
     }
 
     @Test
+    void anUnsentRecordingOfTheSameAttemptIsReplacedAtOnceButAnotherAttemptIsStillRefused() {
+        UUID version = UUID.randomUUID(), lesson = UUID.randomUUID(), attempt = UUID.randomUUID();
+        when(content.getPackageVersion(version)).thenReturn(new PackageVersion(version, UUID.randomUUID(), "PRACTICE_SET",
+                null, Map.of(), List.of(section(PART_1, 1, new Item(Q1, 1, "Describe your weekend.", List.of(),
+                Map.of("type", "SPEAKING"), null, BigDecimal.ONE, List.of())))));
+        SpeakingSubmissionResult unsent = create.executeForAttempt(USER, UUID.randomUUID(), version, lesson, attempt, true);
+
+        // The page was opened again before any file was sent: a new request for the attempt takes its place.
+        SpeakingSubmissionResult again = create.executeForAttempt(USER, UUID.randomUUID(), version, lesson, attempt, true);
+
+        assertEquals(SpeakingSubmissionStatus.ABANDONED, submissions.get(unsent.id()).status());
+        assertEquals(SpeakingSubmissionStatus.UPLOADING, again.status());
+        assertEquals(attempt, submissions.get(again.id()).practiceAttemptId());
+        // Another attempt, or a free practice, still waits for the one that is open.
+        LearningRequestException refused = assertThrows(LearningRequestException.class,
+                () -> create.executeForAttempt(USER, UUID.randomUUID(), version, lesson, UUID.randomUUID(), true));
+        assertEquals("SPEAKING_SUBMISSION_IN_PROGRESS", refused.getCode());
+        assertThrows(LearningRequestException.class, () -> open(UUID.randomUUID()));
+    }
+
+    @Test
     void storesAFileUnderTheFolderOfItsLearnerDayAndSubmission() {
         SpeakingSubmissionResult opened = open(UUID.randomUUID());
 
@@ -418,6 +439,13 @@ class SpeakingPracticeUseCasesTest {
                     current.packageVersionId(), current.scope(), current.status(), current.pointCost(),
                     current.consentAt(), current.failureCode(), current.createdAt().minusSeconds(seconds),
                     current.updatedAt().minusSeconds(seconds), current.queuedAt(), current.recordings()));
+        }
+
+        @Override
+        public Optional<SpeakingSubmission> findLatestForAttempt(UUID userId, UUID practiceAttemptId) {
+            return byId.values().stream().filter(found -> found.userId().equals(userId)
+                    && practiceAttemptId.equals(found.practiceAttemptId()))
+                    .max(java.util.Comparator.comparing(SpeakingSubmission::createdAt));
         }
 
         @Override

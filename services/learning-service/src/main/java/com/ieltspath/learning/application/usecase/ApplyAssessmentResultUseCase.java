@@ -16,6 +16,7 @@ import com.ieltspath.learning.domain.aggregate.LearnerCurriculum;
 import com.ieltspath.learning.domain.aggregate.TopicTestAssignment;
 import com.ieltspath.learning.domain.aggregate.LearnerPlacement;
 import com.ieltspath.learning.domain.aggregate.CourseTestAssignment;
+import com.ieltspath.learning.domain.aggregate.PracticeTestAssignment;
 import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
 import com.ieltspath.learning.domain.repository.LearnerCurriculumRepository;
 import com.ieltspath.learning.domain.repository.TopicTestAssignmentRepository;
@@ -47,8 +48,7 @@ import java.util.UUID;
 @Service
 public class ApplyAssessmentResultUseCase {
     private static final Logger log = LoggerFactory.getLogger(ApplyAssessmentResultUseCase.class);
-    private static final Set<String> REVIEWED_TYPES = Set.of("TOPIC_GATE", "COURSE_GATE", "MOCK",
-            "OFFICIAL_PRACTICE", "QUIZ");
+    private static final Set<String> REVIEWED_TYPES = Set.of("TOPIC_GATE", "COURSE_GATE", "MOCK", "QUIZ");
 
     private final LearnerLock lock;
     private final KnowledgeEvidenceRepository evidence;
@@ -117,6 +117,17 @@ public class ApplyAssessmentResultUseCase {
             applyPlacement(result);
             return;
         }
+        // A practice test is course work only when it counts for a course milestone. Otherwise it is free practice: its items
+        // are logged above, but it moves no mastery and makes no review.
+        boolean practiceTest = "OFFICIAL_PRACTICE".equals(result.assessmentType());
+        var milestone = practiceTest && applied.isEmpty() ? openMilestone(result) : Optional.<PracticeTestAssignment>empty();
+        boolean countsForCourse = !practiceTest
+                || (applied.isEmpty() ? milestone.isPresent() : practiceAssignments.isConsumedBy(userId, result.attemptId()));
+        if (!countsForCourse) {
+            // Evidence kept from before this rule is taken out again if the attempt is regraded.
+            if (!regradedKps.isEmpty()) masteryProfiles.rebuild(userId, regradedKps);
+            return;
+        }
         List<KnowledgeEvidence> judged = new ArrayList<>();
         Set<UUID> considered = new LinkedHashSet<>();
         Set<UUID> wrong = new HashSet<>();
@@ -141,12 +152,9 @@ public class ApplyAssessmentResultUseCase {
         } else {
             masteryProfiles.recordEvidence(userId, judged);
         }
-        if ("OFFICIAL_PRACTICE".equals(result.assessmentType())) {
-            if (applied.isEmpty() && !applyPracticeTest(result)) {
-                // A free practice test counts for nothing, but a wrong answer can still offer an optional review.
-                reviews.executeOptional(userId, considered, wrong, "FREE_PRACTICE_TEST");
-            }
-            // A practice test never creates a blocking review.
+        if (practiceTest) {
+            // A milestone practice test counts for the course once; it never creates a blocking review.
+            milestone.ifPresent(assignment -> consumeMilestone(result, assignment));
             return;
         }
         // The gates record the test; what it means for the course needs the reviews of the wrong points, so it runs last.
@@ -157,18 +165,18 @@ public class ApplyAssessmentResultUseCase {
         followUp.run();
     }
 
-    /** True when the result belongs to a course milestone assignment; false for a free practice test. */
-    private boolean applyPracticeTest(AssessmentResult result) {
-        if (result.packageVersionId() == null) return false;
-        var open = practiceAssignments.findOpenForAttempt(result.userId(), result.packageVersionId(), result.completedAt());
-        if (open.isEmpty()) return false;
+    /** The course milestone this result counts for; empty for a free practice test. */
+    private Optional<PracticeTestAssignment> openMilestone(AssessmentResult result) {
+        if (result.packageVersionId() == null) return Optional.empty();
+        return practiceAssignments.findOpenForAttempt(result.userId(), result.packageVersionId(), result.completedAt());
+    }
+
+    private void consumeMilestone(AssessmentResult result, PracticeTestAssignment assignment) {
         BigDecimal score = result.items().stream().map(ItemResult::score).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal max = result.items().stream().map(ItemResult::maxScore).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal percent = max.signum() == 0 ? BigDecimal.ZERO
                 : score.multiply(BigDecimal.valueOf(100)).divide(max, 4, RoundingMode.HALF_UP);
-        var assignment = open.get();
         if (assignment.consume(result.attemptId(), result.completedAt(), percent)) practiceAssignments.save(assignment);
-        return true;
     }
 
     private void applyPlacement(AssessmentResult result) {

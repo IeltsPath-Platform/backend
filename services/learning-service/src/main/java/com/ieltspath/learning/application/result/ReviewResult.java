@@ -20,7 +20,8 @@ public record ReviewResult(UUID reviewId, String reviewStatus, UUID lessonId, Li
                            String theoryScope, int failedSets, Integer maxFailedSets,
                            List<LessonResult.Question> quickCheck, String state, UUID diagnosticSessionId,
                            boolean blocking, List<UUID> waitingOnReviewIds,
-                           @JsonInclude(JsonInclude.Include.NON_NULL) ErrorTrapResult errorTrap) {
+                           @JsonInclude(JsonInclude.Include.NON_NULL) ErrorTrapResult errorTrap,
+                           String triggerKind) {
     public static final String ACTIVE = "ACTIVE";
     public static final String DIAGNOSING = "DIAGNOSING";
     public static final String WAITING_ON_PREREQUISITES = "WAITING_ON_PREREQUISITES";
@@ -30,7 +31,7 @@ public record ReviewResult(UUID reviewId, String reviewStatus, UUID lessonId, Li
                         String theoryScope, int failedSets, Integer maxFailedSets,
                         List<LessonResult.Question> quickCheck) {
         this(reviewId, reviewStatus, lessonId, theory, set, knowledgePointId, skill, stage, theoryReason, theoryScope,
-                failedSets, maxFailedSets, quickCheck, ACTIVE, null, true, List.of(), null);
+                failedSets, maxFailedSets, quickCheck, ACTIVE, null, true, List.of(), null, null);
     }
 
     public ReviewResult(UUID reviewId, String reviewStatus, UUID lessonId, List<String> theory, ReviewSet set,
@@ -39,7 +40,7 @@ public record ReviewResult(UUID reviewId, String reviewStatus, UUID lessonId, Li
                         List<LessonResult.Question> quickCheck, String state, UUID diagnosticSessionId,
                         List<UUID> waitingOnReviewIds) {
         this(reviewId, reviewStatus, lessonId, theory, set, knowledgePointId, skill, stage, theoryReason, theoryScope,
-                failedSets, maxFailedSets, quickCheck, state, diagnosticSessionId, true, waitingOnReviewIds, null);
+                failedSets, maxFailedSets, quickCheck, state, diagnosticSessionId, true, waitingOnReviewIds, null, null);
     }
 
     public ReviewResult(UUID reviewId, String reviewStatus, UUID lessonId, List<String> theory, ReviewSet set,
@@ -48,7 +49,7 @@ public record ReviewResult(UUID reviewId, String reviewStatus, UUID lessonId, Li
                         List<LessonResult.Question> quickCheck, String state, UUID diagnosticSessionId,
                         List<UUID> waitingOnReviewIds, ErrorTrapResult errorTrap) {
         this(reviewId, reviewStatus, lessonId, theory, set, knowledgePointId, skill, stage, theoryReason, theoryScope,
-                failedSets, maxFailedSets, quickCheck, state, diagnosticSessionId, true, waitingOnReviewIds, errorTrap);
+                failedSets, maxFailedSets, quickCheck, state, diagnosticSessionId, true, waitingOnReviewIds, errorTrap, null);
     }
 
     public record ReviewSet(UUID reviewSetId, UUID packageId, UUID packageVersionId, String passage, Audio audio,
