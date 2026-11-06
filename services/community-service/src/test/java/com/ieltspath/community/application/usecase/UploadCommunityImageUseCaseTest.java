@@ -145,5 +145,29 @@ class UploadCommunityImageUseCaseTest {
         assertEquals(UploadRejectedException.Reason.TOO_LARGE, ex.reason());
         verifyNoInteractions(storagePort);
     }
-}
 
+    @Test
+    void acceptsAnImageOfExactlyFiveMegabytes() {
+        UUID userId = UUID.randomUUID();
+        byte[] atLimit = new byte[5 * 1024 * 1024];
+        System.arraycopy(VALID_PNG, 0, atLimit, 0, VALID_PNG.length);
+        when(storagePort.storeImage(anyString(), any(), eq("image/png"))).thenAnswer(inv ->
+                new StoredMediaResult("https://storage/png", inv.getArgument(0), "image/png", atLimit.length));
+
+        StoredMediaResult result = useCase.execute(new CommunityActor(userId, false), "image/png", atLimit);
+
+        assertNotNull(result);
+        verify(storagePort).storeImage(anyString(), any(), eq("image/png"));
+    }
+
+    @Test
+    void rateLimitRejectionStopsTheUploadBeforeAnythingIsStored() {
+        UUID userId = UUID.randomUUID();
+        doThrow(new IllegalStateException("limited")).when(rateLimiter).checkAndAcquire(userId);
+
+        assertThrows(IllegalStateException.class,
+                () -> useCase.execute(new CommunityActor(userId, false), "image/png", VALID_PNG));
+
+        verifyNoInteractions(storagePort);
+    }
+}
