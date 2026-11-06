@@ -1,5 +1,6 @@
 package com.ieltspath.content.api.controller;
 
+import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.content.api.dto.request.CreateLessonResourceRequest;
 import com.ieltspath.content.api.dto.request.ReorderLessonResourcesRequest;
 import com.ieltspath.content.api.dto.request.UpdateLessonResourceRequest;
@@ -22,7 +23,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
 
-/** Authoring of a lesson's Markdown summary and its slide and document links. */
+/** Authoring of a lesson's Markdown summary, its slide links and its documents (links or uploaded files). */
 @RestController
 @RequestMapping("/api/content/admin/lessons/{lessonId}")
 @PreAuthorize("hasRole('CONTENT_AUTHOR')")
@@ -34,6 +35,7 @@ public class LessonResourceAdminController {
     private final DeleteLessonResourceUseCase deleteResource;
     private final UpdateLessonSummaryUseCase updateSummary;
     private final ReorderLessonResourcesUseCase reorderResources;
+    private final CurrentUserProvider currentUser;
 
     @GetMapping("/resources")
     public LessonResourcesResponse list(@PathVariable("lessonId") UUID lessonId) {
@@ -52,7 +54,8 @@ public class LessonResourceAdminController {
     public LessonResourceResponse create(@PathVariable("lessonId") UUID lessonId,
                                          @Valid @RequestBody CreateLessonResourceRequest request) {
         return LessonResourceResponse.from(createResource.execute(new CreateLessonResourceCommand(lessonId,
-                request.type(), request.title(), request.url(), request.sortOrder())));
+                request.type(), request.title(), request.url(), request.fileKey(), currentUser.requireUserId(),
+                request.sortOrder())));
     }
 
     @PutMapping("/resources/{resourceId}")

@@ -1,5 +1,6 @@
 package com.ieltspath.user.domain.aggregate;
 
+import com.ieltspath.user.domain.vo.DisplayName;
 import com.ieltspath.user.domain.vo.ProfileVisibility;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -40,10 +41,7 @@ public class LearnerProfile {
 
     /** The avatar is not touched here: it changes only through {@link #updateAvatarReference}, i.e. upload and delete. */
     public void updateDetails(String displayName, String bio, BigDecimal selfReportedBand, String timezone) {
-        if (displayName == null || displayName.isBlank()) {
-            throw new IllegalArgumentException("Tên hiển thị không được để trống");
-        }
-        this.displayName = displayName.trim();
+        this.displayName = new DisplayName(displayName).value();
         this.bio = bio;
         this.selfReportedBand = selfReportedBand;
         if (timezone != null && !timezone.isBlank()) {

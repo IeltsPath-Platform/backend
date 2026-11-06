@@ -24,4 +24,10 @@ public class JdbcLlmUsageQuota implements LlmUsageQuota {
                 WHERE llm_daily_usage.count < ?
                 """, userId, day, kind, limit) == 1;
     }
+
+    @Override
+    public void release(UUID userId, LocalDate day, String kind) {
+        jdbc.update("UPDATE llm_daily_usage SET count = count - 1 WHERE user_id = ? AND usage_date = ? AND kind = ? AND count > 0",
+                userId, day, kind);
+    }
 }

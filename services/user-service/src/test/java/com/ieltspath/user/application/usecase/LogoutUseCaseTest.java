@@ -1,5 +1,7 @@
 package com.ieltspath.user.application.usecase;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import com.ieltspath.user.domain.aggregate.RefreshToken;
 import com.ieltspath.user.domain.repository.RefreshTokenRepository;
 import org.junit.jupiter.api.Test;
@@ -48,5 +50,16 @@ class LogoutUseCaseTest {
         useCase.execute(" ");
 
         verifyNoInteractions(refreshTokenRepository, tokenHashService);
+    }
+
+    @Test
+    void ignoresARefreshTokenThatHasNoStoredRow() {
+        LogoutUseCase useCase = new LogoutUseCase(refreshTokenRepository, tokenHashService);
+        when(tokenHashService.hash("unknown")).thenReturn("unknown-hash");
+        when(refreshTokenRepository.findByTokenHash("unknown-hash")).thenReturn(Optional.empty());
+
+        useCase.execute("unknown");
+
+        verify(refreshTokenRepository, never()).save(any());
     }
 }

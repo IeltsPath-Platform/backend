@@ -4,7 +4,7 @@
 ALTER TABLE kp_evidence DROP CONSTRAINT kp_evidence_source_check;
 ALTER TABLE kp_evidence ADD CONSTRAINT kp_evidence_source_check CHECK (source IN
     ('lesson_exercise', 'review_set', 'assessment', 'lesson_writing', 'practice_set', 'diagnostic_probe',
-     'free_practice', 'error_trap', 'human_review'));
+     'free_practice', 'error_trap', 'speaking_practice', 'human_review'));
 
 CREATE TABLE human_review_outcomes (
     review_submission_id UUID PRIMARY KEY,

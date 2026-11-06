@@ -41,6 +41,22 @@ class LearnerProfileTest {
     }
 
     @Test
+    void updateDetails_acceptsADisplayNameAsLongAsTheColumnAndRejectsLonger() {
+        LearnerProfile profile = LearnerProfile.builder()
+                .userId(UUID.randomUUID())
+                .displayName("Name")
+                .build();
+
+        profile.updateDetails("n".repeat(150), null, null, null);
+        assertThat(profile.getDisplayName()).hasSize(150);
+
+        assertThatThrownBy(() -> profile.updateDetails("n".repeat(151), null, null, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Tên hiển thị không được vượt quá 150 ký tự");
+        assertThat(profile.getDisplayName()).hasSize(150);
+    }
+
+    @Test
     void changeVisibility_updatesVisibility() {
         LearnerProfile profile = LearnerProfile.builder()
                 .userId(UUID.randomUUID())

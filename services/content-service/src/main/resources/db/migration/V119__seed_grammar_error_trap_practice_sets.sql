@@ -1,5 +1,5 @@
 -- AI-authored draft practice material; an IELTS-qualified examiner must review it before learner release.
--- Practice sets for the grammar error codes that V115 gave a trap point (ARTICLE, SUBJECT_VERB_AGREEMENT,
+-- Practice sets for the grammar error codes that V118 gave a trap point (ARTICLE, SUBJECT_VERB_AGREEMENT,
 -- SENTENCE_FRAGMENT, TENSE). Each set has four multiple-choice questions mapped to the grammar point; two carry the trap
 -- option, so the error-trap review can find at least two matching traps in a set, as the coverage rule requires.
 -- Correct keys within a set are spread (A, B, C, A) so no key covers more than half of a set.

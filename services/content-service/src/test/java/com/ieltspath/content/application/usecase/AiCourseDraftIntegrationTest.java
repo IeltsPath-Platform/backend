@@ -87,6 +87,10 @@ class AiCourseDraftIntegrationTest {
     @TestConfiguration
     static class Beans {
         @Bean ObjectMapper objectMapper() { return new ObjectMapper(); }
+        /** These tests only create link resources, so the document storage is never reached. */
+        @Bean com.ieltspath.content.application.port.LessonDocumentFiles documentFiles() {
+            return org.mockito.Mockito.mock(com.ieltspath.content.application.port.LessonDocumentFiles.class);
+        }
         @Bean VocabularySenseLookup senses() { return ids -> Set.copyOf(ids); }
         @Bean com.ieltspath.content.application.port.VocabularySenseWriter words() { return words -> java.util.Map.of(); }
         @Bean ContentGenerationPort model() {

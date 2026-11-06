@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.time.Instant;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -24,6 +25,43 @@ class LessonResourceTest {
         assertThat(resource.getTitle()).isEqualTo("Slide buổi 1");
         assertThat(resource.getUrl()).isEqualTo("https://docs.google.com/presentation/d/abc/edit");
         assertThat(resource.getCreatedAt()).isEqualTo(resource.getUpdatedAt());
+    }
+
+    private static final String KEY = "lesson-document/0b1f7c9e-3a40-4d3a-9a52-1d2c8e0a7f11/9c2e5d3a-77b1-4f0a-8f6e-2b8d1c4a9e10.pdf";
+
+    @Test
+    void aDocumentCanBeAnUploadedFileThatHasNoLink() {
+        LessonResource file = LessonResource.createFile(lessonId, " Giáo trình ", " " + KEY + " ", 0);
+
+        assertThat(file.getResourceType()).isEqualTo(LessonResourceType.DOCUMENT);
+        assertThat(file.getFileKey()).isEqualTo(KEY);
+        assertThat(file.getUrl()).isNull();
+        assertThat(file.getTitle()).isEqualTo("Giáo trình");
+    }
+
+    @Test
+    void aFileResourceCanBeRenamedAndReorderedButNotTurnedIntoALink() {
+        LessonResource file = LessonResource.createFile(lessonId, "Cũ", KEY, 0);
+
+        file.update("Mới", null, 3);
+
+        assertThat(file.getTitle()).isEqualTo("Mới");
+        assertThat(file.getSortOrder()).isEqualTo(3);
+        assertThat(file.getFileKey()).isEqualTo(KEY);
+        assertThatThrownBy(() -> file.update("Mới", "https://a.com", 3)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void aResourceIsEitherALinkOrAFileAndOnlyADocumentCanBeAFile() {
+        Instant now = Instant.now();
+        assertThatThrownBy(() -> new LessonResource(UUID.randomUUID(), lessonId, LessonResourceType.DOCUMENT, "x",
+                "https://a.com", KEY, 0, now, now)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new LessonResource(UUID.randomUUID(), lessonId, LessonResourceType.DOCUMENT, "x",
+                null, null, 0, now, now)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new LessonResource(UUID.randomUUID(), lessonId, LessonResourceType.SLIDE, "x",
+                null, KEY, 0, now, now)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> LessonResource.createFile(lessonId, "x", "content-image/u/f.png", 0))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @ParameterizedTest

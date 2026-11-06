@@ -18,12 +18,23 @@ public class ManageRubricsUseCase {
 
     public Rubric create(String code, String task, int version, String sourceNote,
                          List<Rubric.Criterion> criteria, List<Rubric.Example> examples) {
-        return rubrics.create(new Rubric(code, task, version, sourceNote, "DRAFT", criteria, examples));
+        return create(code, task, version, sourceNote, null, criteria, examples);
+    }
+
+    public Rubric create(String code, String task, int version, String sourceNote, String systemPrompt,
+                         List<Rubric.Criterion> criteria, List<Rubric.Example> examples) {
+        return rubrics.create(new Rubric(code, task, version, sourceNote, "DRAFT", systemPrompt, criteria, examples));
     }
 
     public Rubric updateDraft(String code, int version, String task, String sourceNote,
                               List<Rubric.Criterion> criteria, List<Rubric.Example> examples) {
-        return rubrics.updateDraft(code, version, new Rubric(code, task, version, sourceNote, "DRAFT", criteria, examples));
+        return updateDraft(code, version, task, sourceNote, null, criteria, examples);
+    }
+
+    public Rubric updateDraft(String code, int version, String task, String sourceNote, String systemPrompt,
+                              List<Rubric.Criterion> criteria, List<Rubric.Example> examples) {
+        return rubrics.updateDraft(code, version, new Rubric(code, task, version, sourceNote, "DRAFT", systemPrompt,
+                criteria, examples));
     }
 
     public Rubric activate(String code, int version) { return rubrics.activate(code, version); }
@@ -60,7 +71,9 @@ public class ManageRubricsUseCase {
     }
 
     private static String requireTask(String task) {
-        if (!List.of("TASK_1", "TASK_2").contains(task)) throw new IllegalArgumentException("task must be TASK_1 or TASK_2");
+        if (!List.of("TASK_1", "TASK_2", "SPEAKING").contains(task)) {
+            throw new IllegalArgumentException("task must be TASK_1, TASK_2 or SPEAKING");
+        }
         return task;
     }
 }

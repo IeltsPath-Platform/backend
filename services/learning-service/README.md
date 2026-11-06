@@ -253,6 +253,13 @@ approved error codes count against their trap points. Up to `learning.human-revi
 shared between `ERROR_PATTERN` and `WRITING_CRITERION`. Dead letters of `learning.human-review-completed.v1.dlq` are replayed with
 `POST /api/learning/admin/dead-letters/{queue}/replay`. See [human-review-completed-v1](../../docs/contracts/human-review-completed-v1.md).
 
+## AI Speaking practice
+
+Speaking submissions are graded asynchronously with Azure Speech followed by one LLM request. Each submission snapshots
+the active Content rubric, caches Azure analysis by recording, stores learner-facing `display` separately from internal
+`signals`, and charges points only after a valid grade is saved. The scheduler and submission endpoint are disabled by
+default until the starter rubric is reviewed. See the [Speaking grading contract](../../docs/contracts/speaking-practice-grading-v1.md).
+
 ## Assessment results
 
 The consumer reads queue `learning.assessment-completed.v2` (bound to `assessment.events` /

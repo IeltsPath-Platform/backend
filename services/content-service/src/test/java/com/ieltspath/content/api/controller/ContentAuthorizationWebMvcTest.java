@@ -64,6 +64,7 @@ class ContentAuthorizationWebMvcTest {
     @MockitoBean CreateCourseUseCase createCourse;
     @MockitoBean UpdateCourseUseCase updateCourse;
     @MockitoBean MediaReferencePolicy mediaReferencePolicy;
+    @MockitoBean com.ieltspath.content.application.usecase.MediaUrlResolver mediaUrlResolver;
 
     @Test
     @WithMockUser(roles = "CUSTOMER")

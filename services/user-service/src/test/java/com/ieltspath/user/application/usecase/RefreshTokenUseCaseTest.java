@@ -140,4 +140,51 @@ class RefreshTokenUseCaseTest {
                 .status(UserStatus.ACTIVE)
                 .build();
     }
+
+    private RefreshTokenUseCase useCase() {
+        return new RefreshTokenUseCase(refreshTokenRepository, userRepository, tokenHashService, authTokenIssuer, userLock);
+    }
+
+    private RefreshToken tokenExpiringAt(LocalDateTime expiresAt) {
+        return RefreshToken.builder()
+                .id(UUID.randomUUID())
+                .userId(UUID.randomUUID())
+                .tokenHash("hashed-token")
+                .expiresAt(expiresAt)
+                .build();
+    }
+
+    @Test
+    void rejectsATokenThatAlreadyGotItsNewPair() {
+        RefreshToken storedToken = tokenExpiringAt(LocalDateTime.now().plusHours(1));
+        when(tokenHashService.hash("refresh-1")).thenReturn("hashed-token");
+        when(refreshTokenRepository.findByTokenHash("hashed-token")).thenReturn(Optional.of(storedToken));
+        when(refreshTokenRepository.consumeActiveToken(eq("hashed-token"), any(LocalDateTime.class)))
+                .thenReturn(Optional.of(storedToken))
+                .thenReturn(Optional.empty());
+        when(userRepository.findById(storedToken.getUserId())).thenReturn(Optional.of(activeUser(storedToken.getUserId())));
+        when(authTokenIssuer.issue(any(User.class))).thenReturn(new AuthTokenResult("access-2", "refresh-2", 3600, 604800));
+        RefreshTokenUseCase useCase = useCase();
+
+        useCase.execute("refresh-1");
+
+        assertThatThrownBy(() -> useCase.execute("refresh-1"))
+                .isInstanceOf(AuthenticationFailedException.class)
+                .hasMessage("Refresh token không hợp lệ");
+        verify(authTokenIssuer, org.mockito.Mockito.times(1)).issue(any(User.class));
+    }
+
+    @Test
+    void rejectsAnExpiredTokenEvenIfTheRepositoryStillHandsItBack() {
+        RefreshToken storedToken = tokenExpiringAt(LocalDateTime.now().minusSeconds(1));
+        when(tokenHashService.hash("refresh-1")).thenReturn("hashed-token");
+        when(refreshTokenRepository.findByTokenHash("hashed-token")).thenReturn(Optional.of(storedToken));
+        when(refreshTokenRepository.consumeActiveToken(eq("hashed-token"), any(LocalDateTime.class)))
+                .thenReturn(Optional.of(storedToken));
+
+        assertThatThrownBy(() -> useCase().execute("refresh-1"))
+                .isInstanceOf(AuthenticationFailedException.class)
+                .hasMessage("Refresh token không hợp lệ");
+        verifyNoInteractions(userRepository, authTokenIssuer);
+    }
 }

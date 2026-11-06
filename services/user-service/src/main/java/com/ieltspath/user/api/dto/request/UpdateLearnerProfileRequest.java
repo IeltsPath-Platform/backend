@@ -1,5 +1,6 @@
 package com.ieltspath.user.api.dto.request;
 
+import com.ieltspath.user.domain.vo.DisplayName;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
@@ -10,7 +11,7 @@ import java.math.BigDecimal;
 
 public record UpdateLearnerProfileRequest(
         @NotBlank(message = "Tên hiển thị không được để trống")
-        @Size(max = 100, message = "Tên hiển thị không được vượt quá 100 ký tự")
+        @Size(max = DisplayName.MAX_LENGTH, message = DisplayName.TOO_LONG_MESSAGE)
         String displayName,
 
         /** Ignored: the avatar changes only through POST and DELETE /api/users/me/avatar. Kept so existing clients still work. */

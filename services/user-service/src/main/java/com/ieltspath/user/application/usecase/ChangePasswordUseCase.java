@@ -10,6 +10,7 @@ import com.ieltspath.user.domain.exception.UserNotFoundException;
 import com.ieltspath.user.domain.repository.PasswordChangeAttemptRepository;
 import com.ieltspath.user.domain.repository.RefreshTokenRepository;
 import com.ieltspath.user.domain.repository.UserRepository;
+import com.ieltspath.user.domain.vo.PasswordPolicy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -33,6 +34,9 @@ public class ChangePasswordUseCase {
      */
     @Transactional(noRollbackFor = PasswordChangeException.class)
     public void execute(ChangePasswordCommand command) {
+        if (!PasswordPolicy.isWithinLimits(command.newPassword())) {
+            throw new IllegalArgumentException(PasswordPolicy.MESSAGE);
+        }
         UUID userId = command.userId();
         userLock.lock(userId);
         LocalDateTime now = LocalDateTime.now();

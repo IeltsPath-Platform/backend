@@ -8,6 +8,7 @@ import com.ieltspath.content.application.result.StoredMediaResult;
 import com.ieltspath.content.application.usecase.SectionMediaUseCases;
 import com.ieltspath.content.application.usecase.UploadContentAudioUseCase;
 import com.ieltspath.content.application.usecase.UploadContentImageUseCase;
+import com.ieltspath.content.application.usecase.UploadLessonDocumentUseCase;
 import com.ieltspath.content.domain.vo.AccessTier;
 import com.ieltspath.content.domain.exception.VersionNotDraftException;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,6 +34,7 @@ class ContentMediaControllerTest {
 
     private final UploadContentAudioUseCase upload = mock(UploadContentAudioUseCase.class);
     private final UploadContentImageUseCase uploadImage = mock(UploadContentImageUseCase.class);
+    private final UploadLessonDocumentUseCase uploadDocument = mock(UploadLessonDocumentUseCase.class);
     private final SectionMediaUseCases media = mock(SectionMediaUseCases.class);
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private final UUID userId = UUID.randomUUID();
@@ -42,7 +44,7 @@ class ContentMediaControllerTest {
     @BeforeEach
     void setUp() {
         when(currentUser.requireUserId()).thenReturn(userId);
-        mockMvc = MockMvcBuilders.standaloneSetup(new ContentMediaController(upload, uploadImage, currentUser),
+        mockMvc = MockMvcBuilders.standaloneSetup(new ContentMediaController(upload, uploadImage, uploadDocument, currentUser),
                         new SectionMediaController(media))
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
     }
@@ -177,5 +179,47 @@ class ContentMediaControllerTest {
         mockMvc.perform(delete("/api/content/admin/packages/{p}/versions/{v}/sections/{s}/audio", p, v, s))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.details.code").value("VERSION_NOT_DRAFT"));
+    }
+
+    private static MockMultipartFile pdf() {
+        return new MockMultipartFile("file", "a.pdf", "application/pdf", "%PDF-1.7".getBytes());
+    }
+
+    @Test
+    void documentUploadReturnsTheKeyAndNoPublicUrl() throws Exception {
+        when(uploadDocument.execute(eq(userId), eq("application/pdf"), any())).thenReturn(
+                new StoredMediaResult("lesson-document/u/f.pdf", null, "application/pdf", 8));
+
+        mockMvc.perform(multipart("/api/content/admin/media/document").file(pdf()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.mediaReference").value("lesson-document/u/f.pdf"))
+                .andExpect(jsonPath("$.contentType").value("application/pdf"))
+                .andExpect(jsonPath("$.sizeBytes").value(8))
+                .andExpect(jsonPath("$.mediaUrl").doesNotExist());
+    }
+
+    @Test
+    void documentUploadErrorsCarryDocumentCodes() throws Exception {
+        when(uploadDocument.execute(eq(userId), any(), any()))
+                .thenThrow(new UploadRejectedException(UploadRejectedException.Reason.TOO_LARGE))
+                .thenThrow(new UploadRejectedException(UploadRejectedException.Reason.CONTENT_MISMATCH))
+                .thenThrow(new UploadRejectedException(UploadRejectedException.Reason.TYPE_NOT_ALLOWED))
+                .thenThrow(StorageException.withoutObject("put", StorageException.Reason.UNAVAILABLE));
+
+        mockMvc.perform(multipart("/api/content/admin/media/document").file(pdf()))
+                .andExpect(status().isPayloadTooLarge()).andExpect(jsonPath("$.details.code").value("DOCUMENT_TOO_LARGE"));
+        mockMvc.perform(multipart("/api/content/admin/media/document").file(pdf()))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.details.code").value("UNSUPPORTED_DOCUMENT"));
+        mockMvc.perform(multipart("/api/content/admin/media/document").file(pdf()))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.details.code").value("UNSUPPORTED_DOCUMENT"));
+        mockMvc.perform(multipart("/api/content/admin/media/document").file(pdf()))
+                .andExpect(status().isServiceUnavailable()).andExpect(jsonPath("$.details.code").value("STORAGE_UNAVAILABLE"));
+    }
+
+    @Test
+    void emptyDocumentIsRejectedBeforeTheUseCase() throws Exception {
+        mockMvc.perform(multipart("/api/content/admin/media/document")
+                        .file(new MockMultipartFile("file", "a.pdf", "application/pdf", new byte[0])))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.details.code").value("EMPTY_FILE"));
     }
 }

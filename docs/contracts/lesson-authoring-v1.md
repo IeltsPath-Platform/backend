@@ -85,6 +85,29 @@ returns `503`.
 `POST /api/content/admin/lessons/{lessonId}/archive` archives the lesson and returns its updated detail. Learning
 then omits the lesson from learner-facing reads.
 
+## Documents uploaded as files
+
+A lesson document is either a link (`url`) or a PDF the author uploaded (`fileKey`), never both. A slide is always a link.
+
+`POST /api/content/admin/media/document` (multipart field `file`, `CONTENT_AUTHOR` only) stores a PDF in the private
+premium bucket under `lesson-document/{userId}/{uuid}.pdf` and returns `201 { mediaReference, contentType, sizeBytes }`.
+The file is checked by its bytes (`%PDF-`), not by the type the client claims. The response carries no public URL.
+Errors: `400 EMPTY_FILE`, `400 UNSUPPORTED_DOCUMENT`, `413 DOCUMENT_TOO_LARGE` (limit 20 MB), `503 STORAGE_UNAVAILABLE`.
+
+`POST /api/content/admin/lessons/{lessonId}/resources` takes `{ type: "DOCUMENT", title, fileKey, sortOrder }` to attach the
+upload. The key must be one this author uploaded and must exist in storage; a key of another author, outside
+`lesson-document/`, with a path trick, or whose file is missing returns `400`. A slide with a `fileKey`, or a body with both
+`url` and `fileKey`, returns `400`.
+
+`PUT .../resources/{resourceId}` of a file resource takes `{ title, sortOrder }` and no `url`; to replace the file, delete the
+resource and add a new one. Deleting a file resource removes its file after the row is committed; a failed cleanup is logged
+and never fails the delete.
+
+Reads (`GET .../resources`, the internal learner read, and the write responses) return `url` and `fileKey` per resource. For a
+file, `url` is a signed download link valid for 15 minutes (`content.media.premium-url-ttl-seconds`) and `fileKey` is set; for a
+link, `fileKey` is `null`. Signing happens in Content on the internal read that Learning calls after its lesson access check, so
+a learner who cannot read the lesson never gets a link. Do not log or store these links.
+
 ## Reorder slides or documents
 
 `PUT /api/content/admin/lessons/{lessonId}/resources/order` with body `{ "type": "SLIDE" | "DOCUMENT", "resourceIds": ["<uuid>"] }`

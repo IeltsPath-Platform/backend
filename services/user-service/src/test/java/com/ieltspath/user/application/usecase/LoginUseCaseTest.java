@@ -1,5 +1,6 @@
 package com.ieltspath.user.application.usecase;
 
+import static org.mockito.Mockito.verifyNoInteractions;
 import com.ieltspath.user.application.result.AuthTokenResult;
 import com.ieltspath.user.domain.aggregate.User;
 import com.ieltspath.user.domain.exception.AuthenticationFailedException;
@@ -66,5 +67,39 @@ class LoginUseCaseTest {
         assertThatThrownBy(() -> useCase.execute("john@example.com", "bad"))
                 .isInstanceOf(AuthenticationFailedException.class)
                 .hasMessage("Email hoặc mật khẩu không đúng");
+    }
+
+    private User userWithStatus(UserStatus status) {
+        return User.builder()
+                .id(UUID.randomUUID())
+                .email(new Email("john@example.com"))
+                .passwordHash("hash")
+                .fullName("John Doe")
+                .status(status)
+                .build();
+    }
+
+    @Test
+    void rejectsAnEmailWithNoAccountWithTheSameMessageAsAWrongPassword() {
+        LoginUseCase useCase = new LoginUseCase(userRepository, passwordEncoder, authTokenIssuer);
+        when(userRepository.findByEmail("nobody@example.com")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> useCase.execute("nobody@example.com", "secret123"))
+                .isInstanceOf(AuthenticationFailedException.class)
+                .hasMessage("Email hoặc mật khẩu không đúng");
+        verifyNoInteractions(passwordEncoder, authTokenIssuer);
+    }
+
+    @Test
+    void rejectsLockedAndInactiveAccountsBeforeCheckingThePassword() {
+        LoginUseCase useCase = new LoginUseCase(userRepository, passwordEncoder, authTokenIssuer);
+        for (UserStatus status : new UserStatus[]{UserStatus.LOCKED, UserStatus.INACTIVE, UserStatus.PENDING_VERIFY}) {
+            when(userRepository.findByEmail("john@example.com")).thenReturn(Optional.of(userWithStatus(status)));
+
+            assertThatThrownBy(() -> useCase.execute("john@example.com", "secret123"))
+                    .isInstanceOf(AuthenticationFailedException.class)
+                    .hasMessage("Email hoặc mật khẩu không đúng");
+        }
+        verifyNoInteractions(passwordEncoder, authTokenIssuer);
     }
 }

@@ -372,10 +372,10 @@ public class LessonAuthoringRepositoryAdapter implements LessonAuthoringReposito
                     rs.getObject("id", UUID.class), rs.getInt("version_number"),
                     QuestionType.valueOf(rs.getString("question_type")), enumOrNull(Skill.class, rs.getString("skill")),
                     enumOrNull(QuestionPurpose.class, rs.getString("purpose")),
-                    PublicationStatus.valueOf(rs.getString("status")), rs.getString("stem"), rs.getString("answer_spec")));
+                    PublicationStatus.valueOf(rs.getString("status")), rs.getString("stem"), rs.getString("answer_spec"), rs.getObject("question_id", UUID.class)));
         };
         namedJdbc.query("""
-                SELECT lbq.block_id, qv.id, qv.version_number, q.question_type, q.skill, q.purpose,
+                SELECT lbq.block_id, qv.id, qv.question_id, qv.version_number, q.question_type, q.skill, q.purpose,
                        qv.status, qv.stem, qv.answer_spec::text
                 FROM lesson_block_questions lbq
                 JOIN question_versions qv ON qv.id = lbq.question_version_id

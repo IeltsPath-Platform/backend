@@ -51,6 +51,19 @@ class PointWalletTest {
     }
 
     @Test
+    @DisplayName("Should allow a debit equal to the balance and leave the wallet at zero")
+    void shouldAllowDebitEqualToBalance() {
+        PointWallet wallet = PointWallet.create(UUID.randomUUID());
+        wallet.credit(10);
+
+        wallet.debit(10);
+
+        assertThat(wallet.getBalance()).isZero();
+        assertThat(wallet.getTotalDebited()).isEqualTo(10);
+        assertThat(wallet.getTotalCredited()).isEqualTo(10);
+    }
+
+    @Test
     @DisplayName("Should throw InsufficientPointsException when debiting more than balance")
     void shouldThrowWhenDebitExceedsBalance() {
         PointWallet wallet = PointWallet.create(UUID.randomUUID());

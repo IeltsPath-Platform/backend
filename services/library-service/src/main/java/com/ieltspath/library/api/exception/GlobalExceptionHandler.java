@@ -36,6 +36,14 @@ public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    @ExceptionHandler({org.springframework.dao.QueryTimeoutException.class,
+            org.springframework.transaction.TransactionTimedOutException.class})
+    public ResponseEntity<ErrorResponse> handleQueryTimeout(Exception ex, HttpServletRequest request) {
+        log.warn("Database query timed out: {}", request.getRequestURI());
+        return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, "Dịch vụ đang bận. Vui lòng thử lại.",
+                request.getRequestURI(), null);
+    }
+
     @ExceptionHandler({
             VocabularyNotFoundException.class,
             VideoNotFoundException.class
