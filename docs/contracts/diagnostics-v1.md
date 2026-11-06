@@ -15,7 +15,7 @@ For a **blocking** review of B, at the first of:
 
 and only if B has at least one active prerequisite (Content, `POST /internal/learning-content/knowledge-points/prerequisites`).
 A review gets at most one diagnosis. A review that itself came from a diagnosis (`trigger_kind = DIAGNOSTIC`) is never
-diagnosed again, which keeps the walk back finite. Optional reviews (review basket, free practice test) never open one.
+diagnosed again, which keeps the walk back finite. Optional reviews (review basket) never open one.
 
 ## How it runs
 

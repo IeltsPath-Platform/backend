@@ -32,6 +32,11 @@ public class JdbcPracticeTestAssignmentRepository implements PracticeTestAssignm
                 AND consumed_attempt_id IS NULL AND assigned_at<=:completed ORDER BY assigned_at,id LIMIT 1 FOR UPDATE
                 """,Map.of("user",userId,"version",versionId,"completed",Timestamp.from(completedAt)),ROW).stream().findFirst();
     }
+    @Override public boolean isConsumedBy(UUID userId,UUID attemptId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "SELECT EXISTS (SELECT 1 FROM practice_test_assignments WHERE user_id=:user AND consumed_attempt_id=:attempt)",
+                Map.of("user",userId,"attempt",attemptId),Boolean.class));
+    }
     @Override public void save(PracticeTestAssignment a) {
         jdbc.update("""
                 INSERT INTO practice_test_assignments(id,user_id,course_id,package_id,package_version_id,assigned_at,

@@ -14,6 +14,7 @@ public final class LessonEvidenceReference {
     private static final UUID WRITING_NAMESPACE = uuid5(DNS_NAMESPACE, "ielts-path:lesson_writing");
     private static final UUID FREE_NAMESPACE = uuid5(DNS_NAMESPACE, "ielts-path:free_practice");
     private static final UUID PROBE_NAMESPACE = uuid5(DNS_NAMESPACE, "ielts-path:diagnostic_probe");
+    private static final UUID HUMAN_REVIEW_NAMESPACE = uuid5(DNS_NAMESPACE, "ielts-path:human_review");
     /** Fixed by the AssessmentCompleted.v2 contract. */
     private static final UUID ASSESSMENT_NAMESPACE = UUID.fromString("6f0c1b2e-3d7a-4e59-9b8a-2c4d5e6f7a81");
 
@@ -26,6 +27,14 @@ public final class LessonEvidenceReference {
     /** Reference of review-set evidence; a separate namespace keeps it apart from lesson evidence. */
     public static UUID forReviewSet(UUID requestId, UUID questionVersionId, UUID kpId) {
         return uuid5(REVIEW_NAMESPACE, requestId + ":" + questionVersionId + ":" + kpId);
+    }
+
+    /**
+     * Reference of an examiner's evidence for one knowledge point of one standalone review. The review id is unique per essay,
+     * so a stored review is applied once per point.
+     */
+    public static UUID forHumanReview(UUID reviewSubmissionId, UUID kpId) {
+        return uuid5(HUMAN_REVIEW_NAMESPACE, reviewSubmissionId + ":" + kpId);
     }
 
     public static UUID forDiagnosticProbe(UUID requestId, UUID questionVersionId, UUID kpId) {

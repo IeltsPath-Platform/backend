@@ -1,21 +1,28 @@
 package com.ieltspath.learning.application.usecase;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.port.HumanReviewClient;
 import com.ieltspath.learning.application.port.HumanReviewClient.CreateReview;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.domain.aggregate.WritingSubmission;
+import com.ieltspath.learning.domain.repository.HumanReviewOutcomeRepository;
 import com.ieltspath.learning.domain.repository.HumanReviewRequestRepository;
 import com.ieltspath.learning.domain.repository.WritingSubmissionRepository;
 import com.ieltspath.learning.domain.vo.WritingSubmissionStatus;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /**
- * A learner with a human-grading credit asks a Mentor to review a graded lesson or Practice essay. The review is feedback
- * only: it writes no evidence, makes no review and changes no gate. The credit is spent once per essay (Access is
+ * A learner with a human-grading credit asks a Mentor to review a lesson or Practice essay, graded by the AI or sent straight
+ * to the examiner. Asking writes nothing to mastery; the finished grade does, when Assessment reports it (see
+ * {@link ApplyHumanReviewResultUseCase}), and it changes no gate. The credit is spent once per essay (Access is
  * idempotent by essay id). It is given back only when this call spent it and Assessment refused the review outright; a
  * timeout or server error may have left the review behind, so the request is repeated (Assessment creates a review once
  * per request id) and, if it still fails, the credit stays with the essay and asking again reuses it. No call holds a
@@ -27,13 +34,37 @@ public class HumanReviewUseCase {
     private final HumanReviewRequestRepository requests;
     private final HumanReviewClient client;
     private final LearningContentClient content;
+    private final HumanReviewOutcomeRepository outcomes;
+    private final ObjectMapper json;
 
     public HumanReviewUseCase(WritingSubmissionRepository essays, HumanReviewRequestRepository requests,
-                              HumanReviewClient client, LearningContentClient content) {
+                              HumanReviewClient client, LearningContentClient content,
+                              HumanReviewOutcomeRepository outcomes, ObjectMapper json) {
         this.essays = essays;
         this.requests = requests;
         this.client = client;
         this.content = content;
+        this.outcomes = outcomes;
+        this.json = json;
+    }
+
+    /**
+     * What the examiner's review taught the learner: the marked errors and weak criteria, as applied to mastery. Empty until the
+     * review has been applied.
+     */
+    public List<JsonNode> studyPoints(UUID userId, UUID submissionId) {
+        owned(userId, submissionId);
+        return outcomes.studyPointsOf(submissionId)
+                .map(stored -> {
+                    try {
+                        List<JsonNode> points = new ArrayList<>();
+                        json.readTree(stored).forEach(points::add);
+                        return points;
+                    } catch (JsonProcessingException corrupt) {
+                        throw new IllegalStateException("Stored human review study points are invalid", corrupt);
+                    }
+                })
+                .orElse(List.of());
     }
 
     /**

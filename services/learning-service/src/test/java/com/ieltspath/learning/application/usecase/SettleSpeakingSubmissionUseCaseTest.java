@@ -6,7 +6,6 @@ import com.ieltspath.learning.application.exception.InsufficientPointsException;
 import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.port.AccessClient;
 import com.ieltspath.learning.application.port.LearnerLock;
-import com.ieltspath.learning.application.service.SpeakingPathUpdater;
 import com.ieltspath.learning.application.service.SpeakingSettingsFixture;
 import com.ieltspath.learning.domain.aggregate.SpeakingSubmission;
 import com.ieltspath.learning.domain.repository.SpeakingSubmissionRepository;
@@ -38,7 +37,6 @@ class SettleSpeakingSubmissionUseCaseTest {
 
     private final SpeakingSubmissionRepository submissions = mock(SpeakingSubmissionRepository.class);
     private final AccessClient points = mock(AccessClient.class);
-    private final SpeakingPathUpdater pathUpdater = mock(SpeakingPathUpdater.class);
     private final LearnerLock lock = mock(LearnerLock.class);
     private SettleSpeakingSubmissionUseCase useCase;
     private SpeakingSubmission submission;
@@ -47,8 +45,7 @@ class SettleSpeakingSubmissionUseCaseTest {
     void setUp() {
         PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
         when(transactions.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
-        useCase = new SettleSpeakingSubmissionUseCase(submissions, points, pathUpdater, lock,
-                SpeakingSettingsFixture.enabled(), new ObjectMapper(), transactions);
+        useCase = new SettleSpeakingSubmissionUseCase(submissions, points, lock, transactions);
         submission = mock(SpeakingSubmission.class);
         when(submission.id()).thenReturn(SUBMISSION);
         when(submission.userId()).thenReturn(USER);

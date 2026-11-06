@@ -11,9 +11,14 @@ import java.util.Objects;
  */
 public record Mp1Params(int window, int maxPracticeInWindow, double halfLifeDays, int minEvidence, int minDistinctDays,
                         double minConfidence, double hysteresis, int sameItemDays, SourceWeights weights) {
-    /** Weight of one answer by where it came from. */
+    /** Weight of one answer by where it came from. An examiner's band counts more than an AI essay grade, less than a test. */
     public record SourceWeights(double exam, double review, double probe, double practice, double essay,
-                                double errorTrap) {
+                                double errorTrap, double humanReview) {
+        public static final double DEFAULT_HUMAN_REVIEW = 0.75;
+
+        public SourceWeights(double exam, double review, double probe, double practice, double essay, double errorTrap) {
+            this(exam, review, probe, practice, essay, errorTrap, DEFAULT_HUMAN_REVIEW);
+        }
         public SourceWeights(double exam, double review, double probe, double practice, double essay) {
             this(exam, review, probe, practice, essay, 0.3);
         }
@@ -24,8 +29,9 @@ public record Mp1Params(int window, int maxPracticeInWindow, double halfLifeDays
                 case DIAGNOSTIC_PROBE -> probe;
                 case LESSON_EXERCISE, PRACTICE_SET, FREE_PRACTICE -> practice;
                 // The bands of a graded Speaking answer are criterion judgments like an essay's, so they weigh the same.
-                case LESSON_WRITING, SPEAKING_PRACTICE -> essay;
+                case LESSON_WRITING, SPEAKING_PRACTICE, LESSON_SPEAKING -> essay;
                 case ERROR_TRAP -> errorTrap;
+                case HUMAN_REVIEW -> humanReview;
             };
         }
     }
@@ -40,7 +46,7 @@ public record Mp1Params(int window, int maxPracticeInWindow, double halfLifeDays
 
     public static Mp1Params defaults() {
         return new Mp1Params(8, 3, 30, 3, 2, 1.0, 0.03, 7,
-                new SourceWeights(1.0, 1.0, 1.0, 0.6, 0.5, 0.3));
+                new SourceWeights(1.0, 1.0, 1.0, 0.6, 0.5, 0.3, SourceWeights.DEFAULT_HUMAN_REVIEW));
     }
 
     /** True for evidence that counts against {@code maxPracticeInWindow}. */

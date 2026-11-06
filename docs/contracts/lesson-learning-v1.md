@@ -36,9 +36,11 @@ replays, regrades and later attempts cannot change it. Regrading an already-appl
 later assignment. After DONE the assignment route permits retakes using the currently published version without
 creating another scored assignment. Evidence and question events still follow normal result-version idempotency.
 
-Free `OFFICIAL_PRACTICE` results without a matching assignment write evidence/events without course marks or topic
-progression. `OFFICIAL_PRACTICE` does not invoke the blocking-review generator; nonblocking review generation is
-deferred until review tiers exist. Reviews that were already pending from other sources are unaffected.
+Free `OFFICIAL_PRACTICE` results without a matching assignment (the practice library: Listening, Reading, Writing and Speaking
+tests) log their question events only. They write no mastery evidence, change no mastery profile, make no review, and give no
+course marks or topic progression. A regrade of such an attempt removes any evidence an earlier rule had written for it. The
+attempt that counts for a course milestone keeps writing evidence, and so does its regrade. `OFFICIAL_PRACTICE` never invokes the
+blocking-review generator. Reviews that were already pending from other sources are unaffected.
 
 All routes in this section have prefix `/api/learning`, require the learner bearer token through Gateway, and are scoped to the verified user id. Response JSON uses camelCase. Content reads forward the bearer and `X-Correlation-Id`; a Content `404` becomes `404 NOT_FOUND`, and other dependency failures remain `502`/`503`. Lists are ordered by the Content `sortOrder` and stable ids. Learners cannot call Content's internal API or list packages/questions through public `/api/content` routes.
 
@@ -185,6 +187,12 @@ Only a lesson with **no** `EXERCISE` block can be completed this way; a lesson w
 
 `POST /lessons/{id}/practice-attempts` takes `{packageId}` and returns HTTP 201 with `{attemptId, packageId, packageVersionId, passage?, audio?, questions}`. Starting the same package while an attempt is open returns that attempt and keeps its pinned package version. The package must belong to the lesson. `GET /practice-attempts/{id}` returns the owned attempt's question view, or its saved submission response after submission; another learner's attempt returns 404. Questions expose only `questionVersionId`, `sortOrder`, `stem`, `options`, and `hint`; audio exposes `mediaUrl` and `durationSeconds`. Neither route exposes `answerSpec`, `explanation`, solutions, or transcript before submission.
 
+A Practice set may hold items answered by speaking. The attempt view then lists them in the section as `recorded[]`:
+`{questionVersionId, sortOrder, stem, durationSeconds, passBand, latestSubmission:{id, status, overallBand?, passed?}}`, the band
+and verdict appearing only once the newest recorded answer of this attempt is `GRADED`. `POST /practice-attempts/{id}/speaking-submissions`
+opens that answer (see [speaking-practice-grading-v1](speaking-practice-grading-v1.md)); submitting the attempt answers
+`409 SPEAKING_NOT_GRADED` until it is graded, and recorded items are not part of `answers[]`.
+
 `GET /practice-attempts/{id}/review` reopens a submitted attempt read-only and returns `{attempt, result}`: `attempt` is the question and essay view of the package version the attempt was pinned to (essays carry the learner's newest submission, graded or not), and `result` is the saved submission response. It exposes nothing the submission did not already show, and the learner's own selected answers are not stored. An attempt that is still open returns `409 ATTEMPT_NOT_SUBMITTED`; another learner's attempt returns 404. Starting the same set again ("Làm lại") is unchanged and creates a new attempt.
 
 `POST /practice-attempts/{id}/submissions` takes `{requestId, answers:[{questionVersionId, answer}]}` with exactly one answer per question. It returns `{attemptId, correct, total, percent, passed, countedAsEvidence, results, transcript?, reviewsCreated}`; each result contains `questionVersionId`, `correct`, `correctAnswer`, `explanation`, and `hint:null`. A Listening transcript appears after submission. A repeated `requestId` returns the saved result; another request for a submitted attempt returns `409 ATTEMPT_ALREADY_SUBMITTED`. Passing is at least 70%. Only the first submission of an unrevealed package writes `practice_set` evidence and can give `FIRST_SUBMISSION`; subsequent practice of that package, including after a submitted review set, is graded and revealed but writes no evidence or review. `reviewsCreated` is a list of `{reviewId, knowledgePointId, stage, blocking}`. A knowledge point is weak in a counted submission below 70% when it has at least 2 wrong answers in that set and its own share is under 70%. A weak point with no pending review and an unrevealed eligible set gets a suggested `PRACTICE` review, listed with `blocking: false`; the next lesson stays open. A point that is weak again in another counted set while its suggestion (or an `ERROR_PATTERN` review) is still pending has that review promoted to blocking, listed with `blocking: true`. A point with any other pending optional review (for example one picked from the basket) gets no new review. Lesson completion itself creates no review.
@@ -222,7 +230,12 @@ updates the mastery profile.
 - `weak` is an additive array of points with an optional `PENDING` review that appear in none of the other groups,
   sorted by mastery ascending, then KP code. It includes weak Writing criterion points even when their tier is
   `PRIORITY` or they have no review date. `reason` is the review's trigger kind; Writing criterion reviews use
-  `WRITING_CRITERION`. Existing groups keep their shapes and rules.
+  `WRITING_CRITERION`; Speaking criterion reviews use `SPEAKING_CRITERION`. Existing groups keep their shapes and rules.
+
+A counted recorded answer of a lesson Practice can do the same for the Speaking criteria (FC, LR, GRA, PR) below the item's
+pass band: `skill = SPEAKING`, `trigger_kind = SPEAKING_CRITERION`, at most two per submission, weakest first. These reviews
+never become blocking: an AI grade only suggests, so a weak criterion found again leaves the review optional (see
+[speaking-practice-grading-v1](speaking-practice-grading-v1.md)).
 
 A counted lesson Practice essay can create an optional review for a mapped rubric criterion whose band is strictly
 below the prompt's pass band. These reviews have `blocking = false`, `skill = WRITING`, and
@@ -253,7 +266,7 @@ Role `CUSTOMER`. The counts of the basket without its items, for a badge that is
 Role `CUSTOMER`. Starts an optional review of the point and returns it like `GET /reviews/{reviewId}`, with the first set.
 
 - The point already has a `PENDING` review (blocking or optional): that review is returned and nothing is created.
-  This includes a `WRITING_CRITERION` review at `PRIORITY`; it does not require a lesson teaching that criterion.
+  This includes a `WRITING_CRITERION` or `SPEAKING_CRITERION` review at `PRIORITY`; it does not require a lesson teaching that criterion.
 - Otherwise the point must be at the consolidate tier, or at the maintain tier and due; any other point answers
   `409 NOT_IN_REVIEW_BASKET`. A point no completed lesson teaches answers `409 NO_LESSON_FOR_KNOWLEDGE_POINT`. When
   Content has no set the learner has not seen, `409 NO_UNREVEALED_SET` is returned and nothing is created.
@@ -272,8 +285,9 @@ Both write `review_set` evidence and update the mastery profile. A point can hol
 wrong answer in a graded test or Practice would create a blocking review for a point that has an optional one, that
 review is **upgraded**: it becomes blocking and takes the new trigger (`ASSESSMENT` or `PRACTICE`).
 
-A wrong answer in a **free practice test** (an `OFFICIAL_PRACTICE` result that matches no course milestone assignment)
-can create an optional review with `trigger_kind` `FREE_PRACTICE_TEST`. A milestone practice test creates no review.
+A practice test creates no review: neither a **free practice test** (an `OFFICIAL_PRACTICE` result that matches no course
+milestone assignment) nor a milestone one. `FREE_PRACTICE_TEST` stays an allowed `trigger_kind` only for reviews made before this
+rule.
 
 ### `GET /reviews/{reviewId}`
 

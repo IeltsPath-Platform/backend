@@ -8,12 +8,16 @@ import com.ieltspath.learning.application.service.MasteryProfileUpdater;
 import com.ieltspath.learning.application.service.AnswerDurations;
 import com.ieltspath.learning.domain.vo.QuestionAttemptEvent;
 import com.ieltspath.learning.domain.vo.QuestionEventSource;
+import com.ieltspath.learning.application.port.LearningContentClient.Item;
 import com.ieltspath.learning.application.port.LearningContentClient.PackageVersion;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.service.FirstAttemptMistakes;
 import com.ieltspath.learning.application.service.FreePracticeSubmission;
 import com.ieltspath.learning.application.service.GamificationRecorder;
 import com.ieltspath.learning.application.service.HeartsService;
+import com.ieltspath.learning.application.service.SpeakingPracticeBand;
+import com.ieltspath.learning.application.service.SpeakingPracticeSettings;
+import com.ieltspath.learning.application.service.SpeakingResultSignals;
 import com.ieltspath.learning.application.service.WritingCriterionReviews;
 import com.ieltspath.learning.application.service.ErrorTrapEvidence;
 import com.ieltspath.learning.application.service.ErrorTrapCatalog;
@@ -25,13 +29,18 @@ import com.ieltspath.learning.application.service.LessonEvidenceReference;
 import com.ieltspath.learning.application.service.PracticeAccess;
 import com.ieltspath.learning.application.service.PracticeProgress;
 import com.ieltspath.learning.domain.aggregate.PracticeAttempt;
+import com.ieltspath.learning.domain.aggregate.SpeakingSubmission;
 import com.ieltspath.learning.domain.aggregate.WritingSubmission;
+import com.ieltspath.learning.domain.repository.SpeakingSubmissionRepository;
+import com.ieltspath.learning.domain.vo.SpeakingSubmissionStatus;
+import com.ieltspath.learning.domain.repository.HumanReviewOutcomeRepository;
 import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
 import com.ieltspath.learning.domain.repository.PracticeAttemptRepository;
 import com.ieltspath.learning.domain.repository.ReviewItemRepository;
 import com.ieltspath.learning.domain.repository.WritingSubmissionRepository;
 import com.ieltspath.learning.domain.service.LessonHintPolicy;
 import com.ieltspath.learning.domain.service.PracticeReviewRule;
+import com.ieltspath.learning.domain.service.SpeakingEvidenceRule;
 import com.ieltspath.learning.domain.service.WritingEvidenceRule;
 import com.ieltspath.learning.domain.service.ReviewRule;
 import com.ieltspath.learning.domain.vo.EvidenceSource;
@@ -46,6 +55,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.util.*;
 import java.util.ArrayList;
@@ -53,6 +63,7 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -75,10 +86,14 @@ public class SubmitPracticeAttemptUseCase {
     private final HeartsService hearts;
     private final WritingCriterionReviews criterionReviews;
     private final ErrorTrapEvidence errorTrapEvidence;
+    private final SpeakingSubmissionRepository speaking;
+    private final SpeakingPracticeSettings speakingSettings;
+    private final HumanReviewOutcomeRepository outcomes;
     private final ItemGrading grading = new ItemGrading();
     private final LessonHintPolicy hints = new LessonHintPolicy();
     private final PracticeReviewRule reviewRule = new PracticeReviewRule();
     private final WritingEvidenceRule writingEvidence = new WritingEvidenceRule();
+    private final SpeakingEvidenceRule speakingEvidence = new SpeakingEvidenceRule();
     private final Clock clock = Clock.systemUTC();
 
     @Autowired
@@ -89,7 +104,9 @@ public class SubmitPracticeAttemptUseCase {
                                         QuestionEventLog questionEvents, MasteryProfileUpdater masteryProfiles,
                                         FreePracticeSubmission freePractice, GamificationRecorder gamificationRecorder,
                                         HeartsService hearts, WritingCriterionReviews criterionReviews,
-                                        ErrorTrapEvidence errorTrapEvidence) {
+                                        ErrorTrapEvidence errorTrapEvidence, SpeakingSubmissionRepository speaking,
+                                        SpeakingPracticeSettings speakingSettings,
+                                        HumanReviewOutcomeRepository outcomes) {
         this.lock = lock;
         this.access = access;
         this.content = content;
@@ -106,13 +123,16 @@ public class SubmitPracticeAttemptUseCase {
         this.hearts = hearts;
         this.criterionReviews = criterionReviews;
         this.errorTrapEvidence = errorTrapEvidence;
+        this.speaking = speaking;
+        this.speakingSettings = speakingSettings;
+        this.outcomes = outcomes;
     }
 
-    /** Wrong objective answers; essay items are graded by a tutor and never cost a heart. */
+    /** Wrong objective answers; essay and recorded items are graded by someone else and never cost a heart. */
     static int wrongObjectiveAnswers(ItemGrading.Graded graded) {
         int wrong = 0;
         for (int index = 0; index < graded.items().size(); index++) {
-            if (!graded.grades().get(index).correct() && !ItemGrading.isEssay(graded.items().get(index))) wrong++;
+            if (!graded.grades().get(index).correct() && !ItemGrading.isOpenAnswer(graded.items().get(index))) wrong++;
         }
         return wrong;
     }
@@ -131,9 +151,14 @@ public class SubmitPracticeAttemptUseCase {
         if (attempt.origin() == PracticeOrigin.FREE) return freePractice.submit(userId, attempt, command);
         var lesson = access.require(userId, attempt.lessonId());
         var version = content.getPackageVersion(attempt.packageVersionId());
-        Map<UUID, WritingSubmission> essaysByQuestion = gradedEssays(userId, attempt, version);
+        Map<UUID, GradedEssay> essaysByQuestion = gradedEssays(userId, attempt, version);
         Map<UUID, Boolean> essayPassed = new HashMap<>();
-        essaysByQuestion.forEach((question, essay) -> essayPassed.put(question, Boolean.TRUE.equals(essay.passed())));
+        essaysByQuestion.forEach((question, essay) -> essayPassed.put(question, essay.passed()));
+        Map<UUID, SpeakingSubmission> recordedByQuestion = gradedRecordings(userId, attempt, version);
+        Map<UUID, Item> itemsByQuestion = new HashMap<>();
+        ItemGrading.orderedItems(version).forEach(item -> itemsByQuestion.put(item.questionVersionId(), item));
+        recordedByQuestion.forEach((question, answer) ->
+                essayPassed.put(question, recordedPassed(itemsByQuestion.get(question), answer)));
         var graded = grading.grade(version, command.answers(), "Practice set", essayPassed);
         Set<UUID> revealed = attempts.revealedPackageIds(userId);
         boolean counted = !revealed.contains(attempt.packageId());
@@ -147,8 +172,9 @@ public class SubmitPracticeAttemptUseCase {
         Set<UUID> itemKps = new HashSet<>();
         Set<UUID> criterionOnly = new HashSet<>();
         List<FailedWritingCriterion> failedCriteria = new ArrayList<>();
-        ErrorTrapCatalog.ErrorTraps trapCatalog = errorTrapEvidence.loadIfNeeded(
-                graded.items().stream().anyMatch(item -> item.answerSpec().get("distractors") instanceof Map<?, ?>));
+        List<FailedWritingCriterion> failedSpeaking = new ArrayList<>();
+        ErrorTrapCatalog.ErrorTraps trapCatalog = errorTrapEvidence.loadIfNeeded(graded.items().stream().anyMatch(
+                item -> item.answerSpec().get("distractors") instanceof Map<?, ?> || ItemGrading.isSpeaking(item)));
         List<String> feedbackCodes = graded.errorCodes().stream().filter(Objects::nonNull).toList();
         Map<String, com.ieltspath.learning.application.service.ErrorTypeTexts.Text> errorTexts =
                 feedbackCodes.isEmpty() ? Map.of() : errorTrapEvidence.errorTexts(feedbackCodes);
@@ -159,27 +185,57 @@ public class SubmitPracticeAttemptUseCase {
             Set<UUID> kps = new LinkedHashSet<>();
             for (var mapping : item.knowledgePointMappings()) kps.add(mapping.knowledgePointId());
             var outcome = new PracticeReviewRule.ItemOutcome(kps, grade.correct());
-            outcomes.add(outcome);
+            SpeakingSubmission recorded = recordedByQuestion.get(item.questionVersionId());
+            // A recorded answer weighs on mastery only: its points are not sent to review when it falls short.
+            if (recorded == null) outcomes.add(outcome);
             LearningSkill itemSkill = graded.itemSkills().get(index);
-            if (itemSkill != null) outcomesBySkill.computeIfAbsent(itemSkill, ignored -> new ArrayList<>()).add(outcome);
+            if (itemSkill != null && recorded == null) {
+                outcomesBySkill.computeIfAbsent(itemSkill, ignored -> new ArrayList<>()).add(outcome);
+            }
             itemKps.addAll(kps);
-            WritingSubmission essay = essaysByQuestion.get(item.questionVersionId());
+            GradedEssay essayGrade = essaysByQuestion.get(item.questionVersionId());
+            WritingSubmission essay = essayGrade == null ? null : essayGrade.submission();
             Map<UUID, Boolean> evidenceByKp = new LinkedHashMap<>();
+            Set<UUID> spokenTraps = Set.of();
             String errorCode = graded.errorCodes().get(index);
-            if (essay != null) {
+            if (essayGrade != null && essayGrade.byExaminer()) {
+                // The examiner's criterion evidence and reviews were written when the examiner graded the essay. Here only the
+                // question's own points count, on the examiner's pass.
+                for (UUID kp : kps) evidenceByKp.put(kp, grade.correct());
+            } else if (essay != null) {
                 var essayOutcome = writingEvidence.derive(kps, essay.prompt().passBand(), grade.correct(), essay.grade());
                 evidenceByKp.putAll(essayOutcome.correctByKnowledgePoint());
                 criterionOnly.addAll(essayOutcome.criterionKnowledgePoints());
-                if (counted) failedCriteria.addAll(essayOutcome.failedCriteria());
+                if (counted) essayOutcome.failedCriteria().forEach(criterion ->
+                        failedCriteria.add(criterion.fromSubmission(essay.id())));
                 errorCode = essayOutcome.dominantErrorCode();
+            } else if (recorded != null) {
+                // Only a speech the grader could trust is evidence; otherwise the answer is shown but moves nothing.
+                if (SpeakingResultSignals.usableAsEvidence(recorded)) {
+                    var spoken = speakingEvidence.derive(kps, BigDecimal.valueOf(passBandOf(item)), grade.correct(),
+                            SpeakingResultSignals.criteria(recorded), SpeakingResultSignals.errorCodes(recorded),
+                            trapCatalog == null ? Map.of() : trapCatalog.trapKpByCode());
+                    evidenceByKp.putAll(spoken.correctByKnowledgePoint());
+                    criterionOnly.addAll(spoken.criterionKnowledgePoints());
+                    spokenTraps = spoken.trapKnowledgePoints();
+                    if (counted) failedSpeaking.addAll(spoken.failedCriteria());
+                }
             } else {
                 for (UUID kp : kps) evidenceByKp.put(kp, grade.correct());
             }
+            EvidenceSource source = recorded != null ? EvidenceSource.LESSON_SPEAKING : EvidenceSource.PRACTICE_SET;
             if (counted) for (var entry : evidenceByKp.entrySet()) firstAnswers.add(KnowledgeEvidence.of(entry.getKey(),
-                    entry.getValue(), EvidenceSource.PRACTICE_SET,
+                    entry.getValue(), source,
                     LessonEvidenceReference.forPracticeSet(command.requestId(), item.questionVersionId(), entry.getKey()))
                     .forQuestion(item.questionVersionId()));
-            if (counted) errorTrapEvidence.append(firstAnswers, criterionOnly,
+            // An error the grader marked in the recording is evidence against its trap point, as a marked error is in an essay.
+            if (counted) for (UUID trap : spokenTraps) {
+                firstAnswers.add(KnowledgeEvidence.of(trap, false, EvidenceSource.ERROR_TRAP,
+                        LessonEvidenceReference.forPracticeSet(command.requestId(), item.questionVersionId(), trap))
+                        .forQuestion(item.questionVersionId()));
+                criterionOnly.add(trap);
+            }
+            if (counted && recorded == null) errorTrapEvidence.append(firstAnswers, criterionOnly,
                     item.answerSpec(), grade.correct(), errorCode, item.questionVersionId(),
                     kp -> LessonEvidenceReference.forPracticeSet(command.requestId(), item.questionVersionId(), kp),
                     trapCatalog);
@@ -254,27 +310,73 @@ public class SubmitPracticeAttemptUseCase {
         if (counted) errorTrapEvidence.createReviews(userId, attempt.lessonId(), firstAnswers);
         reviews.insertPracticePending(userId, candidates);
         if (counted) criterionReviews.create(userId, attempt.lessonId(), failedCriteria);
+        if (counted) criterionReviews.createForSpeaking(userId, attempt.lessonId(), failedSpeaking);
         progress.refreshPassForLesson(userId, attempt.lessonId());
         return response;
     }
 
+    /** An essay the attempt counts: its submission, whether it passed, and whether an examiner (not the AI) graded it. */
+    private record GradedEssay(WritingSubmission submission, boolean passed, boolean byExaminer) { }
+
     /**
-     * The newest submission of each essay of the set, keyed by question; every essay must be GRADED first.
+     * The newest submission of each essay of the set, keyed by question. An essay is ready when the AI has graded it, or when an
+     * examiner has graded it (its result is applied). Otherwise the learner is asked to wait.
      */
-    private Map<UUID, WritingSubmission> gradedEssays(UUID userId, PracticeAttempt attempt, PackageVersion version) {
+    private Map<UUID, GradedEssay> gradedEssays(UUID userId, PracticeAttempt attempt, PackageVersion version) {
         var essayItems = ItemGrading.orderedItems(version).stream().filter(ItemGrading::isEssay).toList();
         if (essayItems.isEmpty()) return Map.of();
         var latest = essays.latestForPractice(userId, attempt.id());
-        Map<UUID, WritingSubmission> graded = new HashMap<>();
+        Map<UUID, GradedEssay> graded = new HashMap<>();
         for (var item : essayItems) {
             var submission = latest.get(item.questionVersionId());
-            if (submission == null || submission.status() != WritingSubmissionStatus.GRADED) {
+            if (submission != null && submission.status() == WritingSubmissionStatus.GRADED) {
+                graded.put(item.questionVersionId(), new GradedEssay(submission, Boolean.TRUE.equals(submission.passed()), false));
+                continue;
+            }
+            var examiner = submission == null || submission.status() != WritingSubmissionStatus.AWAITING_EXAMINER
+                    ? Optional.<HumanReviewOutcomeRepository.ExaminerResult>empty()
+                    : outcomes.resultOf(submission.id());
+            if (examiner.isEmpty()) {
                 throw new LearningRequestException(409, "ESSAY_NOT_GRADED",
                         "Submit every essay of the set and wait for its grade first");
             }
-            graded.put(item.questionVersionId(), submission);
+            graded.put(item.questionVersionId(), new GradedEssay(submission, examiner.get().passed(), true));
         }
         return graded;
+    }
+
+    /**
+     * The recorded answer of the attempt, which must be GRADED before the attempt can be submitted. One submission
+     * answers every recorded item of the set, so each of them must be one of its questions.
+     */
+    private Map<UUID, SpeakingSubmission> gradedRecordings(UUID userId, PracticeAttempt attempt, PackageVersion version) {
+        var recordedItems = ItemGrading.orderedItems(version).stream().filter(ItemGrading::isSpeaking).toList();
+        if (recordedItems.isEmpty()) return Map.of();
+        SpeakingSubmission answer = speaking.findLatestForAttempt(userId, attempt.id())
+                .filter(found -> found.status() == SpeakingSubmissionStatus.GRADED)
+                .orElseThrow(() -> new LearningRequestException(409, "SPEAKING_NOT_GRADED",
+                        "Record your answer and wait for its grade first"));
+        Map<UUID, SpeakingSubmission> graded = new HashMap<>();
+        for (var item : recordedItems) {
+            if (answer.recordingFor(item.questionVersionId()).isEmpty()) {
+                throw new LearningRequestException(409, "SPEAKING_NOT_GRADED",
+                        "Record your answer and wait for its grade first");
+            }
+            graded.put(item.questionVersionId(), answer);
+        }
+        return graded;
+    }
+
+    /** Passes at the item's own band, or at the practice default when the item names none. */
+    private boolean recordedPassed(Item item, SpeakingSubmission answer) {
+        BigDecimal band = SpeakingPracticeBand.of(answer);
+        return band != null && band.doubleValue() >= passBandOf(item);
+    }
+
+    /** The item's own pass band, or the practice default when the item names none. */
+    private double passBandOf(Item item) {
+        return item != null && item.answerSpec().get("passBand") instanceof Number band ? band.doubleValue()
+                : speakingSettings.passBand();
     }
 
     /**
@@ -293,6 +395,8 @@ public class SubmitPracticeAttemptUseCase {
         Set<UUID> claimed = new HashSet<>(pending);
         for (var score : graded.skillScores()) {
             if (score.passed() || score.skill() == LearningSkill.WRITING) continue;
+            // A skill whose only items were recorded answers has no objective item to review.
+            if (!bySkill.containsKey(score.skill())) continue;
             var skillNeeds = reviewRule.derive(score.percent(), true, bySkill.get(score.skill()), claimed,
                     availability);
             skillNeeds.forEach(need -> claimed.add(need.knowledgePointId()));

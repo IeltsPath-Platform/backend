@@ -494,7 +494,7 @@ class ReviewBasketIntegrationTest {
     }
 
     @Test
-    void aFreePracticeTestRaisesOnlyAnOptionalReviewAndNeverLocksALesson() {
+    void aFreePracticeTestRaisesNoReviewMovesNoMasteryAndNeverLocksALesson() {
         UUID user = learner();
         practiceSet(kpConsolidate, kpConsolidate);
         List<ItemResult> items = new ArrayList<>();
@@ -509,12 +509,10 @@ class ReviewBasketIntegrationTest {
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE user_id = ? "
                 + "AND source = 'error_trap'", Integer.class, user),
                 "official assessments do not record child trap evidence");
-        assertEquals("FREE_PRACTICE_TEST", jdbc.queryForObject(
-                "SELECT trigger_kind FROM review_items WHERE user_id = ? AND knowledge_point_id = ?", String.class,
-                user, kpConsolidate));
-        assertEquals(false, jdbc.queryForObject(
-                "SELECT blocking FROM review_items WHERE user_id = ? AND knowledge_point_id = ?", Boolean.class,
-                user, kpConsolidate));
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM review_items WHERE user_id = ?", Integer.class, user),
+                "a wrong answer in free practice makes no review");
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE user_id = ?", Integer.class, user),
+                "free practice records no mastery evidence");
         assertDoesNotThrow(() -> getLesson.execute(user, lesson));
     }
 

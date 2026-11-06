@@ -246,11 +246,23 @@ affect Practice clearance. They appear in the additive `weak` review-basket grou
 Free writing, revisions and judged sub knowledge points do not create these reviews. See
 [lesson-writing-v1](../../docs/contracts/lesson-writing-v1.md#optional-criterion-reviews) for the rules and limits.
 
+An examiner's finished Writing review is applied to mastery by `ApplyHumanReviewResultUseCase` (from
+`assessment.human-review-completed.v1`). Its criterion bands count as `human_review` evidence with weight
+`learning.mastery.mp1.source-weights.human-review` (default `0.75`) and replace the AI's criterion evidence for the same essay; its
+approved error codes count against their trap points. Up to `learning.human-review.review-limit` (default `2`) optional reviews follow,
+shared between `ERROR_PATTERN` and `WRITING_CRITERION`. Dead letters of `learning.human-review-completed.v1.dlq` are replayed with
+`POST /api/learning/admin/dead-letters/{queue}/replay`. See [human-review-completed-v1](../../docs/contracts/human-review-completed-v1.md).
+
 ## AI Speaking practice
 
 Speaking submissions are graded asynchronously with Azure Speech followed by one LLM request. Each submission snapshots
 the active Content rubric, caches Azure analysis by recording, stores learner-facing `display` separately from internal
-`signals`, and charges points only after a valid grade is saved. The scheduler and submission endpoint are disabled by
+`signals`, and charges points only after a valid grade is saved. A grade never changes the learner's mastery on its own: Speaking practice from the catalogue is outside the course. The one
+exception is the recorded answer of a lesson's practice set (`SPK-REC-n`, opened with
+`POST /practice-attempts/{id}/speaking-submissions`): once graded it counts as `lesson_speaking` evidence when that practice
+attempt is submitted, on the question's points, on each criterion's point (FC, LR, GRA, PR) and, for marked errors that have a
+trap point, as `error_trap` evidence. A criterion below the pass band earns an optional `SPEAKING_CRITERION` review. An AI grade never
+blocks: only a human examiner's grade escalates a waiting Writing criterion review, and only from another essay. The scheduler and submission endpoint are disabled by
 default until the starter rubric is reviewed. See the [Speaking grading contract](../../docs/contracts/speaking-practice-grading-v1.md).
 
 ## Assessment results

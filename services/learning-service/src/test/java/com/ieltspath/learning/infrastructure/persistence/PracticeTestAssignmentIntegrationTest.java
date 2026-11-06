@@ -89,13 +89,36 @@ class PracticeTestAssignmentIntegrationTest {
         assertThat(countAssignments()).isEqualTo(1);
     }
 
-    @Test void freePracticeWritesEvidenceWithoutScoringOrBlockingTopics() {
+    @Test void freePracticeMovesNoMasteryScoresNothingAndMakesNoReview() {
         list.execute(user,course);
         apply.execute(result(user,version,UUID.randomUUID(),1,Instant.now(),1));
         assertThat(countAssignments()).isZero();
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE user_id=?",Integer.class,user)).isEqualTo(5);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE user_id=?",Integer.class,user)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM kp_mastery_profiles WHERE user_id=?",Integer.class,user)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM review_items WHERE user_id=?",Integer.class,user)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM question_attempt_events WHERE user_id=?",Integer.class,user))
+                .as("the items are still logged").isEqualTo(5);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM topic_progress WHERE user_id=? AND passed_at IS NOT NULL",Integer.class,user)).isZero();
         verify(reviews,never()).execute(any(),any(),any());
+    }
+
+    @Test void aMilestonePracticeTestStillWritesEvidenceAndItsRegradeKeepsIt() {
+        list.execute(user,course); pass(first); assign.execute(user,course,pkg);
+        var attempt=UUID.randomUUID();
+        apply.execute(result(user,version,attempt,1,Instant.now().plusSeconds(10),3));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE user_id=?",Integer.class,user)).isEqualTo(5);
+        apply.execute(result(user,version,attempt,2,Instant.now().plusSeconds(20),5));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE user_id=?",Integer.class,user))
+                .as("the regrade replaces the evidence of the milestone attempt").isEqualTo(5);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE user_id=? AND correct",Integer.class,user)).isEqualTo(5);
+    }
+
+    @Test void aFreeAttemptAfterTheMilestoneWasCountedMovesNoMasteryEither() {
+        list.execute(user,course); pass(first); assign.execute(user,course,pkg);
+        apply.execute(result(user,version,UUID.randomUUID(),1,Instant.now().plusSeconds(10),3));
+        int counted=jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE user_id=?",Integer.class,user);
+        apply.execute(result(user,version,UUID.randomUUID(),1,Instant.now().plusSeconds(20),5));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE user_id=?",Integer.class,user)).isEqualTo(counted);
     }
 
     @Test void regradingEarlierFreeAttemptCannotConsumeLaterAssignment() {

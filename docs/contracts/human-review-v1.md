@@ -1,8 +1,9 @@
 # Independent human review contract (v1)
 
 This is the Learning-to-Assessment contract for Mentor feedback on graded lesson and Practice essays. The standalone
-submission is stored separately from assessment attempts and results. It does not create an attempt, an assessment
-result, or mastery evidence.
+submission is stored separately from assessment attempts and results. It does not create an attempt or an assessment
+result. When the examiner finishes, Learning applies the grade to the learner's mastery and may create optional reviews:
+see [`human-review-completed-v1.md`](human-review-completed-v1.md).
 
 ## Learner-facing API (Learning)
 
@@ -43,15 +44,29 @@ is not blocked. `GET /api/learning/free-writing/examiner-submissions/pending?que
 true, "submissionId": "…" }` or `{ "pending": false }` so the screen can say so before the learner writes; when Assessment
 cannot be reached it answers `false` and the send checks again.
 
+`POST /api/learning/practice-attempts/{attemptId}/essays/{questionVersionId}/examiner-submissions` — sends an essay of
+an open practice attempt of a lesson to an examiner **instead of the AI grader**. Body `{ "requestId", "essayText",
+"examinerId" }` (`examinerId` required, `422` without it); `200` with the submission, status `AWAITING_EXAMINER`. The
+essay keeps its lesson and attempt (source `PRACTICE_ITEM`), so the examiner's grade is applied to mastery like any lesson
+essay's (see [`human-review-completed-v1.md`](human-review-completed-v1.md)). Credit, availability, length checks and
+`requestId` behave as for free writing above. The lesson gate of the Practice applies (`409 PRACTICE_LOCKED`,
+`REVIEW_REQUIRED`), and `409 ATTEMPT_SUBMITTED` once the attempt was handed in. **One grade per question of the attempt:**
+it is refused with `409 ESSAY_ALREADY_GRADED` when the AI already graded that question, `409 GRADING_IN_PROGRESS` while
+the AI grades it, and `409 EXAMINER_REVIEW_PENDING` (body `submissionId`) while an earlier essay of it is with an
+examiner. The other way round, `POST …/essays/{questionVersionId}/submissions` (AI) answers `409 EXAMINER_REVIEW_PENDING`
+for a question whose essay is with an examiner, so one essay is never counted twice. An essay whose examiner request was
+refused does not hold the question. An attempt whose essay is with an examiner is not handed in: the examiner's grade is
+what counts for that essay.
+
 The AI path (`POST /api/learning/free-writing/submissions`,
 points) is unchanged; the learner picks one or the other, and which one is open is decided by Premium credits (examiner)
 or the points balance (AI).
 
 Errors: `404 NOT_FOUND` (not the caller's), `404 NO_HUMAN_REVIEW` (nothing requested), `409 NOT_REVIEWABLE` (neither graded nor sent to an examiner),
 `402 HUMAN_GRADING_CREDIT_REQUIRED`, `409 HUMAN_GRADING_CONFLICT`, `409 EXAMINER_UNAVAILABLE` (the chosen examiner is
-full, not accepting submissions or not an examiner), `422` (no `examinerId`), `503 HUMAN_REVIEW_UNAVAILABLE`. The review is feedback
-only: no evidence, no reviews, no change to Practice or gates. Learning stores only `human_review_requests`
-(essay → review id); the essay text is sent to Assessment and never logged.
+full, not accepting submissions or not an examiner), `422` (no `examinerId`), `503 HUMAN_REVIEW_UNAVAILABLE`. Learning stores
+`human_review_requests` (essay → review id) and, once the grade is applied, `human_review_outcomes` (the study points); the essay
+text is sent to Assessment and never logged.
 
 ## Create a review
 
@@ -134,8 +149,13 @@ Only the authenticated learner can read their review; another learner's review a
 Pending response uses `status: "PENDING"` with grade fields omitted; a cancelled one uses `status: "CANCELLED"`, also with
 no grade. A `DONE` response contains the examiner's overall
 band, criteria, error codes, and feedback. `examinerId` is the examiner the learner chose; the learner reads that
-examiner's name, photo, band and certificates from User Service. The examiner does not see the learner (below). The
-review is feedback only: it does not change Learning mastery, remediation, Practice status, or gate results.
+examiner's name, photo, band and certificates from User Service. The examiner does not see the learner (below).
+
+`studyPoints` is added to the `DONE` response (`[]` before the grade is applied): each point is either
+`{kind: "ERROR_CODE", errorCode, count, knowledgePointId, code, name, practiceKnowledgePointId?, reviewItemId?}` (a marked error,
+on its grammar point) or `{kind: "CRITERION", criterionCode, band, knowledgePointId, code, name, practiceKnowledgePointId?, reviewItemId?}`
+(a weak criterion). `reviewItemId` is present when the point has an optional review to study; `practiceKnowledgePointId` when free practice
+is available. Only approved error codes appear. The review gates nothing: Practice status and gate results do not change.
 
 ## Choosing and replacing the examiner
 

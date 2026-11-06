@@ -38,11 +38,15 @@ class SubmitPracticeAttemptUseCaseTest {
     private final FreePracticeSubmission freePractice = mock(FreePracticeSubmission.class);
     private final GamificationRecorder gamification = mock(GamificationRecorder.class);
     private final HeartsService hearts = mock(HeartsService.class);
-    private final WritingCriterionReviews criterionReviews = spy(new WritingCriterionReviews(reviews, attempts, content, 2));
+    private final WritingCriterionReviews criterionReviews = spy(new WritingCriterionReviews(reviews, attempts, content, 2, 2));
     private final ErrorTrapEvidence errorTrapEvidence = mock(ErrorTrapEvidence.class);
+    private final com.ieltspath.learning.domain.repository.SpeakingSubmissionRepository speaking =
+            mock(com.ieltspath.learning.domain.repository.SpeakingSubmissionRepository.class);
     private final SubmitPracticeAttemptUseCase useCase = new SubmitPracticeAttemptUseCase(lock, access, content,
             attempts, reviews, evidence, progress, mistakes, essays, events, mastery, freePractice, gamification,
-            hearts, criterionReviews, errorTrapEvidence);
+            hearts, criterionReviews, errorTrapEvidence, speaking,
+            com.ieltspath.learning.application.service.SpeakingSettingsFixture.enabled(),
+            mock(com.ieltspath.learning.domain.repository.HumanReviewOutcomeRepository.class));
     private final UUID userId = UUID.randomUUID(), lessonId = UUID.randomUUID(), attemptId = UUID.randomUUID();
     private final UUID packageId = UUID.randomUUID(), versionId = UUID.randomUUID(), essayId = UUID.randomUUID();
     private final UUID ta = UUID.randomUUID(), cc = UUID.randomUUID(), lr = UUID.randomUUID(), gra = UUID.randomUUID();
@@ -63,6 +67,7 @@ class SubmitPracticeAttemptUseCaseTest {
                 0, null, List.of(new Item(essayId, 0, "Prompt", null, Map.of("type", "ESSAY"), null,
                 BigDecimal.ONE, List.of()))))));
         WritingSubmission essay = mock(WritingSubmission.class);
+        when(essay.id()).thenReturn(essayId);
         when(essay.status()).thenReturn(WritingSubmissionStatus.GRADED);
         when(essay.passed()).thenReturn(false);
         when(essay.prompt()).thenReturn(new EssayPrompt(essayId, "Prompt", "TASK_1", 150, new BigDecimal("5.5"),
@@ -80,8 +85,10 @@ class SubmitPracticeAttemptUseCaseTest {
     @Test void countedEssayCreatesOnlyTheFailedCriteriaAsOptionalReviews() {
         var result = useCase.execute(userId, attemptId, new SubmitExerciseCommand(UUID.randomUUID(), List.of()));
         assertTrue(result.countedAsEvidence());
-        verify(reviews).insertPending(userId, List.of(new ReviewCandidate(gra, lessonId, LearningSkill.WRITING),
-                new ReviewCandidate(lr, lessonId, LearningSkill.WRITING)), false, "WRITING_CRITERION");
+        verify(reviews).insertCriterionPending(eq(userId), eq(lessonId), eq(LearningSkill.WRITING), eq("WRITING_CRITERION"),
+                argThat(criteria -> criteria.stream().allMatch(criterion -> essayId.equals(criterion.sourceSubmissionId()))
+                        && criteria.stream().map(FailedWritingCriterion::knowledgePointId)
+                                .collect(java.util.stream.Collectors.toSet()).equals(Set.of(gra, lr))));
         verify(errorTrapEvidence, never()).errorTexts(anyCollection());
     }
 

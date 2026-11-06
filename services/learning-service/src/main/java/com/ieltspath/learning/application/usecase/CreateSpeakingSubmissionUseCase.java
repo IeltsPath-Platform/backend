@@ -11,6 +11,7 @@ import com.ieltspath.learning.application.service.SpeakingTestQuestions;
 import com.ieltspath.learning.application.service.SpeakingTestQuestions.Resolved;
 import com.ieltspath.learning.domain.aggregate.SpeakingSubmission;
 import com.ieltspath.learning.domain.repository.SpeakingSubmissionRepository;
+import com.ieltspath.learning.domain.vo.SpeakingSubmissionStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -52,6 +53,30 @@ public class CreateSpeakingSubmissionUseCase {
 
     public SpeakingSubmissionResult execute(UUID userId, UUID requestId, UUID packageVersionId,
                                             List<UUID> partSectionIds, boolean consent) {
+        requireAvailable(consent);
+        Optional<SpeakingSubmission> existing = submissions.findByRequestId(requestId);
+        if (existing.isPresent()) return SpeakingSubmissionResult.from(replay(existing.get(), userId, packageVersionId, null));
+        requireBalance();
+        return open(userId, requestId, packageVersionId, questions.resolve(packageVersionId, partSectionIds), null, null);
+    }
+
+    /**
+     * Opens the submission for a recorded answer inside a lesson's practice attempt. The caller has checked that the
+     * attempt is the learner's, open and not free practice; the submission keeps the lesson and the attempt, which is
+     * what lets its grade reach mastery when the attempt is submitted.
+     */
+    public SpeakingSubmissionResult executeForAttempt(UUID userId, UUID requestId, UUID packageVersionId, UUID lessonId,
+                                                      UUID attemptId, boolean consent) {
+        requireAvailable(consent);
+        Optional<SpeakingSubmission> existing = submissions.findByRequestId(requestId);
+        if (existing.isPresent()) {
+            return SpeakingSubmissionResult.from(replay(existing.get(), userId, packageVersionId, attemptId));
+        }
+        requireBalance();
+        return open(userId, requestId, packageVersionId, questions.resolveSetItems(packageVersionId), lessonId, attemptId);
+    }
+
+    private void requireAvailable(boolean consent) {
         if (!availability.isAvailable()) {
             throw new LearningRequestException(503, "SPEAKING_GRADING_DISABLED",
                     "AI Speaking grading is not available yet");
@@ -59,24 +84,29 @@ public class CreateSpeakingSubmissionUseCase {
         if (!consent) {
             throw new LearningRequestException(422, "CONSENT_REQUIRED", "Consent to process the recordings is required");
         }
-        Optional<SpeakingSubmission> existing = submissions.findByRequestId(requestId);
-        if (existing.isPresent()) return SpeakingSubmissionResult.from(replay(existing.get(), userId, packageVersionId));
+    }
 
-        requireBalance();
-        Resolved resolved = questions.resolve(packageVersionId, partSectionIds);
-        SpeakingSubmission created = transaction.execute(status -> start(userId, requestId, packageVersionId, resolved));
+    private SpeakingSubmissionResult open(UUID userId, UUID requestId, UUID packageVersionId, Resolved resolved,
+                                          UUID lessonId, UUID attemptId) {
+        SpeakingSubmission created = transaction.execute(status -> start(userId, requestId, packageVersionId, resolved,
+                lessonId, attemptId));
         return SpeakingSubmissionResult.from(created);
     }
 
-    private SpeakingSubmission start(UUID userId, UUID requestId, UUID packageVersionId, Resolved resolved) {
+    private SpeakingSubmission start(UUID userId, UUID requestId, UUID packageVersionId, Resolved resolved,
+                                     UUID lessonId, UUID attemptId) {
         lock.lock(userId);
         Optional<SpeakingSubmission> existing = submissions.findByRequestId(requestId);
-        if (existing.isPresent()) return replay(existing.get(), userId, packageVersionId);
+        if (existing.isPresent()) return replay(existing.get(), userId, packageVersionId, attemptId);
 
         Instant now = clock.instant();
         Instant cutoff = now.minusSeconds(settings.uploadStaleSeconds());
         for (SpeakingSubmission active : submissions.findActive(userId)) {
-            if (active.isStaleUpload(cutoff)) {
+            // A file that was never sent for the same practice attempt (the page was reloaded, or storage failed) is
+            // replaced at once; waiting for it to go stale would lock the learner out of the attempt for half an hour.
+            boolean unsentForThisAttempt = attemptId != null && active.status() == SpeakingSubmissionStatus.UPLOADING
+                    && attemptId.equals(active.practiceAttemptId());
+            if (unsentForThisAttempt || active.isStaleUpload(cutoff)) {
                 active.abandon(now);
                 submissions.save(active);
             } else {
@@ -86,12 +116,15 @@ public class CreateSpeakingSubmissionUseCase {
         }
         SpeakingSubmission submission = SpeakingSubmission.start(UUID.randomUUID(), userId, requestId, packageVersionId,
                 resolved.scope(), settings.pointCost(), now, resolved.questions(), now);
+        if (attemptId != null) submission.forPracticeAttempt(lessonId, attemptId);
         submissions.save(submission);
         return submission;
     }
 
-    private static SpeakingSubmission replay(SpeakingSubmission existing, UUID userId, UUID packageVersionId) {
-        if (!existing.userId().equals(userId) || !existing.packageVersionId().equals(packageVersionId)) {
+    private static SpeakingSubmission replay(SpeakingSubmission existing, UUID userId, UUID packageVersionId,
+                                             UUID attemptId) {
+        if (!existing.userId().equals(userId) || !existing.packageVersionId().equals(packageVersionId)
+                || !java.util.Objects.equals(existing.practiceAttemptId(), attemptId)) {
             throw new LearningRequestException(409, "REQUEST_CONFLICT", "This request id was used for another submission");
         }
         return existing;

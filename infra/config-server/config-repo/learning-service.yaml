@@ -142,6 +142,8 @@ learning:
         practice: 0.6
         essay: 0.5
         error-trap: 0.3
+        # An examiner's band and marked errors (standalone Writing review): between an AI essay (0.5) and a test (1.0).
+        human-review: 0.75
   gamification:
     # Learner timezone when none is chosen; the daily XP cap resets at its midnight.
     default-timezone: ${LEARNING_DEFAULT_TIMEZONE:Asia/Ho_Chi_Minh}

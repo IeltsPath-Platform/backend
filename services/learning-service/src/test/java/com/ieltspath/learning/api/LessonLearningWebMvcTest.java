@@ -122,6 +122,8 @@ class LessonLearningWebMvcTest {
     @MockitoBean ReviewPracticeAttemptUseCase reviewPractice;
     @MockitoBean SubmitPracticeAttemptUseCase submitPractice;
     @MockitoBean SubmitPracticeEssayUseCase submitPracticeEssay;
+    @MockitoBean com.ieltspath.learning.application.usecase.SubmitPracticeEssayToExaminerUseCase submitPracticeEssayToExaminer;
+    @MockitoBean com.ieltspath.learning.application.usecase.CreateLessonSpeakingSubmissionUseCase createLessonSpeaking;
 
     @BeforeEach
     void verifiedIdentity() {
@@ -146,6 +148,60 @@ class LessonLearningWebMvcTest {
         assertFalse(started.toString().contains("explanation"));
         assertFalse(fetched.toString().contains("answerSpec"));
         assertFalse(fetched.toString().contains("explanation"));
+    }
+
+    @Test
+    void aPracticeEssaySentToAnExaminerComesBackAwaitingTheExaminer() throws Exception {
+        UUID attemptId = UUID.randomUUID();
+        UUID essay = UUID.randomUUID();
+        UUID examiner = UUID.randomUUID();
+        when(submitPracticeEssayToExaminer.execute(USER, attemptId, QUESTION, REQUEST, "My essay", examiner))
+                .thenReturn(new com.ieltspath.learning.application.result.WritingSubmissionResult(essay, "AWAITING_EXAMINER",
+                        "TASK_1", 2, null, null, null, null, null, null, null, "My essay"));
+        String request = json.writeValueAsString(Map.of("requestId", REQUEST, "essayText", "My essay", "examinerId", examiner));
+
+        mvc.perform(authenticated(post("/api/learning/practice-attempts/{id}/essays/{q}/examiner-submissions", attemptId, QUESTION)
+                        .contentType(MediaType.APPLICATION_JSON).content(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.submissionId").value(essay.toString()))
+                .andExpect(jsonPath("$.status").value("AWAITING_EXAMINER"));
+    }
+
+    @Test
+    void theRecordedAnswerOfAPracticeAttemptIsOpenedForTheAttemptAndComesBackCreated() throws Exception {
+        UUID attemptId = UUID.randomUUID();
+        UUID submission = UUID.randomUUID();
+        when(createLessonSpeaking.execute(USER, attemptId, REQUEST, true))
+                .thenReturn(new com.ieltspath.learning.application.result.SpeakingSubmissionResult(submission,
+                        UUID.randomUUID(), com.ieltspath.learning.domain.vo.SpeakingScope.FULL,
+                        com.ieltspath.learning.domain.vo.SpeakingSubmissionStatus.UPLOADING, 5, null,
+                        java.time.Instant.now(), java.util.List.of()));
+        String request = json.writeValueAsString(Map.of("requestId", REQUEST, "consent", true));
+
+        mvc.perform(authenticated(post("/api/learning/practice-attempts/{id}/speaking-submissions", attemptId)
+                        .contentType(MediaType.APPLICATION_JSON).content(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(submission.toString()))
+                .andExpect(jsonPath("$.status").value("UPLOADING"));
+    }
+
+    @Test
+    void theRecordedAnswerNeedsARequestId() throws Exception {
+        mvc.perform(authenticated(post("/api/learning/practice-attempts/{id}/speaking-submissions", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"consent\":true}")))
+                .andExpect(status().isUnprocessableEntity());
+        org.mockito.Mockito.verifyNoInteractions(createLessonSpeaking);
+    }
+
+    @Test
+    void aPracticeEssayCannotBeSentWithoutChoosingTheExaminer() throws Exception {
+        String request = json.writeValueAsString(Map.of("requestId", REQUEST, "essayText", "My essay"));
+
+        mvc.perform(authenticated(post("/api/learning/practice-attempts/{id}/essays/{q}/examiner-submissions",
+                        UUID.randomUUID(), QUESTION).contentType(MediaType.APPLICATION_JSON).content(request)))
+                // The service answers a request that fails validation with 422, as for every other body.
+                .andExpect(status().isUnprocessableEntity());
+        org.mockito.Mockito.verifyNoInteractions(submitPracticeEssayToExaminer);
     }
 
     @Test

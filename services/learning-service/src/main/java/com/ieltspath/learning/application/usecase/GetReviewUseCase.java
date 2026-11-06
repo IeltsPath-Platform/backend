@@ -150,7 +150,7 @@ public class GetReviewUseCase {
                 review.knowledgePointId(), review.skill(), review.stage().name(),
                 review.theoryReason() == null ? null : review.theoryReason().name(), focus.scope(),
                 review.failedSets(), null, quickCheck, state, diagnosis.map(DiagnosticSession::id).orElse(null),
-                review.blocking(), waitingOn, errorTrap);
+                review.blocking(), waitingOn, errorTrap, review.triggerKind());
     }
 
     private static List<LessonResult.Option> options(List<LearningContentClient.Option> options) {

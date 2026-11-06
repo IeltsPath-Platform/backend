@@ -9,11 +9,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -164,6 +166,47 @@ class HumanReviewFlowIntegrationTest extends ExaminerIntegrationSupport {
         assertEquals(0, count("SELECT count(*) FROM assessment_results"));
         // Both codes are stored: the code review only decides what a learner is shown.
         assertEquals(2, count("SELECT jsonb_array_length(annotations) FROM human_review_submissions WHERE id=?", reviewId));
+    }
+
+    /**
+     * The examiner's grade reaches Learning as a human-review-completed event: criterion bands, and each error code with how
+     * often the examiner marked it. The event repeats neither the essay nor any comment, and a repeated completion adds none.
+     */
+    @Test
+    void theGradeIsPublishedToLearningOnceWithCountedErrorCodesAndNoText() throws Exception {
+        jdbc.update("DELETE FROM outbox_events WHERE event_type='assessment.human-review-completed.v1'");
+        UUID[] ids = requestAndClaim();
+        String examinerToken = internalToken(examiner, "EXAMINER");
+        String twoLinkerMarks = """
+                [{"excerpt":"My","start":0,"end":2,"errorCode":"LINKER_MISUSE","suggestion":"Thus"},
+                 {"excerpt":"independent practice","start":3,"end":23,"errorCode":"TENSE","suggestion":"practised alone"},
+                 {"excerpt":"essay","start":24,"end":29,"errorCode":"LINKER_MISUSE","suggestion":"text"}]
+                """;
+        for (int attempt = 0; attempt < 2; attempt++) {
+            mvc.perform(post("/api/assessments/grading-jobs/{id}/human-review", ids[1])
+                            .header("Authorization", "Bearer " + examinerToken)
+                            .contentType(MediaType.APPLICATION_JSON).content(completeBody(twoLinkerMarks)))
+                    .andExpect(status().isNoContent());
+        }
+
+        assertEquals(1, count("SELECT count(*) FROM outbox_events WHERE event_type='assessment.human-review-completed.v1'"),
+                "a repeated completion publishes nothing new");
+        String payload = jdbc.queryForObject(
+                "SELECT payload::text FROM outbox_events WHERE event_type='assessment.human-review-completed.v1'", String.class);
+        var event = json.readTree(payload);
+        assertEquals(learner.toString(), event.get("learnerId").asText());
+        assertEquals(ids[0].toString(), event.get("reviewSubmissionId").asText());
+        assertEquals(jdbc.queryForObject("SELECT source_submission_id::text FROM human_review_submissions WHERE id=?",
+                String.class, ids[0]), event.get("sourceSubmissionId").asText());
+        assertEquals(json.readTree("[{\"criterion\":\"GRA\",\"band\":6.0}]"), event.get("criteria"));
+        assertEquals(json.readTree("[{\"code\":\"LINKER_MISUSE\",\"count\":2},{\"code\":\"TENSE\",\"count\":1}]"),
+                event.get("errorCodes"), "counted from the marks, most frequent first");
+        assertEquals(Set.of("eventId", "eventType", "occurredAt", "learnerId", "reviewSubmissionId", "sourceSubmissionId",
+                "criteria", "errorCodes"), json.convertValue(event, java.util.Map.class).keySet());
+        for (String text : List.of("My independent practice essay", "independent practice", "Develop the position", "Clear.",
+                "practised alone", "Thus")) {
+            assertFalse(payload.contains(text), "the event must not carry " + text);
+        }
     }
 
     @Test

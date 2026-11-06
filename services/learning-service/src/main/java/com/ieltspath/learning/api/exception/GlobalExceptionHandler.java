@@ -153,8 +153,14 @@ public class GlobalExceptionHandler {
             log.error("OpenAPI generation failed: correlationId={}",
                     request.getHeader("X-Correlation-Id"), exception);
         } else {
-            log.error("Unexpected request failure: type={}, correlationId={}",
-                    exception.getClass().getName(), request.getHeader("X-Correlation-Id"));
+            // The wrapper alone (a ServletException around an Error, say) says nothing. The class of the root cause and the
+            // line it came from are logged, never its message, which may hold what the learner sent.
+            Throwable root = exception;
+            while (root.getCause() != null && root.getCause() != root) root = root.getCause();
+            StackTraceElement[] frames = root.getStackTrace();
+            log.error("Unexpected request failure: type={}, rootCause={}, at={}, correlationId={}",
+                    exception.getClass().getName(), root.getClass().getName(), frames.length > 0 ? frames[0] : "-",
+                    request.getHeader("X-Correlation-Id"));
         }
         return build(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected internal error occurred", request, null);
     }

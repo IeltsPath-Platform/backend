@@ -20,6 +20,9 @@ public interface SpeakingSubmissionRepository {
     /** Submissions of the learner still waiting for a grade. */
     List<SpeakingSubmission> findActive(UUID userId);
 
+    /** The learner's newest submission for a practice attempt, whatever its status. */
+    Optional<SpeakingSubmission> findLatestForAttempt(UUID userId, UUID practiceAttemptId);
+
     /** Claims one queued or stale grading row atomically across service instances. */
     Optional<SpeakingSubmission> claimNext(Instant staleBefore, int maxAttempts);
 

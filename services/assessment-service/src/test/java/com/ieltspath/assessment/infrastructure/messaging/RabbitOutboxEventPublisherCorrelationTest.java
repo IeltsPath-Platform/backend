@@ -58,4 +58,17 @@ class RabbitOutboxEventPublisherCorrelationTest {
         verify(rabbit).send(anyString(), anyString(), message.capture(), any(CorrelationData.class));
         assertNull(message.getValue().getMessageProperties().getHeader("x-correlation-id"));
     }
+
+    @Test
+    void routesTheExaminersGradeToLearningOnTheAssessmentExchange() {
+        brokerAcknowledges();
+        OutboxEvent graded = new OutboxEvent(UUID.randomUUID(), "HumanReviewSubmission", UUID.randomUUID().toString(),
+                com.ieltspath.events.assessment.HumanReviewCompletedV1.EVENT_TYPE, "{}", Instant.now(), null, 0, null, null);
+
+        publisher.publish(graded);
+
+        verify(rabbit).send(org.mockito.ArgumentMatchers.eq(com.ieltspath.events.assessment.AssessmentMessaging.EXCHANGE),
+                org.mockito.ArgumentMatchers.eq(com.ieltspath.events.assessment.AssessmentMessaging.HUMAN_REVIEW_COMPLETED_ROUTING_KEY),
+                any(Message.class), any(CorrelationData.class));
+    }
 }

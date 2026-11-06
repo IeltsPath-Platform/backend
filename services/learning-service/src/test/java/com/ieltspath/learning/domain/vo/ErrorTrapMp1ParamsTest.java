@@ -24,7 +24,7 @@ class ErrorTrapMp1ParamsTest {
         LearningRuleConfigRepository configs = mock(LearningRuleConfigRepository.class);
         when(configs.findAll()).thenReturn(java.util.Map.of(MasteryFormulaSettings.ERROR_TRAP_WEIGHT_KEY, "0.45"));
         MasteryFormulaSettings settings = new MasteryFormulaSettings(configs, new ObjectMapper(), "MP1", 8, 3,
-                30, 3, 2, 1.0, 0.03, 7, 1.0, 1.0, 1.0, 0.6, 0.5, 0.3);
+                30, 3, 2, 1.0, 0.03, 7, 1.0, 1.0, 1.0, 0.6, 0.5, 0.3, 0.75);
 
         assertEquals(0.45, settings.params().weights().of(EvidenceSource.ERROR_TRAP));
     }

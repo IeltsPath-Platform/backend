@@ -12,6 +12,7 @@ import com.ieltspath.learning.application.service.PracticeAccess;
 import com.ieltspath.learning.application.service.WritingSubmissionViewAssembler;
 import com.ieltspath.learning.domain.aggregate.PracticeAttempt;
 import com.ieltspath.learning.domain.aggregate.WritingSubmission;
+import com.ieltspath.learning.domain.repository.HumanReviewRequestRepository;
 import com.ieltspath.learning.domain.repository.PracticeAttemptRepository;
 import com.ieltspath.learning.domain.repository.WritingSubmissionRepository;
 import com.ieltspath.learning.domain.vo.WritingSubmissionStatus;
@@ -39,12 +40,14 @@ public class SubmitPracticeEssayUseCase {
     private final EssaySubmissionFlow flow;
     private final TransactionTemplate transaction;
     private final WritingSubmissionViewAssembler view;
+    private final HumanReviewRequestRepository requests;
     private final Clock clock = Clock.systemUTC();
 
     public SubmitPracticeEssayUseCase(PracticeAttemptRepository attempts, LearningContentClient content,
                                       PracticeAccess access, LearnerLock lock, WritingSubmissionRepository essays,
                                       EssaySubmissionFlow flow, PlatformTransactionManager transactionManager,
-                                      WritingSubmissionViewAssembler view) {
+                                      WritingSubmissionViewAssembler view, HumanReviewRequestRepository requests) {
+        this.requests = requests;
         this.attempts = attempts;
         this.content = content;
         this.access = access;
@@ -109,6 +112,12 @@ public class SubmitPracticeEssayUseCase {
                     "Free practice does not take essays");
         }
         access.require(userId, attempt.lessonId());
+        // The examiner's grade of this question already counts toward mastery; an AI grade on top would count it twice.
+        WritingSubmission latest = essays.latestForPractice(userId, attemptId).get(item.questionVersionId());
+        if (latest != null && latest.status() == WritingSubmissionStatus.AWAITING_EXAMINER
+                && requests.findReviewId(latest.id()).isPresent()) {
+            throw SubmitPracticeEssayToExaminerUseCase.examinerPending(latest.id());
+        }
         Instant now = clock.instant();
         boolean gradingInProgress = false;
         for (WritingSubmission grading : essays.findGradingForPractice(userId, attemptId, item.questionVersionId())) {

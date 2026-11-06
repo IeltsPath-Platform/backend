@@ -433,9 +433,8 @@ class LessonPipelineSeedTest {
                 .allMatch(entry -> entry.skill() == Skill.SPEAKING);
         assertThat(sequence.subList(readingEnd + speaking.size(), sequence.size()))
                 .allMatch(entry -> entry.skill() == Skill.WRITING);
-        // The Speaking chặng has no final test: a learner passes it by completing its lessons.
-        assertThat(sequence).filteredOn(entry -> entry.skill() != Skill.SPEAKING).allMatch(TopicSequenceResult::hasTopicTest);
-        assertThat(topic(sequence, "SPEAKING_FRAMEWORK").hasTopicTest()).isFalse();
+        // Every chặng, Speaking's included, ends with a final test.
+        assertThat(sequence).allMatch(TopicSequenceResult::hasTopicTest);
         // The lower-band Reading course keeps its paid topics after its free topics.
         assertThat(sequence).extracting(TopicSequenceResult::requiredFeatureKey)
                 .containsOnlyNulls();
@@ -627,12 +626,116 @@ class LessonPipelineSeedTest {
                 Map.entry("PS-W4-WR-1", "W4"), Map.entry("PS-W4-WR-2", "W4"),
                 Map.entry("PS-W5-WR-1", "W5"), Map.entry("PS-W5-WR-2", "W5"),
                 Map.entry("SPK-PS-1", "S55-1"), Map.entry("SPK-PS-2", "S60-1"),
-                Map.entry("SPK-PS-3", "S60-2"), Map.entry("SPK-PS-4", "S65-1"))));
+                Map.entry("SPK-PS-3", "S60-2"), Map.entry("SPK-PS-4", "S65-1"),
+                Map.entry("SPK-REC-1", "S55-1"), Map.entry("SPK-REC-2", "S60-1"),
+                Map.entry("SPK-REC-3", "S60-2"), Map.entry("SPK-REC-4", "S65-1"))));
         // The one-question V4 demo package is too small to be anyone's Practice.
         assertThat(jdbc.queryForObject("SELECT lesson_id FROM content_packages WHERE code = 'DEMO_MAIN_FLOW_READING'",
                 Map.of(), UUID.class)).isNull();
         assertThrows(SQLException.class, () -> execute("UPDATE content_packages SET lesson_id = '" + lessonId("L1")
                 + "' WHERE package_type = 'TOPIC_TEST'"));
+    }
+
+    @Test
+    void everySpeakingLessonHasARecordedAnswerSetOfOneQuestionOnItsOwnKnowledgePoint() {
+        for (String lesson : List.of("S55-1", "S60-1", "S60-2", "S65-1")) {
+            var sets = reader.lessonPracticeSets(lessonId(lesson)).stream()
+                    .filter(set -> set.code().startsWith("SPK-REC-")).toList();
+            assertThat(sets).hasSize(1);
+            assertThat(sets.getFirst().questionCount()).isEqualTo(1);
+            assertThat(sets.getFirst().knowledgePointIds()).hasSize(1);
+        }
+        // The recorded answer is graded by the AI from its answer spec; a published question of this kind has no options.
+        List<String> specs = jdbc.queryForList("""
+                SELECT qv.answer_spec::text FROM question_versions qv JOIN questions q ON q.id = qv.question_id
+                WHERE q.question_type = 'SPEAKING' AND qv.stem LIKE 'Describe what you usually do at weekends%'
+                """, Map.of(), String.class);
+        assertThat(specs).singleElement().asString().contains("\"type\": \"SPEAKING\"").contains("\"passBand\": 5.5");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM speaking_criterion_knowledge_points", Map.of(), Integer.class))
+                .isEqualTo(4);
+    }
+
+    @Test
+    void theFourSpeakingCriterionPointsTakeEvidenceAgainAndAreFullyDescribed() {
+        var rows = jdbc.queryForList("""
+                SELECT code, status, cefr_level, can_do FROM knowledge_points
+                WHERE code LIKE 'DEMO_SPEAKING_CRITERION_%' ORDER BY code
+                """, Map.of());
+
+        assertThat(rows).extracting(row -> row.get("code")).containsExactly("DEMO_SPEAKING_CRITERION_FC",
+                "DEMO_SPEAKING_CRITERION_GRA", "DEMO_SPEAKING_CRITERION_LR", "DEMO_SPEAKING_CRITERION_PR");
+        assertThat(rows).allSatisfy(row -> {
+            assertThat(row.get("status")).isEqualTo("ACTIVE");
+            assertThat(row.get("cefr_level")).isNotNull();
+            assertThat((String) row.get("can_do")).isNotBlank();
+        });
+        // The rubric still maps each criterion code to its point, which is how a grade names the point.
+        assertThat(jdbc.queryForList("""
+                SELECT s.criterion_code FROM speaking_criterion_knowledge_points s
+                JOIN knowledge_points kp ON kp.id = s.knowledge_point_id AND kp.status = 'ACTIVE' ORDER BY 1
+                """, Map.of(), String.class)).containsExactly("FC", "GRA", "LR", "PR");
+    }
+
+    @Test
+    void eachSpeakingCriterionPointHasThreeFreeStandingReviewSetsOfThreePublishedQuestions() {
+        var sets = jdbc.queryForList("""
+                SELECT kp.code AS kp_code, p.code, p.topic_id, p.lesson_id, p.status, count(sq.id) AS questions,
+                       count(sq.id) FILTER (WHERE qv.status = 'PUBLISHED' AND qkp.knowledge_point_id = kp.id
+                                              AND qv.explanation IS NOT NULL AND qv.hint IS NOT NULL
+                                              AND qv.difficulty IS NOT NULL) AS valid
+                FROM content_packages p
+                JOIN content_sections s ON s.package_version_id = p.current_published_version_id
+                JOIN section_questions sq ON sq.section_id = s.id
+                JOIN question_versions qv ON qv.id = sq.question_version_id
+                JOIN question_knowledge_points qkp ON qkp.question_version_id = qv.id
+                JOIN knowledge_points kp ON kp.code LIKE 'DEMO_SPEAKING_CRITERION_%' AND kp.id = qkp.knowledge_point_id
+                WHERE p.code LIKE 'PS-SCR-%' GROUP BY kp.code, p.code, p.topic_id, p.lesson_id, p.status
+                """, Map.of());
+
+        assertThat(sets).hasSize(12).allSatisfy(set -> {
+            assertThat(set.get("status")).isEqualTo("PUBLISHED");
+            assertThat(set.get("topic_id")).as("a free-standing set gates nothing").isNull();
+            assertThat(set.get("lesson_id")).isNull();
+            assertThat(set.get("questions")).isEqualTo(3L);
+            assertThat(set.get("valid")).isEqualTo(3L);
+        });
+        assertThat(sets.stream().collect(java.util.stream.Collectors.groupingBy(set -> (String) set.get("kp_code"),
+                java.util.stream.Collectors.counting())))
+                .containsOnlyKeys("DEMO_SPEAKING_CRITERION_FC", "DEMO_SPEAKING_CRITERION_LR",
+                        "DEMO_SPEAKING_CRITERION_GRA", "DEMO_SPEAKING_CRITERION_PR")
+                .allSatisfy((code, total) -> assertThat(total).isEqualTo(3L));
+    }
+
+    @Test
+    void theSpeakingReviewQuestionsAreAnswerableOnTheKeyboardAndEveryAnswerIsConsistent() throws Exception {
+        var rows = jdbc.queryForList("""
+                SELECT q.question_type, q.skill, qv.options::text AS options, qv.answer_spec::text AS spec
+                FROM question_versions qv JOIN questions q ON q.id = qv.question_id
+                JOIN section_questions sq ON sq.question_version_id = qv.id
+                JOIN content_sections s ON s.id = sq.section_id
+                JOIN content_package_versions v ON v.id = s.package_version_id
+                JOIN content_packages p ON p.id = v.package_id
+                WHERE p.code LIKE 'PS-SCR-%'
+                """, Map.of());
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+
+        assertThat(rows).hasSize(36);
+        for (var row : rows) {
+            assertThat(row.get("skill")).isEqualTo("SPEAKING");
+            var spec = mapper.readTree((String) row.get("spec"));
+            if ("MULTIPLE_CHOICE".equals(row.get("question_type"))) {
+                var options = mapper.readTree((String) row.get("options"));
+                assertThat(spec.get("type").asText()).isEqualTo("CHOICE");
+                assertThat(options).hasSize(3);
+                var keys = new java.util.ArrayList<String>();
+                options.forEach(option -> keys.add(option.get("optionKey").asText()));
+                assertThat(keys).contains(spec.get("correct").asText());
+            } else {
+                assertThat(row.get("question_type")).isEqualTo("FILL_IN_BLANK");
+                assertThat(spec.get("type").asText()).isEqualTo("FILL");
+                assertThat(spec.get("accepted")).isNotEmpty();
+            }
+        }
     }
 
     @Test

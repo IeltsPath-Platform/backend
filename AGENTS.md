@@ -234,7 +234,8 @@ src/main/java/com/ieltspath/<service>
   (`403 PRACTICE_REQUIRED` + `lessonIds`); bài ôn còn chờ của lesson trước chặn lesson sau bất kể skill
   (`403 REVIEW_REQUIRED`). Bài ôn lặp set mới đến khi đạt (chỉ lần trượt đầu quay lại theory), chỉ `SKIPPED` khi hết
   package chưa lộ. Bài ôn **chặn** (`blocking = true`) vẫn chặn Practice và thi topic của cùng skill; bài ôn **tùy chọn**
-  (giỏ ôn, practice test tự do) không bao giờ chặn. Thi cuối course không chặn tiến độ topic hay course khác.
+  (giỏ ôn) không bao giờ chặn. Practice test tự do (kho luyện tập 4 kỹ năng, không thuộc mốc course) không ghi bằng chứng,
+  không đổi mastery và không tạo bài ôn; chỉ practice test là mốc của course mới ghi bằng chứng. Thi cuối course không chặn tiến độ topic hay course khác.
   `LessonAccessGate` và use case trong `services/learning-service/src/main/java/com/ieltspath/learning/` quyết định cổng
   bài; trạng thái topic suy ra khi đọc. `GET /topics/{id}/lessons` của topic `LOCKED` vẫn trả danh sách bài, mọi bài
   `LOCKED` (để xem trước lộ trình); mở bài của topic đó vẫn `403 TOPIC_LOCKED`.

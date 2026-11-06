@@ -24,7 +24,8 @@ public interface HumanReviewStore {
     Optional<Completed> complete(UUID jobId, UUID examinerId, BigDecimal band, JsonNode criteria, List<String> errorCodes,
                                  String feedback, JsonNode annotations);
 
-    record Completed(UUID learnerId, UUID reviewSubmissionId, String skill) {}
+    /** {@code sourceSubmissionId} is the learner's essay in Learning, the id the result is applied to. */
+    record Completed(UUID learnerId, UUID reviewSubmissionId, UUID sourceSubmissionId, String skill) {}
 
     /** The essay of a standalone review job, for checking the errors an examiner marked in it. */
     Optional<String> essay(UUID jobId);
