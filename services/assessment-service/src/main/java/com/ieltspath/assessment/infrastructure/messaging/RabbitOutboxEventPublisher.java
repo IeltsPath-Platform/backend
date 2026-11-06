@@ -35,7 +35,9 @@ public class RabbitOutboxEventPublisher implements OutboxEventPublisher {
             com.ieltspath.events.assessment.GradingOverdueV1.EVENT_TYPE, AssessmentMessaging.GRADING_OVERDUE_ROUTING_KEY,
             com.ieltspath.events.assessment.GradingDueSoonV1.EVENT_TYPE, AssessmentMessaging.GRADING_DUE_SOON_ROUTING_KEY,
             com.ieltspath.events.assessment.GradingRequestedV1.EVENT_TYPE, AssessmentMessaging.GRADING_REQUESTED_ROUTING_KEY,
-            com.ieltspath.events.assessment.GradingCompletedV1.EVENT_TYPE, AssessmentMessaging.GRADING_COMPLETED_ROUTING_KEY);
+            com.ieltspath.events.assessment.GradingCompletedV1.EVENT_TYPE, AssessmentMessaging.GRADING_COMPLETED_ROUTING_KEY,
+            com.ieltspath.events.assessment.HumanReviewCompletedV1.EVENT_TYPE,
+            AssessmentMessaging.HUMAN_REVIEW_COMPLETED_ROUTING_KEY);
 
     private final RabbitTemplate rabbitTemplate;
     private final Duration confirmTimeout;
