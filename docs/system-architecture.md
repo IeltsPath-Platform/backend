@@ -258,7 +258,8 @@ trong transaction mới. Thiếu cấu hình, lỗi LLM hoặc hết quota ngày
 Examiner chấm xong một bài Writing gửi từ lesson/Practice/free writing: Assessment ghi `assessment.human-review-completed.v1`
 (band tiêu chí và mã lỗi, không có văn bản) cùng transaction với kết quả. Learning áp kết quả vào mastery như bài AI: evidence
 `human_review` thay evidence tiêu chí AI của cùng bài, mã lỗi đã duyệt thành evidence `error_trap`, và tạo tối đa 2 bài ôn không chặn.
-Xem `docs/contracts/human-review-completed-v1.md`.
+Bài free writing (kho luyện tập, không thuộc lesson) là ngoại lệ, giống khi AI chấm: không ghi evidence, không đổi mastery, không tạo
+bài ôn; học viên chỉ đọc "điểm cần học". Xem `docs/contracts/human-review-completed-v1.md`.
 
 Gợi ý Reading (`question_versions.hint`, Content V13) do Content lưu và trả qua
 `/internal/learning-content/lessons/{id}`; Learning Service Java quyết định hiển thị cho câu `FILL` hoặc `CHOICE`

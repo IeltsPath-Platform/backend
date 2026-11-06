@@ -104,7 +104,7 @@ thứ tự: event chưa có người nghe thì nằm trong queue (topology khai 
 2. Examiner đánh dấu `LINKER_MISUSE` (2 chỗ) → `TRAP_LINKER_MISUSE` có đúng 1 evidence `error_trap` sai; review `ERROR_PATTERN` không chặn cho `DEMO_WRITING_LINKING`.
 3. Cùng event giao lại → không thêm evidence, review, outcome.
 4. Mã không có KP con, tiêu chí không map được, đề không có `passBand` → bỏ qua phần đó, listener vẫn ack.
-5. Bài free-writing → evidence mã lỗi; review `ERROR_PATTERN` qua lesson đã hoàn thành dạy KP cha, nếu có; không có review tiêu chí.
+5. Bài free-writing (không lesson) → chỉ lưu study points; không evidence, không đổi mastery, không review (quyết định sau khi kế hoạch viết: luyện tự do không ảnh hưởng mastery như course, giống bài AI chấm).
 6. Tối đa 2 review mỗi examiner review; KP có review PENDING bị bỏ qua.
 7. `GET /api/learning/writing-submissions/{id}/human-review` trả `studyPoints` (mảng, `[]` khi chưa áp hoặc chưa `DONE`); điểm có review PENDING mang `reviewItemId`.
 7a. Mã chưa duyệt không tạo evidence, review, hay xuất hiện trong `studyPoints`.

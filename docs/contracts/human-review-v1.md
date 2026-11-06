@@ -44,6 +44,20 @@ is not blocked. `GET /api/learning/free-writing/examiner-submissions/pending?que
 true, "submissionId": "…" }` or `{ "pending": false }` so the screen can say so before the learner writes; when Assessment
 cannot be reached it answers `false` and the send checks again.
 
+`POST /api/learning/practice-attempts/{attemptId}/essays/{questionVersionId}/examiner-submissions` — sends an essay of
+an open practice attempt of a lesson to an examiner **instead of the AI grader**. Body `{ "requestId", "essayText",
+"examinerId" }` (`examinerId` required, `422` without it); `200` with the submission, status `AWAITING_EXAMINER`. The
+essay keeps its lesson and attempt (source `PRACTICE_ITEM`), so the examiner's grade is applied to mastery like any lesson
+essay's (see [`human-review-completed-v1.md`](human-review-completed-v1.md)). Credit, availability, length checks and
+`requestId` behave as for free writing above. The lesson gate of the Practice applies (`409 PRACTICE_LOCKED`,
+`REVIEW_REQUIRED`), and `409 ATTEMPT_SUBMITTED` once the attempt was handed in. **One grade per question of the attempt:**
+it is refused with `409 ESSAY_ALREADY_GRADED` when the AI already graded that question, `409 GRADING_IN_PROGRESS` while
+the AI grades it, and `409 EXAMINER_REVIEW_PENDING` (body `submissionId`) while an earlier essay of it is with an
+examiner. The other way round, `POST …/essays/{questionVersionId}/submissions` (AI) answers `409 EXAMINER_REVIEW_PENDING`
+for a question whose essay is with an examiner, so one essay is never counted twice. An essay whose examiner request was
+refused does not hold the question. An attempt whose essay is with an examiner is not handed in: the examiner's grade is
+what counts for that essay.
+
 The AI path (`POST /api/learning/free-writing/submissions`,
 points) is unchanged; the learner picks one or the other, and which one is open is decided by Premium credits (examiner)
 or the points balance (AI).
