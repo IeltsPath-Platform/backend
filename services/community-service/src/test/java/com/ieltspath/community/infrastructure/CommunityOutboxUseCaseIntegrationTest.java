@@ -47,6 +47,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
         "spring.rabbitmq.dynamic=false",
         "spring.rabbitmq.listener.simple.auto-startup=false",
         "community.outbox.relay.enabled=false",
+        "spring.jpa.properties.hibernate.generate_statistics=true",
         "app.auth.internal-jwt-issuer=urn:code-base:api-gateway",
         "app.auth.internal-jwt-secret=SGs1cjhXY1lBOEo4am8ycnVJQkNFWFJjSGhVZlNEVXFQMTZIMjlQMXN4bz0="
 })
@@ -76,6 +77,102 @@ class CommunityOutboxUseCaseIntegrationTest {
     @Autowired CommunityQueriesUseCase queries;
     @Autowired PostRepository postRepository;
     @Autowired CommentRepository commentRepository;
+    @Autowired com.ieltspath.community.domain.repository.CommentReactionRepository commentReactions;
+    @Autowired org.springframework.transaction.support.TransactionTemplate transactions;
+    @Autowired jakarta.persistence.EntityManagerFactory entityManagerFactory;
+
+    @Test
+    void commentReactionReplaceRepeatAndWrongTypeRemovePreserveOneRowAndNoOpTimestamp() {
+        Comment comment = commentRepository.save(Comment.create(savePost().getId(), AUTHOR, null, "comment"));
+        UUID id = comment.getId();
+        assertEquals(true, transactions.execute(status -> commentReactions.add(id, ACTOR, ReactionType.LIKE)));
+        jdbc.update("UPDATE comment_reactions SET created_at='2026-10-16T10:00:00Z' WHERE comment_id=?", id);
+        var timestamp = jdbc.queryForObject("SELECT created_at FROM comment_reactions WHERE comment_id=?", java.time.OffsetDateTime.class, id);
+        assertEquals(false, transactions.execute(status -> commentReactions.add(id, ACTOR, ReactionType.LIKE)));
+        assertEquals(timestamp, jdbc.queryForObject("SELECT created_at FROM comment_reactions WHERE comment_id=?", java.time.OffsetDateTime.class, id));
+        assertEquals(true, transactions.execute(status -> commentReactions.add(id, ACTOR, ReactionType.LOVE)));
+        org.junit.jupiter.api.Assertions.assertNotEquals(timestamp,
+                jdbc.queryForObject("SELECT created_at FROM comment_reactions WHERE comment_id=?", java.time.OffsetDateTime.class, id));
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM comment_reactions WHERE comment_id=?", Integer.class, id));
+        assertEquals("LOVE", jdbc.queryForObject("SELECT reaction_type FROM comment_reactions WHERE comment_id=?", String.class, id));
+        assertEquals(false, transactions.execute(status -> commentReactions.remove(id, ACTOR, ReactionType.LIKE)));
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM comment_reactions WHERE comment_id=?", Integer.class, id));
+        assertEquals(true, transactions.execute(status -> commentReactions.remove(id, ACTOR, ReactionType.LOVE)));
+        assertEquals(false, transactions.execute(status -> commentReactions.remove(id, ACTOR, ReactionType.LOVE)));
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM comment_reactions WHERE comment_id=?", Integer.class, id));
+    }
+
+    @Test
+    void twentyCommentsUseOneSqlForCountsAndViewerReaction() {
+        Post post = savePost();
+        var ids = new java.util.HashSet<UUID>();
+        for (int i = 0; i < 20; i++) {
+            UUID id = commentRepository.save(Comment.create(post.getId(), AUTHOR, null, "comment " + i)).getId();
+            ids.add(id);
+            transactions.executeWithoutResult(status -> {
+                commentReactions.add(id, ACTOR, ReactionType.LIKE);
+                commentReactions.add(id, AUTHOR, ReactionType.LOVE);
+            });
+        }
+        var statistics = entityManagerFactory.unwrap(org.hibernate.SessionFactory.class).getStatistics();
+        statistics.clear();
+        var summary = commentReactions.interactions(ids, ACTOR);
+        assertEquals(1, statistics.getPrepareStatementCount(), "Counts and myReaction must share one batch query");
+        assertEquals(20, summary.size());
+        for (UUID id : ids) {
+            assertEquals(java.util.Map.of(ReactionType.LIKE, 1L, ReactionType.LOVE, 1L,
+                    ReactionType.HELPFUL, 0L, ReactionType.ACCURATE, 0L), summary.get(id).reactionCounts());
+            assertEquals(ReactionType.LIKE, summary.get(id).myReaction());
+        }
+        assertEquals(ReactionType.LOVE, commentReactions.interactions(ids, AUTHOR).get(ids.iterator().next()).myReaction());
+        assertEquals(1L, commentReactions.counts(ids).get(ids.iterator().next()).get(ReactionType.LIKE));
+        assertEquals(ReactionType.LIKE, commentReactions.mine(ids, ACTOR).get(ids.iterator().next()));
+        assertEquals(java.util.Map.of(), commentReactions.mine(ids, UUID.randomUUID()));
+        org.junit.jupiter.api.Assertions.assertNull(commentReactions.interactions(ids, UUID.randomUUID()).get(ids.iterator().next()).myReaction());
+        statistics.clear();
+        assertEquals(java.util.Map.of(), commentReactions.interactions(java.util.Set.of(), ACTOR));
+        assertEquals(0, statistics.getPrepareStatementCount());
+    }
+
+    @Test
+    void concurrentDifferentReactionsBySameViewerLeaveExactlyOneRow() throws Exception {
+        UUID id = commentRepository.save(Comment.create(savePost().getId(), AUTHOR, null, "concurrent")).getId();
+        var ready = new java.util.concurrent.CountDownLatch(2);
+        var start = new java.util.concurrent.CountDownLatch(1);
+        try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var futures = new java.util.ArrayList<java.util.concurrent.Future<?>>();
+            for (ReactionType type : java.util.List.of(ReactionType.LIKE, ReactionType.LOVE)) {
+                futures.add(executor.submit(() -> {
+                    ready.countDown();
+                    try {
+                        if (!start.await(10, java.util.concurrent.TimeUnit.SECONDS)) throw new AssertionError("Start barrier timed out");
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new AssertionError(e);
+                    }
+                    transactions.executeWithoutResult(status -> commentReactions.add(id, ACTOR, type));
+                }));
+            }
+            org.junit.jupiter.api.Assertions.assertTrue(ready.await(10, java.util.concurrent.TimeUnit.SECONDS));
+            start.countDown();
+            for (var future : futures) future.get(15, java.util.concurrent.TimeUnit.SECONDS);
+        }
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM comment_reactions WHERE comment_id=? AND user_id=?", Integer.class, id, ACTOR));
+        org.junit.jupiter.api.Assertions.assertTrue(java.util.Set.of("LIKE", "LOVE").contains(
+                jdbc.queryForObject("SELECT reaction_type FROM comment_reactions WHERE comment_id=? AND user_id=?", String.class, id, ACTOR)));
+    }
+
+    @Test
+    void softModerationKeepsCommentReactionsAndPhysicalDeleteCascades() {
+        UUID id = commentRepository.save(Comment.create(savePost().getId(), AUTHOR, null, "moderated")).getId();
+        transactions.executeWithoutResult(status -> commentReactions.add(id, ACTOR, ReactionType.ACCURATE));
+        for (String state : java.util.List.of("HIDDEN", "DELETED")) {
+            jdbc.update("UPDATE comments SET status=? WHERE id=?", state, id);
+            assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM comment_reactions WHERE comment_id=?", Integer.class, id));
+        }
+        jdbc.update("DELETE FROM comments WHERE id=?", id);
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM comment_reactions WHERE comment_id=?", Integer.class, id));
+    }
 
     @BeforeEach
     void clearDatabase() {

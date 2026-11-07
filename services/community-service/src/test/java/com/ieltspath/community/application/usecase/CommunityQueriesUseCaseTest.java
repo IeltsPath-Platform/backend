@@ -34,7 +34,72 @@ class CommunityQueriesUseCaseTest {
     @Mock PublicProfileClient profiles;
     @Mock PostRepository posts;
     @Mock CommentRepository comments;
+    @Mock com.ieltspath.community.domain.repository.CommentReactionRepository commentReactions;
     @InjectMocks CommunityQueriesUseCase queries;
+
+    @Test
+    void commentsBatchInteractionsOnceAndUseCurrentViewerWithFourZeroDefaults() {
+        UUID viewer = UUID.randomUUID(), author = UUID.randomUUID();
+        var content = java.util.stream.IntStream.range(0, 20)
+                .mapToObj(i -> com.ieltspath.community.application.result.CommentResult.from(
+                        Comment.create(UUID.randomUUID(), author, null, "body " + i))).toList();
+        var ids = content.stream().map(com.ieltspath.community.application.result.CommentResult::id)
+                .collect(java.util.stream.Collectors.toSet());
+        UUID reacted = content.getFirst().id();
+        when(profiles.findProfiles(Set.of(author))).thenReturn(Map.of());
+        when(reads.replyCounts(ids)).thenReturn(Map.of(reacted, 3L));
+        when(commentReactions.interactions(ids, viewer)).thenReturn(Map.of(reacted,
+                new com.ieltspath.community.domain.vo.CommentInteractions(Map.of(
+                        com.ieltspath.community.domain.vo.ReactionType.LIKE, 2L),
+                        com.ieltspath.community.domain.vo.ReactionType.LIKE)));
+        var result = queries.enrichComments(new CommunityActor(viewer, false), content);
+        assertEquals(content.stream().map(com.ieltspath.community.application.result.CommentResult::id).toList(),
+                result.stream().map(com.ieltspath.community.application.result.CommentResult::id).toList());
+        assertEquals(3L, result.getFirst().replyCount());
+        assertEquals(2L, result.getFirst().reactionCounts().get(com.ieltspath.community.domain.vo.ReactionType.LIKE));
+        assertEquals(com.ieltspath.community.domain.vo.ReactionType.LIKE, result.getFirst().myReaction());
+        for (var item : result) {
+            assertEquals(4, item.reactionCounts().size());
+            assertEquals(author, item.author().id());
+        }
+        assertTrue(result.getLast().reactionCounts().values().stream().allMatch(count -> count == 0L));
+        assertNull(result.getLast().myReaction());
+        verify(commentReactions, times(1)).interactions(ids, viewer);
+        verifyNoMoreInteractions(commentReactions);
+    }
+
+    @Test
+    void emptyCommentsAvoidAllEnrichmentQueries() {
+        assertEquals(List.of(), queries.enrichComments(new CommunityActor(UUID.randomUUID(), false), List.of()));
+        verifyNoInteractions(reads, profiles, commentReactions);
+    }
+
+    @Test
+    void threadedRootsAndRepliesBothEnrichUsingViewer() {
+        UUID viewer = UUID.randomUUID();
+        var actor = new CommunityActor(viewer, false);
+        Post post = Post.create(viewer, PostCategory.GENERAL, null, "post");
+        Comment root = Comment.create(post.getId(), viewer, null, "root");
+        Comment reply = Comment.create(post.getId(), viewer, root.getId(), "reply");
+        when(posts.findById(post.getId())).thenReturn(java.util.Optional.of(post));
+        when(comments.findById(root.getId())).thenReturn(java.util.Optional.of(root));
+        when(reads.thread(post.getId(), null, 0, 20)).thenReturn(new com.ieltspath.community.domain.vo.CommunityPage<>(List.of(root), 1));
+        when(reads.thread(post.getId(), root.getId(), 0, 20)).thenReturn(new com.ieltspath.community.domain.vo.CommunityPage<>(List.of(reply), 1));
+        when(profiles.findProfiles(anySet())).thenReturn(Map.of());
+        when(reads.replyCounts(anySet())).thenReturn(Map.of());
+        when(commentReactions.interactions(anySet(), eq(viewer))).thenAnswer(invocation -> {
+            Set<UUID> ids = invocation.getArgument(0);
+            return ids.stream().collect(java.util.stream.Collectors.toMap(id -> id, id ->
+                    new com.ieltspath.community.domain.vo.CommentInteractions(Map.of(), com.ieltspath.community.domain.vo.ReactionType.ACCURATE)));
+        });
+        var query = new com.ieltspath.community.application.query.PageQuery(0, 20);
+        assertEquals(com.ieltspath.community.domain.vo.ReactionType.ACCURATE,
+                queries.thread(actor, post.getId(), null, query).content().getFirst().myReaction());
+        assertEquals(com.ieltspath.community.domain.vo.ReactionType.ACCURATE,
+                queries.thread(actor, null, root.getId(), query).content().getFirst().myReaction());
+        verify(commentReactions).interactions(Set.of(root.getId()), viewer);
+        verify(commentReactions).interactions(Set.of(reply.getId()), viewer);
+    }
 
     @Test
     void followingFeedUsesViewerAndCursorAndReturnsNextCursor() {
