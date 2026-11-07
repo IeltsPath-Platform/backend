@@ -4,6 +4,7 @@ import com.ieltspath.access.application.command.DebitPointsCommand;
 import com.ieltspath.access.application.result.PointLedgerResult;
 import com.ieltspath.access.domain.entity.PointLedgerEntry;
 import com.ieltspath.access.domain.exception.DuplicateIdempotencyException;
+import com.ieltspath.access.domain.exception.InsufficientPointsException;
 import com.ieltspath.access.domain.exception.PointsActorMismatchException;
 import com.ieltspath.access.domain.repository.PointLedgerRepository;
 import com.ieltspath.access.domain.vo.PointTransactionType;
@@ -38,8 +39,9 @@ public class DebitPointsUseCase {
         }
         try {
             return pointDebitWriter.debit(command);
-        } catch (DataIntegrityViolationException | OptimisticLockingFailureException e) {
-            // A concurrent request with the same key committed first; any other cause has no entry and is rethrown.
+        } catch (DataIntegrityViolationException | OptimisticLockingFailureException | InsufficientPointsException e) {
+            // A duplicate may read the wallet after the winning debit has depleted it. The writer has rolled back;
+            // replay a committed winner, or preserve the original failure when no matching key was committed.
             PointLedgerEntry winner = pointLedgerRepository.findByIdempotencyKey(command.idempotencyKey())
                     .orElseThrow(() -> e);
             return replay(winner, command);

@@ -4,6 +4,7 @@ import com.ieltspath.access.application.command.DebitPointsCommand;
 import com.ieltspath.access.application.result.PointLedgerResult;
 import com.ieltspath.access.domain.entity.PointLedgerEntry;
 import com.ieltspath.access.domain.exception.DuplicateIdempotencyException;
+import com.ieltspath.access.domain.exception.InsufficientPointsException;
 import com.ieltspath.access.domain.exception.PointsActorMismatchException;
 import com.ieltspath.access.domain.repository.PointLedgerRepository;
 import com.ieltspath.access.domain.vo.PointTransactionType;
@@ -129,5 +130,35 @@ class DebitPointsUseCaseTest {
 
         assertThatThrownBy(() -> debitPointsUseCase.execute(command(userId, 3, refId)))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void depletedWalletAfterConcurrentSameKeyDebitReplaysTheWinner() {
+        PointLedgerEntry winner = entry(-3);
+        when(pointLedgerRepository.findByIdempotencyKey("idem-1"))
+                .thenReturn(Optional.empty(), Optional.of(winner));
+        when(pointDebitWriter.debit(any())).thenThrow(new InsufficientPointsException(userId, 0, 3));
+
+        assertThat(debitPointsUseCase.execute(command(userId, 3, refId)).id()).isEqualTo(winner.getId());
+        verify(pointDebitWriter, times(1)).debit(any());
+    }
+
+    @Test
+    void genuinelyInsufficientPointsKeepsTheOriginalFailure() {
+        var failure = new InsufficientPointsException(userId, 0, 3);
+        when(pointLedgerRepository.findByIdempotencyKey("idem-1")).thenReturn(Optional.empty());
+        when(pointDebitWriter.debit(any())).thenThrow(failure);
+
+        assertThatThrownBy(() -> debitPointsUseCase.execute(command(userId, 3, refId))).isSameAs(failure);
+    }
+
+    @Test
+    void insufficientPointsRecoveryStillRejectsDifferentPayloadForTheSameKey() {
+        when(pointLedgerRepository.findByIdempotencyKey("idem-1"))
+                .thenReturn(Optional.empty(), Optional.of(entry(-3)));
+        when(pointDebitWriter.debit(any())).thenThrow(new InsufficientPointsException(userId, 0, 5));
+
+        assertThatThrownBy(() -> debitPointsUseCase.execute(command(userId, 5, refId)))
+                .isInstanceOf(DuplicateIdempotencyException.class);
     }
 }
