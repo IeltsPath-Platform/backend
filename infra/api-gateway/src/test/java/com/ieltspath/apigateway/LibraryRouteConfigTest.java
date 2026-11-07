@@ -32,7 +32,7 @@ class LibraryRouteConfigTest {
         assertEquals("lb://LIBRARY-SERVICE", yaml.getProperty(prefix + personalIndex + "].uri"));
         assertEquals("Path=/api/learning-support/flashcards/**,/api/learning-support/decks/**,"
                         + "/api/learning-support/notes/**,/api/learning-support/video-progress/**,"
-                        + "/api/learning-support/saved-segments/**",
+                        + "/api/learning-support/saved-segments/**,/api/learning-support/vocabulary-study/**",
                 yaml.getProperty(prefix + personalIndex + "].predicates[0]"));
         boolean hasJwtPrefix = false;
         for (int index = 0; index < 30; index++) {

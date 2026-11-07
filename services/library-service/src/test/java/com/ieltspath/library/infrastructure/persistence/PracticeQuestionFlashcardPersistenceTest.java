@@ -48,7 +48,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Testcontainers(disabledWithoutDocker = true)
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({FlashcardRepositoryAdapter.class, FlashcardReviewEventJdbcAdapter.class, FlashcardVocabularyMetadataAdapter.class, FlashcardMapperImpl.class,
-        SavePracticeQuestionFlashcardUseCase.class, ReviewFlashcardUseCase.class, FlashcardSrsProperties.class})
+        SavePracticeQuestionFlashcardUseCase.class, ReviewFlashcardUseCase.class, FlashcardSrsProperties.class,
+        com.ieltspath.library.application.service.StudyStreakRecorder.class,
+        com.ieltspath.library.infrastructure.adapter.StudyGamificationJdbcAdapter.class,
+        com.ieltspath.library.infrastructure.adapter.JdbcStudyLock.class,
+        com.ieltspath.library.config.StudyGamificationProperties.class,
+        PracticeQuestionFlashcardPersistenceTest.StudyConfig.class})
 @ImportAutoConfiguration(FlywayAutoConfiguration.class)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @TestPropertySource(properties = {
@@ -58,6 +63,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
         "eureka.client.enabled=false"
 })
 class PracticeQuestionFlashcardPersistenceTest {
+    @org.springframework.boot.test.context.TestConfiguration
+    static class StudyConfig {
+        @org.springframework.context.annotation.Bean com.fasterxml.jackson.databind.ObjectMapper mapper(){return new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules();}
+    }
     @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:15-alpine");
 
@@ -118,6 +127,9 @@ class PracticeQuestionFlashcardPersistenceTest {
         assertEquals(1, persisted.getReviewCount());
         assertEquals(1, jdbc.queryForObject("select count(*) from flashcard_review_events where user_id=? and flashcard_id=?",
                 Integer.class, userId, stored.getId()));
+        assertEquals(1,jdbc.queryForObject("select current_days from vocabulary_study_streaks where user_id=?",Integer.class,userId));
+        assertEquals(0,jdbc.queryForObject("select count(*) from vocabulary_study_profiles where user_id=?",Integer.class,userId));
+        assertEquals(0,jdbc.queryForObject("select count(*) from vocabulary_study_xp_ledger where user_id=?",Integer.class,userId));
     }
 
     @Test
@@ -133,6 +145,14 @@ class PracticeQuestionFlashcardPersistenceTest {
         cards.save(first);
         SavedFlashcard again = savePracticeQuestion.execute(userId, questionId, "Front", "Back");
         assertTrue(again.created());
+    }
+    @Test void wrongNewReviewMaintainsVocabularyStreakWithoutProfileOrXp() {
+        UUID user=UUID.randomUUID();Flashcard card=cards.save(Flashcard.create(user,FlashcardSourceType.MANUAL,null,null,null,"Word","Meaning"));
+        var result=reviewFlashcard.execute(user,card.getId(),false,UUID.randomUUID());
+        assertEquals(1,result.leitnerBox());assertEquals(1,result.reviewCount());
+        assertEquals(1,jdbc.queryForObject("select current_days from vocabulary_study_streaks where user_id=?",Integer.class,user));
+        assertEquals(0,jdbc.queryForObject("select count(*) from vocabulary_study_profiles where user_id=?",Integer.class,user));
+        assertEquals(0,jdbc.queryForObject("select count(*) from vocabulary_study_xp_ledger where user_id=?",Integer.class,user));
     }
 
     @Test

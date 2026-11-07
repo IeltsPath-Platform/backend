@@ -29,6 +29,7 @@ class ReviewFlashcardUseCaseTest {
     @Mock FlashcardVocabularyMetadataReader metadataReader;
     @Mock FlashcardImageStorage storage;
     @Mock FlashcardReviewEventWriter eventWriter;
+    @Mock com.ieltspath.library.application.port.StudyStreakActivity studyStreak;
     private ReviewFlashcardUseCase useCase;
     private final UUID userId = UUID.randomUUID();
     private final UUID cardId = UUID.randomUUID();
@@ -36,9 +37,9 @@ class ReviewFlashcardUseCaseTest {
     private final UUID requestId = UUID.randomUUID();
 
     @BeforeEach void setUp() {
-        useCase = new ReviewFlashcardUseCase(repository, new FlashcardSrsProperties(), metadataReader, storage, eventWriter);
-        when(metadataReader.findBySenseIds(anyList())).thenReturn(Map.of());
-        when(storage.publicUrl(any())).thenReturn(null);
+        useCase = new ReviewFlashcardUseCase(repository, new FlashcardSrsProperties(), metadataReader, storage, eventWriter,studyStreak);
+        lenient().when(metadataReader.findBySenseIds(anyList())).thenReturn(Map.of());
+        lenient().when(storage.publicUrl(any())).thenReturn(null);
     }
 
     @Test void recordsAppliedReviewWithOptionalSessionId() {
@@ -50,6 +51,7 @@ class ReviewFlashcardUseCaseTest {
         useCase.execute(userId, cardId, true, requestId, sessionId);
 
         verify(eventWriter).append(eq(userId), eq(cardId), eq(senseId), eq(sessionId), eq(true), eq(card.getLastReviewedAt()));
+        verify(studyStreak).recordActivity(userId,card.getLastReviewedAt());
     }
 
     @Test void recordsAppliedReviewWhenSessionIdIsNull() {
@@ -60,6 +62,7 @@ class ReviewFlashcardUseCaseTest {
         useCase.execute(userId, cardId, false, requestId, null);
 
         verify(eventWriter).append(eq(userId), eq(cardId), eq(senseId), isNull(), eq(false), eq(card.getLastReviewedAt()));
+        verify(studyStreak).recordActivity(userId,card.getLastReviewedAt());
     }
 
     @Test void replayedRequestDoesNotSaveOrAppendAnEvent() {
@@ -69,7 +72,16 @@ class ReviewFlashcardUseCaseTest {
         useCase.execute(userId, cardId, true, requestId, UUID.randomUUID());
 
         verify(repository, never()).save(any());
-        verifyNoInteractions(eventWriter);
+        verifyNoInteractions(eventWriter,studyStreak);
+    }
+    @Test void missingOrInactiveCardNeverRecordsActivity() {
+        when(repository.findForReviewByIdAndUserId(cardId,userId)).thenReturn(Optional.empty());
+        org.junit.jupiter.api.Assertions.assertThrows(com.ieltspath.library.domain.exception.ResourceNotFoundException.class,()->useCase.execute(userId,cardId,true,requestId));
+        verifyNoInteractions(studyStreak);
+        Flashcard inactive=card(null);inactive.update(FlashcardSourceType.VOCABULARY_SENSE,senseId,null,null,"front","back",LibraryStatus.DELETED);
+        when(repository.findForReviewByIdAndUserId(cardId,userId)).thenReturn(Optional.of(inactive));
+        org.junit.jupiter.api.Assertions.assertThrows(com.ieltspath.library.domain.exception.ResourceNotFoundException.class,()->useCase.execute(userId,cardId,true,requestId));
+        verifyNoInteractions(studyStreak);
     }
 
     private Flashcard card(UUID lastRequestId) {

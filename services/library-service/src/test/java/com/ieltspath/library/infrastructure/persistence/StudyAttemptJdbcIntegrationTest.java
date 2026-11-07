@@ -24,11 +24,12 @@ import java.util.concurrent.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 @JdbcTest
+@Transactional(propagation=Propagation.NOT_SUPPORTED)
 @Testcontainers(disabledWithoutDocker=true)
 @AutoConfigureTestDatabase(replace=AutoConfigureTestDatabase.Replace.NONE)
 @Import({StudyUnitJdbcAdapter.class,VocabularyAudioUrlResolver.class,StudyUnitAuthoringService.class,
     StudyExercisePreview.class,StudyAttemptService.class,StudyProgressService.class,StudyAttemptJdbcAdapter.class,StudyProgressJdbcAdapter.class,
-    JdbcStudyLock.class,StudyRequestHash.class,StudyAttemptJdbcIntegrationTest.Config.class})
+    JdbcStudyLock.class,StudyRequestHash.class,StudyGamificationJdbcAdapter.class,StudyGamificationService.class,StudyStreakRecorder.class,StudyPlanRefresher.class,com.ieltspath.library.config.StudyGamificationProperties.class,StudyAttemptJdbcIntegrationTest.Config.class})
 @ImportAutoConfiguration(FlywayAutoConfiguration.class)
 @TestPropertySource(properties={"spring.flyway.enabled=true","spring.cloud.config.enabled=false","eureka.client.enabled=false"})
 class StudyAttemptJdbcIntegrationTest {
@@ -38,6 +39,7 @@ class StudyAttemptJdbcIntegrationTest {
         @Bean Clock clock(){return Clock.fixed(Instant.parse("2026-11-07T10:00:00Z"),ZoneOffset.UTC);}
         @Bean ObjectMapper mapper(){return new ObjectMapper().findAndRegisterModules();}
     }
+    @org.springframework.boot.test.mock.mockito.MockBean com.ieltspath.library.application.port.StudyAccessClient access;
     @Autowired JdbcTemplate jdbc;
     @Autowired StudyUnitAuthoringService author;
     @Autowired StudyAttemptService study;
@@ -104,6 +106,8 @@ class StudyAttemptJdbcIntegrationTest {
         try {var jobs=List.<Callable<Object>>of(()->study.complete(user,a.attemptId(),UUID.randomUUID()),()->study.complete(user,a.attemptId(),UUID.randomUUID()));var results=executor.invokeAll(jobs);assertEquals(results.get(0).get(),results.get(1).get());}
         finally{executor.shutdownNow();}
         assertEquals(1,jdbc.queryForObject("select count(*) from vocabulary_study_unit_progress where user_id=? and unit_id=?",Integer.class,user,unit));
+        assertEquals(2,jdbc.queryForObject("select count(*) from vocabulary_study_xp_ledger where user_id=?",Integer.class,user));
+        assertEquals(30,jdbc.queryForObject("select total_xp from vocabulary_study_profiles where user_id=?",Integer.class,user));
     }
     @Test @Transactional(propagation=Propagation.NOT_SUPPORTED) void simultaneousStartsShareOneAttempt() throws Exception {
         ExecutorService executor=Executors.newFixedThreadPool(2);

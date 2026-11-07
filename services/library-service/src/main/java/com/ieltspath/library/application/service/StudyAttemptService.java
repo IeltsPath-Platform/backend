@@ -22,13 +22,17 @@ public class StudyAttemptService {
     private final StudyRequestHash hashes;
     private final Clock clock;
     private final TransactionTemplate transactions;
+    private final StudyGamificationService gamification;
+    private final StudyPlanRefresher plans;
     public StudyAttemptService(StudyUnitRepository units,StudyAttemptRepository repository,StudyProgressService progress,
-            StudyLock lock,StudyRequestHash hashes,Clock clock,PlatformTransactionManager manager) {
+            StudyLock lock,StudyRequestHash hashes,Clock clock,PlatformTransactionManager manager,StudyGamificationService gamification,StudyPlanRefresher plans) {
         this.units=units;this.repository=repository;this.progress=progress;this.lock=lock;this.hashes=hashes;this.clock=clock;this.transactions=new TransactionTemplate(manager);
+        this.gamification=gamification;this.plans=plans;
     }
     public Start start(UUID user,UUID unitId,UUID request,String mode) {
         if(mode==null || !List.of("RESUME_OR_START","REPLAY").contains(mode))throw new StudyRequestException(HttpStatus.BAD_REQUEST,"VOCAB_UNIT_INVALID","Chế độ học không hợp lệ.");
         String hash=hashes.start(unitId,mode);
+        if(!mode.equals("REPLAY"))plans.ensureFresh(user);
         return write(user,()->{
             var previous=repository.findStart(user,request);
             if(previous.isPresent()) {
@@ -45,6 +49,7 @@ public class StudyAttemptService {
             if(active!=null){repository.rememberStart(user,request,active.id(),hash);return new Start(view(active),false);}
             if(state.status().equals("LOCKED"))throw new StudyRequestException(HttpStatus.CONFLICT,"VOCAB_UNIT_LOCKED","Hoàn thành bài trước để tiếp tục.",Map.of("requiredUnitId",state.prerequisiteUnitId().toString()));
             if(!mode.equals("REPLAY") && completed)throw StudyRequestException.conflict("VOCAB_UNIT_COMPLETED","Bài đã hoàn thành. Hãy chọn ôn lại.");
+            if(!mode.equals("REPLAY"))gamification.requireHearts(user);
             var words=units.words(unitId,unit.revision(),true);
             if(words.size()<4)throw StudyRequestException.conflict("VOCAB_UNIT_UNAVAILABLE","Bài hiện chưa đủ từ để học.");
             UUID id=UUID.randomUUID();var steps=new ExerciseGenerator().generate(words,units.distractors(unit.topicId()),id);
@@ -59,6 +64,8 @@ public class StudyAttemptService {
     public Attempt get(UUID user,UUID id){return view(require(user,id));}
     public StepResult answer(UUID user,UUID id,UUID stepId,UUID request,StudyAnswer answer) {
         String hash=hashes.answer(id,stepId,answer);
+        var context=repository.find(user,id);
+        if(context.isPresent() && context.get().mode().equals("FIRST_COMPLETION") && repository.steps(id).stream().anyMatch(s->s.snapshot().stepId().equals(stepId) && s.snapshot().graded()))plans.ensureFresh(user);
         return write(user,()->{
             var prior=repository.submission(user,request);
             if(prior.isPresent()){if(!prior.get().hash().equals(hash))throw conflict();return prior.get().result();}
@@ -67,6 +74,7 @@ public class StudyAttemptService {
             requireInProgress(attempt);
             var current=steps.stream().filter(s->s.completedAt()==null).findFirst().orElse(null);
             if(current==null || !current.snapshot().stepId().equals(stepId))throw StudyRequestException.conflict("STEP_OUT_OF_ORDER","Hãy tiếp tục đúng bước hiện tại.");
+            var profile=attempt.mode().equals("FIRST_COMPLETION") && step.snapshot().graded()?gamification.requireHearts(user):null;
             AnswerGrader.Grade grade;
             try{grade=new AnswerGrader().grade(step.snapshot(),answer);}
             catch(InvalidStudyAnswer e){throw new StudyRequestException(HttpStatus.UNPROCESSABLE_ENTITY,"INVALID_ANSWER",e.getMessage(),Map.of("field",e.field()));}
@@ -74,7 +82,9 @@ public class StudyAttemptService {
             Instant now=clock.instant();repository.applyAnswer(id,stepId,correct,first,step.snapshot().graded(),now);
             int done=(int)steps.stream().filter(s->s.completedAt()!=null).count()+(correct?1:0);
             UUID next=correct?steps.stream().filter(s->s.completedAt()==null && !s.snapshot().stepId().equals(stepId)).map(s->s.snapshot().stepId()).findFirst().orElse(null):stepId;
-            var result=new StepResult(id,stepId,UUID.randomUUID(),grade.outcome(),grade.correctAnswer(),grade.explanationVi(),correct,done,steps.size(),next,done==steps.size(),false,null);
+            boolean heartLost=profile!=null && !correct && first;
+            var hearts=profile==null?null:gamification.afterAnswer(profile,heartLost);
+            var result=new StepResult(id,stepId,UUID.randomUUID(),grade.outcome(),grade.correctAnswer(),grade.explanationVi(),correct,done,steps.size(),next,done==steps.size(),heartLost,hearts);
             repository.appendSubmission(user,request,hash,answer,first,result,now);return result;
         });
     }
@@ -90,7 +100,8 @@ public class StudyAttemptService {
             int index=-1;for(int i=0;i<after.units().size();i++)if(after.units().get(i).unitId().equals(attempt.unitId()))index=i;
             UUID next=index>=0 && index+1<after.units().size()?after.units().get(index+1).unitId():null;
             boolean unlocked=first && next!=null && before.units().stream().anyMatch(u->u.unitId().equals(next)&&u.status().equals("LOCKED"));
-            var result=new Completion(id,attempt.unitId(),attempt.topicId(),now,(int)steps.stream().filter(s->s.snapshot().type().equals("WORD")).count(),attempt.gradedCount(),attempt.firstTryCount(),accuracy,Math.max(0,Duration.between(attempt.startedAt(),now).toSeconds()),first,after,unlocked?List.of(next):List.of(),next,null);
+            var reward=gamification.completed(user,attempt.unitId(),first,attempt.gradedCount(),attempt.firstTryCount());
+            var result=new Completion(id,attempt.unitId(),attempt.topicId(),now,(int)steps.stream().filter(s->s.snapshot().type().equals("WORD")).count(),attempt.gradedCount(),attempt.firstTryCount(),accuracy,Math.max(0,Duration.between(attempt.startedAt(),now).toSeconds()),first,after,unlocked?List.of(next):List.of(),next,reward);
             repository.complete(id,result,now);return result;
         });
     }

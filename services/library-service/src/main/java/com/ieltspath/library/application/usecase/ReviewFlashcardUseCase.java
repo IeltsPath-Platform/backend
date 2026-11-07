@@ -25,6 +25,7 @@ public class ReviewFlashcardUseCase {
     private final FlashcardVocabularyMetadataReader vocabularyMetadataReader;
     private final FlashcardImageStorage storage;
     private final FlashcardReviewEventWriter reviewEventWriter;
+    private final com.ieltspath.library.application.port.StudyStreakActivity studyStreak;
 
     @Transactional
     public FlashcardResult execute(UUID userId, UUID flashcardId, boolean correct, UUID requestId) {
@@ -41,6 +42,7 @@ public class ReviewFlashcardUseCase {
         if (card.review(correct, requestId, Instant.now(), srsProperties.getIntervalsDays())) {
             card = repository.save(card);
             reviewEventWriter.append(userId, card.getId(), card.getVocabularySenseId(), sessionId, correct, card.getLastReviewedAt());
+            studyStreak.recordActivity(userId,card.getLastReviewedAt());
         }
         var metadata = card.getVocabularySenseId() == null
                 ? null

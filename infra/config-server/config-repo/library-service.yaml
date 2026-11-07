@@ -45,6 +45,23 @@ app:
           - "/api/content/vocabulary/sets/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}/words"
 
 library:
+  access:
+    base-url: ${ACCESS_SERVICE_URL:http://localhost:8084}
+  vocabulary-study:
+    xp:
+      first-completion: 20
+      perfect-bonus: 10
+      level-xp: 500
+    hearts:
+      max: 5
+      premium-max: 7
+      regen-hours: 5
+      refill-cost: 5
+      plan-refresh-minutes: 10
+    streak:
+      freeze-price: 10
+      max-consecutive-freezes: 5
+    default-timezone: Asia/Ho_Chi_Minh
   vocabulary:
     weekly-goal-default: 120
   flashcard-images:

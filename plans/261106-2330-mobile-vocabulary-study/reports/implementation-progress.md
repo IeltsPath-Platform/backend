@@ -20,3 +20,14 @@
 - Measured progress for 100 topics: exactly 3 real SQL queries, 18 ms in the full test run. This is a local test measurement, not a production SLA.
 - Coverage includes cross-device resume, wrong-then-correct accuracy, invalid answer no-write, owner404, path-bound idempotency, published snapshot stability, archived-unit completion, expiry persistence, simultaneous starts/completion, and no leaked answer keys.
 - API rewards remain absent at this intermediate commit as prescribed; the branch is not ready for mobile enablement until gamification lands.
+
+## Independent gamification and Points purchases
+
+- Tests-first clean RED observed missing gamification, Access client and refresher types before implementation.
+- Focused PostgreSQL/domain/flashcard tests: 39 passed. Access client, plan refresher and me-security tests: 29 passed.
+- Full required Library clean: 394 tests, zero failures/errors/skips, BUILD SUCCESS (2026-11-07, 6m44s). Surefire emitted a fork shutdown timeout after all tests completed; the build still exited successfully.
+- Full Gateway clean: 58 tests, zero failures/errors/skips. Route regression first observed zero matching routes; anonymous gateway regression first observed 401 before the exact GET allowlist fix.
+- Real PostgreSQL tests cover independent XP and streak, first-try hearts, Premium capacity, local dates, level-up refill, flashcard activity without profile/XP, same-request concurrency, crash recovery after debit, 402 cleanup, retained 503 intents, and rejection of HTTP calls within an outer transaction.
+- Accepted purchase limitation remains: different concurrent request IDs can each debit before either effect is applied. Same-key purchase retries converge on one logical debit and one saved result.
+- Necessary Access dependency fix and its independent validation are recorded in phase 3; no Library business HTTP retry was introduced.
+- Seed content, live ingress acceptance, metrics and final operational validation remain pending.

@@ -102,6 +102,27 @@ class InternalPathSecurityTest {
     }
 
     @Test
+    void studyContentGetsArePublicAndAdjacentRoutesRequireAuthentication() {
+        String id = "10000000-0000-4000-8000-000000000001";
+        client.get().uri("/api/content/vocabulary/topics/" + id + "/units")
+                .exchange().expectStatus().isOk();
+        client.get().uri("/api/content/vocabulary/units/" + id)
+                .exchange().expectStatus().isOk();
+        client.post().uri("/api/content/vocabulary/units/" + id).bodyValue("{}")
+                .exchange().expectStatus().isUnauthorized();
+        client.get().uri("/api/content/vocabulary/units/not-a-uuid")
+                .exchange().expectStatus().isUnauthorized();
+        client.get().uri("/api/content/vocabulary/topics/not-a-uuid/units")
+                .exchange().expectStatus().isUnauthorized();
+        client.get().uri("/api/learning-support/vocabulary-study/me/summary")
+                .exchange().expectStatus().isUnauthorized();
+        client.get().uri("/api/learning-support/vocabulary-study/progress?topicIds=" + id)
+                .exchange().expectStatus().isUnauthorized();
+        client.post().uri("/api/learning-support/vocabulary-study/units/" + id + "/attempts").bodyValue("{}")
+                .exchange().expectStatus().isUnauthorized();
+    }
+
+    @Test
     void systemMonitoringRequiresAdminRole() throws Exception {
         client.get().uri("/api/admin/system/services")
                 .exchange()
@@ -151,6 +172,8 @@ class InternalPathSecurityTest {
                     .route("test-public-vocabulary", route -> route
                             .path("/api/content/vocabulary", "/api/content/vocabulary/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}",
                                     "/api/content/vocabulary/suggestions", "/api/content/vocabulary/topics", "/api/content/vocabulary/sets", "/api/content/vocabulary/mindmap",
+                                    "/api/content/vocabulary/topics/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}/units",
+                                    "/api/content/vocabulary/units/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}",
                                     "/api/content/vocabulary/sets/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}",
                                     "/api/content/vocabulary/sets/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}/words")
                             .and().method(HttpMethod.GET)

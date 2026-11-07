@@ -352,3 +352,11 @@ Dòng "hai máy" là giới hạn cố ý chấp nhận, vì việc khóa chặt
 - Hoàn thành cùng một unit hai lần, từ hai thiết bị, hoặc sau khi sửa revision đều trả XP đúng một lần.
 - Access hỏng hay chậm không làm mất Points, không cấp tim hay freeze khi chưa trả.
 - `mvn -pl services/library-service -o clean test` và test route của api-gateway xanh.
+
+## Implementation clarifications (2026-11-07)
+
+- The timezone example uses 17:30 UTC: Asia/Ho_Chi_Minh is UTC+7, so 16:30 UTC is still 23:30 on the same date. The test fixes the example rather than changing the timezone rules.
+- Gateway has its own explicit public GET allowlist in SecurityConfig, in addition to Library configuration. Both exact UUID unit read paths are added there so anonymous reads work through the actual ingress.
+- API result records are typed for hearts, rewards, summary, and purchases; public JSON shapes remain the approved contract and stored retries preserve all timestamps/values.
+
+- A real Access concurrency defect contradicted the plan assumption that debit replay was already safe: a same-key loser could return 402 after the winner committed its debit. The necessary narrow dependency fix reuses DebitPointsUseCase existing committed-ledger recovery for InsufficientPointsException. It changes no HTTP/API/locking design, adds no Library business retry, and retains normal 402 pending cleanup. Parent-owned Access tests observe the actual PostgreSQL interleaving RED before the fix.
