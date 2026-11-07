@@ -185,6 +185,43 @@ class StudyGamificationJdbcIntegrationTest {
         assertEquals(distinct?2:1,logicalDebits.get());assertEquals(5,gamma.summary(user).hearts().hearts());
         assertEquals(distinct?2:1,jdbc.queryForObject("select count(*) from vocabulary_study_purchases where user_id=? and status='DONE'",Integer.class,user));
     }
+    @Test void countersTrackCommittedLogicalOperationsRatherThanRetriedRequests() {
+        var registry=new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        io.micrometer.core.instrument.Metrics.addRegistry(registry);
+        try {
+            var initial=start();study.start(user,unit,UUID.randomUUID(),"RESUME_OR_START");
+            assertEquals(1,registry.get("vocabulary_study_attempts_started").counter().count());
+            finish(user,initial.attemptId());study.complete(user,initial.attemptId(),UUID.randomUUID());study.complete(user,initial.attemptId(),UUID.randomUUID());
+            assertEquals(1,registry.get("vocabulary_study_attempts_completed").counter().count());
+            var replay=study.start(user,unit,UUID.randomUUID(),"REPLAY").attempt();finish(user,replay.attemptId());study.complete(user,replay.attemptId(),UUID.randomUUID());
+            assertEquals(2,registry.get("vocabulary_study_attempts_started").counter().count());assertEquals(2,registry.get("vocabulary_study_attempts_completed").counter().count());
+            setHearts(2);UUID request=UUID.randomUUID();
+            org.mockito.Mockito.doThrow(new com.ieltspath.library.application.port.StudyAccessClient.AccessUnavailableException()).when(access).debit(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyLong(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString());
+            assertThrows(StudyRequestException.class,()->purchases.purchase(user,request,"HEART_REFILL"));
+            assertEquals(1,registry.get("vocabulary_study_purchases").tags("kind","HEART_REFILL","status","PENDING").counter().count());
+            org.mockito.Mockito.doReturn(new com.ieltspath.library.application.port.StudyAccessClient.PointsDebit(UUID.randomUUID(),37)).when(access).debit(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyLong(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString());
+            org.mockito.Mockito.doThrow(new IllegalStateException("post-debit rollback")).doCallRealMethod().when(gammaAdapter).finishPurchase(org.mockito.ArgumentMatchers.eq(request),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyLong(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any());
+            assertThrows(IllegalStateException.class,()->purchases.purchase(user,request,"HEART_REFILL"));
+            var rolledBackDone=registry.find("vocabulary_study_purchases").tags("kind","HEART_REFILL","status","DONE").counter();
+            assertTrue(rolledBackDone==null||rolledBackDone.count()==0);
+            purchases.purchase(user,request,"HEART_REFILL");purchases.purchase(user,request,"HEART_REFILL");
+            assertEquals(1,registry.get("vocabulary_study_purchases").tags("kind","HEART_REFILL","status","PENDING").counter().count());
+            assertEquals(1,registry.get("vocabulary_study_purchases").tags("kind","HEART_REFILL","status","DONE").counter().count());
+        } finally {io.micrometer.core.instrument.Metrics.removeRegistry(registry);registry.close();}
+    }
+    @Test void seededEightWordAttemptUsesAllExerciseTypesWithinLocalBudget() {
+        UUID seeded=UUID.fromString("d9000000-0000-4000-8000-000000000101");
+        long total=0;
+        for(int i=0;i<4;i++) {
+            UUID learner=UUID.randomUUID();refresher.ensureFresh(learner);long began=System.nanoTime();
+            var attempt=study.start(learner,seeded,UUID.randomUUID(),"RESUME_OR_START").attempt();
+            long elapsed=(System.nanoTime()-began)/1_000_000;
+            assertEquals(26,attempt.steps().size());assertEquals(Set.of("WORD","CHOICE","MATCH","FILL"),attempt.steps().stream().map(s->s.get("type").toString()).collect(java.util.stream.Collectors.toSet()));
+            if(i>0)total+=elapsed;
+        }
+        long average=total/3;System.out.println("Vocabulary seeded eight-word attempt local average: "+average+" ms (3 warm samples)");
+        assertTrue(average<200,"local attempt average "+average+" ms");
+    }
     static class MutableClock extends Clock {
         Instant at=Instant.parse("2026-11-07T17:30:00Z");
         public java.time.ZoneId getZone(){return ZoneOffset.UTC;}

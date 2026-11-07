@@ -57,7 +57,7 @@ public class StudyAttemptService {
             if(graded==0)throw StudyRequestException.conflict("VOCAB_UNIT_UNAVAILABLE","Bài hiện chưa có bài tập phù hợp.");
             Instant now=clock.instant();
             var attempt=new AttemptRow(id,user,unit.topicId(),unitId,unit.revision(),mode.equals("REPLAY")?"REPLAY":"FIRST_COMPLETION","IN_PROGRESS",now,now.plus(Duration.ofDays(14)),request,hash,graded,0,null);
-            repository.create(attempt,steps,now);return new Start(view(attempt),true);
+            repository.create(attempt,steps,now);StudyMetrics.afterCommit("vocabulary_study_attempts_started");return new Start(view(attempt),true);
         });
     }
     @org.springframework.transaction.annotation.Transactional(readOnly=true,isolation=org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
@@ -102,7 +102,7 @@ public class StudyAttemptService {
             boolean unlocked=first && next!=null && before.units().stream().anyMatch(u->u.unitId().equals(next)&&u.status().equals("LOCKED"));
             var reward=gamification.completed(user,attempt.unitId(),first,attempt.gradedCount(),attempt.firstTryCount());
             var result=new Completion(id,attempt.unitId(),attempt.topicId(),now,(int)steps.stream().filter(s->s.snapshot().type().equals("WORD")).count(),attempt.gradedCount(),attempt.firstTryCount(),accuracy,Math.max(0,Duration.between(attempt.startedAt(),now).toSeconds()),first,after,unlocked?List.of(next):List.of(),next,reward);
-            repository.complete(id,result,now);return result;
+            repository.complete(id,result,now);StudyMetrics.afterCommit("vocabulary_study_attempts_completed");return result;
         });
     }
     private AttemptRow require(UUID user,UUID id){return repository.find(user,id).orElseThrow(()->StudyRequestException.missing("ATTEMPT_NOT_FOUND"));}

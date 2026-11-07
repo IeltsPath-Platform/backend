@@ -32,6 +32,7 @@ public class StudyPurchaseCoordinator {
             lock.lock(user);var existing=repository.purchase(request);
             if(existing.isPresent())return requireOwner(existing.get(),user,kind);
             int amount=gamification.checkPurchase(user,kind);repository.createPurchase(request,user,kind,amount,clock.instant());
+            StudyMetrics.afterCommit("vocabulary_study_purchases","kind",kind,"status","PENDING");
             return requireOwner(repository.purchase(request).orElseThrow(),user,kind);
         });
         if(intent.status().equals("DONE"))return intent.result();
@@ -52,6 +53,7 @@ public class StudyPurchaseCoordinator {
             if(current.status().equals("DONE"))return current.result();
             var result=gamification.applyPurchase(user,kind,current.amount(),debit.balanceAfter());
             repository.finishPurchase(request,debit.ledgerId(),debit.balanceAfter(),result,clock.instant());
+            StudyMetrics.afterCommit("vocabulary_study_purchases","kind",kind,"status","DONE");
             log.info("Vocabulary study purchase requestId={} kind={} status=DONE",request,kind);return result;
         });
     }

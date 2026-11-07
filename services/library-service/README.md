@@ -130,3 +130,28 @@ V41 adds vocabulary-only XP (20 first completion, +10 perfect bonus, 500 XP per 
 Authenticated settings/summary are `/api/learning-support/vocabulary-study/me/settings` (PUT timezone) and `/me/summary` (GET), with `/me/hearts/refill` and `/me/streak/freeze` POST purchases. Refill costs 5 Points; freeze costs 10 times the consecutive frozen run including the next day, at most five consecutive days and one owned freeze. All prices and reward rules bind under `library.vocabulary-study.*` in Config Server; `ACCESS_SERVICE_URL` configures `library.access.base-url` (host default `http://localhost:8084`, Compose `http://access-service:8084`). No Access startup dependency is added.
 
 Purchase flow is intent transaction -> Access HTTP outside transactions/locks -> effect transaction. Clients retry the same requestId after an uncertain 503; the immutable amount and `vocab-study:` idempotency key are preserved. A confirmed 402 removes the pending purchase without an effect. A PENDING purchase older than 15 minutes needs operator inspection; there is no background reconciliation job in this version. Two different purchase request IDs can both pass validation before either effect and both charge; this is the approved concurrency limit. Never manufacture flashcard reviews to obtain unit rewards.
+
+V42 seeds Education and Environment with three curated eight-word LEARN units and one REVIEW unit each. Review words overlap the preceding lessons; each topic exposes 24 distinct vocabulary items. Seed publication metadata is checked against the real exercise generator. On an existing installation, a topic is skipped if author edits make any selected word, meaning or whole-word example unsuitable; catalog data is never reactivated or overwritten. Available demo lessons append after existing units and increment that topic's curriculum version once. Demo wording needs content-author review before production use.
+
+Operational counters are `vocabulary_study_attempts_started`, `vocabulary_study_attempts_completed`, `vocabulary_study_purchases` (tags `kind`, `status`) and `vocabulary_study_access_failures`. Application counters count committed new transitions, so retries and rolled-back effects do not inflate them. Access failures count one terminal unavailable call after the shared retry policy, excluding 402/409 and recovered retries. Inspect old pending purchases with:
+
+```sql
+SELECT request_id, user_id, kind, amount, created_at
+FROM vocabulary_study_purchases
+WHERE status = 'PENDING' AND created_at < CURRENT_TIMESTAMP - INTERVAL '15 minutes';
+```
+
+Study configuration defaults (all keys below begin with `library.vocabulary-study.`):
+
+| Key | Default |
+|---|---|
+| `xp.first-completion` / `xp.perfect-bonus` / `xp.level-xp` | 20 / 10 / 500 |
+| `hearts.max` / `hearts.premium-max` | 5 / 7 |
+| `hearts.regen-hours` / `hearts.refill-cost` | 5 hours / 5 Points |
+| `hearts.plan-refresh-minutes` | 10 minutes |
+| `streak.freeze-price` / `streak.max-consecutive-freezes` | 10 Points / 5 days |
+| `default-timezone` | `Asia/Ho_Chi_Minh` |
+
+`library.access.base-url` resolves from `ACCESS_SERVICE_URL`. Rule changes apply to new operations; pending purchases keep their recorded amount and completed results remain saved verbatim.
+
+Keep the same requestId when resuming an uncertain purchase; inspect the Access ledger before any manual recovery. Run `scripts/verify-vocabulary-study.ps1 -BaseUrl http://localhost:18080 -Credential (Get-Credential)` against a fresh learner account. It exercises public reads, authenticated progress, resume, answers, completion replay and XP. Do not place credentials in committed scripts or logs. Required verification uses `mvn -pl services/library-service -o clean test` and `mvn -pl infra/api-gateway -o clean test` with Docker available.

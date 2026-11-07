@@ -39,7 +39,7 @@ class StudyMeSecurityTest {
     private static final String ROOT = "/api/learning-support/vocabulary-study/me";
     private static final HeartsView HEARTS = new HeartsView(5, 5, null, 5);
     private static final StreakView STREAK = new StreakView(3, 7, LocalDate.of(2026, 11, 7), true,
-            false, null, "QUALIFIED_TODAY", 0, "Asia/Ho_Chi_Minh");
+            false, 10, null, 0, "Asia/Ho_Chi_Minh");
     static { new SecureRandom().nextBytes(KEY); }
 
     @Autowired MockMvc mvc;
@@ -78,7 +78,8 @@ class StudyMeSecurityTest {
                 .andExpect(jsonPath("$.hearts.nextHeartAt").isEmpty())
                 .andExpect(jsonPath("$.streak.lastQualifiedDate").value("2026-11-07"))
                 .andExpect(jsonPath("$.streak.qualifiedToday").value(true))
-                .andExpect(jsonPath("$.streak.freezeBlockedReason").value("QUALIFIED_TODAY"));
+                .andExpect(jsonPath("$.streak.freezeCost").value(10))
+                .andExpect(jsonPath("$.streak.freezeBlockedReason").isEmpty());
         verify(summary).execute(USER);
     }
 

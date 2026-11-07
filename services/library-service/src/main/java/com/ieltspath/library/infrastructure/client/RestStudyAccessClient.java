@@ -5,6 +5,7 @@ import com.ieltspath.commonresilience.DownstreamUnavailableException;
 import com.ieltspath.commonresilience.ResilientCall;
 import com.ieltspath.commonsecurity.header.SecurityHeaders;
 import com.ieltspath.library.application.port.StudyAccessClient;
+import io.micrometer.core.instrument.Metrics;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -47,7 +48,7 @@ public class RestStudyAccessClient implements StudyAccessClient {
                 .body(new Debit(userId, amount, referenceType, referenceId, idempotencyKey, description))
                 .retrieve().body(Ledger.class), CallKind.IDEMPOTENT_WRITE, true);
         if (response == null || response.id() == null || response.balanceAfter() == null) {
-            throw new AccessUnavailableException();
+            throw unavailable(null);
         }
         return new PointsDebit(response.id(), response.balanceAfter());
     }
@@ -59,7 +60,7 @@ public class RestStudyAccessClient implements StudyAccessClient {
         return switch (response.getStatusCode().value()) {
             case 200 -> true;
             case 204 -> false;
-            default -> throw new AccessUnavailableException();
+            default -> throw unavailable(null);
         };
     }
 
@@ -67,14 +68,21 @@ public class RestStudyAccessClient implements StudyAccessClient {
         try {
             return resilient.call("access", kind, request);
         } catch (DownstreamUnavailableException unavailable) {
-            throw new AccessUnavailableException(unavailable);
+            throw unavailable(unavailable);
         } catch (RestClientResponseException response) {
             if (debit && response.getStatusCode().value() == 402) throw new InsufficientPointsException();
             if (debit && response.getStatusCode().value() == 409) throw new PointsIdempotencyConflictException();
-            throw new AccessUnavailableException();
+            throw unavailable(response);
         } catch (RestClientException unavailable) {
-            throw new AccessUnavailableException(unavailable);
+            throw unavailable(unavailable);
+        } catch (AccessUnavailableException unavailable) {
+            throw unavailable(unavailable);
         }
+    }
+
+    private AccessUnavailableException unavailable(Throwable cause) {
+        Metrics.counter("vocabulary_study_access_failures").increment();
+        return new AccessUnavailableException(cause);
     }
 
     private void forwardHeaders(HttpHeaders headers) {
