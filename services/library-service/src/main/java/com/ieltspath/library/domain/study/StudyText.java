@@ -8,7 +8,7 @@ public final class StudyText {
     private StudyText() {}
     public static String normalize(String value) {
         return Normalizer.normalize(value == null ? "" : value, Normalizer.Form.NFC)
-                .strip().toLowerCase(Locale.ROOT).replaceAll("(?U)\\s+", " ");
+                .toLowerCase(Locale.ROOT).replaceAll("(?U)\\s+", " ").strip();
     }
     public static Pattern lemmaPattern(String lemma) {
         String quoted = String.join("\\s+", java.util.Arrays.stream(lemma.strip().split("(?U)\\s+"))

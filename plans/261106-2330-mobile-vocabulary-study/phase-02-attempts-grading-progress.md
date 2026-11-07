@@ -1,5 +1,7 @@
 # Phase 2: Attempt — sinh bài, chấm điểm, tiến độ, mở khóa, hoàn thành
 
+Status: implemented; automated verification passed; reward and live acceptance follow in phases 3?4.
+
 Service: library-service. Phụ thuộc: phase 1. Đọc trước: [plan.md](./plan.md) mục 7.
 
 ## 1. Mục tiêu
@@ -251,3 +253,10 @@ Phase 3 thêm vào bước 4–5: XP, streak, `reward`.
 - Chạy được trọn một unit chỉ bằng API, tiếp tục từ phiên khác, replay, và gọi lại mọi POST với cùng `requestId` an toàn.
 - `accuracyPercent` và `firstTryCorrectCount` chỉ tính lần nộp đầu.
 - `mvn -pl services/library-service -o clean test` xanh.
+
+## Implementation notes (2026-11-07)
+
+- V40 additionally persists `start_payload_hash` and `vocabulary_study_start_requests`: every start/resume POST requestId is durably bound to its payload and original attempt. Without resume aliases, retrying a resume after completion returned VOCAB_UNIT_COMPLETED and the key could be reused on another unit. The regression was observed RED before the fix.
+- Answer request hashes include attemptId and stepId as well as canonical body content; MATCH pairs are ordered by leftOptionId. Expiry transitions commit before returning their 409.
+- Completion includes the contract topicId/completedAt and excludes the finishing attempt from currentAttemptId. Progress reads use exactly three batched SQL queries, including curriculumVersion for topics whose units have all been archived.
+- Unicode NBSP and narrow-NBSP normalization is covered; whitespace-only fill input is invalid rather than a wrong answer.
