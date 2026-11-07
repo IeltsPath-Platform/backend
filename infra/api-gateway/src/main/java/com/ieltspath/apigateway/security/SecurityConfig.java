@@ -110,6 +110,8 @@ public class SecurityConfig {
                     exchange.pathMatchers(HttpMethod.GET,
                             "/api/content/vocabulary/suggestions", "/api/content/vocabulary/topics",
                             "/api/content/vocabulary/sets", "/api/content/vocabulary/mindmap",
+                            "/api/content/vocabulary/topics/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}/units",
+                            "/api/content/vocabulary/units/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}",
                             "/api/content/vocabulary/sets/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}",
                             "/api/content/vocabulary/sets/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}/words")
                             .permitAll();

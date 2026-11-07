@@ -1,5 +1,7 @@
 # Phase 3: XP, streak, tim, mua bằng Points, gateway
 
+Status: complete for backend delivery; final Library 407, Gateway 58 and required Access fix 112 clean tests passed. Live rewards, Points recovery, Premium, flashcard streak and two-way web independence passed; split-run acceptance evidence is recorded in phase 4 reports.
+
 Service: library-service, cộng thêm config-server, api-gateway, docker-compose. Phụ thuộc: phase 2. Đọc trước: [plan.md](./plan.md) mục 7 và hợp đồng mục 7.
 
 ## 1. Mục tiêu
@@ -330,7 +332,7 @@ Dòng "hai máy" là giới hạn cố ý chấp nhận, vì việc khóa chặt
 1. `StudyXpRulesTest`: bảng ở mục 4, ranh giới cấp 499/500/999/1000.
 2. `StudyStreakRulesTest`: sao chép các ca của test streak bên learning-service (cùng ngày hai lần, qua ngày trống, freeze phủ đúng một ngày, giá 10/20/30, giới hạn 5 ngày, freeze cần chuỗi đang sống, chỉ giữ một freeze) và chạy lại các ví dụ ở mục 5.
 3. `StudyHeartsTest`: các ví dụ giờ ở mục 6; đồng hồ dừng khi đầy; không xuống dưới 0; hồi đầy khi lên cấp.
-4. Tích hợp (`@JdbcTest`, Testcontainers): hoàn thành hai lần và hai thread cùng lúc chỉ trả XP một lần (khóa unique của sổ XP); `local_date` ghi đúng theo múi giờ (đặt `Clock` ở 16:30 UTC với `Asia/Ho_Chi_Minh` là ngày hôm sau); đổi múi giờ không đổi ngày đã ghi; replay không cộng XP mà vẫn cập nhật streak.
+4. Tích hợp (`@JdbcTest`, Testcontainers): hoàn thành hai lần và hai thread cùng lúc chỉ trả XP một lần (khóa unique của sổ XP); `local_date` ghi đúng theo múi giờ (đặt `Clock` ở 17:30 UTC với `Asia/Ho_Chi_Minh` là ngày hôm sau); đổi múi giờ không đổi ngày đã ghi; replay không cộng XP mà vẫn cập nhật streak.
 5. Luồng tim: sai bước chấm điểm lần đầu mất 1 tim, sai lần hai không mất thêm; WORD không mất tim; replay không mất tim và `hearts = null`; 0 tim chặn bắt đầu attempt mới và chặn nộp bước chấm điểm, nhưng không chặn `GET` attempt, trả attempt đang làm, replay, hay phát lại request cũ.
 6. `StudyPurchaseCoordinatorTest` với `StudyAccessClient` giả, đi hết ma trận ở mục 10, kể cả "ném lỗi sau bước 2, trước bước 3, rồi retry".
 7. Test hợp đồng `RestStudyAccessClient` với server HTTP giả (WireMock hoặc `MockRestServiceServer`): chuyển đúng bearer và correlation id, đúng body, ánh xạ 402/409/5xx, timeout.
@@ -352,3 +354,11 @@ Dòng "hai máy" là giới hạn cố ý chấp nhận, vì việc khóa chặt
 - Hoàn thành cùng một unit hai lần, từ hai thiết bị, hoặc sau khi sửa revision đều trả XP đúng một lần.
 - Access hỏng hay chậm không làm mất Points, không cấp tim hay freeze khi chưa trả.
 - `mvn -pl services/library-service -o clean test` và test route của api-gateway xanh.
+
+## Implementation clarifications (2026-11-07)
+
+- The timezone example uses 17:30 UTC: Asia/Ho_Chi_Minh is UTC+7, so 16:30 UTC is still 23:30 on the same date. The test fixes the example rather than changing the timezone rules.
+- Gateway has its own explicit public GET allowlist in SecurityConfig, in addition to Library configuration. Both exact UUID unit read paths are added there so anonymous reads work through the actual ingress.
+- API result records are typed for hearts, rewards, summary, and purchases; public JSON shapes remain the approved contract and stored retries preserve all timestamps/values.
+
+- A real Access concurrency defect contradicted the plan assumption that debit replay was already safe: a same-key loser could return 402 after the winner committed its debit. The necessary narrow dependency fix reuses DebitPointsUseCase existing committed-ledger recovery for InsufficientPointsException. It changes no HTTP/API/locking design, adds no Library business retry, and retains normal 402 pending cleanup. Parent-owned Access tests observe the actual PostgreSQL interleaving RED before the fix.

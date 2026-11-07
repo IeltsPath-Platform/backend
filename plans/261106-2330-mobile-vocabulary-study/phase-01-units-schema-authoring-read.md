@@ -1,5 +1,7 @@
 # Phase 1: Unit — bảng dữ liệu, API biên soạn (content author), API đọc nội dung
 
+Status: complete for backend delivery; automated verification passed, and live Gateway public reads/OpenAPI passed. See [implementation progress](./reports/implementation-progress.md) and [backend handoff](./reports/backend-handoff.md) for evidence and client media checks.
+
 Service: library-service. Phụ thuộc: không. Đọc trước: [plan.md](./plan.md) mục 7 (quy ước chung).
 
 ## 1. Mục tiêu
@@ -269,3 +271,9 @@ Quy tắc ánh xạ: `ipaUk = ipa_uk`, `ipaUs = ipa_us`; nếu cả hai null th�
 - Toàn bộ API ở mục 5 và 6 chạy qua gateway với token thật.
 - Học viên không bao giờ thấy nội dung nháp hoặc đã lưu trữ.
 - `mvn -pl services/library-service -o clean test` xanh.
+
+## Implementation notes (2026-11-07)
+
+- Revision rows also store `kind`. The proposed schema kept kind only on the unit, which exposed a draft LEARN/REVIEW edit before publication. Keeping the draft kind with its revision preserves the approved publication-isolation invariant; publish updates the unit metadata. Regression observed RED (`LEARN` expected, `REVIEW` actual), then fixed.
+- Author/public lists batch all unit+revision words in one SQL query. Public content reads use read-only REPEATABLE_READ transactions so a concurrent publication cannot label old revision content with a new curriculumVersion. The concurrent regression observed RED (version 1 expected, 2 actual).
+- Author writes lock the topic before unit rows, consistently with reorder, to avoid opposite row-lock ordering.

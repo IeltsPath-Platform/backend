@@ -34,6 +34,13 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(com.ieltspath.library.application.exception.StudyRequestException.class)
+    public ResponseEntity<ErrorResponse> handleStudyRequest(com.ieltspath.library.application.exception.StudyRequestException ex,
+                                                           HttpServletRequest request) {
+        return ResponseEntity.status(ex.status()).body(new ErrorResponse(LocalDateTime.now(), ex.status().value(),
+                ex.status().getReasonPhrase(), ex.getMessage(), request.getRequestURI(), ex.details(), ex.code()));
+    }
+
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler({org.springframework.dao.QueryTimeoutException.class,

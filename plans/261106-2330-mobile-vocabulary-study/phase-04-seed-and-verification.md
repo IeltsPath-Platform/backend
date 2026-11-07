@@ -1,5 +1,9 @@
 # Phase 4: Dữ liệu mẫu và nghiệm thu đầu cuối
 
+Status: complete for backend delivery; final focused 38 and full Library 407 tests passed, and the final fresh isolated Gateway matrix passed 404 checks with exit 0. [Live acceptance](./reports/vocabulary-study-e2e-verification.md) preserves earlier harness failures and the final passing rerun. Non-null remote media and physical-device/client fallback verification remain explicitly unchecked client acceptance work.
+
+Implementation clarification (2026-11-07): the fresh catalog receives all eight curated units. On upgrade, V42 preserves author edits and skips an entire demo topic if a chosen primary sense is inactive, has an unsuitable meaning/example, or duplicates a meaning within a unit. Valid demo units append after existing author units and bump the existing curriculum version once per topic. This prevents demo data from blocking service startup or hiding a curriculum change from cached clients.
+
 Phụ thuộc: phase 1–3. Mục đích: chứng minh cả chuỗi chạy thật (gateway, xác thực, access, library, DB) và đối chiếu từng mục của checklist hợp đồng mục 11. Phase này chỉ làm việc backend; đội mobile và frontend dùng kết quả để tích hợp.
 
 ## 1. Dữ liệu mẫu `V42__seed_vocabulary_study_units_demo.sql`
@@ -104,4 +108,4 @@ Pass khi: hoàn thành unit mobile **không** làm đổi bất kỳ số nào c
 
 - Mọi ô trong checklist hợp đồng mục 11 được tích kèm bằng chứng (tên test, kết quả lệnh, hoặc ghi chép lần chạy tay).
 - Không còn lỗi mở từ mục 4.
-- Biên bản bàn giao ghi rõ phần chưa làm: tim Premium, thưởng mốc streak, job tự hoàn tất purchase `PENDING`, trường hợp hai máy hồi tim cùng lúc (xem phase 3 mục 10).
+- Biên bản bàn giao ghi rõ phần ngoài phạm vi: thưởng mốc streak, job tự hoàn tất purchase `PENDING`, trường hợp hai máy hồi tim cùng lúc (xem phase 3 mục 10). Tim Premium nằm trong phạm vi và đã triển khai.

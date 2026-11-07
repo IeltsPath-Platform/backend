@@ -1,9 +1,9 @@
 ﻿---
 title: "BE: học từ vựng theo unit cho mobile, XP/streak/tim độc lập với web"
 description: "library-service cung cấp unit do content author biên soạn, chấm bài theo attempt, và hệ thống XP/streak(freeze)/tim riêng; hồi tim và mua freeze bằng Points của access-service"
-status: pending
+status: completed
 priority: P1
-branch: ""
+branch: "feat/mobile-vocabulary-study"
 tags: [backend, library-service, vocabulary, gamification, hearts, streak, points]
 blockedBy: []
 blocks: []
@@ -17,6 +17,8 @@ source: skill
 **Người đọc: dev backend** (Spring Boot, library-service). Tài liệu này tự đủ để làm mà không cần xem hội thoại hay code mobile. Hình dạng JSON của mọi endpoint nằm ở hợp đồng API: [api-contract.md](./api-contract.md) (bản sao của `mobile/docs/vocabulary-study-backend-contract.md`). Plan này nói **làm gì, ở đâu, theo thứ tự nào, kiểm thử thế nào**, và ghi lại những chỗ code hiện tại buộc phải làm khác hợp đồng.
 
 Các file: [phase 1](./phase-01-units-schema-authoring-read.md) · [phase 2](./phase-02-attempts-grading-progress.md) · [phase 3](./phase-03-gamification-and-points.md) · [phase 4](./phase-04-seed-and-verification.md).
+
+Implementation status (2026-11-07): all four phases are complete for backend delivery. Final clean suites passed Library 407, Gateway 58 and Access 112 tests; the final fresh isolated Gateway matrix passed 404 checks with exit 0. [Automated evidence](./reports/implementation-progress.md), [backend handoff](./reports/backend-handoff.md), [live acceptance](./reports/vocabulary-study-e2e-verification.md) and [final review](./reports/final-review.md) record results and limits. Non-null remote media and physical-device/client fallback verification remain explicitly unchecked client acceptance work.
 
 ## 1. Bối cảnh
 
@@ -137,7 +139,7 @@ SELECT pg_advisory_xact_lock(hashtext('vocab-study:' || :userId))
 
 Mẫu: `JdbcLearnerLock` của learning-service (ném lỗi nếu không có transaction đang mở). Tạo `JdbcStudyLock` tương tự trong library-service.
 
-**Không gọi HTTP khi đang giữ khóa hoặc transaction.** Lời gọi duy nhất ra ngoài (trừ Points) nằm giữa hai transaction (phase 3). Đây chính là lỗi vừa phải sửa ở consumer kết quả examiner của learning-service.
+**Không gọi HTTP khi đang giữ khóa hoặc transaction.** Trừ Points nằm giữa hai transaction; đọc gói Premium cũng diễn ra trước khi mở transaction (phase 3). Đây chính là lỗi vừa phải sửa ở consumer kết quả examiner của learning-service.
 
 **Idempotency.** Mọi POST ghi nhận `requestId` (UUID do mobile sinh). Lưu kèm `payload_hash` = SHA-256 hex của JSON chuẩn hóa của body (khóa sắp xếp, mảng `pairs` sắp theo `leftOptionId`). Cùng `requestId` và cùng hash: trả lại kết quả đã lưu. Cùng `requestId` khác hash: `409 IDEMPOTENCY_CONFLICT`. Tra cứu `requestId` diễn ra **trước** các kiểm tra trạng thái hiện tại (tim, thứ tự bước), để retry sau khi trạng thái đã đổi vẫn trả đúng kết quả cũ.
 

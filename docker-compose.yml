@@ -196,6 +196,7 @@ services:
       SERVER_PORT: 8081
       LIBRARY_DB_URL: jdbc:postgresql://postgres:5432/library_db
       LIBRARY_DB_PASSWORD: "${POSTGRES_PASSWORD}"
+      ACCESS_SERVICE_URL: http://access-service:8084
       SUPABASE_URL: "${SUPABASE_URL:-}"
       SUPABASE_SECRET_KEY: "${SUPABASE_SECRET_KEY:-}"
     depends_on: *after-infra

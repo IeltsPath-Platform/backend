@@ -37,12 +37,31 @@ app:
           - "/api/content/vocabulary/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}"
           - /api/content/vocabulary/suggestions
           - /api/content/vocabulary/topics
+          - "/api/content/vocabulary/topics/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}/units"
+          - "/api/content/vocabulary/units/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}"
           - /api/content/vocabulary/sets
           - /api/content/vocabulary/mindmap
           - "/api/content/vocabulary/sets/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}"
           - "/api/content/vocabulary/sets/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}/words"
 
 library:
+  access:
+    base-url: ${ACCESS_SERVICE_URL:http://localhost:8084}
+  vocabulary-study:
+    xp:
+      first-completion: 20
+      perfect-bonus: 10
+      level-xp: 500
+    hearts:
+      max: 5
+      premium-max: 7
+      regen-hours: 5
+      refill-cost: 5
+      plan-refresh-minutes: 10
+    streak:
+      freeze-price: 10
+      max-consecutive-freezes: 5
+    default-timezone: Asia/Ho_Chi_Minh
   vocabulary:
     weekly-goal-default: 120
   flashcard-images:
@@ -56,6 +75,7 @@ springdoc:
   api-docs:
     enabled: ${API_DOCS_ENABLED:true}
   paths-to-match:
+    - /api/learning-support/vocabulary-study/**
     - /api/content/videos/**
     - /api/content/vocabulary/**
     - /api/content/admin/vocabulary/**

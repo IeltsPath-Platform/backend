@@ -1,8 +1,8 @@
 # Bàn giao BE: học từ vựng theo chủ đề trên mobile
 
-Ngày đối chiếu mã nguồn: 06/11/2026.
+Ngày đối chiếu mã nguồn: 07/11/2026.
 
-Đây là **đề xuất hợp đồng API**, chưa phải các endpoint đã được triển khai. Các URL mới bên dưới là tên đề xuất; đội BE có thể đổi tên nếu cung cấp OpenAPI và thống nhất mapping. Không có thay đổi mã BE trong tài liệu này.
+Các endpoint dưới đây đã được triển khai trong Library và định tuyến qua Gateway, giữ nguyên URL của hợp đồng đã duyệt. Kết quả kiểm thử, giới hạn và trạng thái nghiệm thu nằm trong [bằng chứng triển khai](./reports/implementation-progress.md). OpenAPI được cung cấp qua `/api-docs/library-service`.
 
 **Bản 2 (06/11/2026):** XP, cấp độ, streak (có freeze) và tim của mobile là hệ thống **độc lập với web**, nằm trong library-service; mua tim và freeze bằng điểm của access-service. Unit do content author biên soạn (không phải admin). Kế hoạch triển khai: `plans/261106-2330-mobile-vocabulary-study/plan.md`.
 
@@ -358,10 +358,10 @@ type Completion = {
 
 ### 7.6 Mua tim và freeze bằng điểm (gọi sang Access)
 
-Trừ điểm là lời gọi HTTP duy nhất sang service khác. Không gọi khi đang giữ transaction hay khóa người dùng. Quy trình ba bước, an toàn khi gọi lại cùng `requestId`:
+Library gọi Access qua HTTP để đọc gói Premium (`GET /api/access/me/subscription`) và trừ Points. Không gọi khi đang giữ transaction hay khóa người dùng. Giao dịch mua dùng quy trình ba bước, an toàn khi gọi lại cùng `requestId`:
 
 1. **Ghi nhận**: transaction ngắn kiểm tra điều kiện (chưa đầy tim / đủ điều kiện freeze) và ghi dòng `purchase` trạng thái `PENDING` theo `requestId`. Nếu `requestId` đã có `DONE` thì trả lại kết quả đã lưu; nếu khác loại hoặc khác người dùng thì `409 IDEMPOTENCY_CONFLICT`.
-2. **Trừ điểm**: gọi Access `POST /internal/access/points/debit` với token của người học, `referenceType` là `HEART_REFILL` hoặc `STREAK_FREEZE`, `referenceId` và `idempotencyKey` là `requestId`. Access đã idempotent theo khóa này. Thiếu điểm trả `402 INSUFFICIENT_POINTS`; Access lỗi trả `503 ACCESS_UNAVAILABLE`, dòng `PENDING` được giữ để retry.
+2. **Trừ điểm**: gọi Access `POST /internal/access/points/debit` với token của người học, `referenceType` là `HEART_REFILL` hoặc `STREAK_FREEZE`, `referenceId` là `requestId`, `idempotencyKey` là `"vocab-study:" + requestId`. Access idempotent theo khóa này. Thiếu điểm trả `402 INSUFFICIENT_POINTS` và xóa dòng `PENDING`; Access lỗi trả `503 ACCESS_UNAVAILABLE`, dòng `PENDING` được giữ để retry.
 3. **Áp dụng**: transaction ngắn có khóa người dùng ghi hiệu ứng (hồi đầy tim / đặt freeze) và đánh dấu `DONE` cùng kết quả. Mobile retry cùng `requestId` sẽ hoàn tất dòng `PENDING` mà không trừ điểm lần hai.
 
 Rủi ro đã biết: tim tự đầy do hồi theo giờ ngay giữa bước 2 và 3 thì người học trả điểm cho một lần hồi không cần thiết. Cửa sổ rất ngắn; chấp nhận ở bản đầu và ghi trong kiểm thử.
@@ -433,7 +433,7 @@ Response lỗi theo đúng `ErrorResponse` hiện có của library-service (`de
 }
 ```
 
-| HTTP | Code đề xuất | Mobile xử lý |
+| HTTP | Code | Mobile xử lý |
 |---|---|---|
 | 401 | UNAUTHENTICATED | Đăng nhập lại |
 | 403 hoặc 409 | VOCAB_UNIT_LOCKED | Hiện bài cần hoàn thành, tải lại progress |
@@ -454,33 +454,37 @@ Response lỗi theo đúng `ErrorResponse` hiện có của library-service (`de
 | 429 | RATE_LIMITED | Trả Retry-After |
 | 5xx | SERVER_ERROR | Cho retry cùng requestId |
 
-Mỗi lỗi nghiệp vụ phải có `code` (machine-readable); hiện library-service chưa điền `code` cho lỗi nào nên cần thêm exception mang mã lỗi (xem plan BE, mục 7). Không có `traceId`; dùng correlation id của gateway để truy vết. Media lỗi không biến thành lỗi mất kết nối API toàn màn hình.
+Mỗi lỗi nghiệp vụ study có `code` (machine-readable) qua `StudyRequestException`; lỗi định dạng đầu vào dùng validation chung của Library. Không có `traceId`; dùng correlation id của gateway để truy vết. Media lỗi không biến thành lỗi mất kết nối API toàn màn hình.
 
 ## 11. Checklist nghiệm thu để đội BE bàn giao
 
-- [ ] Có dữ liệu mẫu ít nhất 2 chủ đề, mỗi chủ đề nhiều unit với từ đúng nội dung tên bài.
-- [ ] Mọi unit trả nội dung không rỗng; wordCount/uniqueWordCount chính xác, sortOrder ổn định.
-- [ ] Phân biệt đúng các nghĩa của từ đa nghĩa bằng vocabularySenseId.
-- [ ] Hỗ trợ WORD, CHOICE, MATCH, FILL; không tạo quiz chỉ có một lựa chọn hoặc ghép một cặp.
-- [ ] Mở bài đầu mỗi chủ đề, chặn bài khóa trên server; complete hợp lệ mở đúng bài tiếp.
-- [ ] Đang học ở máy A, đăng nhập máy B thấy cùng tiến độ và tiếp tục đúng bước.
-- [ ] Sai đáp án có feedback, làm lại được; accuracy lần đầu không bị tăng giả khi retry.
-- [ ] Mất mạng sau khi server đã nhận: gửi lại answer/complete không ghi trùng, không thưởng trùng.
-- [ ] Hai máy bấm hoàn thành đồng thời vẫn chỉ có một lần thưởng unit.
-- [ ] Replay không thưởng XP; vẫn tính ngày streak.
-- [ ] Bonus +10 chỉ ở lần hoàn thành đầu và chỉ khi không sai bước nào; sửa revision không trả XP lần hai.
-- [ ] XP, streak, tim của mobile không đổi khi làm bài trên web và ngược lại (kiểm thử hai chiều).
-- [ ] Nửa đêm theo múi giờ, đổi múi giờ, hai thiết bị cùng hoàn thành đều cho streak và XP đúng một lần.
-- [ ] Về 0 tim: không bắt đầu được attempt mới, không nộp đáp án chấm điểm; replay vẫn mở; tim hồi sau 5 giờ.
-- [ ] Ôn một flashcard trong ngày giữ streak mobile (kể cả khi chưa hoàn thành unit nào), không cộng XP; gửi lại cùng `requestId` không tính thêm.
-- [ ] Premium có tối đa 7 tim, người thường 5; hạ gói thì tim bị cắt; Access lỗi vẫn học được với mức tối đa đã lưu.
-- [ ] Khách không token đọc được hai endpoint nội dung unit; mọi API `vocabulary-study/*` còn lại trả 401.
-- [ ] Hồi tim và mua freeze: thiếu điểm bị từ chối; gọi lại cùng `requestId` chỉ trừ điểm một lần; Access lỗi không mất điểm hay đổi trạng thái.
-- [ ] Content author biên soạn, kiểm tra hợp lệ, phát hành, lưu trữ unit; `ADMIN` không gọi được các API này; attempt đang làm dùng snapshot cũ.
-- [ ] Thêm từ/sửa nội dung không làm mất nghĩa ID bài hoặc kết quả cũ.
+Evidence: [backend handoff](./reports/backend-handoff.md) and [implementation progress](./reports/implementation-progress.md). Unchecked items retain an explicit live/client verification requirement.
+
+Backend nullable-media checks passed with unconfigured storage (192 null fields). The remaining media item requires real non-null HTTPS assets and physical-device/client fallback validation; it is not claimed as complete by this backend delivery.
+
+- [x] Có dữ liệu mẫu ít nhất 2 chủ đề, mỗi chủ đề nhiều unit với từ đúng nội dung tên bài.
+- [x] Mọi unit trả nội dung không rỗng; wordCount/uniqueWordCount chính xác, sortOrder ổn định.
+- [x] Phân biệt đúng các nghĩa của từ đa nghĩa bằng vocabularySenseId.
+- [x] Hỗ trợ WORD, CHOICE, MATCH, FILL; không tạo quiz chỉ có một lựa chọn hoặc ghép một cặp.
+- [x] Mở bài đầu mỗi chủ đề, chặn bài khóa trên server; complete hợp lệ mở đúng bài tiếp.
+- [x] Đang học ở máy A, đăng nhập máy B thấy cùng tiến độ và tiếp tục đúng bước.
+- [x] Sai đáp án có feedback, làm lại được; accuracy lần đầu không bị tăng giả khi retry.
+- [x] Mất mạng sau khi server đã nhận: gửi lại answer/complete không ghi trùng, không thưởng trùng.
+- [x] Hai máy bấm hoàn thành đồng thời vẫn chỉ có một lần thưởng unit.
+- [x] Replay không thưởng XP; vẫn tính ngày streak.
+- [x] Bonus +10 chỉ ở lần hoàn thành đầu và chỉ khi không sai bước nào; sửa revision không trả XP lần hai.
+- [x] XP, streak, tim của mobile không đổi khi làm bài trên web và ngược lại (kiểm thử hai chiều).
+- [x] Nửa đêm theo múi giờ, đổi múi giờ, hai thiết bị cùng hoàn thành đều cho streak và XP đúng một lần.
+- [x] Về 0 tim: không bắt đầu được attempt mới, không nộp đáp án chấm điểm; replay vẫn mở; tim hồi sau 5 giờ.
+- [x] Ôn một flashcard trong ngày giữ streak mobile (kể cả khi chưa hoàn thành unit nào), không cộng XP; gửi lại cùng `requestId` không tính thêm.
+- [x] Premium có tối đa 7 tim, người thường 5; hạ gói thì tim bị cắt; Access lỗi vẫn học được với mức tối đa đã lưu.
+- [x] Khách không token đọc được hai endpoint nội dung unit; mọi API `vocabulary-study/*` còn lại trả 401.
+- [x] Hồi tim và mua freeze: thiếu điểm bị từ chối; gọi lại cùng `requestId` chỉ trừ điểm một lần; Access lỗi không mất điểm hay đổi trạng thái.
+- [x] Content author biên soạn, kiểm tra hợp lệ, phát hành, lưu trữ unit; `ADMIN` không gọi được các API này; attempt đang làm dùng snapshot cũ.
+- [x] Thêm từ/sửa nội dung không làm mất nghĩa ID bài hoặc kết quả cũ.
 - [ ] Ảnh/audio HTTPS dùng được từ thiết bị; dữ liệu null có fallback.
-- [ ] Không cần tạo flashcard để được học/hoàn thành unit; lưu từ là thao tác độc lập.
-- [ ] Cung cấp OpenAPI, enum, ví dụ request/response và lỗi, dữ liệu seed, giới hạn payload/phân trang, cơ chế auth/gateway.
+- [x] Không cần tạo flashcard để được học/hoàn thành unit; lưu từ là thao tác độc lập.
+- [x] Cung cấp OpenAPI, enum, ví dụ request/response và lỗi, dữ liệu seed, giới hạn payload/phân trang, cơ chế auth/gateway.
 
 Thứ tự thực hiện: **P0** unit, biên soạn của content author, attempt/chấm đáp án, progress/mở khóa; **P1** XP, cấp độ, streak, tim, mua bằng điểm trong library-service; **P2** nhập tiến độ cũ, offline sync, thống kê nâng cao nếu có yêu cầu. Kế hoạch từng giai đoạn nằm ở `plans/261106-2330-mobile-vocabulary-study/`. API notebook đã tồn tại được mobile tích hợp song song.
 
@@ -501,4 +505,4 @@ Thứ tự thực hiện: **P0** unit, biên soạn của content author, attemp
 - `backend/infra/config-server/config-repo/api-gateway.yaml` (route `library-service`, `library-personal-service`)
 - `backend/services/library-service/src/main/resources/db/migration` (V19 topic/set, hiện tới V38)
 
-Đây là đối chiếu source code trong workspace, không phải xác nhận các API mới đã tồn tại trên môi trường đang chạy.
+Đối chiếu source code đã được bổ sung bằng kiểm thử qua Gateway của stack Docker cô lập. Đây không phải xác nhận đã triển khai lên production; kết quả và giới hạn nằm trong các báo cáo nghiệm thu của plan.

@@ -212,7 +212,7 @@ spring:
             - id: library-personal-service
               uri: lb://LIBRARY-SERVICE
               predicates:
-                - Path=/api/learning-support/flashcards/**,/api/learning-support/decks/**,/api/learning-support/notes/**,/api/learning-support/video-progress/**,/api/learning-support/saved-segments/**
+                - Path=/api/learning-support/flashcards/**,/api/learning-support/decks/**,/api/learning-support/notes/**,/api/learning-support/video-progress/**,/api/learning-support/saved-segments/**,/api/learning-support/vocabulary-study/**
 
             - id: library-video-dictation-service
               uri: lb://LIBRARY-SERVICE
