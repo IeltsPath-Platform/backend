@@ -1,6 +1,6 @@
 # Phase 1: Unit — bảng dữ liệu, API biên soạn (content author), API đọc nội dung
 
-Status: implemented; automated verification passed; live gateway acceptance remains in phase 4.
+Status: complete for backend delivery; automated verification passed, and live Gateway public reads/OpenAPI passed. See [implementation progress](./reports/implementation-progress.md) and [backend handoff](./reports/backend-handoff.md) for evidence and client media checks.
 
 Service: library-service. Phụ thuộc: không. Đọc trước: [plan.md](./plan.md) mục 7 (quy ước chung).
 

@@ -1,6 +1,6 @@
 # Phase 2: Attempt — sinh bài, chấm điểm, tiến độ, mở khóa, hoàn thành
 
-Status: implemented; automated verification passed; reward and live acceptance follow in phases 3?4.
+Status: complete for backend delivery; automated verification and the live Gateway learner flow passed (239 checks, 50 XP after two units plus replay, streak 1). See [implementation progress](./reports/implementation-progress.md) and [backend handoff](./reports/backend-handoff.md).
 
 Service: library-service. Phụ thuộc: phase 1. Đọc trước: [plan.md](./plan.md) mục 7.
 
