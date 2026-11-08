@@ -310,6 +310,7 @@ Backend hiện có 22 phương thức `@Scheduled` trong 21 job. Cơ chế chố
 | game | `OutboxRetentionJob` | Xóa theo ngưỡng thời gian; chạy lặp an toàn | Không |
 | game | `RoomEventChannelSupervisor` | Mỗi instance tự đăng ký lại Redis pub/sub của nó | Không |
 | notification | `NoticePushChannelConfig` | Mỗi instance tự đăng ký lại Redis pub/sub của nó | Không |
+| notification | `PushDeliveryScheduler` | Claim batch bằng `FOR UPDATE SKIP LOCKED`; lease/fencing lưu trong Notification DB | Firebase call ngoài transaction; delivery bền trong PostgreSQL |
 | assessment | `OutboxRelayScheduler` | `FOR UPDATE SKIP LOCKED`; publish broker trong transaction ngắn để giữ claim tới khi gửi xong | Broker trong transaction ngắn |
 | access | `AccessOutboxRelayScheduler` | `FOR UPDATE SKIP LOCKED`; publish broker trong transaction ngắn | Broker trong transaction ngắn |
 | community | `CommunityOutboxRelayScheduler` | `FOR UPDATE SKIP LOCKED`; publish broker trong transaction ngắn | Broker trong transaction ngắn |
@@ -330,6 +331,8 @@ Backend hiện có 22 phương thức `@Scheduled` trong 21 job. Cơ chế chố
 Game không cần thêm claim riêng: hàng trận được khóa trước khi cập nhật và trạng thái được kiểm lại. Relay dùng row claim để instance khác có thể xử lý các hàng còn lại. Việc đọc nguồn của `WorkItemSyncJob` có thể chạy đồng thời; phần ghi được tuần tự hóa và repository bỏ qua work item đã tồn tại.
 
 Redis pub/sub của `game.room-events` và `notification.push` là kênh đẩy không bền; API/DB vẫn là nguồn dữ liệu. Vé WebSocket game lưu với TTL dưới `game:ws-ticket:*`. Compose cho phép scale service ứng dụng bằng `--scale` vì không gán `container_name` và không bind các cổng nội bộ ra host; gateway vẫn chạy một instance.
+
+Notification push FCM dùng `notification_push_deliveries` làm local outbox, được tạo cùng transaction với notification và snapshot thiết bị active. Worker claim bằng lease/fencing, tải lại token/binding hiện tại, commit claim rồi gọi Firebase ngoài transaction. Flags enqueue/worker mặc định tắt; FCM lỗi không ảnh hưởng inbox hay Redis/WebSocket.
 
 ## Dừng một instance
 

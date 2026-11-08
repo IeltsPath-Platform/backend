@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import com.ieltspath.notification.application.NotificationInboxUseCase;
+import com.ieltspath.notification.application.RegisterNotificationDeviceUseCase;
+import com.ieltspath.notification.application.DisableNotificationDeviceUseCase;
 import com.ieltspath.notification.domain.exception.NotificationNotFoundException;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -21,21 +23,62 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
-@WebMvcTest(NotificationController.class)
+@WebMvcTest(controllers = {NotificationController.class, NotificationDeviceController.class})
 @TestPropertySource(properties={"app.auth.internal-jwt-issuer=urn:code-base:api-gateway","app.auth.internal-jwt-secret=SGs1cjhXY1Y4OFluY2JHdG9hR2dpcWZtRmtKRWprQk5vYUtTd25xV0h0TT0="})
 class NotificationSecurityTest {
     @Autowired MockMvc mvc;
     @MockitoBean CurrentUserProvider users;
     @MockitoBean NotificationInboxUseCase inbox;
     @MockitoBean NotificationPreferenceService preferences;
+    @MockitoBean RegisterNotificationDeviceUseCase registerDevice;
+    @MockitoBean DisableNotificationDeviceUseCase disableDevice;
 
     @Test void unauthenticatedListAndPreferencesAreRejected() throws Exception {
         mvc.perform(get("/api/notifications")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/notifications/preferences")).andExpect(status().isUnauthorized());
+        mvc.perform(put("/api/notifications/devices/{id}", UUID.randomUUID()).contentType("application/json")
+                .with(csrf())
+                .content("{\"provider\":\"FCM\",\"platform\":\"ANDROID\",\"token\":\"token\"}"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(delete("/api/notifications/devices/{id}", UUID.randomUUID()).with(csrf()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test void deviceRegistrationUsesAuthenticatedOwnerAndNeverReturnsToken() throws Exception {
+        UUID owner = UUID.randomUUID(), installation = UUID.randomUUID();
+        when(users.requireCurrentUser()).thenReturn(new CurrentUser(owner, Set.of(CanonicalRoles.CUSTOMER)));
+        mvc.perform(put("/api/notifications/devices/{id}", installation)
+                        .with(jwt().jwt(token -> token.subject(owner.toString()).claim("roles", List.of("CUSTOMER"))))
+                        .contentType("application/json")
+                        .content("{\"provider\":\"FCM\",\"platform\":\"ANDROID\",\"token\":\"secret-token\",\"userId\":\""
+                                + UUID.randomUUID() + "\"}"))
+                .andExpect(status().isNoContent());
+        verify(registerDevice).execute(owner, installation, "FCM", "ANDROID", "secret-token", null);
+    }
+
+    @Test void invalidDeviceTokenIsRejectedBeforeRegistration() throws Exception {
+        UUID owner = UUID.randomUUID(), installation = UUID.randomUUID();
+        when(users.requireCurrentUser()).thenReturn(new CurrentUser(owner, Set.of(CanonicalRoles.CUSTOMER)));
+        mvc.perform(put("/api/notifications/devices/{id}", installation)
+                        .with(jwt().jwt(token -> token.subject(owner.toString()).claim("roles", List.of("CUSTOMER"))))
+                        .contentType("application/json")
+                        .content("{\"provider\":\"FCM\",\"platform\":\"ANDROID\",\"token\":\" \"}"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(registerDevice);
+    }
+
+    @Test void deviceDeleteIsScopedToAuthenticatedOwner() throws Exception {
+        UUID owner = UUID.randomUUID(), installation = UUID.randomUUID();
+        when(users.requireCurrentUser()).thenReturn(new CurrentUser(owner, Set.of(CanonicalRoles.CUSTOMER)));
+        mvc.perform(delete("/api/notifications/devices/{id}", installation)
+                        .with(jwt().jwt(token -> token.subject(owner.toString()).claim("roles", List.of("CUSTOMER")))))
+                .andExpect(status().isNoContent());
+        verify(disableDevice).execute(owner, installation);
     }
 
     @Test void preferencesRequireAuthenticationAndUpdateForVerifiedOwner() throws Exception {
