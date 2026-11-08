@@ -36,6 +36,30 @@ app:
           - /actuator/health
           - /actuator/info
 
+notification:
+  push:
+    enqueue-enabled: ${NOTIFICATION_PUSH_ENQUEUE_ENABLED:false}
+    worker-enabled: ${NOTIFICATION_PUSH_WORKER_ENABLED:false}
+    poll-interval: ${NOTIFICATION_PUSH_POLL_INTERVAL:PT1S}
+    firebase:
+      project-id: ${FIREBASE_PROJECT_ID:}
+      android-channel-id: ${FIREBASE_ANDROID_CHANNEL_ID:default}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      fcm:
+        failure-rate-threshold: 50
+        minimum-number-of-calls: 10
+        sliding-window-size: 20
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 2
+  bulkhead:
+    instances:
+      fcm:
+        max-concurrent-calls: 4
+        max-wait-duration: 0
+
 management:
   endpoints:
     web:

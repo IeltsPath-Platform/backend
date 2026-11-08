@@ -36,6 +36,8 @@ Self-interactions do not emit notifications. A comment may mention at most five 
 - STOMP delivery happens after commit. A disconnected browser or push failure never rolls back the notification. Reconnecting clients reconcile the REST list and unread count.
 - Consumers must validate routing/event type consistency, UUID fields, timestamp and required references. Logs contain IDs and failure types, never raw payloads.
 
+Notification Service may additionally snapshot active Android FCM devices into its local PostgreSQL push-delivery table in the same transaction as a new notification. This does not change event envelopes, RabbitMQ acknowledgements, deduplication, community preference checks, or WebSocket delivery. Push is best effort and uses generic text plus identifiers; the inbox remains authoritative. See [Notification push v1](notification-push-v1.md).
+
 ## Notification preferences
 
 Notification Service exposes authenticated `GET /api/notifications/preferences` and `PUT /api/notifications/preferences/{eventType}` with body `{"enabled": boolean}`. The response lists every supported event type. A recipient with no saved preference is treated as enabled for every type. Disabling a type causes the consumer to ACK the event without inserting a notification or sending a WebSocket push; enabling it again applies to subsequently consumed events. Preference rows are scoped by recipient UUID and event type in Notification Service's database.
