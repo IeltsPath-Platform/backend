@@ -91,6 +91,14 @@ class LookupVocabularyWordUseCaseTest {
         assertThat(result.get(1).audioUs()).isNull();
     }
 
+    @Test
+    void unknownLemmasReturnNoMatches() {
+        when(vocabulary.findByNormalizedLemmas(List.of("unknown"))).thenReturn(List.of());
+        when(catalog.pronunciationAudio(List.of("unknown"))).thenReturn(Map.of());
+
+        assertThat(useCase().execute(List.of("unknown"))).isEmpty();
+    }
+
     private static VocabularySense sense(VocabularyItem item, int sortOrder, ContentStatus status) {
         return new VocabularySense(UUID.randomUUID(), item.getId(), PartOfSpeech.NOUN, "def", "nghĩa", "Example.",
                 null, sortOrder, status, Instant.now(), Instant.now());

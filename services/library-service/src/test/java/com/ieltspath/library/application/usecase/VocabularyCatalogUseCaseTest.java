@@ -123,4 +123,15 @@ class VocabularyCatalogUseCaseTest {
         verify(store).replaceSetItems(set, senses);
         assertEquals(2, senses.size());
     }
+
+    @Test
+    void duplicateSetSenseIdsAreRejectedBeforeLockingOrWriting() {
+        UUID set = UUID.randomUUID();
+        UUID sense = UUID.randomUUID();
+
+        assertThrows(InvalidDataException.class, () -> useCase.replaceSetItems(set, List.of(sense, sense)));
+
+        verify(store, never()).lockSet(any());
+        verify(store, never()).replaceSetItems(any(), any());
+    }
 }

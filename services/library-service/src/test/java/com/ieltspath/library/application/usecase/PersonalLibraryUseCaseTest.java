@@ -9,6 +9,7 @@ import com.ieltspath.library.domain.exception.ResourceNotFoundException;
 import com.ieltspath.library.domain.repository.FlashcardDeckItemRepository;
 import com.ieltspath.library.domain.repository.FlashcardDeckRepository;
 import com.ieltspath.library.domain.repository.FlashcardRepository;
+import com.ieltspath.library.domain.repository.NoteRepository;
 import com.ieltspath.library.domain.vo.FlashcardSourceType;
 import com.ieltspath.library.domain.vo.LibraryStatus;
 import org.junit.jupiter.api.Test;
@@ -141,5 +142,36 @@ class PersonalLibraryUseCaseTest {
         org.mockito.Mockito.doThrow(new ConflictException()).when(items).add(deck.getId(), card.getId(), 1);
 
         assertThrows(ConflictException.class, () -> useCase.execute(userId, deck.getId(), card.getId(), 1));
+    }
+
+    @Test
+    void anotherLearnersNotesAndFlashcardsCannotBeReadOrUpdated() {
+        NoteRepository notes = mock(NoteRepository.class);
+        FlashcardRepository cards = mock(FlashcardRepository.class);
+        FlashcardImageStorage storage = mock(FlashcardImageStorage.class);
+        FlashcardDeckItemRepository items = mock(FlashcardDeckItemRepository.class);
+        com.ieltspath.library.application.service.FlashcardImageUsageService imageUsage =
+                mock(com.ieltspath.library.application.service.FlashcardImageUsageService.class);
+        org.springframework.transaction.support.TransactionTemplate txTemplate =
+                mock(org.springframework.transaction.support.TransactionTemplate.class);
+        UUID requestingUser = UUID.randomUUID();
+        UUID noteId = UUID.randomUUID();
+        UUID cardId = UUID.randomUUID();
+
+        GetNoteUseCase getNote = new GetNoteUseCase(notes);
+        UpdateNoteUseCase updateNote = new UpdateNoteUseCase(notes);
+        GetFlashcardUseCase getCard = new GetFlashcardUseCase(cards, storage);
+        UpdateFlashcardUseCase updateCard = new UpdateFlashcardUseCase(cards, items, storage, imageUsage, txTemplate);
+
+        assertThrows(ResourceNotFoundException.class, () -> getNote.execute(requestingUser, noteId));
+        assertThrows(ResourceNotFoundException.class,
+                () -> updateNote.execute(requestingUser, noteId, "Changed", "Body", LibraryStatus.ACTIVE));
+        assertThrows(ResourceNotFoundException.class, () -> getCard.execute(requestingUser, cardId));
+        assertThrows(ResourceNotFoundException.class, () -> updateCard.execute(requestingUser, cardId,
+                FlashcardSourceType.MANUAL, null, null, null, "Changed", "Meaning", LibraryStatus.ACTIVE));
+
+        verify(notes, never()).save(any());
+        verify(cards, never()).save(any());
+        verifyNoInteractions(storage, items, imageUsage, txTemplate);
     }
 }
