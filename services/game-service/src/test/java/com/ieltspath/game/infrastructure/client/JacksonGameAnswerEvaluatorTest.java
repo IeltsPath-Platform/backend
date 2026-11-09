@@ -33,4 +33,9 @@ class JacksonGameAnswerEvaluatorTest {
         assertFalse(evaluator.isCorrect(null, "answer"));
         assertThrows(IllegalStateException.class, () -> evaluator.isCorrect("{invalid", "answer"));
     }
+
+    @Test
+    void aWrongAnswerIsNotCorrect() {
+        assertFalse(evaluator.isCorrect("\"London\"", "Paris"));
+    }
 }

@@ -28,4 +28,12 @@ class GameSessionTest {
         assertThrows(InvalidGameSessionStateException.class,
                 () -> session.recordAnswer(true, Instant.parse("2026-09-23T00:00:03Z")));
     }
+
+    @Test
+    void aSessionNeedsAtLeastOneItem() {
+        var error = assertThrows(IllegalArgumentException.class, () -> new GameSession(UUID.randomUUID(), UUID.randomUUID(), null, null,
+                "WORD_MEANING_MATCH", "VOCABULARY", "PRACTICE", Instant.parse("2026-09-23T00:00:00Z"),
+                Map.of("items", List.of()), "PENDING"));
+        assertEquals("A game session must contain at least one item", error.getMessage());
+    }
 }
