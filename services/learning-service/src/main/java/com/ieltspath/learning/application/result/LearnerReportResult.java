@@ -12,13 +12,19 @@ import java.util.UUID;
  * block. {@code code}, {@code name}, {@code skill} and {@code band} come from Content and are null when it does not
  * list the point. {@code skills} groups mastery per skill and per foundation kind, {@code focus} names the few points to
  * work on first, {@code estimatedBand} is an estimate and not an exam result, and {@code target} is the learner's goal
- * when the User Service could give it.
+ * when the User Service could give it. {@code placementBand} is the separately stored diagnostic placement, if any.
  */
 public record LearnerReportResult(UUID userId, Instant generatedAt, List<KnowledgePointReport> knowledgePoints,
                                   List<SkillSummary> skills, List<FocusPoint> focus, EstimatedBand estimatedBand,
-                                  Target target) {
+                                  Target target, BigDecimal placementBand) {
+    public LearnerReportResult(UUID userId, Instant generatedAt, List<KnowledgePointReport> knowledgePoints,
+                               List<SkillSummary> skills, List<FocusPoint> focus, EstimatedBand estimatedBand,
+                               Target target) {
+        this(userId, generatedAt, knowledgePoints, skills, focus, estimatedBand, target, null);
+    }
+
     public LearnerReportResult(UUID userId, Instant generatedAt, List<KnowledgePointReport> knowledgePoints) {
-        this(userId, generatedAt, knowledgePoints, List.of(), List.of(), null, null);
+        this(userId, generatedAt, knowledgePoints, List.of(), List.of(), null, null, null);
     }
 
     /**

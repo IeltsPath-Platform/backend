@@ -2,8 +2,10 @@ package com.ieltspath.learning.api.controller;
 
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.learning.application.result.LearningProgressStatistics;
+import com.ieltspath.learning.application.result.LearningOverviewStatistics;
 import com.ieltspath.learning.application.result.StudyContextResult;
 import com.ieltspath.learning.application.usecase.GetLearningProgressStatisticsUseCase;
+import com.ieltspath.learning.application.usecase.GetLearningOverviewUseCase;
 import com.ieltspath.learning.application.usecase.GetStudyContextUseCase;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -16,11 +18,19 @@ public class LearningStatisticsController {
     private final CurrentUserProvider currentUser;
     private final GetLearningProgressStatisticsUseCase progress;
     private final GetStudyContextUseCase context;
+    private final GetLearningOverviewUseCase overview;
     public LearningStatisticsController(CurrentUserProvider currentUser,
-            GetLearningProgressStatisticsUseCase progress, GetStudyContextUseCase context) {
+            GetLearningProgressStatisticsUseCase progress, GetStudyContextUseCase context,
+            GetLearningOverviewUseCase overview) {
         this.currentUser = currentUser;
         this.progress = progress;
         this.context = context;
+        this.overview = overview;
+    }
+
+    @GetMapping("/overview")
+    public LearningOverviewStatistics overview() {
+        return overview.execute(currentUser.requireUserId());
     }
 
     @GetMapping("/progress")

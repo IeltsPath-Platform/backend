@@ -13,18 +13,40 @@ import java.util.TreeMap;
 import java.util.UUID;
 
 /**
- * Estimates a learner's band from their mastery. A skill reaches a band when at least 80% of its knowledge points at that
- * band are maintained; with no band reached it takes the placement band. The overall band is the mean of the skills that
- * have one, rounded to a half. Grammar and vocabulary are not skills and never enter the band. This is an estimate, not
- * an exam result.
+ * Estimates a learner's band from their mastery. A band is only judged once the learner has studied at least
+ * {@value #MIN_COVERAGE_PERCENT}% of the catalog's points at that band, so a few lucky points cannot reach it. A skill
+ * reaches a band when at least 80% of the points studied at that band are maintained and every judged band below it is
+ * reached too; with no band reached it takes the placement band. The overall band is the mean of the skills that have
+ * one, rounded to a half, and only exists once at least {@value #MIN_SKILLS} skills have a band. Grammar and vocabulary
+ * are not skills and never enter the band. This is an estimate, not an exam result.
  */
 public final class BandEstimator {
     /** The skills a band is estimated for. */
     public static final List<String> SKILLS = List.of("LISTENING", "READING", "WRITING", "SPEAKING");
     static final double ENOUGH = 0.8;
     static final int MAX_HINT_POINTS = 5;
+    /** Share of a band's catalog points the learner must have studied before the band is judged. */
+    static final int MIN_COVERAGE_PERCENT = 30;
+    /** Skills that must have a band before an overall band is given. */
+    static final int MIN_SKILLS = 2;
 
     private BandEstimator() {}
+
+    /** How many points the catalog lists per skill and band: the denominator of the coverage a band needs. */
+    public static final class Catalog {
+        private final Map<String, TreeMap<BigDecimal, Integer>> counts = new java.util.HashMap<>();
+
+        public Catalog add(String skill, BigDecimal band) {
+            if (skill == null || band == null) return this;
+            counts.computeIfAbsent(skill.toUpperCase(java.util.Locale.ROOT), key -> new TreeMap<>()).merge(band, 1, Integer::sum);
+            return this;
+        }
+
+        int size(String skill, BigDecimal band) {
+            TreeMap<BigDecimal, Integer> bands = counts.get(skill);
+            return bands == null ? 0 : bands.getOrDefault(band, 0);
+        }
+    }
 
     /** A knowledge point's skill, the band of its course, and how the learner stands on it. */
     public record Point(UUID id, String skill, BigDecimal band, MasteryTier tier, double mastery) {}
@@ -36,7 +58,7 @@ public final class BandEstimator {
     public record Estimate(BigDecimal overall, Map<String, BigDecimal> skillBands, boolean speakingIncluded,
                            List<Hint> hints) {}
 
-    public static Estimate estimate(List<Point> points, BigDecimal placementBand) {
+    public static Estimate estimate(List<Point> points, BigDecimal placementBand, Catalog catalog) {
         Map<String, BigDecimal> bands = new LinkedHashMap<>();
         List<Hint> hints = new ArrayList<>();
         for (String skill : SKILLS) {
@@ -49,13 +71,17 @@ public final class BandEstimator {
             if (byBand.isEmpty()) continue;
             BigDecimal reached = null;
             for (Map.Entry<BigDecimal, List<Point>> entry : byBand.entrySet()) {
-                if (share(entry.getValue(), MasteryTier.MAINTAIN) >= ENOUGH) reached = entry.getKey();
+                int studied = entry.getValue().size();
+                int listed = Math.max(catalog.size(skill, entry.getKey()), studied);
+                if ((long) studied * 100 < (long) listed * MIN_COVERAGE_PERCENT) continue;
+                if (share(entry.getValue(), MasteryTier.MAINTAIN) < ENOUGH) break;
+                reached = entry.getKey();
             }
             BigDecimal skillBand = reached != null ? reached : placementBand;
             if (skillBand != null) bands.put(skill, skillBand);
             hint(skill, skillBand, byBand).ifPresent(hints::add);
         }
-        return new Estimate(overall(bands), bands, bands.containsKey("SPEAKING"), hints);
+        return new Estimate(bands.size() < MIN_SKILLS ? null : overall(bands), bands, bands.containsKey("SPEAKING"), hints);
     }
 
     private static java.util.Optional<Hint> hint(String skill, BigDecimal from, TreeMap<BigDecimal, List<Point>> byBand) {

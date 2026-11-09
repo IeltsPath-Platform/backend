@@ -85,10 +85,13 @@ and public profiles take the streak from here (see [`POST /internal/learning/str
 
 ```json
 { "currentDays": 6, "longestDays": 16, "freezeAvailable": false, "nextFreezeCost": 10, "activeToday": true,
-  "lostStreakDays": 0 }
+  "lostStreakDays": 0, "frozenDays": ["2026-11-08"] }
 ```
 
 After a break, `currentDays` is 0 and `lostStreakDays` is the length that was lost (for "streak lost, was 16 days").
+
+`frozenDays` are the local dates of the latest run of days a freeze covered, oldest first (`yyyy-MM-dd`); the array is empty
+when no freeze was ever used. Only the latest run is kept, so an older run is replaced when a new one starts.
 
 ### `POST /me/streak/freeze`
 

@@ -36,6 +36,14 @@ public class BandStatisticsController {
         return history.execute(currentUser.requireUserId(), from, to, seriesKind, skill, cursor, limit, timezone);
     }
 
+    @GetMapping("/bands/availability")
+    public GetBandHistoryUseCase.Availability availability(
+            @RequestParam("from") LocalDate from,
+            @RequestParam("to") LocalDate to,
+            @RequestParam(name = "timezone", defaultValue = "Asia/Ho_Chi_Minh") String timezone) {
+        return history.availability(currentUser.requireUserId(), from, to, timezone);
+    }
+
     @GetMapping("/study-context")
     public GetBandHistoryUseCase.StudyContext context(@RequestParam("sourceType") String sourceType,
                                                      @RequestParam("sourceId") UUID sourceId) {

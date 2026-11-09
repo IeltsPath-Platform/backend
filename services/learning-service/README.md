@@ -112,13 +112,18 @@ calling the paths they always used; the Gateway rewrites them:
 | `/api/users/me/learning-goals[/active\|/{id}/status]` | `/api/learning/goals[...]` |
 | `/api/users/{id}/learning-goals[/{goalId}/status]` (role `ADMIN`) | `/api/learning/admin/users/{id}/goals[...]` |
 | `/api/users/me/study-sessions[/{id}/heartbeats\|/{id}/close]` | `/api/learning/study-sessions[...]` |
+| `/api/learning/practice-sessions` | `/api/learning/practice-sessions` |
 | `/api/users/me/statistics/study-time` | `/api/learning/statistics/study-time` |
 | `/api/learning-support/activities[/{id}]` | `/api/learning/activities[...]` |
 
 Study time:
 
 - `POST /study-sessions`: `{clientSessionId, sourceType, sourceId, takeover?}`. UUID identifiers; source types `LESSON`,
-  `PRACTICE`, `REVIEW`, `ASSESSMENT`.
+  `PRACTICE`, `REVIEW`, `ASSESSMENT`, `WRITING`, `SPEAKING`, `VOCABULARY`. The last three require a learner-owned, matching
+  practice-session id; they have no course and contribute only to the `ALL` total.
+- `POST /practice-sessions`: `{requestId, kind}` where kind is `WRITING`, `SPEAKING` or `VOCABULARY`; returns `{id, kind, expiresAt}`.
+  The request is idempotent per learner and request id, and the issued id is usable for six hours. These sessions are locally
+  verified by Learning and are not linked to a course.
 - `POST /study-sessions/{id}/heartbeats` and `/close`: `{epoch, sequence, intervals: [{startOffsetMs, endOffsetMs}]}`. At
   most 16 ordered, non-overlapping intervals per request; offsets use the server session anchor. Close includes the final
   flush.
@@ -146,7 +151,8 @@ timezone is used, then `Asia/Ho_Chi_Minh`. Starting a study session reschedules 
 since it was scheduled.
 
 Before a session starts, the Learning Service checks that the source belongs to the learner. `LESSON`, `PRACTICE` and
-`REVIEW` are checked in `learning_db`; `ASSESSMENT` through `GET /api/assessments/me/statistics/study-context` of the
+`REVIEW` are checked in `learning_db`; `WRITING`, `SPEAKING` and `VOCABULARY` are checked against the learner-owned
+`practice_sessions` record in the same service; `ASSESSMENT` through `GET /api/assessments/me/statistics/study-context` of the
 Assessment Service (bearer and correlation id forwarded; 2 s connect, 3 s read). Owner failure returns 503
 `SOURCE_UNAVAILABLE`. For services on the host set `USER_SERVICE_URL=http://localhost:8085` and
 `ASSESSMENT_SERVICE_URL=http://localhost:8083`.

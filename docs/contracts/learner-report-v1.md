@@ -87,16 +87,23 @@ The report body also carries four blocks added after `knowledgePoints`; the fiel
 - `focus`: at most three points in `PRIORITY` or `CONSOLIDATE`; a point with a blocking review (`reviewRequired`) comes first,
   then the lowest mastery.
 - `estimatedBand`: always marked `estimated: true`; it is an estimate, not an exam result.
-  - A skill reaches a band when at least 80% of its points of that band are `MAINTAIN`; the skill's band is the highest such
-    band. When it reaches none, the placement band stands in, but only for a skill that has points; a skill with no points has no
-    band (Speaking has none for now).
-  - `value` is the mean of the skill bands rounded to a half band, `null` when no skill has one. Grammar and vocabulary do not
-    enter it. `speakingIncluded` is true only when Speaking has a band.
+  - A band of a skill is only judged once the learner has studied at least 30% of the catalog's points at that band (points
+    of a band = the skill's points in courses of that band; error-trap children excluded). A band below that coverage is
+    skipped, neither reached nor blocking.
+  - A skill reaches a band when at least 80% of the points studied at that band are `MAINTAIN` and every judged band below
+    it is reached too; the skill's band is the highest band reached before the first judged band that fails. When it
+    reaches none, the placement band stands in, but only for a skill that has points; a skill with no points has no band
+    (Speaking has none for now).
+  - `value` is the mean of the skill bands rounded to a half band, and is `null` unless at least 2 skills have a band.
+    Grammar and vocabulary do not enter it. `speakingIncluded` is true only when Speaking has a band. Weekly and monthly
+    snapshots use the same rule from the day it ships; snapshots already stored keep their old values.
   - `nextBandHints`: for a skill whose next band has at least 80% of its points at `CONSOLIDATE` or better, up to five points
     still to maintain there, weakest first.
 - `target`: set only when the learner has an active goal (read from `learning_goals` in Learning's own database); otherwise `null`
   and the report is otherwise complete. `gap` is the target minus `estimatedBand.value` (`null` if either is unknown).
   `projection` is described in [progress-snapshots-v1](progress-snapshots-v1.md) and is `null` without a target band.
+- `placementBand`: the stored diagnostic placement band, or `null` when no placement is stored. This additive field is
+  separate from `estimatedBand` and does not change its rules. It is available on both the learner and staff reports.
 
 ## Mastery rules (Content Author)
 

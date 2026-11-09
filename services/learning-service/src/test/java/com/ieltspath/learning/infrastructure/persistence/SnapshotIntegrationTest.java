@@ -71,6 +71,7 @@ class SnapshotIntegrationTest {
 
     private final UUID readingA = UUID.randomUUID();
     private final UUID readingB = UUID.randomUUID();
+    private final UUID listeningA = UUID.randomUUID();
 
     /**
      * The snapshot run reads the skill and band of each point from the catalog table: it runs with no learner request,
@@ -83,7 +84,8 @@ class SnapshotIntegrationTest {
         UUID topic = UUID.randomUUID();
         catalog.upsert(List.of(
                 new KnowledgePointCatalogEntry(readingA, topic, true, LearningSkill.READING, new BigDecimal("6.0")),
-                new KnowledgePointCatalogEntry(readingB, topic, true, LearningSkill.READING, new BigDecimal("6.0"))));
+                new KnowledgePointCatalogEntry(readingB, topic, true, LearningSkill.READING, new BigDecimal("6.0")),
+                new KnowledgePointCatalogEntry(listeningA, topic, true, LearningSkill.LISTENING, new BigDecimal("6.0"))));
     }
 
     @Test
@@ -98,6 +100,7 @@ class SnapshotIntegrationTest {
         event(idle, true, 1_000, Instant.now().minusSeconds(40L * 24 * 3600));
         profile(active, readingA, "MAINTAIN", 0.9);
         profile(active, readingB, "MAINTAIN", 0.85);
+        profile(active, listeningA, "MAINTAIN", 0.9);
 
         int written = service.snapshotWeek(week);
 
