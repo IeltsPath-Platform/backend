@@ -57,4 +57,12 @@ class VocabularyProgressPolicyTest {
         assertThrows(IllegalArgumentException.class, () -> VocabularyProgressPolicy.validateWeeklyTarget(9));
         assertThrows(IllegalArgumentException.class, () -> VocabularyProgressPolicy.validateWeeklyTarget(1001));
     }
+
+    @Test void topicStatusDistinguishesNotStartedInProgressAndCompleted() {
+        assertEquals("NOT_STARTED", VocabularyProgressPolicy.topicStatus(0, 0));
+        assertEquals("NOT_STARTED", VocabularyProgressPolicy.topicStatus(5, 0));
+        assertEquals("IN_PROGRESS", VocabularyProgressPolicy.topicStatus(5, 1));
+        assertEquals("COMPLETED", VocabularyProgressPolicy.topicStatus(5, 5));
+        assertEquals("COMPLETED", VocabularyProgressPolicy.topicStatus(5, 6));
+    }
 }

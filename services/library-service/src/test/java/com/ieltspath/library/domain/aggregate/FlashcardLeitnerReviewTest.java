@@ -1,5 +1,6 @@
 package com.ieltspath.library.domain.aggregate;
 
+import com.ieltspath.library.domain.exception.InvalidDataException;
 import com.ieltspath.library.domain.vo.FlashcardSourceType;
 import org.junit.jupiter.api.Test;
 
@@ -10,6 +11,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FlashcardLeitnerReviewTest {
@@ -54,6 +56,40 @@ class FlashcardLeitnerReviewTest {
         assertEquals(now.plusSeconds(1).plusSeconds(24L * 60 * 60), scheduled);
         assertEquals(scheduled, card.getNextReviewAt());
         assertEquals(2, card.getReviewCount());
+    }
+
+    @Test
+    void rejectsMissingRequestValuesWithoutChangingTheCard() {
+        Flashcard card = newCard();
+
+        InvalidDataException missingRequestId = assertThrows(InvalidDataException.class,
+                () -> card.review(true, null, Instant.parse("2026-10-17T00:00:00Z"), INTERVALS));
+        assertEquals("review request is incomplete", missingRequestId.getMessage());
+        InvalidDataException missingTime = assertThrows(InvalidDataException.class,
+                () -> card.review(true, UUID.randomUUID(), null, INTERVALS));
+        assertEquals("review request is incomplete", missingTime.getMessage());
+
+        assertEquals(1, card.getLeitnerBox());
+        assertEquals(0, card.getReviewCount());
+        assertNull(card.getLastReviewedAt());
+        assertNull(card.getNextReviewAt());
+    }
+
+    @Test
+    void rejectsInvalidSchedulesWithoutChangingTheCard() {
+        Flashcard card = newCard();
+
+        InvalidDataException wrongSize = assertThrows(InvalidDataException.class,
+                () -> card.review(true, UUID.randomUUID(), Instant.parse("2026-10-17T00:00:00Z"), List.of(1, 2, 4, 8)));
+        assertEquals("Leitner schedule is invalid", wrongSize.getMessage());
+        InvalidDataException nonPositiveInterval = assertThrows(InvalidDataException.class,
+                () -> card.review(true, UUID.randomUUID(), Instant.parse("2026-10-17T00:00:00Z"), List.of(1, 2, 0, 8, 16)));
+        assertEquals("Leitner schedule is invalid", nonPositiveInterval.getMessage());
+
+        assertEquals(1, card.getLeitnerBox());
+        assertEquals(0, card.getReviewCount());
+        assertNull(card.getLastReviewedAt());
+        assertNull(card.getNextReviewAt());
     }
 
     private static Flashcard newCard() {

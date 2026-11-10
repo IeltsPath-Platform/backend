@@ -5,6 +5,7 @@ import com.ieltspath.library.application.port.FlashcardReviewEventWriter;
 import com.ieltspath.library.application.port.FlashcardVocabularyMetadataReader;
 import com.ieltspath.library.config.FlashcardSrsProperties;
 import com.ieltspath.library.domain.aggregate.Flashcard;
+import com.ieltspath.library.domain.exception.ResourceNotFoundException;
 import com.ieltspath.library.domain.repository.FlashcardRepository;
 import com.ieltspath.library.domain.vo.FlashcardSourceType;
 import com.ieltspath.library.domain.vo.LibraryStatus;
@@ -22,6 +23,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @ExtendWith(MockitoExtension.class)
 class ReviewFlashcardUseCaseTest {
@@ -42,7 +44,12 @@ class ReviewFlashcardUseCaseTest {
         lenient().when(storage.publicUrl(any())).thenReturn(null);
     }
 
+    private void stubResponseDependencies() {
+        // The response stubs are set up leniently in setUp for every test.
+    }
+
     @Test void recordsAppliedReviewWithOptionalSessionId() {
+        stubResponseDependencies();
         UUID sessionId = UUID.randomUUID();
         Flashcard card = card(null);
         when(repository.findForReviewByIdAndUserId(cardId, userId)).thenReturn(Optional.of(card));
@@ -55,6 +62,7 @@ class ReviewFlashcardUseCaseTest {
     }
 
     @Test void recordsAppliedReviewWhenSessionIdIsNull() {
+        stubResponseDependencies();
         Flashcard card = card(null);
         when(repository.findForReviewByIdAndUserId(cardId, userId)).thenReturn(Optional.of(card));
         when(repository.save(card)).thenReturn(card);
@@ -66,6 +74,7 @@ class ReviewFlashcardUseCaseTest {
     }
 
     @Test void replayedRequestDoesNotSaveOrAppendAnEvent() {
+        stubResponseDependencies();
         Flashcard card = card(requestId);
         when(repository.findForReviewByIdAndUserId(cardId, userId)).thenReturn(Optional.of(card));
 
@@ -82,6 +91,16 @@ class ReviewFlashcardUseCaseTest {
         when(repository.findForReviewByIdAndUserId(cardId,userId)).thenReturn(Optional.of(inactive));
         org.junit.jupiter.api.Assertions.assertThrows(com.ieltspath.library.domain.exception.ResourceNotFoundException.class,()->useCase.execute(userId,cardId,true,requestId));
         verifyNoInteractions(studyStreak);
+    }
+
+    @Test void missingOrForeignOwnedCardCannotBeReviewed() {
+        when(repository.findForReviewByIdAndUserId(cardId, userId)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> useCase.execute(userId, cardId, true, requestId, null));
+
+        verify(repository, never()).save(any());
+        verifyNoInteractions(eventWriter);
     }
 
     private Flashcard card(UUID lastRequestId) {

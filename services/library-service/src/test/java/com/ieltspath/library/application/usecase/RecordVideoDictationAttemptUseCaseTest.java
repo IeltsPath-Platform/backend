@@ -80,6 +80,20 @@ class RecordVideoDictationAttemptUseCaseTest {
         assertThrows(InvalidDataException.class, () -> useCase.execute(command("   ", false, "0")));
     }
 
+    @Test
+    void acceptsAccuracyAtBothInclusiveEndpoints() {
+        when(videoRepository.findPublishedVideoIdBySegmentId(segmentId)).thenReturn(Optional.of(videoId));
+        when(attemptRepository.maxAttemptNo(userId, segmentId)).thenReturn(0, 1);
+        when(attemptRepository.save(any())).thenAnswer(call -> call.getArgument(0));
+
+        VideoDictationAttemptResult zero = useCase.execute(command("typed answer", false, "0"));
+        VideoDictationAttemptResult oneHundred = useCase.execute(command("typed answer", true, "100"));
+
+        assertEquals(BigDecimal.ZERO, zero.accuracyPercent());
+        assertEquals(new BigDecimal("100"), oneHundred.accuracyPercent());
+        verify(attemptRepository, org.mockito.Mockito.times(2)).save(any());
+    }
+
     private RecordVideoDictationAttemptCommand command(String typed, boolean correct, String accuracy) {
         return new RecordVideoDictationAttemptCommand(userId, segmentId, typed, correct, new BigDecimal(accuracy));
     }
