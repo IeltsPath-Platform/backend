@@ -34,4 +34,12 @@ public class NotificationInboxUseCase {
 
     @Transactional
     public int markAllRead(UUID recipientId) { return notifications.markAllRead(recipientId, Instant.now()); }
+
+    @Transactional
+    public void delete(UUID recipientId, UUID notificationId) {
+        if (!notifications.deleteByRecipient(notificationId, recipientId)) throw new NotificationNotFoundException();
+    }
+
+    @Transactional
+    public int deleteRead(UUID recipientId) { return notifications.deleteReadByRecipient(recipientId); }
 }
