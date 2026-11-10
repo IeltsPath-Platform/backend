@@ -16,7 +16,8 @@ Base path: `/api/users`. Every endpoint in this contract requires the `ADMIN` ro
 | GET | `/api/users/{id}/profile` | Read the learner profile. |
 | PUT | `/api/users/{id}/profile` | Update the learner profile. |
 
-User responses contain `id`, `email`, `fullName`, `phoneNumber`, `status`, `roles`, `createdAt`, and `updatedAt`.
+User responses contain `id`, `email`, `fullName`, `phoneNumber`, `status`, `roles`, `createdAt`, `updatedAt`, and `hasPassword`.
+`hasPassword` is `true` when a password hash exists; the hash is never returned.
 The create request defaults an omitted or empty role set to `CUSTOMER`.
 
 ## Role and account rules

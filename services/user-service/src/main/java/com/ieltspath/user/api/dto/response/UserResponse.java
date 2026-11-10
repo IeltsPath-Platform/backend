@@ -12,6 +12,7 @@ public record UserResponse(
         String status,
         Set<RoleResponse> roles,
         LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        boolean hasPassword
 ) {
 }

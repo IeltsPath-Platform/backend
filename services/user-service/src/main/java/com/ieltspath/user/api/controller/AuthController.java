@@ -50,7 +50,7 @@ public class AuthController {
     @PostMapping("/forgot-password")
     public MessageResponse forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
         forgotPasswordUseCase.execute(new ForgotPasswordCommand(request.email()));
-        return new MessageResponse("Mã xác nhận đặt lại mật khẩu đã được xử lý");
+        return new MessageResponse("Nếu email tồn tại, hướng dẫn đặt lại mật khẩu sẽ được gửi.");
     }
 
     @PostMapping("/reset-password")

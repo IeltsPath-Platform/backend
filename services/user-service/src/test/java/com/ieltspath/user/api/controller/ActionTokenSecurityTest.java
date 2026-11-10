@@ -70,8 +70,6 @@ class ActionTokenSecurityTest {
 
     @Test
     void forgotPasswordIsPublic() throws Exception {
-        when(forgotPasswordUseCase.execute(any(ForgotPasswordCommand.class))).thenReturn("raw-token");
-
         String body = """
                 {
                     "email": "test@example.com"
@@ -82,9 +80,18 @@ class ActionTokenSecurityTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value("Mã xác nhận đặt lại mật khẩu đã được xử lý"));
+                .andExpect(jsonPath("$.message").value("Nếu email tồn tại, hướng dẫn đặt lại mật khẩu sẽ được gửi."));
 
         verify(forgotPasswordUseCase).execute(any(ForgotPasswordCommand.class));
+    }
+
+    @Test
+    void forgotPasswordAcceptsInvalidEmailAndReturnsSameGenericResponse() throws Exception {
+        mockMvc.perform(post("/auth/forgot-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"not-an-email\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Nếu email tồn tại, hướng dẫn đặt lại mật khẩu sẽ được gửi."));
     }
 
     @Test

@@ -35,6 +35,10 @@ External JWT có payload tối giản:
 
 ## Luồng request protected
 
+Quên mật khẩu dùng `POST /auth/forgot-password`; mọi email nhận cùng phản hồi. User Service ghi token hash và event gửi mail
+vào `outbox_events` trong một transaction. Notification Service gửi email qua SMTP. Token sống 15 phút, dùng một lần;
+mỗi tài khoản có cooldown 60 giây. Local có thể dùng Mailpit (`docker compose --profile dev-mail up -d mailpit`).
+
 Client không gọi trực tiếp user-service trong mô hình chuẩn. Client gọi qua gateway:
 
 ```text
@@ -147,6 +151,8 @@ REFRESH_TOKEN_MAX_AGE_SECONDS=604800
 POST /auth/login
 POST /auth/refresh
 POST /auth/logout
+POST /auth/forgot-password
+POST /auth/reset-password
 GET  /auth/me
 POST /api/users/register
 GET  /api/users/me/profile

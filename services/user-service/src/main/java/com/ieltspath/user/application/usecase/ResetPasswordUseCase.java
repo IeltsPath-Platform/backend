@@ -10,6 +10,7 @@ import com.ieltspath.user.domain.repository.UserRepository;
 import com.ieltspath.user.application.port.UserLock;
 import com.ieltspath.user.domain.repository.RefreshTokenRepository;
 import com.ieltspath.user.domain.vo.ActionTokenPurpose;
+import com.ieltspath.user.domain.vo.UserStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -47,6 +48,11 @@ public class ResetPasswordUseCase {
         User user = userRepository.findById(actionToken.getUserId())
                 .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng sở hữu token này"));
         userLock.lock(user.getId());
+        user = userRepository.findById(user.getId())
+                .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng sở hữu token này"));
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            throw new InvalidActionTokenException("Không thể đặt lại mật khẩu cho tài khoản không hoạt động");
+        }
         if (!accountActionTokenRepository.consumePasswordResetToken(tokenHash, java.time.LocalDateTime.now())) {
             throw new InvalidActionTokenException("Mã token đã hết hạn hoặc đã được sử dụng");
         }
