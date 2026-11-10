@@ -44,7 +44,7 @@ public class LearningPointsGrantListener {
     public LearningPointsGrantListener(ObjectMapper objectMapper,
                                        CreditPointsUseCase creditPoints,
                                        RabbitTemplate rabbitTemplate,
-                                       MessageRetry retry) {
+                                       @org.springframework.beans.factory.annotation.Qualifier("pointsGrantRetry") MessageRetry retry) {
         this.objectMapper = objectMapper;
         this.creditPoints = creditPoints;
         this.rabbitTemplate = rabbitTemplate;

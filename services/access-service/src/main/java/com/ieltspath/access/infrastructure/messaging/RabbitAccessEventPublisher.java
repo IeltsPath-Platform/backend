@@ -35,23 +35,33 @@ public class RabbitAccessEventPublisher implements AccessEventPublisher {
         this.confirmTimeout = confirmTimeout;
     }
 
+    /** Each relayed outbox type has its own routing key, so consumers bind only to what they handle. */
+    private static String routingKeyFor(String outboxEventType) {
+        return switch (outboxEventType) {
+            case "SubscriptionGranted" -> AccessMessaging.SUBSCRIPTION_GRANTED_ROUTING_KEY;
+            case "SubscriptionExpiryNotice" -> AccessMessaging.SUBSCRIPTION_EXPIRY_NOTICE_ROUTING_KEY;
+            default -> throw new IllegalStateException("Event type is not relayed: " + outboxEventType);
+        };
+    }
+
     @Override
     public void publish(OutboxEvent event) {
         if (!OutboxEvent.RELAYED_EVENT_TYPES.contains(event.getEventType())) {
             throw new IllegalStateException("Event type is not relayed: " + event.getEventType());
         }
+        String routingKey = routingKeyFor(event.getEventType());
         var messageBuilder = MessageBuilder.withBody(event.getPayload().getBytes(StandardCharsets.UTF_8))
                 .setContentType(MessageProperties.CONTENT_TYPE_JSON)
                 .setContentEncoding(StandardCharsets.UTF_8.name())
                 .setMessageId(event.getId().toString())
-                .setType(AccessMessaging.SUBSCRIPTION_GRANTED_ROUTING_KEY)
+                .setType(routingKey)
                 .setTimestamp(Date.from(event.getCreatedAt()))
                 .setDeliveryMode(MessageDeliveryMode.PERSISTENT)
                 .setHeader("aggregate_id", event.getAggregateId().toString());
         if (event.getCorrelationId() != null) messageBuilder.setHeader(Correlation.HEADER, event.getCorrelationId());
         Message message = messageBuilder.build();
         CorrelationData correlation = new CorrelationData(event.getId().toString());
-        rabbitTemplate.send(AccessMessaging.EXCHANGE, AccessMessaging.SUBSCRIPTION_GRANTED_ROUTING_KEY, message, correlation);
+        rabbitTemplate.send(AccessMessaging.EXCHANGE, routingKey, message, correlation);
         CorrelationData.Confirm confirm;
         try {
             confirm = correlation.getFuture().get(confirmTimeout.toMillis(), TimeUnit.MILLISECONDS);
