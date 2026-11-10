@@ -59,7 +59,7 @@ public class ResetPasswordUseCase {
         if (user.getStatus() != UserStatus.ACTIVE) {
             throw new InvalidActionTokenException("Không thể đặt lại mật khẩu cho tài khoản không hoạt động");
         }
-        if (!accountActionTokenRepository.consumePasswordResetToken(tokenHash, java.time.LocalDateTime.now())) {
+        if (!accountActionTokenRepository.consumePasswordResetToken(tokenHash, java.time.LocalDateTime.now(java.time.ZoneOffset.UTC))) {
             throw new InvalidActionTokenException("Mã token đã hết hạn hoặc đã được sử dụng");
         }
 

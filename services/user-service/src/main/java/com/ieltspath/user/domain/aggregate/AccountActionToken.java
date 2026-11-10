@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.UUID;
 
 @Getter
@@ -27,7 +28,7 @@ public class AccountActionToken {
         if (isExpired()) {
             throw new IllegalStateException("Token này đã hết hạn");
         }
-        this.usedAt = LocalDateTime.now();
+        this.usedAt = LocalDateTime.now(ZoneOffset.UTC);
     }
 
     public boolean isUsed() {
@@ -35,7 +36,7 @@ public class AccountActionToken {
     }
 
     public boolean isExpired() {
-        return LocalDateTime.now().isAfter(this.expiresAt);
+        return LocalDateTime.now(ZoneOffset.UTC).isAfter(this.expiresAt);
     }
 
     public boolean isValid() {

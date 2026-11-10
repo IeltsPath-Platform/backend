@@ -1,5 +1,8 @@
 package com.ieltspath.user.infrastructure.adapter;
 
+import com.ieltspath.commonresilience.CallKind;
+import com.ieltspath.commonresilience.DownstreamUnavailableException;
+import com.ieltspath.commonresilience.ResilientCall;
 import com.ieltspath.user.application.exception.GoogleSignInUnavailableException;
 import com.ieltspath.user.application.port.GoogleIdTokenVerifier;
 import com.ieltspath.user.application.result.GoogleIdentity;
@@ -18,9 +21,11 @@ import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestOperations;
 import org.springframework.web.client.RestTemplate;
 
+import java.io.IOException;
 import java.util.List;
 
 @Slf4j
@@ -30,15 +35,22 @@ public class NimbusGoogleIdTokenVerifier implements GoogleIdTokenVerifier {
     private static final String JWKS_URI = "https://www.googleapis.com/oauth2/v3/certs";
     private final GoogleAuthProperties properties;
     private final NimbusJwtDecoder decoder;
+    private final ResilientCall resilientCall;
 
     @Autowired
-    public NimbusGoogleIdTokenVerifier(GoogleAuthProperties properties) {
-        this(properties, createRestOperations());
+    public NimbusGoogleIdTokenVerifier(GoogleAuthProperties properties, ResilientCall resilientCall) {
+        this(properties, createRestOperations(), resilientCall);
     }
 
     NimbusGoogleIdTokenVerifier(GoogleAuthProperties properties, RestOperations restOperations) {
+        this(properties, restOperations, ResilientCall.isolatedDefault());
+    }
+
+    private NimbusGoogleIdTokenVerifier(GoogleAuthProperties properties, RestOperations restOperations,
+                                        ResilientCall resilientCall) {
         this.properties = properties;
         this.decoder = createDecoder(restOperations);
+        this.resilientCall = resilientCall;
     }
 
     @Override
@@ -48,7 +60,7 @@ public class NimbusGoogleIdTokenVerifier implements GoogleIdTokenVerifier {
             throw new GoogleSignInUnavailableException();
         }
         try {
-            Jwt jwt = decoder.decode(idToken);
+            Jwt jwt = resilientCall.call("google", CallKind.READ, () -> decode(idToken));
             String subject = jwt.getSubject();
             String email = jwt.getClaimAsString("email");
             if (subject == null || subject.isBlank() || email == null || email.isBlank()) {
@@ -57,9 +69,23 @@ public class NimbusGoogleIdTokenVerifier implements GoogleIdTokenVerifier {
             return new GoogleIdentity(subject, email, jwt.getClaimAsString("name"), jwt.getClaimAsString("hd"));
         } catch (BadJwtException invalidToken) {
             throw new AuthenticationFailedException("Google ID token is invalid");
-        } catch (JwtException unavailable) {
+        } catch (ResourceAccessException | DownstreamUnavailableException | JwtException unavailable) {
             log.warn("Google ID token verification unavailable errorType={}", unavailable.getClass().getSimpleName());
             throw new GoogleSignInUnavailableException(unavailable);
+        }
+    }
+
+    /**
+     * An invalid token is the caller's problem and passes through untouched. Any other failure means Google's keys could
+     * not be loaded, which is reported as a transient network failure so the call is retried and counted by the breaker.
+     */
+    private Jwt decode(String idToken) {
+        try {
+            return decoder.decode(idToken);
+        } catch (BadJwtException invalidToken) {
+            throw invalidToken;
+        } catch (JwtException unavailable) {
+            throw new ResourceAccessException("Google signing keys unavailable", new IOException(unavailable));
         }
     }
 

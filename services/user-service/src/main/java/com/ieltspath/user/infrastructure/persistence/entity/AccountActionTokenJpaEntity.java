@@ -59,7 +59,7 @@ public class AccountActionTokenJpaEntity {
             id = UUID.randomUUID();
         }
         if (createdAt == null) {
-            createdAt = LocalDateTime.now();
+            createdAt = LocalDateTime.now(java.time.ZoneOffset.UTC);
         }
     }
 }
