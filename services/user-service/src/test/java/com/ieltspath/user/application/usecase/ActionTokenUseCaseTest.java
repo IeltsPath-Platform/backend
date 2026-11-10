@@ -23,11 +23,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Optional;
+import java.util.TimeZone;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -97,7 +100,7 @@ class ActionTokenUseCaseTest {
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(accountActionTokenRepository.findLatestCreatedAt(userId, ActionTokenPurpose.PASSWORD_RESET))
-                .thenReturn(Optional.of(LocalDateTime.now().minusSeconds(30)));
+                .thenReturn(Optional.of(LocalDateTime.now(ZoneOffset.UTC).minusSeconds(30)));
         forgotPasswordUseCase.execute(new ForgotPasswordCommand("test@example.com"));
         verify(accountActionTokenRepository, never()).save(any());
         verify(outboxEventRepository, never()).save(any());
@@ -109,7 +112,7 @@ class ActionTokenUseCaseTest {
         User user = User.builder().id(userId).passwordHash("old-hash").status(UserStatus.ACTIVE).build();
         AccountActionToken token = AccountActionToken.builder().id(UUID.randomUUID()).userId(userId)
                 .purpose(ActionTokenPurpose.PASSWORD_RESET).tokenHash("token-hash")
-                .expiresAt(LocalDateTime.now().plusMinutes(10)).build();
+                .expiresAt(LocalDateTime.now(ZoneOffset.UTC).plusMinutes(10)).build();
         when(tokenHashService.hash("my-token")).thenReturn("token-hash");
         when(accountActionTokenRepository.findByTokenHashAndPurpose("token-hash", ActionTokenPurpose.PASSWORD_RESET))
                 .thenReturn(Optional.of(token));
@@ -129,7 +132,7 @@ class ActionTokenUseCaseTest {
     void resetPasswordRejectsExpiredToken() {
         AccountActionToken expiredToken = AccountActionToken.builder().id(UUID.randomUUID()).userId(UUID.randomUUID())
                 .purpose(ActionTokenPurpose.PASSWORD_RESET).tokenHash("token-hash")
-                .expiresAt(LocalDateTime.now().minusMinutes(5)).build();
+                .expiresAt(LocalDateTime.now(ZoneOffset.UTC).minusMinutes(5)).build();
         when(tokenHashService.hash("expired-token")).thenReturn("token-hash");
         when(accountActionTokenRepository.findByTokenHashAndPurpose("token-hash", ActionTokenPurpose.PASSWORD_RESET))
                 .thenReturn(Optional.of(expiredToken));
@@ -142,7 +145,7 @@ class ActionTokenUseCaseTest {
         UUID userId = UUID.randomUUID();
         AccountActionToken token = AccountActionToken.builder().id(UUID.randomUUID()).userId(userId)
                 .purpose(ActionTokenPurpose.PASSWORD_RESET).tokenHash("token-hash")
-                .expiresAt(LocalDateTime.now().plusMinutes(10)).build();
+                .expiresAt(LocalDateTime.now(ZoneOffset.UTC).plusMinutes(10)).build();
         when(tokenHashService.hash("my-token")).thenReturn("token-hash");
         when(accountActionTokenRepository.findByTokenHashAndPurpose("token-hash", ActionTokenPurpose.PASSWORD_RESET))
                 .thenReturn(Optional.of(token));
@@ -150,6 +153,40 @@ class ActionTokenUseCaseTest {
         assertThrows(InvalidActionTokenException.class,
                 () -> resetPasswordUseCase.execute(new ResetPasswordCommand("my-token", "new-secret")));
         verify(accountActionTokenRepository, never()).consumePasswordResetToken(any(), any());
+    }
+
+    @Test
+    void aResetTokenIssuedOnAServerOutsideUtcIsStillValidWhenItIsUsed() {
+        TimeZone original = TimeZone.getDefault();
+        TimeZone.setDefault(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
+        try {
+            UUID userId = UUID.randomUUID();
+            User user = User.builder().id(userId).email(new Email("test@example.com")).fullName("Test User")
+                    .passwordHash("old-hash").status(UserStatus.ACTIVE).build();
+            when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+            when(accountActionTokenRepository.findLatestCreatedAt(userId, ActionTokenPurpose.PASSWORD_RESET)).thenReturn(Optional.empty());
+            when(tokenHashService.hash(any(String.class))).thenReturn("hashed-token");
+            forgotPasswordUseCase.execute(new ForgotPasswordCommand("test@example.com"));
+            ArgumentCaptor<AccountActionToken> saved = ArgumentCaptor.forClass(AccountActionToken.class);
+            verify(accountActionTokenRepository).save(saved.capture());
+            AccountActionToken issued = saved.getValue();
+
+            when(accountActionTokenRepository.findByTokenHashAndPurpose("hashed-token", ActionTokenPurpose.PASSWORD_RESET))
+                    .thenReturn(Optional.of(issued));
+            when(accountActionTokenRepository.consumePasswordResetToken(eq("hashed-token"), any(LocalDateTime.class))).thenReturn(true);
+            when(passwordEncoder.encode("new-secret")).thenReturn("new-hash");
+
+            resetPasswordUseCase.execute(new ResetPasswordCommand("raw-token", "new-secret"));
+
+            ArgumentCaptor<LocalDateTime> consumedAt = ArgumentCaptor.forClass(LocalDateTime.class);
+            verify(accountActionTokenRepository).consumePasswordResetToken(eq("hashed-token"), consumedAt.capture());
+            // The repository query keeps a token only while expiresAt is after the time it is consumed.
+            assertTrue(issued.getExpiresAt().isAfter(consumedAt.getValue()), "a fresh token must not look expired");
+            assertTrue(issued.isValid());
+        } finally {
+            TimeZone.setDefault(original);
+        }
     }
 
     @Test

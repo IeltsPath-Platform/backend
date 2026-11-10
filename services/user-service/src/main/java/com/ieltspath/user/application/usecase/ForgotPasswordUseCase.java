@@ -53,7 +53,8 @@ public class ForgotPasswordUseCase {
         User user = userRepository.findById(found.getId()).orElse(null);
         if (user == null || user.getStatus() != UserStatus.ACTIVE) return;
 
-        LocalDateTime now = LocalDateTime.now();
+        // Token timestamps are all UTC: expiresAt is stored in UTC and compared against this clock on consume.
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         if (accountActionTokenRepository.findLatestCreatedAt(user.getId(), ActionTokenPurpose.PASSWORD_RESET)
                 .filter(createdAt -> createdAt.isAfter(now.minusSeconds(COOLDOWN_SECONDS))).isPresent()) {
             return;
