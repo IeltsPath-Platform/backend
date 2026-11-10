@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +41,7 @@ class LearningMailUseCaseTest {
         repository = mock(LearningMailRepository.class);
         when(renderer.render(any(), anyMap())).thenReturn(RENDERED);
         when(repository.learningEnabled(any())).thenReturn(true);
+        when(deliveries.reserveDailyNonSecuritySlot(any(), any(), any(), any(), any())).thenReturn(true);
         useCase = new LearningMailUseCase(renderer, sender, deliveries, repository, new MailUnsubscribeTokens(SECRET));
         ReflectionTestUtils.setField(useCase, "frontendBaseUrl", "https://learn.example.test/");
         ReflectionTestUtils.setField(useCase, "apiBaseUrl", "https://api.example.test");
@@ -96,6 +98,21 @@ class LearningMailUseCaseTest {
         useCase.gradingCompleted(eventId, learner);
 
         verify(sender, never()).send(any(), any());
+    }
+
+    @Test
+    void learningMailStopsWhenThreeDailySlotsAreAlreadyReserved() {
+        UUID learner = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        when(deliveries.exists(eventId, "essay-graded")).thenReturn(false);
+        when(repository.findContact(learner)).thenReturn(Optional.of(new LearningMailRepository.Contact("learner@example.test", "An")));
+        when(deliveries.reserveDailyNonSecuritySlot(eq(learner), any(LocalDate.class), eq(eventId),
+                eq("essay-graded"), any())).thenReturn(false);
+
+        useCase.gradingCompleted(eventId, learner);
+
+        verify(sender, never()).send(any(), any());
+        verify(deliveries, never()).recordSent(any(), any(), any());
     }
 
     @Test

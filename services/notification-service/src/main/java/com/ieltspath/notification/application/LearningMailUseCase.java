@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
@@ -125,7 +126,14 @@ public class LearningMailUseCase {
         model.put("displayName", name(contact.get().displayName()));
         model.put("actionLink", frontendBaseUrl.replaceAll("/+$", "") + path);
         model.put("unsubscribeLink", unsubscribeLink(recipientId));
-        deliver(template, eventId, contact.get().email(), model);
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"));
+        if (!deliveries.reserveDailyNonSecuritySlot(recipientId, today, eventId, template.key(), Instant.now())) return false;
+        try {
+            deliver(template, eventId, contact.get().email(), model);
+        } catch (RuntimeException failure) {
+            deliveries.releaseDailyNonSecuritySlot(recipientId, today, eventId, template.key());
+            throw failure;
+        }
         return true;
     }
 
