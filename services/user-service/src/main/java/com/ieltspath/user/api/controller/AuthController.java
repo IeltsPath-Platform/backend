@@ -2,6 +2,7 @@ package com.ieltspath.user.api.controller;
 
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.user.api.dto.request.ForgotPasswordRequest;
+import com.ieltspath.user.api.dto.request.GoogleLoginRequest;
 import com.ieltspath.user.api.dto.request.LoginRequest;
 import com.ieltspath.user.api.dto.request.LogoutRequest;
 import com.ieltspath.user.api.dto.request.RefreshRequest;
@@ -11,8 +12,11 @@ import com.ieltspath.user.api.dto.response.CurrentUserResponse;
 import com.ieltspath.user.api.dto.response.MessageResponse;
 import com.ieltspath.user.application.command.ForgotPasswordCommand;
 import com.ieltspath.user.application.command.ResetPasswordCommand;
+import com.ieltspath.user.application.command.LoginContext;
 import com.ieltspath.user.application.result.AuthTokenResult;
+import com.ieltspath.user.application.result.GoogleSignInResult;
 import com.ieltspath.user.application.usecase.ForgotPasswordUseCase;
+import com.ieltspath.user.application.usecase.GoogleSignInUseCase;
 import com.ieltspath.user.application.usecase.GetUserByIdUseCase;
 import com.ieltspath.user.application.usecase.AuditedLoginUseCase;
 import com.ieltspath.user.application.usecase.LogoutUseCase;
@@ -39,6 +43,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AuthController {
     private final AuditedLoginUseCase loginUseCase;
+    private final GoogleSignInUseCase googleSignInUseCase;
     private final RefreshTokenUseCase refreshTokenUseCase;
     private final LogoutUseCase logoutUseCase;
     private final ForgotPasswordUseCase forgotPasswordUseCase;
@@ -74,6 +79,20 @@ public class AuthController {
                 tokens.accessTokenExpiresInSeconds(),
                 tokens.refreshTokenExpiresInSeconds()
         );
+        return tokenResponse(tokens, "Login successful");
+    }
+
+    @PostMapping("/google")
+    public AuthTokenResponse googleLogin(
+            @Valid @RequestBody GoogleLoginRequest request,
+            HttpServletRequest httpRequest,
+            HttpServletResponse response
+    ) {
+        GoogleSignInResult result = googleSignInUseCase.execute(
+                request.idToken(), LoginContextResolver.from(httpRequest));
+        AuthTokenResult tokens = result.tokens();
+        authCookieService.addAuthCookies(response, tokens.accessToken(), tokens.refreshToken(),
+                tokens.accessTokenExpiresInSeconds(), tokens.refreshTokenExpiresInSeconds());
         return tokenResponse(tokens, "Login successful");
     }
 

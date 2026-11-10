@@ -149,6 +149,7 @@ REFRESH_TOKEN_MAX_AGE_SECONDS=604800
 
 ```text
 POST /auth/login
+POST /auth/google
 POST /auth/refresh
 POST /auth/logout
 POST /auth/forgot-password
@@ -174,6 +175,12 @@ The `/internal/users/**` routes require a verified internal service JWT and are 
 Gateway. The study-timezone response is `{"timezone": "..."}`: the timezone of the learner profile, or `Asia/Ho_Chi_Minh`
 when there is none. The display-name request accepts 1–50 IDs in one batch. It uses a learner profile's `displayName`
 when available, falls back to the account `fullName`, omits unknown IDs, and never returns email.
+
+Google sign-in verifies an ID token and uses the same body and cookies as `/auth/login`. It accepts Gmail/Googlemail or
+Workspace email addresses whose `hd` claim matches the email domain, and creates `CUSTOMER` accounts only. Linking a
+password account clears its password and revokes active refresh tokens; the user can set a new password through the
+reset-email flow. Configure `GOOGLE_CLIENT_IDS` as a comma-separated list. An empty value leaves the service available
+but makes `/auth/google` return 503. See [`google-sign-in-v1.md`](../../docs/contracts/google-sign-in-v1.md).
 
 Goals (`/api/users/me/learning-goals/**`, `/api/users/{id}/learning-goals/**`), study time
 (`/api/users/me/study-sessions/**`, `/api/users/me/statistics/study-time`) and learning activity

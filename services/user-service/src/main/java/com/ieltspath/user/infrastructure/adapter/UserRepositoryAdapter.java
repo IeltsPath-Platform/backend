@@ -37,6 +37,11 @@ public class UserRepositoryAdapter implements UserRepository {
     }
 
     @Override
+    public void clearPasswordHash(UUID userId) {
+        userJpaRepository.clearPasswordHash(userId);
+    }
+
+    @Override
     public Optional<User> findById(UUID id) {
         return userJpaRepository.findWithRolesById(id).map(userMapper::toDomain);
     }

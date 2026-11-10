@@ -149,6 +149,7 @@ services:
       <<: *spring-env
       SERVER_PORT: 8085
       EXTERNAL_JWT_SECRET: "${EXTERNAL_JWT_SECRET:?Set EXTERNAL_JWT_SECRET}"
+      GOOGLE_CLIENT_IDS: "${GOOGLE_CLIENT_IDS:-}"
       REDIS_HOST: redis
       REDIS_PASSWORD: "${REDIS_PASSWORD}"
       USER_DB_URL: jdbc:postgresql://postgres:5432/user_db

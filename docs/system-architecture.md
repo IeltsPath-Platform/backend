@@ -183,7 +183,7 @@ Client --external JWT--> Gateway: kiểm issuer, subject UUID, role hợp lệ
 
 - `user-service` ký external HMAC JWT và chỉ lưu refresh token dạng hash; refresh token dùng một lần.
 - Gateway (WebFlux) có `SecurityWebFilterChain` riêng; `InternalJwtGatewayFilter` thay header Authorization cho các path
-  trong `internal-jwt-paths`. Public: `/auth/login|refresh|logout|forgot-password|reset-password`, `/api/users/register`,
+  trong `internal-jwt-paths`. Public: `/auth/login|refresh|logout|forgot-password|reset-password|google`, `/api/users/register`,
   `/ws/games/**`.
 - Downstream không bao giờ tin header `X-User-*`; test MVC của user-service chứng minh token external và header giả bị từ chối.
 - Role chuẩn (`CanonicalRoles.ALL`): `ADMIN`, `CUSTOMER`, `CONTENT_AUTHOR`, `EXAMINER`, `SALES_STAFF`. Đăng ký công khai
@@ -217,6 +217,11 @@ api ----------> application ----------> domain
 Client -> Gateway (public /auth/login) -> user-service LoginUseCase -> UserRepository
        -> AuthTokenIssuer -> external JWT + refresh token (hash trong user_db) [+ cookie nếu APP_AUTH_COOKIE_ENABLED]
 ```
+
+Google sign-in uses `POST /auth/google`: the User Service validates Google's RS256 ID token through its private Nimbus
+decoder/JWKS cache, links by provider subject or verified email, then issues the standard auth token and cookies. Linking
+a password account clears its password and revokes refresh tokens under `UserLock`. The JWKS request uses bounded
+connect/read timeouts and does not replace the application's normal external `JwtDecoder`.
 
 `RefreshTokenUseCase` hash token nhận vào, chỉ consume token còn hiệu lực một lần, kiểm user active rồi phát cặp mới.
 
@@ -356,7 +361,7 @@ Claude sẽ ghi số request lỗi và thời gian dừng tới lỗi cuối sau
 | Subscription grant nhận lại cùng khóa | `GrantSubscriptionIdempotencyTest` | PostgreSQL Testcontainers, gồm cạnh tranh và outbox |
 | Mở breaker và hồi phục downstream | `RestLearningContentClientResilienceTest`, `ResilientCallTest` | Unit/integration test; phép dừng service qua gateway vẫn cần kiểm tay |
 | Correlation HTTP → downstream content/assessment → outbox → relay → consumer | `CorrelationAcrossServicesReliabilityTest.sameCorrelationIdInHttpAndConsumerLogs`; `CommunityOutboxRelayIntegrationTest.correlationSurvivesHttpOutboxRelayAndBrokerConsumerLogs` | Learning kiểm hai HTTP client, reward outbox production, relay/publisher production và log consumer với PostgreSQL/RabbitMQ Testcontainers; Community kiểm luồng outbox riêng |
-| Auth endpoint rate-limit mapping | `AuthRouteConsistencyTest` | `/auth/login`, `/auth/refresh`, `/auth/forgot-password`, `/auth/reset-password`, `/api/users/register` thuộc tier `auth`; `/auth/logout` thuộc tier `default` |
+| Auth endpoint rate-limit mapping | `AuthRouteConsistencyTest` | `/auth/login`, `/auth/refresh`, `/auth/forgot-password`, `/auth/reset-password`, `/auth/google`, `/api/users/register` thuộc tier `auth`; `/auth/logout` thuộc tier `default` |
 | Message được retry và đưa lại từ DLQ | `SubscriptionGrantedBrokerIntegrationTest`, `ReplayedMessageIsProcessedTest` | RabbitMQ Testcontainers |
 | Dừng một replica còn replica khác | Phép đo in-flight và tải Compose trong report E; trạng thái idempotent được đối chiếu bằng `OutboxRelayConcurrencyTest`, `CommunityOutboxRelayConcurrencyTest`, `GrantSubscriptionIdempotencyTest.concurrentSameKeyGrantsOnce`, `UnlockCourseFailureWindowTest.retryWithSameKeyWhilePendingDoesNotCreateIntent` | Request đang xử lý hoàn tất 200 và replica còn lại tiếp tục phục vụ; kiểm tra idempotency chạy riêng, không gộp vào cùng phép dừng replica |
 
@@ -408,7 +413,7 @@ Rate limit được cấu hình trong `infra/config-server/config-repo/api-gatew
 khóa theo subject của JWT; request ẩn danh dùng IP, chỉ tin `X-Forwarded-For` từ proxy thuộc
 `gateway.rate-limit.trusted-proxies`. Với header được tin, gateway duyệt các hop từ phải sang trái, bỏ qua proxy
 được tin cậy và chọn IP đầu tiên không thuộc danh sách; nếu không còn IP phù hợp thì dùng remote address.
-Tier `auth` áp dụng cho `/auth/login`, `/auth/refresh`, `/auth/forgot-password`, `/auth/reset-password` và
+Tier `auth` áp dụng cho `/auth/login`, `/auth/refresh`, `/auth/forgot-password`, `/auth/reset-password`, `/auth/google` và
 `/api/users/register`; `/auth/logout` thuộc tier `default`. Redis dùng chung trạng thái giữa các gateway instance. Khi Redis lỗi,
 gateway cho request thường đi tiếp và ghi metric cảnh báo; login bị fail-closed với HTTP 503 để tránh bỏ qua
 giới hạn đăng nhập. Upload avatar, media và ảnh community dùng Redis limiter riêng theo user, với mức lần

@@ -63,6 +63,11 @@ public class User {
         touch();
     }
 
+    public void clearPassword() {
+        this.passwordHash = null;
+        touch();
+    }
+
     public Set<Role> getRoles() {
         return Collections.unmodifiableSet(new HashSet<>(roles));
     }
