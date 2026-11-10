@@ -78,6 +78,18 @@ class ReportControllerTest {
         verify(report).execute(learner);
     }
 
+    @Test
+    void storedPlacementIsAnAdditiveReportField() throws Exception {
+        when(currentUser.requireUserId()).thenReturn(learner);
+        when(report.execute(learner)).thenReturn(new LearnerReportResult(learner,
+                Instant.parse("2026-11-08T05:00:00Z"), List.of(), List.of(), List.of(), null, null,
+                new BigDecimal("5.5")));
+
+        mvc.perform(get("/api/learning/report").with(user("customer").roles("CUSTOMER")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.placementBand").value(5.5))
+                .andExpect(jsonPath("$.knowledgePoints").isArray()).andExpect(jsonPath("$.skills").isArray());
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"EXAMINER"})
     void staffReadAnyLearnersReport(String role) throws Exception {

@@ -72,4 +72,28 @@ class GetBandHistoryUseCaseTest {
         when(attempts.findByIdAndUserId(id,user)).thenReturn(Optional.of(attempt));
         assertThrows(AssessmentNotFoundException.class,()->useCase.context(user,"ASSESSMENT",id));
     }
+    @Test void availabilityValidatesRangesAndTimezonesBeforeQuery() {
+        assertThrows(IllegalArgumentException.class, () -> useCase.availability(user, null, to, "UTC"));
+        assertThrows(IllegalArgumentException.class, () -> useCase.availability(user, from, null, "UTC"));
+        assertThrows(IllegalArgumentException.class, () -> useCase.availability(user, to, from, "UTC"));
+        assertThrows(IllegalArgumentException.class, () -> useCase.availability(user, from, from.plusDays(366), "UTC"));
+        for (String zone : Arrays.asList("Invalid/Zone", "+07:00", "", null)) {
+            assertThrows(IllegalArgumentException.class, () -> useCase.availability(user, from, to, zone));
+        }
+        verifyNoInteractions(store);
+    }
+    @Test void availabilityUsesLocalMidnightsAcrossDaylightSavingAndPreservesOptions() {
+        LocalDate day = LocalDate.of(2026, 3, 8);
+        Instant start = Instant.parse("2026-03-08T05:00:00Z"), end = Instant.parse("2026-03-09T04:00:00Z");
+        var options = List.of(new BandStatisticsStore.AvailableOption("MOCK", "READING", start));
+        when(store.availability(user, start, end)).thenReturn(options);
+        assertEquals(options, useCase.availability(user, day, day, "America/New_York").options());
+        verify(store).availability(user, start, end);
+    }
+    @Test void availabilityAcceptsMaximumRangeAndEmptyResults() {
+        when(store.availability(eq(user), any(), any())).thenReturn(List.of());
+        assertTrue(useCase.availability(user, from, from.plusDays(365), "UTC").options().isEmpty());
+        verify(store).availability(user, from.atStartOfDay(ZoneOffset.UTC).toInstant(),
+                from.plusDays(366).atStartOfDay(ZoneOffset.UTC).toInstant());
+    }
 }

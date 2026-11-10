@@ -4,6 +4,7 @@ import com.ieltspath.learning.api.controller.AdminLearningGoalController;
 import com.ieltspath.learning.api.controller.LearningActivityController;
 import com.ieltspath.learning.api.controller.LearningGoalController;
 import com.ieltspath.learning.api.controller.StudySessionController;
+import com.ieltspath.learning.api.controller.PracticeSessionController;
 import com.ieltspath.learning.domain.exception.ConflictException;
 import com.ieltspath.learning.domain.exception.InvalidDataException;
 import com.ieltspath.learning.domain.exception.LearningGoalConflictException;
@@ -33,7 +34,7 @@ import java.util.Map;
  */
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @RestControllerAdvice(assignableTypes = {LearningGoalController.class, AdminLearningGoalController.class,
-        LearningActivityController.class, StudySessionController.class})
+        LearningActivityController.class, StudySessionController.class, PracticeSessionController.class})
 public class StudyDataExceptionHandler {
     private static final String INVALID = "Dữ liệu không hợp lệ";
 

@@ -4,11 +4,12 @@ import com.ieltspath.library.application.result.NotebookSummaryResult;
 import java.time.Instant;
 
 public record NotebookSummaryResponse(long total, ByLevel byLevel, long dueNow, long addedLast7Days,
-        long reviewedToday, Instant nextDueAt, long learnedCount, long catalogTotal, long learningCount, long masteredCount) {
+        long reviewedToday, Instant nextDueAt, long learnedCount, long catalogTotal, long learningCount, long masteredCount,
+        long newCount, long inProgressCount, long dueReviewCount) {
     public record ByLevel(long UNKNOWN, long FAMILIAR, long LEARNING, long MASTERED) {}
     public static NotebookSummaryResponse from(NotebookSummaryResult r) {
         return new NotebookSummaryResponse(r.total(), new ByLevel(r.unknown(), r.familiar(), r.learning(), r.mastered()),
                 r.dueNow(), r.addedLast7Days(), r.reviewedToday(), r.nextDueAt(), r.learnedCount(), r.catalogTotal(),
-                r.familiar() + r.learning(), r.mastered());
+                r.familiar() + r.learning(), r.mastered(), r.newCount(), r.inProgressCount(), r.dueReviewCount());
     }
 }

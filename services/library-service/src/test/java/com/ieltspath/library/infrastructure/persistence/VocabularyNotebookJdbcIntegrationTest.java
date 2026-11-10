@@ -118,6 +118,57 @@ class VocabularyNotebookJdbcIntegrationTest {
         assertEquals("https://legacy.example/audio.mp3", adapter.findEntry(user, legacyCard).orElseThrow().pronunciationAudioReference());
     }
 
+    @Test void overviewCountsPartitionThePersonalNotebookAndExcludeNewCardsFromDueReviews() {
+        UUID user = UUID.randomUUID();
+        Instant now = Instant.parse("2026-11-08T10:00:00Z");
+        Instant due = now.minusSeconds(60);
+        Instant future = now.plusSeconds(86400);
+        insertNotebookCard(user, 1, 0, null, "ACTIVE", now);
+        insertNotebookCard(user, 1, 2, due, "ACTIVE", now);
+        insertNotebookCard(user, 2, 0, due, "ACTIVE", now);
+        insertNotebookCard(user, 3, 1, future, "ACTIVE", now);
+        insertNotebookCard(user, 4, 2, due, "ACTIVE", now);
+        insertNotebookCard(user, 5, 0, future, "ACTIVE", now);
+        insertNotebookCard(user, 3, 2, due, "DELETED", now);
+        insertNotebookCard(UUID.randomUUID(), 1, 0, null, "ACTIVE", now);
+
+        var summary = adapter.summarize(user, now, now.minusSeconds(36000), now.plusSeconds(50400));
+
+        assertEquals(6, summary.total());
+        assertEquals(1, summary.newCount());
+        assertEquals(3, summary.inProgressCount());
+        assertEquals(2, summary.mastered());
+        assertEquals(summary.total(), summary.newCount() + summary.inProgressCount() + summary.mastered());
+        assertEquals(5, summary.learnedCount());
+        assertEquals(4, summary.dueNow());
+        assertEquals(3, summary.dueReviewCount());
+
+        var duePage = adapter.findEntries(user, new NotebookQuery(null, null, true, "DUE", 0, 1, null, null, true), now);
+        assertEquals(3, duePage.total());
+        assertEquals(1, duePage.items().size());
+        assertTrue(duePage.items().stream().allMatch(card -> card.reviewCount() > 0 || card.leitnerBox() >= 2));
+        var newPage = adapter.findEntries(user, new NotebookQuery(null, null, true, "DUE", 0, 50, null, null, false), now);
+        assertEquals(1, newPage.total());
+        assertEquals(0, newPage.items().getFirst().reviewCount());
+
+        var empty = adapter.summarize(UUID.randomUUID(), now, now.minusSeconds(36000), now.plusSeconds(50400));
+        assertEquals(0, empty.total());
+        assertEquals(0, empty.newCount());
+        assertEquals(0, empty.inProgressCount());
+        assertEquals(0, empty.dueReviewCount());
+    }
+
+    private void insertNotebookCard(UUID user, int box, int reviews, Instant nextReview, String status, Instant now) {
+        UUID item = UUID.randomUUID();
+        UUID sense = UUID.randomUUID();
+        String lemma = "overview-" + item;
+        jdbc.update("insert into vocabulary_items(id,lemma,normalized_lemma,status) values(?,?,?,'ACTIVE')", item, lemma, lemma);
+        jdbc.update("insert into vocabulary_senses(id,vocabulary_item_id,part_of_speech,vietnamese_meaning,example_sentence,status) values(?,?,'NOUN','nghĩa','Example.','ACTIVE')", sense, item);
+        jdbc.update("insert into flashcards(id,user_id,source_type,vocabulary_sense_id,source_reference_id,front,back,status,leitner_box,review_count,next_review_at,created_at) values(?,?,'VOCABULARY_SENSE',?,?,'word','meaning',?,?,?,?,?)",
+                UUID.randomUUID(), user, sense, sense, status, box, reviews,
+                nextReview == null ? null : java.sql.Timestamp.from(nextReview), java.sql.Timestamp.from(now));
+    }
+
     @Test void catalogItemResolvesPreferredAudioKey() {
         UUID item = UUID.randomUUID();
         String key = "vocabulary/pronunciation/us/catalog-word.mp3";

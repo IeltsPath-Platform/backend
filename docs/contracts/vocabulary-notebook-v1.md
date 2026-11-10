@@ -18,9 +18,19 @@ Query: `q` (optional, up to 100 characters; case-insensitive search across lemma
 
 Understanding is derived from Leitner: box 1 = `UNKNOWN`, 2 = `FAMILIAR`, 3 = `LEARNING`, boxes 4–5 = `MASTERED`.
 
+The optional `learned` boolean filters by the same learned predicate as the summary: `true` means reviewed at least once or box at least 2; `false` means unreviewed box-1 entries. Omit it to preserve the existing list behavior. `due=true&learned=true&sort=DUE` opens personal scheduled reviews without adding brand-new cards to the due queue.
+
 ### `GET /api/learning-support/flashcards/notebook/summary`
 
 Query: `timezone` (IANA zone, default `Asia/Ho_Chi_Minh`). Returns the existing fields `{total,byLevel:{UNKNOWN,FAMILIAR,LEARNING,MASTERED},dueNow,addedLast7Days,reviewedToday,nextDueAt}` plus `learnedCount`, `catalogTotal`, `learningCount`, and `masteredCount`. A notebook entry is learned when `review_count > 0` or its Leitner box is at least 2; `learningCount` combines FAMILIAR and LEARNING, while `byLevel` keeps their separate counts. `catalogTotal` counts active catalog senses with active items. Summary counts are computed in one SQL aggregate. Invalid timezone returns 400.
+
+The overview also receives additive `newCount`, `inProgressCount`, and `dueReviewCount` fields. These use the same active personal `VOCABULARY_SENSE` notebook scope:
+
+- `newCount`: box 1 with no applied reviews (`review_count = 0`). A reviewed word that falls back to box 1 is not new.
+- `inProgressCount`: boxes 1–3 that have been reviewed or manually marked at least FAMILIAR. Together, `newCount + inProgressCount + masteredCount = total`.
+- `dueReviewCount`: previously learned entries (`review_count > 0` or box at least 2) whose next review is due or unset. Brand-new entries are excluded. This is independent of the three progress categories: mastered words can still be due for review.
+
+Existing fields keep their meanings: `learnedCount` includes in-progress and mastered entries, and `dueNow` also includes brand-new unscheduled entries. Counts refer to saved vocabulary senses, not unique lemmas or the entire public catalog.
 
 ### `PUT /api/learning-support/flashcards/notebook/entries/{flashcardId}/level`
 

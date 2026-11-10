@@ -101,6 +101,8 @@ public class SnapshotService {
         Instant to = end.atStartOfDay(zone).toInstant();
         List<UUID> active = repository.usersActiveSince(clock.instant().minus(Duration.ofDays(ACTIVE_WINDOW_DAYS)));
         Map<UUID, KnowledgePointDirectory.Entry> described = active.isEmpty() ? Map.of() : describe();
+        BandEstimator.Catalog catalog = new BandEstimator.Catalog();
+        described.values().forEach(meta -> catalog.add(meta.skill(), meta.band()));
         int written = 0;
         for (int offset = 0; offset < active.size(); offset += BATCH) {
             List<UUID> batch = active.subList(offset, Math.min(offset + BATCH, active.size()));
@@ -110,7 +112,7 @@ public class SnapshotService {
             List<Snapshot> snapshots = new ArrayList<>();
             for (UUID userId : batch) {
                 snapshots.add(build(userId, start, activity.get(userId), profiles.getOrDefault(userId, List.of()),
-                        placements.get(userId), described));
+                        placements.get(userId), described, catalog));
             }
             repository.save(period, snapshots);
             written += snapshots.size();
@@ -135,7 +137,7 @@ public class SnapshotService {
     }
 
     private Snapshot build(UUID userId, LocalDate start, Activity activity, List<ProfileRow> rows, BigDecimal placement,
-                           Map<UUID, KnowledgePointDirectory.Entry> described) {
+                           Map<UUID, KnowledgePointDirectory.Entry> described, BandEstimator.Catalog catalog) {
         List<SkillRollup.Item> items = new ArrayList<>();
         List<BandEstimator.Point> points = new ArrayList<>();
         for (ProfileRow row : rows) {
@@ -154,7 +156,7 @@ public class SnapshotService {
                 .filter(row -> row.tier() == MasteryTier.PRIORITY || row.tier() == MasteryTier.CONSOLIDATE)
                 .sorted(Comparator.comparingDouble(ProfileRow::mastery)).limit(FOCUS_POINTS)
                 .map(ProfileRow::knowledgePointId).toList();
-        BigDecimal band = BandEstimator.estimate(points, placement).overall();
+        BigDecimal band = BandEstimator.estimate(points, placement, catalog).overall();
         Activity seen = activity == null ? new Activity(0, 0, 0) : activity;
         return new Snapshot(userId, start, skills, tiers, seen.answered(), seen.correct(),
                 (int) ((seen.activeMs() + 30_000) / 60_000), focus, band);

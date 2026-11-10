@@ -39,15 +39,11 @@ public class GetBandHistoryUseCase {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Result execute(UUID user, LocalDate from, LocalDate to, String kind, String skill,
                           String cursor, int limit, String timezone) {
-        if (from == null || to == null || from.isAfter(to) || ChronoUnit.DAYS.between(from, to) > 365
-                || limit < 1 || limit > 100 || kind == null || !SERIES_KINDS.contains(kind)
+        ZoneId zone = validateRange(from, to, timezone);
+        if (limit < 1 || limit > 100 || kind == null || !SERIES_KINDS.contains(kind)
                 || skill == null || !SKILLS.contains(skill)) {
             throw new IllegalArgumentException("Invalid band range, series, skill or page size");
         }
-        if (timezone == null || !ZoneId.getAvailableZoneIds().contains(timezone)) {
-            throw new IllegalArgumentException("Invalid IANA timezone");
-        }
-        ZoneId zone = ZoneId.of(timezone);
         var position = decode(cursor);
         if ("PLACEMENT".equals(kind) && Set.of("SPEAKING", "OVERALL").contains(skill)) {
             return new Result("UNAVAILABLE", Instant.now(), null, kind, skill,
@@ -64,6 +60,25 @@ public class GetBandHistoryUseCase {
                 kind, skill, reason, points, next, page.baseline(), page.latest(),
                 page.eligibleCount() < 2 || page.baseline() == null || page.latest() == null
                         ? null : page.latest() - page.baseline());
+    }
+
+    public record Availability(List<BandStatisticsStore.AvailableOption> options) {}
+
+    @Transactional(readOnly = true)
+    public Availability availability(UUID user, LocalDate from, LocalDate to, String timezone) {
+        ZoneId zone = validateRange(from, to, timezone);
+        return new Availability(store.availability(user, from.atStartOfDay(zone).toInstant(),
+                to.plusDays(1).atStartOfDay(zone).toInstant()));
+    }
+
+    private ZoneId validateRange(LocalDate from, LocalDate to, String timezone) {
+        if (from == null || to == null || from.isAfter(to) || ChronoUnit.DAYS.between(from, to) > 365) {
+            throw new IllegalArgumentException("Invalid band range");
+        }
+        if (timezone == null || !ZoneId.getAvailableZoneIds().contains(timezone)) {
+            throw new IllegalArgumentException("Invalid IANA timezone");
+        }
+        return ZoneId.of(timezone);
     }
 
     private BandStatisticsStore.Cursor decode(String value) {

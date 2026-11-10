@@ -70,4 +70,53 @@ class BandStatisticsControllerTest {
                 .with(jwt().jwt(j->j.subject(user.toString())))).andExpect(status().isOk());
         verify(history).context(user,"ASSESSMENT",source);
     }
+    @Test void availabilityRequiresAuthentication() throws Exception {
+        mvc.perform(get("/api/assessments/me/statistics/bands/availability")
+                .param("from", "2026-10-01").param("to", "2026-10-15"))
+                .andExpect(status().isUnauthorized());
+        verifyNoInteractions(history);
+    }
+    @Test void availabilityUsesVerifiedOwnerAndReturnsOptions() throws Exception {
+        UUID user = UUID.randomUUID();
+        LocalDate from = LocalDate.parse("2026-10-01"), to = LocalDate.parse("2026-10-15");
+        when(history.availability(user, from, to, "Asia/Ho_Chi_Minh")).thenReturn(
+                new GetBandHistoryUseCase.Availability(List.of(
+                        new com.ieltspath.assessment.application.port.BandStatisticsStore.AvailableOption(
+                                "MOCK", "READING", java.time.Instant.parse("2026-10-15T00:00:00Z")))));
+        mvc.perform(get("/api/assessments/me/statistics/bands/availability")
+                .param("from", from.toString()).param("to", to.toString())
+                .param("userId", UUID.randomUUID().toString()).header("X-User-Id", UUID.randomUUID().toString())
+                .with(jwt().jwt(j -> j.subject(user.toString()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.options.length()").value(1))
+                .andExpect(jsonPath("$.options[0].seriesKind").value("MOCK"))
+                .andExpect(jsonPath("$.options[0].skill").value("READING"))
+                .andExpect(jsonPath("$.options[0].latestSubmittedAt").value("2026-10-15T00:00:00Z"));
+        verify(history).availability(user, from, to, "Asia/Ho_Chi_Minh");
+    }
+    @Test void availabilityBindsExplicitTimezoneAndEmptyOptions() throws Exception {
+        UUID user = UUID.randomUUID();
+        when(history.availability(user, LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-15"), "UTC"))
+                .thenReturn(new GetBandHistoryUseCase.Availability(List.of()));
+        mvc.perform(get("/api/assessments/me/statistics/bands/availability")
+                .param("from", "2026-10-01").param("to", "2026-10-15").param("timezone", "UTC")
+                .with(jwt().jwt(j -> j.subject(user.toString()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.options").isEmpty());
+    }
+    @Test void availabilityInvalidOrMissingDatesAreBadRequest() throws Exception {
+        for (String date : List.of("bad", "2026-02-30")) {
+            mvc.perform(get("/api/assessments/me/statistics/bands/availability")
+                    .param("from", date).param("to", "2026-10-15")
+                    .with(jwt().jwt(j -> j.subject(UUID.randomUUID().toString()))))
+                    .andExpect(status().isBadRequest());
+        }
+        mvc.perform(get("/api/assessments/me/statistics/bands/availability").param("from", "2026-10-01")
+                .with(jwt().jwt(j -> j.subject(UUID.randomUUID().toString())))).andExpect(status().isBadRequest());
+        verifyNoInteractions(history);
+    }
+    @Test void availabilityValidationErrorsUseBadRequestEnvelope() throws Exception {
+        when(history.availability(any(), any(), any(), any())).thenThrow(new IllegalArgumentException("Invalid band range"));
+        mvc.perform(get("/api/assessments/me/statistics/bands/availability")
+                .param("from", "2026-10-15").param("to", "2026-10-01").param("timezone", "Invalid/Zone")
+                .with(jwt().jwt(j -> j.subject(UUID.randomUUID().toString())))).andExpect(status().isBadRequest());
+    }
 }
