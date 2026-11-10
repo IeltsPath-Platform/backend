@@ -1,5 +1,7 @@
 package com.ieltspath.game.domain.vo;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.time.Duration;
@@ -78,5 +80,21 @@ class RocketRulesTest {
         assertThrows(IllegalArgumentException.class, () -> RocketRoomSettings.multiplayer(21, 4, 15));
         assertThrows(IllegalArgumentException.class, () -> RocketRoomSettings.multiplayer(10, 7, 15));
         assertThrows(IllegalArgumentException.class, () -> RocketRoomSettings.multiplayer(10, 4, 12));
+    }
+
+    @Test
+    void theExactLimitsOfQuestionsLivesAndSecondsAreAccepted() {
+        assertEquals(5, RocketRoomSettings.multiplayer(5, 3, 10).questionCount());
+        assertEquals(20, RocketRoomSettings.multiplayer(20, 6, 20).questionCount());
+        assertEquals(3, RocketRoomSettings.multiplayer(10, 3, 15).initialLives());
+        assertEquals(6, RocketRoomSettings.multiplayer(10, 6, 15).initialLives());
+        assertEquals(10, RocketRoomSettings.multiplayer(10, 4, 10).secondsPerQuestion());
+        assertEquals(20, RocketRoomSettings.multiplayer(10, 4, 20).secondsPerQuestion());
+    }
+
+    @Test
+    void twoLivesAreRejected() {
+        var error = assertThrows(IllegalArgumentException.class, () -> RocketRoomSettings.multiplayer(10, 2, 15));
+        assertEquals("Initial lives must be between 3 and 6", error.getMessage());
     }
 }

@@ -1,5 +1,8 @@
 package com.ieltspath.game.domain.aggregate;
 
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.ieltspath.game.domain.exception.SoloGameplayException;
@@ -61,6 +64,20 @@ class RocketRoundTest {
     }
 
     @Test
+    void rejectsNullOrBlankRequestIdWithoutRecordingAnAnswer() {
+        var round = openRound();
+
+        var nullId = assertThrows(IllegalArgumentException.class,
+                () -> round.accept(alice, actor.optionId(), null, opens.plusSeconds(1)));
+        var blankId = assertThrows(IllegalArgumentException.class,
+                () -> round.accept(alice, actor.optionId(), "  ", opens.plusSeconds(1)));
+
+        assertEquals("Request id is required", nullId.getMessage());
+        assertEquals("Request id is required", blankId.getMessage());
+        assertTrue(round.answerOf(alice).isEmpty());
+    }
+
+    @Test
     void answersAtOrAfterTheDeadlineAreRejected() {
         var round = openRound();
         assertCode("ROUND_CLOSED", () -> round.accept(alice, actor.optionId(), "late", opens.plusSeconds(15)));
@@ -111,5 +128,24 @@ class RocketRoundTest {
                 actor.sourceWordId(), "x", List.of(driver, actor), actor.optionId()));
         assertThrows(IllegalArgumentException.class, () -> new RocketRound(UUID.randomUUID(), UUID.randomUUID(), 1,
                 actor.sourceWordId(), "x", List.of(driver, actor, career), UUID.randomUUID()));
+    }
+
+    @Test
+    void aRoundNeedsASequenceFromOneAndAMeaning() {
+        var zero = assertThrows(IllegalArgumentException.class, () -> new RocketRound(UUID.randomUUID(), UUID.randomUUID(), 0,
+                actor.sourceWordId(), "x", List.of(driver, actor, career), actor.optionId()));
+        assertEquals("Sequence starts at 1", zero.getMessage());
+        var blank = assertThrows(IllegalArgumentException.class, () -> new RocketRound(UUID.randomUUID(), UUID.randomUUID(), 1,
+                actor.sourceWordId(), " ", List.of(driver, actor, career), actor.optionId()));
+        assertEquals("A round needs a meaning", blank.getMessage());
+    }
+
+    @Test
+    void aRoundCannotOpenWithAZeroTimeLimit() {
+        var round = new RocketRound(UUID.randomUUID(), UUID.randomUUID(), 1, actor.sourceWordId(), "Diễn viên (nam)",
+                List.of(driver, actor, career), actor.optionId());
+        var error = assertThrows(IllegalArgumentException.class, () -> round.open(opens, Duration.ZERO));
+        assertEquals("Time limit must be positive", error.getMessage());
+        assertEquals(RocketRound.Status.PENDING, round.status());
     }
 }

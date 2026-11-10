@@ -117,4 +117,11 @@ class StartWordlyMultiplayerTest {
         verify(matches,never()).save(any());
         assertEquals("WAITING",room.status().name());
     }
+
+    @Test void aRoomThatDoesNotExistCannotBeStarted() {
+        UUID unknown=UUID.randomUUID();
+        assertThrows(com.ieltspath.game.domain.exception.GameRoomNotFoundException.class,()->start.execute(unknown,host));
+        verify(matches,never()).save(any());
+        verify(provider,never()).catalog();
+    }
 }
