@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Tài khoản IELTSPath đã được liên kết với Google</title>
+</head>
+<body>
+<th:block th:replace="~{_layout :: header}"></th:block>
+  <p>Xin chào <span th:text="${displayName}">bạn</span>,</p>
+  <p>Tài khoản IELTSPath của bạn vừa được liên kết với Google. Mật khẩu cũ đã được xóa, từ nay bạn đăng nhập bằng Google.</p>
+  <p>Nếu đây không phải bạn thực hiện, hãy liên hệ đội ngũ hỗ trợ ngay.</p>
+<th:block th:replace="~{_layout :: footer}"></th:block>
+</body>
+</html>

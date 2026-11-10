@@ -1,0 +1,7 @@
+Xin chào [(${displayName})],
+
+Giáo viên chưa chấm xong bài của bạn đúng hạn. Bạn có thể chờ tiếp hoặc đổi giáo viên.
+
+Xem bài chấm: [(${actionLink})]
+
+Bạn có thể tắt email học tập bất cứ lúc nào tại đây: [(${unsubscribeLink})]

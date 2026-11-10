@@ -1,0 +1,7 @@
+Xin chào [(${displayName})],
+
+Có bài đang sắp quá hạn chấm (còn khoảng 12 giờ). Hãy ưu tiên chấm bài này.
+
+Mở hàng đợi chấm: [(${actionLink})]
+
+Bạn có thể tắt email học tập bất cứ lúc nào tại đây: [(${unsubscribeLink})]

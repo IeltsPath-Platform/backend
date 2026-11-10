@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Gói Premium của bạn đã được kích hoạt</title>
+</head>
+<body>
+<th:block th:replace="~{_layout :: header}"></th:block>
+  <p>Xin chào <span th:text="${displayName}">bạn</span>,</p>
+  <p>Gói Premium của bạn đã được kích hoạt, hiệu lực đến <span th:text="${endsAt}">01/01/2026</span>.</p>
+<th:block th:replace="~{_layout :: footer}"></th:block>
+</body>
+</html>

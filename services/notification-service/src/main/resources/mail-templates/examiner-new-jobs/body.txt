@@ -1,0 +1,7 @@
+Xin chào [(${displayName})],
+
+Bạn có [(${jobCount})] bài mới chờ chấm (hạn 48 giờ).
+
+Mở hàng đợi chấm: [(${actionLink})]
+
+Bạn có thể tắt email học tập bất cứ lúc nào tại đây: [(${unsubscribeLink})]

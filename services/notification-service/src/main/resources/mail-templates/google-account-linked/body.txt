@@ -1,0 +1,5 @@
+Xin chào [(${displayName})],
+
+Tài khoản IELTSPath của bạn vừa được liên kết với Google. Mật khẩu cũ đã được xóa, từ nay bạn đăng nhập bằng Google.
+
+Nếu đây không phải bạn thực hiện, hãy liên hệ đội ngũ hỗ trợ ngay.
