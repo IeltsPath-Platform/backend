@@ -21,4 +21,9 @@ public class AdvisoryUserLock implements UserLock {
     public void lock(UUID userId) {
         jdbc.query("SELECT pg_advisory_xact_lock(?)", (r, n) -> 0, key(userId));
     }
+
+    @Override
+    public void lockCreationKey(String key) {
+        jdbc.query("SELECT pg_advisory_xact_lock(121315, hashtext(?))", (r, n) -> 0, key);
+    }
 }

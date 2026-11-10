@@ -4,6 +4,8 @@ import com.ieltspath.user.infrastructure.persistence.entity.UserJpaEntity;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -22,6 +24,10 @@ public interface UserJpaRepository extends JpaRepository<UserJpaEntity, UUID> {
     boolean existsByEmail(String email);
     boolean existsByPhoneNumber(String phoneNumber);
     boolean existsByPhoneNumberAndIdNot(String phoneNumber, UUID id);
+
+    @Modifying
+    @Query("update UserJpaEntity user set user.passwordHash = null where user.id = :userId")
+    int clearPasswordHash(@Param("userId") UUID userId);
 
     @Query(value = """
             SELECT u.id

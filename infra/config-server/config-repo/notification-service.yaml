@@ -23,6 +23,20 @@ spring:
     publisher-returns: true
     template:
       mandatory: true
+  mail:
+    host: ${SMTP_HOST:}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${SMTP_AUTH:false}
+          starttls:
+            enable: ${SMTP_STARTTLS:false}
+          connectiontimeout: 3000
+          timeout: 5000
+          writetimeout: 5000
 
 app:
   auth:
@@ -37,6 +51,10 @@ app:
           - /actuator/info
 
 notification:
+  mail:
+    enabled: ${NOTIFICATION_MAIL_ENABLED:false}
+    from: ${MAIL_FROM:}
+    frontend-base-url: ${FRONTEND_BASE_URL:}
   push:
     enqueue-enabled: ${NOTIFICATION_PUSH_ENQUEUE_ENABLED:false}
     worker-enabled: ${NOTIFICATION_PUSH_WORKER_ENABLED:false}

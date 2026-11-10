@@ -19,6 +19,15 @@ spring:
     locations: classpath:db/migration,classpath:db/callback
     placeholders:
       demoData: ${DEMO_DATA_ENABLED:false}
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
   servlet:
     multipart:
       max-file-size: 2MB
@@ -34,6 +43,8 @@ app:
     avatar:
       bucket: ${USER_AVATAR_BUCKET:avatars}
   auth:
+    google:
+      client-ids: ${GOOGLE_CLIENT_IDS:}
     external-jwt-issuer: ${EXTERNAL_JWT_ISSUER:urn:code-base:auth}
     external-jwt-secret: ${EXTERNAL_JWT_SECRET:FaU24nQz6jxA6m3ihV49zlGXoncSfkNMgYpgC7XPKXc=}
     internal-jwt-issuer: ${INTERNAL_JWT_ISSUER:urn:code-base:api-gateway}
@@ -58,6 +69,7 @@ app:
           - /auth/logout
           - /auth/forgot-password
           - /auth/reset-password
+          - /auth/google
           - /api/users/register
       - method: GET
         patterns:

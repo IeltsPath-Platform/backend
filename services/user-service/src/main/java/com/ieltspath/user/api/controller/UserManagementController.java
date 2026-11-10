@@ -192,7 +192,8 @@ public class UserManagementController {
                 user.getStatus().name(),
                 toRoleResponses(user.getRoles()),
                 user.getCreatedAt(),
-                user.getUpdatedAt()
+                user.getUpdatedAt(),
+                user.getPasswordHash() != null
         );
     }
 
