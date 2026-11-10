@@ -30,6 +30,10 @@ class SentenceWordsTest {
         assertEquals(List.of("one", "two"), SentenceWords.normalized("one — two"));
         assertEquals(List.of("700"), SentenceWords.normalized("7:00."));
         assertTrue(SentenceWords.normalized("  ...  ").isEmpty());
+    }
+
+    @Test
+    void nullInputReturnsAnEmptyList() {
         assertTrue(SentenceWords.normalized(null).isEmpty());
     }
 }

@@ -4,6 +4,7 @@ import com.ieltspath.events.assessment.GradingCompletedV1;
 import com.ieltspath.notification.domain.repository.NotificationRepository;
 import com.ieltspath.notification.domain.vo.Notification;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
@@ -17,9 +18,16 @@ import java.util.Optional;
 @Service
 public class RecordGradingCompletedUseCase {
     private final NotificationRepository notifications;
+    private final EnqueueNotificationPushUseCase enqueuePush;
+
+    @Autowired
+    public RecordGradingCompletedUseCase(NotificationRepository notifications, EnqueueNotificationPushUseCase enqueuePush) {
+        this.notifications = notifications;
+        this.enqueuePush = enqueuePush;
+    }
 
     public RecordGradingCompletedUseCase(NotificationRepository notifications) {
-        this.notifications = notifications;
+        this(notifications, EnqueueNotificationPushUseCase.disabled());
     }
 
     /**
@@ -37,6 +45,8 @@ public class RecordGradingCompletedUseCase {
         }
         var notification = new Notification(event.eventId(), event.learnerId(), event.learnerId(), event.eventType(),
                 null, null, event.gradingJobId(), event.occurredAt(), null);
-        return notifications.insertIfAbsent(event.eventId(), notification) ? Optional.of(notification) : Optional.empty();
+        if (!notifications.insertIfAbsent(event.eventId(), notification)) return Optional.empty();
+        enqueuePush.execute(notification);
+        return Optional.of(notification);
     }
 }

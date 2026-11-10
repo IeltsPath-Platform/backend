@@ -1,5 +1,7 @@
 package com.ieltspath.game.application.usecase;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -76,5 +78,13 @@ class StartRocketMatchUseCaseTest {
         assertSame(expected, start.execute(room.id(), host));
         verify(rocket).execute(room, host);
         assertEquals(Set.of("ROCKET"), Set.of(room.gameType()));
+    }
+
+    @Test
+    void aFilteredBankSmallerThanTheQuestionCountIsRefused() {
+        var smallBank = bank.subList(0, 4);
+        var error = assertThrows(com.ieltspath.game.domain.exception.NotEnoughWordsException.class,
+                () -> StartRocketMatchUseCase.prepareRounds(UUID.randomUUID(), RocketRoomSettings.solo(10), smallBank));
+        assertEquals(4, error.available());
     }
 }

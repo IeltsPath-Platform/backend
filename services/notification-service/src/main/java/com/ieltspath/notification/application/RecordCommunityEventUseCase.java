@@ -7,6 +7,7 @@ import com.ieltspath.events.community.CommunityEventTypes;
 import com.ieltspath.notification.domain.repository.NotificationRepository;
 import com.ieltspath.notification.domain.vo.Notification;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
@@ -20,10 +21,18 @@ import java.util.UUID;
 public class RecordCommunityEventUseCase {
     private final NotificationRepository notifications;
     private final NotificationPreferenceService preferences;
+    private final EnqueueNotificationPushUseCase enqueuePush;
 
-    public RecordCommunityEventUseCase(NotificationRepository notifications, NotificationPreferenceService preferences) {
+    @Autowired
+    public RecordCommunityEventUseCase(NotificationRepository notifications, NotificationPreferenceService preferences,
+                                       EnqueueNotificationPushUseCase enqueuePush) {
         this.notifications = notifications;
         this.preferences = preferences;
+        this.enqueuePush = enqueuePush;
+    }
+
+    public RecordCommunityEventUseCase(NotificationRepository notifications, NotificationPreferenceService preferences) {
+        this(notifications, preferences, EnqueueNotificationPushUseCase.disabled());
     }
 
 
@@ -46,6 +55,8 @@ public class RecordCommunityEventUseCase {
         if (!preferences.isEnabled(event.recipientId(), type)) return Optional.empty();
         var notification = new Notification(event.eventId(), event.actorId(), event.recipientId(), type, event.postId(),
                 event.commentId(), null, event.occurredAt(), null);
-        return notifications.insertIfAbsent(event.eventId(), notification) ? Optional.of(notification) : Optional.empty();
+        if (!notifications.insertIfAbsent(event.eventId(), notification)) return Optional.empty();
+        enqueuePush.execute(notification);
+        return Optional.of(notification);
     }
 }

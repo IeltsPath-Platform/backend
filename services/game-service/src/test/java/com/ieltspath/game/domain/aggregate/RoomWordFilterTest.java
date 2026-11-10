@@ -1,5 +1,9 @@
 package com.ieltspath.game.domain.aggregate;
 
+import com.ieltspath.game.domain.vo.WordlyRoomSettings;
+import com.ieltspath.game.domain.exception.InvalidGameRoomStateException;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.ieltspath.game.domain.exception.GameRoomForbiddenException;
@@ -56,5 +60,15 @@ class RoomWordFilterTest {
     @Test
     void rejectsAnUnknownLevel() {
         assertThrows(IllegalArgumentException.class, () -> new WordFilter("D1", null));
+    }
+
+    @Test
+    void aWordlyRoomCannotUseRocketSettings() {
+        var wordlyHost = UUID.randomUUID();
+        var room = GameRoom.open(UUID.randomUUID(), "ABC123", wordlyHost,
+                new WordlyRoomSettings(WordlyRoomSettings.PlayerMode.MULTIPLAYER, 4, WordlyRoomSettings.PlayMode.FINITE, 10), now);
+        var error = assertThrows(InvalidGameRoomStateException.class,
+                () -> room.updateRocketSettings(wordlyHost, 4, null, null, b1, now));
+        assertEquals("Room is not a Rocket room", error.getMessage());
     }
 }
