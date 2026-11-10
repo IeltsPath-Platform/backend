@@ -1,5 +1,7 @@
 package com.ieltspath.user.application.usecase;
 
+import com.ieltspath.events.user.PasswordChangedV1;
+import com.ieltspath.events.user.UserEmailVerificationStateV1;
 import com.ieltspath.user.application.command.ResetPasswordCommand;
 import com.ieltspath.user.domain.aggregate.AccountActionToken;
 import com.ieltspath.user.domain.aggregate.User;
@@ -17,6 +19,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.util.UUID;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -27,6 +32,7 @@ public class ResetPasswordUseCase {
     private final PasswordEncoder passwordEncoder;
     private final UserLock userLock;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final UserNoticeOutbox notices;
 
     @Transactional
     public void execute(ResetPasswordCommand command) {
@@ -57,10 +63,21 @@ public class ResetPasswordUseCase {
             throw new InvalidActionTokenException("Mã token đã hết hạn hoặc đã được sử dụng");
         }
 
+        boolean wasVerified = user.isEmailVerified();
+        user.markEmailVerified(java.time.LocalDateTime.now());
+        if (!wasVerified) {
+            UUID stateId = UUID.randomUUID();
+            notices.enqueue(stateId, user.getId(), UserEmailVerificationStateV1.EVENT_TYPE, new UserEmailVerificationStateV1(
+                    stateId, UserEmailVerificationStateV1.EVENT_TYPE, Instant.now(), user.getId(), true,
+                    user.getEmail().value(), user.getFullName()));
+        }
         user.changePassword(passwordEncoder.encode(command.newPassword()));
         userRepository.save(user);
         refreshTokenRepository.revokeAllActiveForUser(user.getId(), java.time.LocalDateTime.now());
 
+        UUID eventId = UUID.randomUUID();
+        notices.enqueue(eventId, user.getId(), PasswordChangedV1.EVENT_TYPE, new PasswordChangedV1(eventId,
+                PasswordChangedV1.EVENT_TYPE, Instant.now(), user.getId(), user.getEmail().value(), user.getFullName()));
         log.info("Đặt lại mật khẩu thành công cho userId={}", user.getId());
     }
 }

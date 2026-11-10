@@ -47,6 +47,7 @@ class LinkGoogleAccountUseCaseTest {
     @Mock RefreshTokenRepository refreshTokens;
     @Mock UserLock userLock;
     @Mock AuthTokenIssuer tokenIssuer;
+    @Mock UserNoticeOutbox notices;
 
     private LinkGoogleAccountUseCase useCase;
     private final UUID userId = UUID.randomUUID();
@@ -55,7 +56,7 @@ class LinkGoogleAccountUseCaseTest {
 
     @BeforeEach
     void setUp() {
-        useCase = new LinkGoogleAccountUseCase(users, identities, roles, refreshTokens, userLock, tokenIssuer);
+        useCase = new LinkGoogleAccountUseCase(users, identities, roles, refreshTokens, userLock, tokenIssuer, notices);
         lenient().when(users.findById(userId)).thenReturn(Optional.of(customerWithPassword));
         lenient().when(tokenIssuer.issue(any(User.class))).thenReturn(tokens);
         lenient().when(identities.save(any(OAuthIdentity.class))).thenAnswer(call -> call.getArgument(0));
@@ -162,6 +163,7 @@ class LinkGoogleAccountUseCaseTest {
                 .map(name -> Role.builder().id(UUID.randomUUID()).name(name).build())
                 .collect(java.util.stream.Collectors.toSet());
         return User.builder().id(id).email(new Email("learner@gmail.com")).passwordHash(passwordHash)
+                .emailVerifiedAt(java.time.LocalDateTime.now())
                 .fullName("Learner").status(status).roles(userRoles).build();
     }
 }

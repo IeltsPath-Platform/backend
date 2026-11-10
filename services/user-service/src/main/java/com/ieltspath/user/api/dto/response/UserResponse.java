@@ -13,6 +13,7 @@ public record UserResponse(
         Set<RoleResponse> roles,
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
-        boolean hasPassword
+        boolean hasPassword,
+        boolean emailVerified
 ) {
 }

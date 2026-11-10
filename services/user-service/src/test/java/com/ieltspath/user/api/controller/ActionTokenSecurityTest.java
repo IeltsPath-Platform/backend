@@ -13,6 +13,7 @@ import com.ieltspath.user.application.usecase.GetUserByIdUseCase;
 import com.ieltspath.user.application.usecase.AuditedLoginUseCase;
 import com.ieltspath.user.application.usecase.LogoutUseCase;
 import com.ieltspath.user.application.usecase.RefreshTokenUseCase;
+import com.ieltspath.user.application.usecase.EmailVerificationUseCase;
 import com.ieltspath.user.application.usecase.ResetPasswordUseCase;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -67,6 +68,8 @@ class ActionTokenSecurityTest {
     private ForgotPasswordUseCase forgotPasswordUseCase;
     @MockBean
     private ResetPasswordUseCase resetPasswordUseCase;
+    @MockBean
+    private EmailVerificationUseCase emailVerificationUseCase;
     @MockBean
     private GetUserByIdUseCase getUserByIdUseCase;
     @MockBean

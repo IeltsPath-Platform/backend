@@ -3,6 +3,7 @@ package com.ieltspath.user.api.exception;
 import com.ieltspath.user.domain.exception.AuthenticationFailedException;
 import com.ieltspath.user.domain.exception.ConflictException;
 import com.ieltspath.user.domain.exception.EmailAlreadyExistsException;
+import com.ieltspath.user.domain.exception.EmailNotVerifiedException;
 import com.ieltspath.user.domain.exception.InvalidActionTokenException;
 import com.ieltspath.user.domain.exception.InvalidDataException;
 import com.ieltspath.user.domain.exception.InvalidUserStatusException;
@@ -145,6 +146,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .body(errorBody(HttpStatus.SERVICE_UNAVAILABLE, "Đăng nhập Google tạm thời không khả dụng",
                         request, null, "GOOGLE_SIGNIN_UNAVAILABLE"));
+    }
+
+    @ExceptionHandler(EmailNotVerifiedException.class)
+    ResponseEntity<ErrorResponse> handleEmailNotVerified(EmailNotVerifiedException exception, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(errorBody(HttpStatus.FORBIDDEN, exception.getMessage(), request, null, "EMAIL_NOT_VERIFIED"));
     }
 
     @ExceptionHandler(LoginRateLimitedException.class)

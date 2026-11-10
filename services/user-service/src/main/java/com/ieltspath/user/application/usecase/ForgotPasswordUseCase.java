@@ -63,7 +63,8 @@ public class ForgotPasswordUseCase {
         String rawToken = UUID.randomUUID().toString();
         Instant expiresAt = Instant.now().plusSeconds(TOKEN_LIFETIME_MINUTES * 60L);
         accountActionTokenRepository.save(AccountActionToken.builder()
-                .id(UUID.randomUUID()).userId(user.getId()).purpose(ActionTokenPurpose.PASSWORD_RESET)
+                // No id here: the entity generates it, and a preset id makes JPA merge instead of insert.
+                .userId(user.getId()).purpose(ActionTokenPurpose.PASSWORD_RESET)
                 .tokenHash(tokenHashService.hash(rawToken))
                 .expiresAt(LocalDateTime.ofInstant(expiresAt, ZoneOffset.UTC)).createdAt(now).build());
 

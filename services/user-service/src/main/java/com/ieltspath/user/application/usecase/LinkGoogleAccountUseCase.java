@@ -1,5 +1,6 @@
 package com.ieltspath.user.application.usecase;
 
+import com.ieltspath.events.user.GoogleAccountLinkedV1;
 import com.ieltspath.user.application.exception.GoogleAccountConflictException;
 import com.ieltspath.user.application.exception.GoogleAccountNotActiveException;
 import com.ieltspath.user.application.exception.GoogleEmailNotSupportedException;
@@ -10,6 +11,7 @@ import com.ieltspath.user.application.result.GoogleIdentity;
 import com.ieltspath.user.application.result.GoogleSignInResult;
 import com.ieltspath.user.domain.aggregate.OAuthIdentity;
 import com.ieltspath.user.domain.aggregate.User;
+import com.ieltspath.user.domain.exception.EmailNotVerifiedException;
 import com.ieltspath.user.domain.exception.RoleNotFoundException;
 import com.ieltspath.user.domain.exception.UserNotFoundException;
 import com.ieltspath.user.domain.repository.OAuthIdentityRepository;
@@ -26,6 +28,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
@@ -40,6 +43,7 @@ public class LinkGoogleAccountUseCase {
     private final RefreshTokenRepository refreshTokenRepository;
     private final UserLock userLock;
     private final AuthTokenIssuer authTokenIssuer;
+    private final UserNoticeOutbox notices;
 
     @Transactional
     public GoogleSignInResult execute(GoogleIdentity google) {
@@ -66,6 +70,8 @@ public class LinkGoogleAccountUseCase {
                 user = createGoogleUser(google, email);
             } else {
                 user = lockAndReload(user.getId());
+                // Linking a social login to an existing account needs the owner to prove the address first.
+                if (!user.isEmailVerified()) throw new EmailNotVerifiedException();
                 identity = oauthIdentityRepository.findByUserIdAndProvider(user.getId(), OAuthProvider.GOOGLE)
                         .orElse(null);
                 if (identity != null && !identity.getProviderSubject().equals(google.subject())) {
@@ -80,6 +86,9 @@ public class LinkGoogleAccountUseCase {
             userRepository.clearPasswordHash(user.getId());
             user.clearPassword();
             refreshTokenRepository.revokeAllActiveForUser(user.getId(), now);
+            UUID noticeId = UUID.randomUUID();
+            notices.enqueue(noticeId, user.getId(), GoogleAccountLinkedV1.EVENT_TYPE, new GoogleAccountLinkedV1(noticeId,
+                    GoogleAccountLinkedV1.EVENT_TYPE, Instant.now(), user.getId(), email, user.getFullName()));
         }
         if (identity == null) {
             identity = OAuthIdentity.builder()
@@ -108,6 +117,7 @@ public class LinkGoogleAccountUseCase {
                 .phoneNumber(PhoneNumber.parse(null))
                 .status(UserStatus.ACTIVE)
                 .roles(new HashSet<>(roles))
+                .emailVerifiedAt(LocalDateTime.now())
                 .build();
         User saved = userRepository.save(user);
         return lockAndReload(saved.getId());

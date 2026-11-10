@@ -193,7 +193,8 @@ public class UserManagementController {
                 toRoleResponses(user.getRoles()),
                 user.getCreatedAt(),
                 user.getUpdatedAt(),
-                user.getPasswordHash() != null
+                user.getPasswordHash() != null,
+                user.isEmailVerified()
         );
     }
 

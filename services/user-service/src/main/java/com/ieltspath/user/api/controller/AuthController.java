@@ -6,7 +6,9 @@ import com.ieltspath.user.api.dto.request.GoogleLoginRequest;
 import com.ieltspath.user.api.dto.request.LoginRequest;
 import com.ieltspath.user.api.dto.request.LogoutRequest;
 import com.ieltspath.user.api.dto.request.RefreshRequest;
+import com.ieltspath.user.api.dto.request.ResendVerificationRequest;
 import com.ieltspath.user.api.dto.request.ResetPasswordRequest;
+import com.ieltspath.user.api.dto.request.VerifyEmailRequest;
 import com.ieltspath.user.api.dto.response.AuthTokenResponse;
 import com.ieltspath.user.api.dto.response.CurrentUserResponse;
 import com.ieltspath.user.api.dto.response.MessageResponse;
@@ -21,6 +23,7 @@ import com.ieltspath.user.application.usecase.GetUserByIdUseCase;
 import com.ieltspath.user.application.usecase.AuditedLoginUseCase;
 import com.ieltspath.user.application.usecase.LogoutUseCase;
 import com.ieltspath.user.application.usecase.RefreshTokenUseCase;
+import com.ieltspath.user.application.usecase.EmailVerificationUseCase;
 import com.ieltspath.user.application.usecase.ResetPasswordUseCase;
 import com.ieltspath.user.api.cookie.AuthCookieService;
 import com.ieltspath.user.api.request.LoginContextResolver;
@@ -48,6 +51,7 @@ public class AuthController {
     private final LogoutUseCase logoutUseCase;
     private final ForgotPasswordUseCase forgotPasswordUseCase;
     private final ResetPasswordUseCase resetPasswordUseCase;
+    private final EmailVerificationUseCase emailVerificationUseCase;
     private final GetUserByIdUseCase getUserByIdUseCase;
     private final CurrentUserProvider currentUserProvider;
     private final AuthCookieService authCookieService;
@@ -62,6 +66,18 @@ public class AuthController {
     public MessageResponse resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         resetPasswordUseCase.execute(new ResetPasswordCommand(request.token(), request.newPassword()));
         return new MessageResponse("Đặt lại mật khẩu thành công");
+    }
+
+    @PostMapping("/verify-email")
+    public MessageResponse verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
+        emailVerificationUseCase.verify(request.token());
+        return new MessageResponse("Xác minh email thành công");
+    }
+
+    @PostMapping("/resend-verification")
+    public MessageResponse resendVerification(@RequestBody ResendVerificationRequest request) {
+        emailVerificationUseCase.resend(request.email());
+        return new MessageResponse("Nếu email chưa được xác minh, liên kết xác minh mới sẽ được gửi.");
     }
 
     @PostMapping("/login")

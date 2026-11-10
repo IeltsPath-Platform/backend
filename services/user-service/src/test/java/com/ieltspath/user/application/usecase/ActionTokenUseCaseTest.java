@@ -43,6 +43,7 @@ class ActionTokenUseCaseTest {
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private UserLock userLock;
     @Mock private RefreshTokenRepository refreshTokenRepository;
+    @Mock private UserNoticeOutbox notices;
 
     private ForgotPasswordUseCase forgotPasswordUseCase;
     private ResetPasswordUseCase resetPasswordUseCase;
@@ -54,7 +55,7 @@ class ActionTokenUseCaseTest {
         forgotPasswordUseCase = new ForgotPasswordUseCase(userRepository, accountActionTokenRepository,
                 outboxEventRepository, tokenHashService, userLock, new ObjectMapper().findAndRegisterModules());
         resetPasswordUseCase = new ResetPasswordUseCase(userRepository, accountActionTokenRepository, tokenHashService,
-                passwordEncoder, userLock, refreshTokenRepository);
+                passwordEncoder, userLock, refreshTokenRepository, notices);
         getActionTokensByUserIdUseCase = new GetActionTokensByUserIdUseCase(accountActionTokenRepository);
         revokeUserActionTokensUseCase = new RevokeUserActionTokensUseCase(accountActionTokenRepository);
     }
@@ -106,7 +107,7 @@ class ActionTokenUseCaseTest {
     @Test
     void resetPasswordUpdatesPasswordAndUsesToken() {
         UUID userId = UUID.randomUUID();
-        User user = User.builder().id(userId).passwordHash("old-hash").status(UserStatus.ACTIVE).build();
+        User user = User.builder().id(userId).email(new Email("test@example.com")).passwordHash("old-hash").status(UserStatus.ACTIVE).build();
         AccountActionToken token = AccountActionToken.builder().id(UUID.randomUUID()).userId(userId)
                 .purpose(ActionTokenPurpose.PASSWORD_RESET).tokenHash("token-hash")
                 .expiresAt(LocalDateTime.now().plusMinutes(10)).build();
