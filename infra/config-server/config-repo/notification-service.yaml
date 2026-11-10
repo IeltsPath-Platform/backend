@@ -52,6 +52,10 @@ app:
           - /mail/unsubscribe
 
 notification:
+  retention:
+    cleanup-interval: ${NOTIFICATION_RETENTION_CLEANUP_INTERVAL:PT6H}
+    initial-delay: ${NOTIFICATION_RETENTION_INITIAL_DELAY:PT2M}
+    batch-size: ${NOTIFICATION_RETENTION_BATCH_SIZE:500}
   mail:
     enabled: ${NOTIFICATION_MAIL_ENABLED:false}
     from: ${MAIL_FROM:}

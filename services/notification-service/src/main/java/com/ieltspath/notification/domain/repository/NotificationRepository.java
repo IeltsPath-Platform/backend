@@ -18,4 +18,10 @@ public interface NotificationRepository {
     boolean markRead(UUID id, UUID recipientId, Instant readAt);
 
     int markAllRead(UUID recipientId, Instant readAt);
+
+    boolean deleteByRecipient(UUID id, UUID recipientId);
+
+    int deleteReadByRecipient(UUID recipientId);
+
+    int deleteExpiredBatch(Instant readBefore, Instant unreadBefore, int batchSize);
 }

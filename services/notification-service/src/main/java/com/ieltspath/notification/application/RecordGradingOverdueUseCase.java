@@ -18,11 +18,18 @@ import java.util.Optional;
 public class RecordGradingOverdueUseCase {
     private final NotificationRepository notifications;
     private final EnqueueNotificationPushUseCase enqueuePush;
+    private final NotificationPreferenceService preferences;
 
     @Autowired
-    public RecordGradingOverdueUseCase(NotificationRepository notifications, EnqueueNotificationPushUseCase enqueuePush) {
+    public RecordGradingOverdueUseCase(NotificationRepository notifications, EnqueueNotificationPushUseCase enqueuePush,
+                                       NotificationPreferenceService preferences) {
         this.notifications = notifications;
         this.enqueuePush = enqueuePush;
+        this.preferences = preferences;
+    }
+
+    public RecordGradingOverdueUseCase(NotificationRepository notifications, EnqueueNotificationPushUseCase enqueuePush) {
+        this(notifications, enqueuePush, null);
     }
 
     public RecordGradingOverdueUseCase(NotificationRepository notifications) {
@@ -43,6 +50,7 @@ public class RecordGradingOverdueUseCase {
                 || !event.eventId().toString().equals(messageId)) {
             throw new IllegalArgumentException("Unsupported grading overdue event");
         }
+        if (preferences != null && !preferences.isEnabled(event.learnerId(), event.eventType())) return Optional.empty();
         var notification = new Notification(event.eventId(), event.examinerId(), event.learnerId(), event.eventType(),
                 null, null, event.gradingJobId(), event.occurredAt(), null);
         if (!notifications.insertIfAbsent(event.eventId(), notification)) return Optional.empty();

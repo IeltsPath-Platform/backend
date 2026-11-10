@@ -19,11 +19,18 @@ import java.util.Optional;
 public class RecordGradingRequestedUseCase {
     private final NotificationRepository notifications;
     private final EnqueueNotificationPushUseCase enqueuePush;
+    private final NotificationPreferenceService preferences;
 
     @Autowired
-    public RecordGradingRequestedUseCase(NotificationRepository notifications, EnqueueNotificationPushUseCase enqueuePush) {
+    public RecordGradingRequestedUseCase(NotificationRepository notifications, EnqueueNotificationPushUseCase enqueuePush,
+                                         NotificationPreferenceService preferences) {
         this.notifications = notifications;
         this.enqueuePush = enqueuePush;
+        this.preferences = preferences;
+    }
+
+    public RecordGradingRequestedUseCase(NotificationRepository notifications, EnqueueNotificationPushUseCase enqueuePush) {
+        this(notifications, enqueuePush, null);
     }
 
     public RecordGradingRequestedUseCase(NotificationRepository notifications) {
@@ -43,6 +50,7 @@ public class RecordGradingRequestedUseCase {
                 || !event.eventType().equals(routingKey) || !event.eventId().toString().equals(messageId)) {
             throw new IllegalArgumentException("Unsupported grading requested event");
         }
+        if (preferences != null && !preferences.isEnabled(event.examinerId(), event.eventType())) return Optional.empty();
         var notification = new Notification(event.eventId(), event.examinerId(), event.examinerId(), event.eventType(),
                 null, null, event.gradingJobId(), event.occurredAt(), null);
         if (!notifications.insertIfAbsent(event.eventId(), notification)) return Optional.empty();

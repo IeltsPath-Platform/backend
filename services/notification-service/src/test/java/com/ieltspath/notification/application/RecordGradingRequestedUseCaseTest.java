@@ -21,6 +21,7 @@ import static org.mockito.Mockito.when;
 
 class RecordGradingRequestedUseCaseTest {
     private final NotificationRepository notifications = mock(NotificationRepository.class);
+    private final NotificationPreferenceService preferences = mock(NotificationPreferenceService.class);
     private final RecordGradingRequestedUseCase useCase = new RecordGradingRequestedUseCase(notifications);
     private final GradingRequestedV1 event = new GradingRequestedV1(UUID.randomUUID(), GradingRequestedV1.EVENT_TYPE,
             Instant.parse("2026-10-23T21:10:00Z"), UUID.randomUUID(), UUID.randomUUID(), "WRITING",
@@ -49,6 +50,17 @@ class RecordGradingRequestedUseCaseTest {
         when(notifications.insertIfAbsent(any(), any())).thenReturn(false);
 
         assertTrue(useCase.execute(event, GradingRequestedV1.EVENT_TYPE, event.eventId().toString()).isEmpty());
+    }
+
+    @Test
+    void aDisabledExaminerPreferenceSkipsTheNotice() {
+        var preferenceAware = new RecordGradingRequestedUseCase(notifications,
+                EnqueueNotificationPushUseCase.disabled(), preferences);
+        when(preferences.isEnabled(event.examinerId(), event.eventType())).thenReturn(false);
+
+        assertTrue(preferenceAware.execute(event, GradingRequestedV1.EVENT_TYPE, event.eventId().toString()).isEmpty());
+        verify(preferences).isEnabled(event.examinerId(), event.eventType());
+        verifyNoInteractions(notifications);
     }
 
     @Test
