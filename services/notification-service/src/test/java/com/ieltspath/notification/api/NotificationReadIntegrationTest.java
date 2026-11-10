@@ -56,6 +56,18 @@ class NotificationReadIntegrationTest {
     @BeforeEach
     void cleanUp() {
         jdbc.execute("DELETE FROM notifications");
+        jdbc.execute("DELETE FROM notification_preferences");
+    }
+
+    @Test
+    void migrationAllowsPreferencesForEveryCurrentlyStoredNotificationType() {
+        UUID recipient = UUID.randomUUID();
+        NotificationPreferenceService preferences = new NotificationPreferenceService(new NotificationPreferenceRepositoryAdapter(jdbc));
+        for (String eventType : com.ieltspath.notification.application.NotificationEventTypes.ORDERED) {
+            preferences.update(recipient, eventType, false);
+        }
+        org.junit.jupiter.api.Assertions.assertEquals(com.ieltspath.notification.application.NotificationEventTypes.ORDERED.size(),
+                preferences.list(recipient).size());
     }
 
     private MockMvc createMockMvc(UUID callerId) {
