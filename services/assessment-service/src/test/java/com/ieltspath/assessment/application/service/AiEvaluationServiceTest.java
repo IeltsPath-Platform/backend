@@ -3,6 +3,7 @@ package com.ieltspath.assessment.application.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.assessment.application.port.ActiveRubricProvider;
 import com.ieltspath.assessment.application.port.EssayGradingPort;
+import com.ieltspath.assessment.infrastructure.client.ConfiguredEvaluationRunSettings;
 import com.ieltspath.assessment.infrastructure.config.AssessmentLlmProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -21,7 +22,7 @@ class AiEvaluationServiceTest {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
         when(jdbc.update(anyString(), any(Object[].class))).thenReturn(0);
         AiEvaluationService service = new AiEvaluationService(jdbc, mock(EssayGradingPort.class),
-                mock(ActiveRubricProvider.class), new AssessmentLlmProperties(), new ObjectMapper(),
+                mock(ActiveRubricProvider.class), new ConfiguredEvaluationRunSettings(new AssessmentLlmProperties()), new ObjectMapper(),
                 100, new java.math.BigDecimal("0.80"), new java.math.BigDecimal("0.60"), "Asia/Ho_Chi_Minh", new BigDecimal("0.05"), 20);
 
         ResponseStatusException error = assertThrows(ResponseStatusException.class,
@@ -35,7 +36,7 @@ class AiEvaluationServiceTest {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
         when(jdbc.update(anyString(), any(Object[].class))).thenReturn(1);
         AiEvaluationService service = new AiEvaluationService(jdbc, mock(EssayGradingPort.class),
-                mock(ActiveRubricProvider.class), new AssessmentLlmProperties(), new ObjectMapper(),
+                mock(ActiveRubricProvider.class), new ConfiguredEvaluationRunSettings(new AssessmentLlmProperties()), new ObjectMapper(),
                 100, new BigDecimal("0.80"), new BigDecimal("0.60"), "Asia/Ho_Chi_Minh", new BigDecimal("0.05"), 20);
 
         UUID runId = UUID.randomUUID();
@@ -55,7 +56,7 @@ class AiEvaluationServiceTest {
         when(grader.grade(any(), eq("essay two"))).thenReturn(new EssayGradingPort.EssayGrade(
                 new BigDecimal("6.5"), criterionTwo, "rubric@1+tplv1", List.of()));
         AiEvaluationService service = new AiEvaluationService(jdbc, grader, mock(ActiveRubricProvider.class),
-                new AssessmentLlmProperties(), new ObjectMapper(), 100, new BigDecimal("0.80"),
+                new ConfiguredEvaluationRunSettings(new AssessmentLlmProperties()), new ObjectMapper(), 100, new BigDecimal("0.80"),
                 new BigDecimal("0.60"), "Asia/Ho_Chi_Minh", new BigDecimal("0.05"), 20);
         List<AiEvaluationService.GoldEssay> gold = List.of(
                 new AiEvaluationService.GoldEssay(UUID.randomUUID(), "TASK_2", "prompt", null, "essay one",

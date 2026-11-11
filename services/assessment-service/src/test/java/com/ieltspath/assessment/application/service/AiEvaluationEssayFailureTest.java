@@ -5,6 +5,7 @@ import com.ieltspath.assessment.application.exception.EssayGradingException;
 import com.ieltspath.assessment.application.port.ActiveRubricProvider;
 import com.ieltspath.assessment.application.port.EssayGradingPort;
 import com.ieltspath.assessment.domain.service.ExaminerErrorRecall;
+import com.ieltspath.assessment.infrastructure.client.ConfiguredEvaluationRunSettings;
 import com.ieltspath.assessment.infrastructure.config.AssessmentLlmProperties;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -107,7 +108,7 @@ class AiEvaluationEssayFailureTest {
     }
 
     private static AiEvaluationService service(JdbcTemplate jdbc, EssayGradingPort grader, int gradingTimeoutSeconds) {
-        return new AiEvaluationService(jdbc, grader, mock(ActiveRubricProvider.class), new AssessmentLlmProperties(),
+        return new AiEvaluationService(jdbc, grader, mock(ActiveRubricProvider.class), new ConfiguredEvaluationRunSettings(new AssessmentLlmProperties()),
                 new ObjectMapper(), 100, new BigDecimal("0.80"), new BigDecimal("0.60"), "Asia/Ho_Chi_Minh",
                 new BigDecimal("0.05"), gradingTimeoutSeconds);
     }

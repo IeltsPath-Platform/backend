@@ -7,8 +7,7 @@ import com.ieltspath.assessment.application.port.EssayGradingPort;
 import com.ieltspath.assessment.application.port.ActiveRubricProvider;
 import com.ieltspath.assessment.domain.service.AgreementMetrics;
 import com.ieltspath.assessment.domain.service.ExaminerErrorRecall;
-import com.ieltspath.assessment.infrastructure.config.AssessmentLlmProperties;
-import com.ieltspath.assessment.infrastructure.client.RubricPromptBuilder;
+import com.ieltspath.assessment.application.port.EvaluationRunSettings;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -36,7 +35,7 @@ public class AiEvaluationService {
     private final JdbcTemplate jdbc;
     private final EssayGradingPort grader;
     private final ActiveRubricProvider rubrics;
-    private final AssessmentLlmProperties llm;
+    private final EvaluationRunSettings settings;
     private final ObjectMapper json;
     private final int dailyLimit;
     private final BigDecimal minWithin;
@@ -46,7 +45,7 @@ public class AiEvaluationService {
     private final ZoneId quotaZone;
 
     public AiEvaluationService(JdbcTemplate jdbc, EssayGradingPort grader, ActiveRubricProvider rubrics,
-            AssessmentLlmProperties llm, ObjectMapper json,
+            EvaluationRunSettings settings, ObjectMapper json,
             @Value("${assessment.ai-eval.daily-limit:100}") int dailyLimit,
             @Value("${assessment.ai-eval.min-within-half-band:0.80}") BigDecimal minWithin,
             @Value("${assessment.ai-eval.min-qwk:0.60}") BigDecimal minQwk,
@@ -54,7 +53,7 @@ public class AiEvaluationService {
             @Value("${assessment.ai-eval.max-invalid-rate:0.05}") BigDecimal maxInvalidRate,
             @Value("${assessment.ai-eval.grading-timeout-seconds:20}") int gradingTimeoutSeconds) {
         this.gradingTimeoutSeconds = gradingTimeoutSeconds;
-        this.jdbc = jdbc; this.grader = grader; this.rubrics = rubrics; this.llm = llm; this.json = json;
+        this.jdbc = jdbc; this.grader = grader; this.rubrics = rubrics; this.settings = settings; this.json = json;
         this.dailyLimit = dailyLimit; this.minWithin = minWithin; this.minQwk = minQwk;
         this.maxInvalidRate = maxInvalidRate;
         this.quotaZone = ZoneId.of(quotaTimezone);
@@ -116,8 +115,8 @@ public class AiEvaluationService {
     @Transactional
     public UUID start(String requestedTask, String templateVersion) {
         String template = templateVersion == null || templateVersion.isBlank()
-                ? RubricPromptBuilder.TEMPLATE_VERSION : templateVersion;
-        if (!RubricPromptBuilder.isKnownTemplate(template)) throw new IllegalArgumentException("UNKNOWN_TEMPLATE_VERSION");
+                ? settings.defaultTemplateVersion() : templateVersion;
+        if (!settings.isKnownTemplate(template)) throw new IllegalArgumentException("UNKNOWN_TEMPLATE_VERSION");
         if (!grader.available()) throw new IllegalStateException("LLM_UNAVAILABLE");
         String task = requestedTask;
         if (task == null || task.isBlank()) task = jdbc.queryForObject(
@@ -125,7 +124,7 @@ public class AiEvaluationService {
         if (task == null) throw new IllegalStateException("GOLD_SET_EMPTY");
         String finalTask = task;
         ActiveRubricProvider.Rubric activeRubric = rubrics.getActive(finalTask);
-        String expectedPromptVersion = RubricPromptBuilder.promptVersion(activeRubric, template);
+        String expectedPromptVersion = settings.promptVersion(activeRubric, template);
         List<GoldEssay> gold = jdbc.query("""
                 SELECT id,task,prompt,chart_facts,essay,examiner_band,examiner_error_codes,
                        examiner_criteria::text AS criteria,examiner_errors::text AS examiner_errors
@@ -138,11 +137,11 @@ public class AiEvaluationService {
                 gold.size(), usageDate, gold.size(), dailyLimit);
         if (charged != 1) throw new IllegalStateException("AI_EVAL_DAILY_LIMIT");
         UUID id = UUID.randomUUID();
-        String reasoningEffort = llm.getReasoningEffort() == null || llm.getReasoningEffort().isBlank() ? null : llm.getReasoningEffort();
+        String reasoningEffort = settings.reasoningEffort();
         jdbc.update("""
                 INSERT INTO ai_eval_runs(id,task,model,prompt_version,status,n,started_at,reasoning_effort)
                 VALUES(?,?,?,?,'RUNNING',?,CURRENT_TIMESTAMP,?)
-                """, id, task, llm.getModel(), expectedPromptVersion, gold.size(), reasoningEffort);
+                """, id, task, settings.model(), expectedPromptVersion, gold.size(), reasoningEffort);
         org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
                 new org.springframework.transaction.support.TransactionSynchronization() {
                     @Override public void afterCommit() {
