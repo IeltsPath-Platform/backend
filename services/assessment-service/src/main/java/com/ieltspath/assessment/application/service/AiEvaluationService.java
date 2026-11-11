@@ -25,6 +25,9 @@ import java.time.Clock;
 import java.time.ZoneId;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 /** Stores gold essays and runs bounded AI-versus-examiner evaluations independently of learner quota. */
@@ -39,6 +42,7 @@ public class AiEvaluationService {
     private final BigDecimal minWithin;
     private final BigDecimal minQwk;
     private final BigDecimal maxInvalidRate;
+    private final int gradingTimeoutSeconds;
     private final ZoneId quotaZone;
 
     public AiEvaluationService(JdbcTemplate jdbc, EssayGradingPort grader, ActiveRubricProvider rubrics,
@@ -47,7 +51,9 @@ public class AiEvaluationService {
             @Value("${assessment.ai-eval.min-within-half-band:0.80}") BigDecimal minWithin,
             @Value("${assessment.ai-eval.min-qwk:0.60}") BigDecimal minQwk,
             @Value("${assessment.ai-eval.quota-timezone:Asia/Ho_Chi_Minh}") String quotaTimezone,
-            @Value("${assessment.ai-eval.max-invalid-rate:0.05}") BigDecimal maxInvalidRate) {
+            @Value("${assessment.ai-eval.max-invalid-rate:0.05}") BigDecimal maxInvalidRate,
+            @Value("${assessment.ai-eval.grading-timeout-seconds:20}") int gradingTimeoutSeconds) {
+        this.gradingTimeoutSeconds = gradingTimeoutSeconds;
         this.jdbc = jdbc; this.grader = grader; this.rubrics = rubrics; this.llm = llm; this.json = json;
         this.dailyLimit = dailyLimit; this.minWithin = minWithin; this.minQwk = minQwk;
         this.maxInvalidRate = maxInvalidRate;
@@ -210,7 +216,7 @@ public class AiEvaluationService {
             for (GoldEssay item : gold) {
                 long started = System.nanoTime();
                 try {
-                    EssayGradingPort.EssayGrade grade = grader.grade(new EssayGradingPort.Prompt(item.prompt(), task, null,
+                    EssayGradingPort.EssayGrade grade = gradeWithTimeout(new EssayGradingPort.Prompt(item.prompt(), task, null,
                             item.chartFacts(), expectedPromptVersion), item.essay());
                     int latency = latencyMs(started);
                     latencies.add(latency);
@@ -270,6 +276,27 @@ public class AiEvaluationService {
         } catch (Exception exception) {
             jdbc.update("UPDATE ai_eval_runs SET status='FAILED',failure_code=?,finished_at=CURRENT_TIMESTAMP WHERE id=?",
                     safeCode(exception), runId);
+        }
+    }
+
+    /**
+     * One essay, cut at the grading timeout so a slow reply counts as that essay's failure. Runs on its own thread so
+     * the wait can end; the caller's security context is not needed here.
+     */
+    private EssayGradingPort.EssayGrade gradeWithTimeout(EssayGradingPort.Prompt prompt, String essay) {
+        CompletableFuture<EssayGradingPort.EssayGrade> reply = CompletableFuture.supplyAsync(() -> grader.grade(prompt, essay));
+        try {
+            return reply.get(gradingTimeoutSeconds, TimeUnit.SECONDS);
+        } catch (TimeoutException exception) {
+            reply.cancel(true);
+            throw new EssayGradingException("LLM_TIMEOUT");
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            reply.cancel(true);
+            throw new EssayGradingException("LLM_TIMEOUT");
+        } catch (ExecutionException exception) {
+            if (exception.getCause() instanceof RuntimeException cause) throw cause;
+            throw new EssayGradingException("EVALUATION_FAILED");
         }
     }
 

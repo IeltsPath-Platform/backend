@@ -22,7 +22,7 @@ class AiEvaluationServiceTest {
         when(jdbc.update(anyString(), any(Object[].class))).thenReturn(0);
         AiEvaluationService service = new AiEvaluationService(jdbc, mock(EssayGradingPort.class),
                 mock(ActiveRubricProvider.class), new AssessmentLlmProperties(), new ObjectMapper(),
-                100, new java.math.BigDecimal("0.80"), new java.math.BigDecimal("0.60"), "Asia/Ho_Chi_Minh", new BigDecimal("0.05"));
+                100, new java.math.BigDecimal("0.80"), new java.math.BigDecimal("0.60"), "Asia/Ho_Chi_Minh", new BigDecimal("0.05"), 20);
 
         ResponseStatusException error = assertThrows(ResponseStatusException.class,
                 () -> service.activate(UUID.randomUUID(), UUID.randomUUID()));
@@ -36,7 +36,7 @@ class AiEvaluationServiceTest {
         when(jdbc.update(anyString(), any(Object[].class))).thenReturn(1);
         AiEvaluationService service = new AiEvaluationService(jdbc, mock(EssayGradingPort.class),
                 mock(ActiveRubricProvider.class), new AssessmentLlmProperties(), new ObjectMapper(),
-                100, new BigDecimal("0.80"), new BigDecimal("0.60"), "Asia/Ho_Chi_Minh", new BigDecimal("0.05"));
+                100, new BigDecimal("0.80"), new BigDecimal("0.60"), "Asia/Ho_Chi_Minh", new BigDecimal("0.05"), 20);
 
         UUID runId = UUID.randomUUID();
         UUID actor = UUID.randomUUID();
@@ -56,7 +56,7 @@ class AiEvaluationServiceTest {
                 new BigDecimal("6.5"), criterionTwo, "rubric@1+tplv1", List.of()));
         AiEvaluationService service = new AiEvaluationService(jdbc, grader, mock(ActiveRubricProvider.class),
                 new AssessmentLlmProperties(), new ObjectMapper(), 100, new BigDecimal("0.80"),
-                new BigDecimal("0.60"), "Asia/Ho_Chi_Minh", new BigDecimal("0.05"));
+                new BigDecimal("0.60"), "Asia/Ho_Chi_Minh", new BigDecimal("0.05"), 20);
         List<AiEvaluationService.GoldEssay> gold = List.of(
                 new AiEvaluationService.GoldEssay(UUID.randomUUID(), "TASK_2", "prompt", null, "essay one",
                         new BigDecimal("6.0"), new String[]{"GRAMMAR"}, "[{\"code\":\"TR\",\"band\":6.0,\"comment\":\"ok\"}]",

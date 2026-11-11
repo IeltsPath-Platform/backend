@@ -80,10 +80,36 @@ class AiEvaluationEssayFailureTest {
         assertEquals(null, AiEvaluationService.percentile95(List.of()));
     }
 
+    @Test
+    void aReplyPastTheGradingTimeoutIsCountedAsThatEssaysFailure() throws Exception {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        when(jdbc.update(any(PreparedStatementCreator.class))).thenReturn(1);
+        EssayGradingPort grader = mock(EssayGradingPort.class);
+        when(grader.grade(any(), eq(ESSAY_ONE))).thenAnswer(invocation -> {
+            Thread.sleep(3_000);
+            return new EssayGradingPort.EssayGrade(new BigDecimal("6.0"), null, "rubric@1+tplv1");
+        });
+        AiEvaluationService service = service(jdbc, grader, 1);
+
+        service.evaluate(UUID.randomUUID(), "TASK_2", List.of(gold(ESSAY_ONE, List.of())), "rubric@1+tplv1");
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Object[]> args = ArgumentCaptor.forClass(Object[].class);
+        verify(jdbc).update(sql.capture(), args.capture());
+        assertTrue(sql.getValue().contains("status='DONE'"));
+        // The only essay was invalid: the rate is 1, so the run does not pass.
+        assertEquals(0, new BigDecimal("1.00000").compareTo((BigDecimal) args.getValue()[11]));
+        assertEquals(false, args.getValue()[5]);
+    }
+
     private static AiEvaluationService service(JdbcTemplate jdbc, EssayGradingPort grader) {
+        return service(jdbc, grader, 20);
+    }
+
+    private static AiEvaluationService service(JdbcTemplate jdbc, EssayGradingPort grader, int gradingTimeoutSeconds) {
         return new AiEvaluationService(jdbc, grader, mock(ActiveRubricProvider.class), new AssessmentLlmProperties(),
                 new ObjectMapper(), 100, new BigDecimal("0.80"), new BigDecimal("0.60"), "Asia/Ho_Chi_Minh",
-                new BigDecimal("0.05"));
+                new BigDecimal("0.05"), gradingTimeoutSeconds);
     }
 
     private static AiEvaluationService.GoldEssay gold(String essay, List<ExaminerErrorRecall.MarkedError> errors) {
