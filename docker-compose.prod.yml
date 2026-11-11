@@ -1,0 +1,203 @@
+# Requires Docker Compose >= 2.30.0; invoke through scripts/production/compose.py.
+# Inherited interpolation is isolated by that launcher before this override is merged.
+services:
+  config-server:
+    image: ghcr.io/${IMAGE_OWNER:?Set IMAGE_OWNER}/ieltspath-config-server:${IMAGE_TAG:?Set IMAGE_TAG}
+    build: !reset null
+    volumes: !reset []
+    environment: !reset {}
+    env_file: !override
+      - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/config-server.env
+        format: raw
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 384m
+  eureka-server:
+    image: ghcr.io/${IMAGE_OWNER:?Set IMAGE_OWNER}/ieltspath-eureka-server:${IMAGE_TAG:?Set IMAGE_TAG}
+    build: !reset null
+    volumes: !reset []
+    environment: !reset {}
+    env_file: !override
+      - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/eureka-server.env
+        format: raw
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 384m
+  api-gateway:
+    image: ghcr.io/${IMAGE_OWNER:?Set IMAGE_OWNER}/ieltspath-api-gateway:${IMAGE_TAG:?Set IMAGE_TAG}
+    build: !reset null
+    volumes: !reset []
+    environment: !reset {}
+    env_file: !override
+      - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/api-gateway.env
+        format: raw
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 512m
+  user-service:
+    image: ghcr.io/${IMAGE_OWNER:?Set IMAGE_OWNER}/ieltspath-user-service:${IMAGE_TAG:?Set IMAGE_TAG}
+    build: !reset null
+    volumes: !reset []
+    environment: !reset {}
+    env_file: !override
+      - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/user-service.env
+        format: raw
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 512m
+  content-service:
+    image: ghcr.io/${IMAGE_OWNER:?Set IMAGE_OWNER}/ieltspath-content-service:${IMAGE_TAG:?Set IMAGE_TAG}
+    build: !reset null
+    volumes: !reset []
+    environment: !reset {}
+    env_file: !override
+      - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/content-service.env
+        format: raw
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 768m
+  library-service:
+    image: ghcr.io/${IMAGE_OWNER:?Set IMAGE_OWNER}/ieltspath-library-service:${IMAGE_TAG:?Set IMAGE_TAG}
+    build: !reset null
+    volumes: !reset []
+    environment: !reset {}
+    env_file: !override
+      - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/library-service.env
+        format: raw
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 512m
+  assessment-service:
+    image: ghcr.io/${IMAGE_OWNER:?Set IMAGE_OWNER}/ieltspath-assessment-service:${IMAGE_TAG:?Set IMAGE_TAG}
+    build: !reset null
+    volumes: !reset []
+    environment: !reset {}
+    env_file: !override
+      - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/assessment-service.env
+        format: raw
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 768m
+  access-service:
+    image: ghcr.io/${IMAGE_OWNER:?Set IMAGE_OWNER}/ieltspath-access-service:${IMAGE_TAG:?Set IMAGE_TAG}
+    build: !reset null
+    volumes: !reset []
+    environment: !reset {}
+    env_file: !override
+      - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/access-service.env
+        format: raw
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 512m
+  learning-service:
+    image: ghcr.io/${IMAGE_OWNER:?Set IMAGE_OWNER}/ieltspath-learning-service:${IMAGE_TAG:?Set IMAGE_TAG}
+    build: !reset null
+    volumes: !reset []
+    environment: !reset {}
+    env_file: !override
+      - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/learning-service.env
+        format: raw
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 768m
+  game-service:
+    image: ghcr.io/${IMAGE_OWNER:?Set IMAGE_OWNER}/ieltspath-game-service:${IMAGE_TAG:?Set IMAGE_TAG}
+    build: !reset null
+    volumes: !reset []
+    environment: !reset {}
+    env_file: !override
+      - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/game-service.env
+        format: raw
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 512m
+  notification-service:
+    image: ghcr.io/${IMAGE_OWNER:?Set IMAGE_OWNER}/ieltspath-notification-service:${IMAGE_TAG:?Set IMAGE_TAG}
+    build: !reset null
+    volumes: !reset []
+    environment: !reset {}
+    env_file: !override
+      - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/notification-service.env
+        format: raw
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 512m
+  community-service:
+    image: ghcr.io/${IMAGE_OWNER:?Set IMAGE_OWNER}/ieltspath-community-service:${IMAGE_TAG:?Set IMAGE_TAG}
+    build: !reset null
+    volumes: !reset []
+    environment: !reset {}
+    env_file: !override
+      - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/community-service.env
+        format: raw
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 512m
+  postgres:
+    environment: !reset {}
+    env_file: !override
+      - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/postgres.env
+        format: raw
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 1024m
+    volumes: !override
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/postgres/init-production.sh:/docker-entrypoint-initdb.d/01-production.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+  rabbitmq:
+    environment: !reset {}
+    env_file: !override
+      - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/rabbitmq.env
+        format: raw
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 512m
+    volumes: !override
+      - rabbitmq-data:/var/lib/rabbitmq
+  redis:
+    environment: !reset {}
+    env_file: !override
+      - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/redis.env
+        format: raw
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 192m
+    entrypoint: ["sh", "/usr/local/bin/start-production.sh"]
+    command: !reset []
+    volumes: !override
+      - redis-data:/data
+      - ./infra/redis/start-production.sh:/usr/local/bin/start-production.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=$$REDIS_PASSWORD redis-cli --no-auth-warning ping | grep -q PONG"]
+  prometheus:
+    environment: !reset {}
+    env_file: !override
+      - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/prometheus.env
+        format: raw
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 256m
+    profiles: !override ["production-observability-disabled"]
+    volumes: !reset []
+  caddy:
+    image: caddy:2.10-alpine
+    env_file:
+      - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/caddy.env
+        format: raw
+    ports: ["80:80", "443:443"]
+    networks: [codebase-network]
+    restart: unless-stopped
+    mem_limit: 128m
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+volumes:
+  redis-data:
+  caddy-data:
+  caddy-config:

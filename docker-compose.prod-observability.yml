@@ -1,0 +1,50 @@
+# Optional production observability. Loaded ONLY by compose.py --observability.
+# Apply after the base observability file and the production override.
+services:
+  prometheus:
+    environment: !reset {}
+    env_file: !override
+      - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/prometheus.env
+        format: raw
+    profiles: !reset []
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 256m
+    volumes: !override
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+  loki:
+    environment: !reset {}
+    env_file: !override
+      - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/loki.env
+        format: raw
+    profiles: !reset []
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 512m
+  tempo:
+    environment: !reset {}
+    env_file: !override
+      - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/tempo.env
+        format: raw
+    profiles: !reset []
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 512m
+  alloy:
+    environment: !reset {}
+    env_file: !override
+      - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/alloy.env
+        format: raw
+    profiles: !reset []
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 256m
+  grafana:
+    environment: !reset {}
+    env_file: !override
+      - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/grafana.env
+        format: raw
+    profiles: !reset []
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 256m
