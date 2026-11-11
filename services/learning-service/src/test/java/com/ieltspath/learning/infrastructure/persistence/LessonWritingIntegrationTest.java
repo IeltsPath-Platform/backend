@@ -116,7 +116,7 @@ class LessonWritingIntegrationTest {
         reset(content, access, llm);
         LearningContentClientTestSupport.stubLessonAccessSummaries(content);
         when(content.getActiveRubric(anyString())).thenAnswer(invocation -> testRubric(invocation.getArgument(0)));
-        when(content.activeErrorTypes()).thenReturn(List.of(new LearningContentClient.ErrorType("GRAMMAR",
+        when(content.activeErrorTypes("WRITING")).thenReturn(List.of(new LearningContentClient.ErrorType("GRAMMAR",
                 "Grammar", "GRAMMAR", 1, "Fix grammar")));
         when(content.getTopicSequence()).thenReturn(List.of(new LearningContentClient.Topic(TOPIC, "WRITING",
                 "Writing", 900, null, List.of(kp(KP), kp(ESSAY_KP)), LearningSkill.WRITING, true)));

@@ -15,6 +15,42 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ErrorTypeTest {
 
     @Test
+    void aCodeWithoutSkillsAppliesToNoSkillAndIsNotAFallback() {
+        ErrorType errorType = ErrorType.create("PARAPHRASE_TRAP", "Paraphrase trap", ErrorCategory.READING_STRATEGY,
+                2, null, "Check the original sentence.");
+
+        assertThat(errorType.getSkills()).isEmpty();
+        assertThat(errorType.isFallback()).isFalse();
+    }
+
+    @Test
+    void skillsAreStoredDistinctAndInAStableOrder() {
+        ErrorType errorType = new ErrorType(UUID.randomUUID(), "GRAMMAR_SPEAKING_AND_WRITING", "Grammar", ErrorCategory.GRAMMAR,
+                1, null, null, "Fix it.", ContentStatus.ACTIVE, ErrorReviewStatus.APPROVED,
+                java.time.Instant.now(), java.time.Instant.now(), java.util.List.of("WRITING", "SPEAKING", "WRITING"), false);
+
+        assertThat(errorType.getSkills()).containsExactly("SPEAKING", "WRITING");
+    }
+
+    @Test
+    void anUnknownSkillIsRejected() {
+        ErrorType errorType = ErrorType.create("TENSE", "Tense", ErrorCategory.GRAMMAR, 1, null, "Fix it.");
+
+        assertThatThrownBy(() -> errorType.updateSkills(java.util.List.of("MATH")))
+                .isInstanceOf(InvalidErrorTypeException.class);
+    }
+
+    @Test
+    void updatingSkillsKeepsTheCode() {
+        ErrorType errorType = ErrorType.create("TENSE", "Tense", ErrorCategory.GRAMMAR, 1, null, "Fix it.");
+
+        errorType.updateSkills(java.util.List.of("WRITING"));
+
+        assertThat(errorType.getSkills()).containsExactly("WRITING");
+        assertThat(errorType.getCode()).isEqualTo("TENSE");
+    }
+
+    @Test
     void createsAnActiveErrorTypeWithItsCode() {
         ErrorType errorType = ErrorType.create("PARAPHRASE_TRAP", "Paraphrase trap", ErrorCategory.READING_STRATEGY,
                 2, null, "Check the original sentence.");

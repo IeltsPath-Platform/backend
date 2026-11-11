@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Quick fixes without prompt change"
-status: pending
+status: done (metric llm.call.duration và llm.tokens chờ phase 0b)
 priority: P1
 dependencies: [0]
 ---

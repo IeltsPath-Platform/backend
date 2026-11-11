@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Progress endpoint"
-status: pending
+status: done
 priority: P2
 dependencies: []
 ---

@@ -86,13 +86,14 @@ public class OpenAiCompatibleEssayGrader implements EssayGradingPort {
             throw new EssayGradingException("INVALID_PROMPT");
         }
         try {
-            ActiveRubricProvider.Rubric rubric = resolveRubric(prompt);
-            var activeErrorTypes = errorTypes.activeErrorTypes();
+            String templateVersion = templateVersionOf(prompt);
+            ActiveRubricProvider.Rubric rubric = resolveRubric(prompt, templateVersion);
+            var activeErrorTypes = errorTypes.activeErrorTypes("WRITING");
             Set<String> allowedErrorCodes = activeErrorTypes.stream().map(ErrorTypeCatalog.ErrorType::code)
                     .filter(java.util.Objects::nonNull).collect(java.util.stream.Collectors.toSet());
             String response = client.chat(new ChatRequest("writing-grading",
-                    RubricPromptBuilder.build(rubric, activeErrorTypes), userPrompt(prompt, essay), true, null)).content();
-            return parseGrade(response, rubric, allowedErrorCodes, essay);
+                    RubricPromptBuilder.build(rubric, activeErrorTypes, templateVersion), userPrompt(prompt, essay), true, null)).content();
+            return parseGrade(response, rubric, allowedErrorCodes, essay, templateVersion);
         } catch (EssayGradingException exception) {
             throw exception;
         } catch (ContentUnavailableException exception) {
@@ -104,18 +105,25 @@ public class OpenAiCompatibleEssayGrader implements EssayGradingPort {
         }
     }
 
-    private ActiveRubricProvider.Rubric resolveRubric(Prompt prompt) {
+    /** Nothing activated keeps the first template; an activated version names its own. */
+    private static String templateVersionOf(Prompt prompt) {
+        if (prompt.expectedPromptVersion() == null) return RubricPromptBuilder.TEMPLATE_VERSION;
+        String[] parts = prompt.expectedPromptVersion().split("@|\\+tpl", -1);
+        if (parts.length != 3 || !RubricPromptBuilder.isKnownTemplate(parts[2]))
+            throw new EssayGradingException("PROMPT_NOT_ACTIVATED");
+        return parts[2];
+    }
+
+    private ActiveRubricProvider.Rubric resolveRubric(Prompt prompt, String templateVersion) {
         ActiveRubricProvider.Rubric rubric;
         if (prompt.expectedPromptVersion() == null) {
             rubric = rubrics.getActive(prompt.task());
         } else {
             String[] parts = prompt.expectedPromptVersion().split("@|\\+tpl", -1);
-            if (parts.length != 3 || !RubricPromptBuilder.TEMPLATE_VERSION.equals(parts[2]))
-                throw new EssayGradingException("PROMPT_NOT_ACTIVATED");
             rubric = rubrics.getVersion(parts[0], parts[1]);
         }
         if (rubric == null || !prompt.task().equals(rubric.task())) throw new EssayGradingException("RUBRIC_UNAVAILABLE");
-        String version = RubricPromptBuilder.promptVersion(rubric);
+        String version = RubricPromptBuilder.promptVersion(rubric, templateVersion);
         if (prompt.expectedPromptVersion() != null && !prompt.expectedPromptVersion().equals(version))
             throw new EssayGradingException("PROMPT_VERSION_UNAVAILABLE");
         return rubric;
@@ -149,7 +157,7 @@ public class OpenAiCompatibleEssayGrader implements EssayGradingPort {
 
     /** Bands are validated strictly; comments are optional, trimmed and capped so a chatty reply cannot bloat a row. */
     private EssayGrade parseGrade(String response, ActiveRubricProvider.Rubric rubric, Set<String> allowedErrorCodes,
-                                  String essay) {
+                                  String essay, String templateVersion) {
         try {
             String content = response;
             int start = content.indexOf('{');
@@ -191,10 +199,12 @@ public class OpenAiCompatibleEssayGrader implements EssayGradingPort {
                 String suggestion = text(correction.path("suggestion"), MAX_COMMENT);
                 if (errorCode == null || !allowedErrorCodes.contains(errorCode) || excerpt == null || !essay.contains(excerpt)
                         || suggestion == null) continue;
+                // Acceptable text with a better wording is not an error: it stays out of the grade and the codes.
+                if ("SUGGESTION".equals(correction.path("certainty").asText(""))) continue;
                 ObjectNode item = corrections.addObject().put("excerpt", excerpt).put("suggestion", suggestion).put("errorCode", errorCode);
                 usedCodes.add(errorCode);
             }
-            String promptVersion = RubricPromptBuilder.promptVersion(rubric);
+            String promptVersion = RubricPromptBuilder.promptVersion(rubric, templateVersion);
             return new EssayGrade(overall, feedback(reply, comments, corrections), promptVersion, List.copyOf(usedCodes));
         } catch (EssayGradingException exception) {
             throw exception;

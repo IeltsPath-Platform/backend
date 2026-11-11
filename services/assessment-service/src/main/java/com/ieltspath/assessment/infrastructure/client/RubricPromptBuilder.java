@@ -11,11 +11,21 @@ import java.util.stream.Collectors;
 
 public final class RubricPromptBuilder {
     public static final String TEMPLATE_VERSION = "v1";
-    private static final String TEMPLATE = loadTemplate();
+    public static final String TEMPLATE_VERSION_2 = "v2";
+    private static final String TEMPLATE = loadTemplate(TEMPLATE_VERSION);
+    private static final String TEMPLATE_2 = loadTemplate(TEMPLATE_VERSION_2);
     private RubricPromptBuilder() {}
 
+    public static boolean isKnownTemplate(String version) {
+        return TEMPLATE_VERSION.equals(version) || TEMPLATE_VERSION_2.equals(version);
+    }
+
     public static String promptVersion(ActiveRubricProvider.Rubric rubric) {
-        return rubric.code() + "@" + rubric.version() + "+tpl" + TEMPLATE_VERSION;
+        return promptVersion(rubric, TEMPLATE_VERSION);
+    }
+
+    public static String promptVersion(ActiveRubricProvider.Rubric rubric, String templateVersion) {
+        return rubric.code() + "@" + rubric.version() + "+tpl" + templateVersion;
     }
 
     public static String build(ActiveRubricProvider.Rubric rubric, Set<String> errorCodes) {
@@ -23,13 +33,18 @@ public final class RubricPromptBuilder {
     }
 
     public static String build(ActiveRubricProvider.Rubric rubric, List<ErrorTypeCatalog.ErrorType> errorTypes) {
+        return build(rubric, errorTypes, TEMPLATE_VERSION);
+    }
+
+    public static String build(ActiveRubricProvider.Rubric rubric, List<ErrorTypeCatalog.ErrorType> errorTypes,
+                               String templateVersion) {
         String criteria = rubric.criteria().stream().sorted(java.util.Comparator.comparingInt(ActiveRubricProvider.Criterion::sortOrder))
                 .map(RubricPromptBuilder::formatCriterion).collect(Collectors.joining("\n\n"));
         String task = "TASK_1".equals(rubric.task()) ? "Academic Writing Task 1" : "Writing Task 2";
         String codes = errorTypes.stream().filter(java.util.Objects::nonNull).filter(error -> error.code() != null)
                 .sorted(java.util.Comparator.comparing(ErrorTypeCatalog.ErrorType::code))
                 .map(error -> error.code() + " — " + error.name() + ": " + error.fixHint()).collect(Collectors.joining("\n"));
-        return TEMPLATE.replace("{{task}}", task).replace("{{criteria}}", criteria)
+        return (TEMPLATE_VERSION_2.equals(templateVersion) ? TEMPLATE_2 : TEMPLATE).replace("{{task}}", task).replace("{{criteria}}", criteria)
                 .replace("{{error_codes}}", codes.isBlank() ? "(none)" : codes);
     }
 
@@ -45,8 +60,8 @@ public final class RubricPromptBuilder {
         return text.toString().stripTrailing();
     }
 
-    private static String loadTemplate() {
-        try (InputStream stream = RubricPromptBuilder.class.getResourceAsStream("/essay-prompt-template-v1.txt")) {
+    private static String loadTemplate(String version) {
+        try (InputStream stream = RubricPromptBuilder.class.getResourceAsStream("/essay-prompt-template-" + version + ".txt")) {
             if (stream == null) throw new IllegalStateException("Essay prompt template is missing");
             return new String(stream.readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException exception) { throw new IllegalStateException("Essay prompt template cannot be read", exception); }

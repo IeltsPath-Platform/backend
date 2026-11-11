@@ -1,6 +1,7 @@
 package com.ieltspath.learning.application.service;
 
 import jakarta.validation.constraints.AssertTrue;
+import java.math.BigDecimal;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -22,7 +23,22 @@ public record WritingSettings(
         @DefaultValue("20") @Min(1) @Max(25) int gradingTimeoutSeconds,
         @DefaultValue("120") @Min(1) int staleGradingSeconds,
         @DefaultValue("10") @Min(1) int dailyGradingLimit,
-        @DefaultValue("Asia/Ho_Chi_Minh") @NotBlank String quotaTimezone) {
+        @DefaultValue("Asia/Ho_Chi_Minh") @NotBlank String quotaTimezone,
+        @DefaultValue("2") @Min(1) int progressFixedAfter,
+        // Band caps stay off until an examiner has set the thresholds; a null cap switches its rule off.
+        @DefaultValue("false") boolean bandCapsEnabled,
+        BigDecimal tooShortBandCap,
+        BigDecimal offTopicBandCap,
+        BigDecimal noOverviewBandCap,
+        BigDecimal partialAnswerBandCap,
+        BigDecimal noPositionBandCap,
+        @DefaultValue("30") @Min(1) @Max(50) int maxCorrections) {
+
+    /** The settings the grader uses when the configuration is not given: caps off. */
+    public static WritingSettings defaults() {
+        return new WritingSettings(3, 50, 1000, 10000, 20, 120, 10, "Asia/Ho_Chi_Minh", 2, false,
+                null, null, null, null, null, 30);
+    }
 
     @AssertTrue(message = "minWords must be below maxWords")
     public boolean isWordRangeValid() {

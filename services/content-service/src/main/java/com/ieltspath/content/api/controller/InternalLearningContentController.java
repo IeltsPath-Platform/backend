@@ -42,6 +42,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -79,18 +80,25 @@ public class InternalLearningContentController {
         return getPlacementTestPackages.execute().stream().map(TopicTestPackageResponse::from).toList();
     }
 
-    /** Active error types only; grading and error analysis record codes from this list. */
+    /**
+     * Approved active error types. {@code skill} (READING, LISTENING, WRITING or SPEAKING) limits the list to the codes
+     * that apply to it; without it every approved code is returned, as before.
+     */
     @GetMapping("/error-types")
-    public List<ActiveErrorTypeResponse> errorTypes() {
-        return listErrorTypes.executeApprovedActive().stream().map(ActiveErrorTypeResponse::from).toList();
+    public List<ActiveErrorTypeResponse> errorTypes(@RequestParam(value = "skill", required = false) String skill) {
+        if (skill != null && !Set.of("READING", "LISTENING", "WRITING", "SPEAKING").contains(skill)) {
+            throw new IllegalArgumentException("INVALID_SKILL");
+        }
+        var errorTypes = skill == null ? listErrorTypes.executeApprovedActive() : listErrorTypes.executeApprovedActive(skill);
+        return errorTypes.stream().map(ActiveErrorTypeResponse::from).toList();
     }
 
     public record ActiveErrorTypeResponse(String code, String name, String category, int severity, String fixHint,
-                                          UUID knowledgePointId) {
+                                          UUID knowledgePointId, List<String> skills, boolean fallback) {
         static ActiveErrorTypeResponse from(com.ieltspath.content.domain.aggregate.ErrorType errorType) {
             return new ActiveErrorTypeResponse(errorType.getCode(), errorType.getName(),
                     errorType.getCategory().name(), errorType.getSeverity(), errorType.getFixHint(),
-                    errorType.getKnowledgePointId());
+                    errorType.getKnowledgePointId(), errorType.getSkills(), errorType.isFallback());
         }
     }
 

@@ -85,9 +85,22 @@ Response 200:
   most 3 items of ≤ 300 characters.
 - `overallBand` is computed by Learning Service, not taken from the LLM: the mean of the four bands rounded to the
   nearest half band, with .25 rounding up to .5 and .75 up to the next whole band.
-- `corrections`: at most 10; `excerpt` is an exact substring of the essay; `category` remains the broad category
+- `corrections`: at most 10 with prompt template `v1`, at most `learning.writing.max-corrections` (default 30, range 1–50)
+  with template `v2`; `excerpt` is an exact substring of the essay; `category` remains the broad category
   (`GRAMMAR`, `VOCABULARY`, `COHERENCE`, `TASK` or `OTHER`) and the additive `errorCode` identifies a matching active,
   human-approved Content error type. A correction with an unknown, inactive or unapproved `errorCode` is omitted.
+  Each correction also carries `errorName`, `fixHint` and `severity` (1–3) copied from that error type when the grade
+  is stored, and `practiceKnowledgePointId` with `practiceKnowledgePointCode` only when the error type maps to a knowledge point that has a practice set.
+  These fields are absent (not null) on grades stored before they were added and are not backfilled.
+- `model` is stored with the grade for audit (value of `LEARNING_LLM_MODEL`); the learner API does not return it.
+- Quota: a grading that fails for a system reason (`LLM_UNAVAILABLE`, `AI_BUSY`, `RUBRIC_UNAVAILABLE`,
+  `PROMPT_VERSION_UNAVAILABLE`) gives its daily grading unit back. `INVALID_GRADE` keeps the unit, because a malformed
+  output may be caused by the essay itself.
+- `bandLimits` (optional, present only when a cap lowered a band): `[{reason, criterion, cap, message}]`, the same shape
+  as Speaking's `bandLimits` plus `criterion` (TA or TR). `reason` is `TOO_SHORT`, `OFF_TOPIC`, `T1_NO_OVERVIEW`,
+  `PARTIAL_ANSWER` or `NO_POSITION`. A criterion lowered by a cap carries `limited: true`. Caps are off until
+  `learning.writing.band-caps-enabled` is true and the thresholds are set; while off, responses carry neither field.
+  Only the length rule can fire from the grade alone; the other rules need the flags of prompt v2.
 - `summary` ≤ 600 characters. `passed = overallBand ≥ passBand`. `sampleAnswer` only when `passed` or the block was
   passed before.
 
@@ -99,8 +112,15 @@ Each criterion also includes `knowledgePointJudgments`, an ordered array that is
 Each judgment has `knowledgePointId`, `code`, `name`, and `judgment` (`PASS`, `FAIL` or `NOT_ASSESSED`); `excerpt` and `reason` are omitted
 when no evidence is available. When the rubric lists sub-points, Learning appends `essay-kp-judgment-v2` instructions to
 the unchanged band template `v1`; one response supplies `criteria`, `corrections`, `summary`, `focus` and `judgments`.
-Rubrics without sub-points do not require `judgments`. `promptVersion` remains
-`<rubricCode>@<rubricVersion>+tplv1` for band activation; internal grade JSON stores `judgmentVersion=kpj2` whenever the rubric has
+Rubrics without sub-points do not require `judgments`. `promptVersion` is
+`<rubricCode>@<rubricVersion>+tplv1` for band activation, or `+tplv2` when an administrator has activated a run made with the
+second template (`docs/contracts/essay-prompt-template-v2.txt`); with nothing activated, `v1` is used and an unknown template
+version is `PROMPT_VERSION_UNAVAILABLE`. Template `v2` additionally returns, and the grade JSON stores (not yet exposed by the API),
+per correction a `reason` (at most 300 characters, optional) and `certainty` (`ERROR` or `SUGGESTION`; missing or unknown reads as
+`ERROR`; a `SUGGESTION` never creates a knowledge-point `FAIL` and is not counted in the essay event's `error_code`), per criterion
+`evidence` (exact quotations, at most 3; a quotation not in the essay is dropped and the band is kept) and `descriptor`, at most 3
+`priorities` and one `errorExamples` entry per error code in `corrections`. Missing optional parts never make the grade `INVALID_GRADE`.
+Band activation is unchanged; internal grade JSON stores `judgmentVersion=kpj2` whenever the rubric has
 sub-points (the prompt was extended), even if the response has no judgments array, otherwise null. This version is not
 exposed by the API. `EssayKnowledgeJudge` validates the received data without LLM or clock
 dependencies; the grader supplies a lazy Content catalog, loaded at most once when needed for practice targets.

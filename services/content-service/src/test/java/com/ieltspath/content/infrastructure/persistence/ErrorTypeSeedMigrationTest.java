@@ -46,6 +46,9 @@ class ErrorTypeSeedMigrationTest {
 
     @Test
     void gradingCatalogAndQuestionCodesRequireHumanApproval() {
+        // The repository reads the skill columns added by a later migration; this class stops at the first-shipped seed.
+        jdbc.getJdbcTemplate().execute("ALTER TABLE error_types ADD COLUMN IF NOT EXISTS skills VARCHAR(20)[] NOT NULL DEFAULT '{}'");
+        jdbc.getJdbcTemplate().execute("ALTER TABLE error_types ADD COLUMN IF NOT EXISTS fallback BOOLEAN NOT NULL DEFAULT false");
         jdbc.getJdbcTemplate().update("UPDATE error_types SET review_status = 'APPROVED' WHERE code = 'PARAPHRASE_TRAP'");
         var repository = new JdbcErrorTypeRepository(jdbc);
 
