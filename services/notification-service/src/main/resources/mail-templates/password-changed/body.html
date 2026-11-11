@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Mật khẩu IELTSPath đã được thay đổi</title>
+</head>
+<body>
+<th:block th:replace="~{_layout :: header}"></th:block>
+  <p>Xin chào <span th:text="${displayName}">bạn</span>,</p>
+  <p>Mật khẩu tài khoản IELTSPath của bạn vừa được thay đổi lúc <strong th:text="${changedAt}">00:00 01/01/2026</strong>.</p>
+  <p>Nếu đây không phải bạn, hãy dùng chức năng Quên mật khẩu để đặt lại mật khẩu ngay và liên hệ đội ngũ hỗ trợ.</p>
+<th:block th:replace="~{_layout :: footer}"></th:block>
+</body>
+</html>

@@ -1,0 +1,6 @@
+Xin chào [(${displayName})],
+
+Cảm ơn bạn đã đăng ký IELTSPath. Dùng liên kết sau để xác minh email trong vòng [(${expiresInMinutes})] phút:
+[(${verifyLink})]
+
+Nếu bạn không đăng ký tài khoản, hãy bỏ qua email này.

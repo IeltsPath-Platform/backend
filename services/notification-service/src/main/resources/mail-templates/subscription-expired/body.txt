@@ -1,0 +1,5 @@
+Xin chào [(${displayName})],
+
+Gói Premium của bạn đã hết hạn lúc [(${endsAt})].
+
+Bạn có thể gia hạn bất cứ lúc nào trong ứng dụng để tiếp tục học.

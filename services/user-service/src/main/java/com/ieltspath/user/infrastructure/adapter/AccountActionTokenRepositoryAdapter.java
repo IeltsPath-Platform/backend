@@ -13,6 +13,7 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.LocalDateTime;
 
 @Repository
 @RequiredArgsConstructor
@@ -48,6 +49,21 @@ public class AccountActionTokenRepositoryAdapter implements AccountActionTokenRe
     @Override
     public boolean consumePasswordResetToken(String tokenHash, java.time.LocalDateTime consumedAt) {
         return accountActionTokenJpaRepository.consumePasswordResetToken(tokenHash, consumedAt) == 1;
+    }
+
+    @Override
+    public boolean consumeToken(String tokenHash, ActionTokenPurpose purpose, LocalDateTime consumedAt) {
+        return accountActionTokenJpaRepository.consumeToken(tokenHash, purpose, consumedAt) == 1;
+    }
+
+    @Override
+    public int invalidateUnusedForUser(UUID userId, ActionTokenPurpose purpose, LocalDateTime invalidatedAt) {
+        return accountActionTokenJpaRepository.invalidateUnusedForUser(userId, purpose, invalidatedAt);
+    }
+
+    @Override
+    public Optional<LocalDateTime> findLatestCreatedAt(UUID userId, ActionTokenPurpose purpose) {
+        return accountActionTokenJpaRepository.findLatestCreatedAt(userId, purpose);
     }
 
     @Override

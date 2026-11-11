@@ -5,6 +5,7 @@ import static org.mockito.Mockito.never;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.ieltspath.user.domain.exception.RoleNotFoundException;
 import com.ieltspath.user.application.command.AssignRoleCommand;
+import com.ieltspath.user.application.port.UserLock;
 import com.ieltspath.user.domain.aggregate.Role;
 import com.ieltspath.user.domain.aggregate.User;
 import com.ieltspath.user.domain.repository.RoleRepository;
@@ -33,6 +34,8 @@ class AssignRoleUseCaseTest {
     private UserRepository userRepository;
     @Mock
     private RoleRepository roleRepository;
+    @Mock
+    private UserLock userLock;
     @InjectMocks
     private AssignRoleUseCase useCase;
 

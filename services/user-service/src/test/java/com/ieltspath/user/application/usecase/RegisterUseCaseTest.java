@@ -30,7 +30,7 @@ class RegisterUseCaseTest {
     void publicRegistrationCreatesCustomerUser() {
         User user = user();
         when(createUserUseCase.execute(any(CreateUserCommand.class))).thenReturn(user);
-        RegisterUseCase useCase = new RegisterUseCase(createUserUseCase);
+        RegisterUseCase useCase = new RegisterUseCase(createUserUseCase, org.mockito.Mockito.mock(EmailVerificationUseCase.class));
 
         User result = useCase.execute(new RegisterCommand(
                 "learner@example.com",
@@ -49,7 +49,7 @@ class RegisterUseCaseTest {
 
     @Test
     void publicAdminRegistrationIsRejectedWithoutCreatingUser() {
-        RegisterUseCase useCase = new RegisterUseCase(createUserUseCase);
+        RegisterUseCase useCase = new RegisterUseCase(createUserUseCase, org.mockito.Mockito.mock(EmailVerificationUseCase.class));
 
         assertThatThrownBy(() -> useCase.execute(new RegisterCommand(
                         "admin@example.com",

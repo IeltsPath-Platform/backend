@@ -24,4 +24,13 @@ class NotificationPreferenceServiceTest {
         assertThrows(IllegalArgumentException.class,()->service.update(UUID.randomUUID(),"community.unknown.v1",false));
         verifyNoInteractions(repository);
     }
+
+    @Test void includesStoredAssessmentAndAccessNoticesByDefault() {
+        when(repository.findAll(any())).thenReturn(java.util.Map.of());
+        var result = service.list(UUID.randomUUID());
+        org.junit.jupiter.api.Assertions.assertEquals(NotificationEventTypes.ORDERED.size(), result.size());
+        org.junit.jupiter.api.Assertions.assertTrue(result.stream().allMatch(NotificationPreference::enabled));
+        org.junit.jupiter.api.Assertions.assertTrue(NotificationEventTypes.ALL.contains("assessment.grading-requested.v1"));
+        org.junit.jupiter.api.Assertions.assertTrue(NotificationEventTypes.ALL.contains("access.subscription-granted.v1"));
+    }
 }

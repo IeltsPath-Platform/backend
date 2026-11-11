@@ -5,6 +5,7 @@ import static org.mockito.Mockito.never;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.ieltspath.user.domain.exception.PhoneAlreadyExistsException;
 import com.ieltspath.user.application.command.UpdateUserCommand;
+import com.ieltspath.user.application.port.UserLock;
 import com.ieltspath.user.domain.aggregate.User;
 import com.ieltspath.user.domain.repository.UserRepository;
 import com.ieltspath.user.domain.vo.Email;
@@ -27,6 +28,8 @@ import static org.mockito.Mockito.when;
 class UpdateUserUseCaseTest {
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private UserLock userLock;
     @InjectMocks
     private UpdateUserUseCase useCase;
 

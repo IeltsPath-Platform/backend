@@ -15,6 +15,13 @@ class AuthRequestValidationTest {
     private static final String PASSWORD_MESSAGE = "Mật khẩu phải có từ 6 đến 72 byte (chữ có dấu tính nhiều byte hơn)";
     private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 
+    @Test
+    void googleLoginRequiresANonblankTokenAndCapsItsLength() {
+        assertThat(validator.validate(new GoogleLoginRequest(" "))).isNotEmpty();
+        assertThat(validator.validate(new GoogleLoginRequest("x".repeat(4097)))).isNotEmpty();
+        assertThat(validator.validate(new GoogleLoginRequest("signed-token"))).isEmpty();
+    }
+
     private static RegisterRequest register(String password, String fullName, String phone) {
         return new RegisterRequest("learner@example.com", password, fullName, phone, null);
     }

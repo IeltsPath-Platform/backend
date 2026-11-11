@@ -77,7 +77,7 @@ spring:
             - id: user-auth-limited
               uri: lb://USER-SERVICE
               predicates:
-                - Path=/auth/login,/auth/refresh,/auth/forgot-password,/auth/reset-password,/api/users/register
+                - Path=/auth/login,/auth/refresh,/auth/forgot-password,/auth/reset-password,/auth/google,/auth/verify-email,/auth/resend-verification,/api/users/register
               filters:
                 - name: ClientRateLimit
                   args:
@@ -234,6 +234,11 @@ spring:
               predicates:
                 - Path=/api/notifications/**
 
+            - id: notification-mail-unsubscribe
+              uri: lb://NOTIFICATION-SERVICE
+              predicates:
+                - Path=/mail/unsubscribe
+
             - id: notification-service-websocket
               uri: lb:ws://NOTIFICATION-SERVICE
               predicates:
@@ -373,7 +378,11 @@ gateway:
       - /auth/logout
       - /auth/forgot-password
       - /auth/reset-password
+      - /auth/google
+      - /auth/verify-email
+      - /auth/resend-verification
       - /api/users/register
+      - /mail/unsubscribe
       - /ws/games/**
       - /swagger-ui.html
       - /swagger-ui/**

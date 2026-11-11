@@ -1,0 +1,5 @@
+Xin chào [(${displayName})],
+
+Mật khẩu tài khoản IELTSPath của bạn vừa được thay đổi lúc [(${changedAt})].
+
+Nếu đây không phải bạn, hãy dùng chức năng Quên mật khẩu để đặt lại mật khẩu ngay và liên hệ đội ngũ hỗ trợ.

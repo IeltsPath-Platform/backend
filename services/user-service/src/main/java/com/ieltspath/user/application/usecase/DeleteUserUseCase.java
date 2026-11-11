@@ -6,6 +6,7 @@ import com.ieltspath.user.domain.exception.UserManagementRuleViolationException;
 import com.ieltspath.user.domain.repository.UserRepository;
 import com.ieltspath.user.domain.vo.RoleName;
 import com.ieltspath.user.domain.vo.UserStatus;
+import com.ieltspath.user.application.port.UserLock;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,11 +17,15 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class DeleteUserUseCase {
     private final UserRepository userRepository;
+    private final UserLock userLock;
 
     @Transactional
     public User execute(UUID id, UUID actorId) {
         var activeAdminIds = userRepository.lockActiveAdminUserIds();
         User user = userRepository.findById(id)
+                .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng: " + id));
+        userLock.lock(user.getId());
+        user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng: " + id));
         if (id.equals(actorId)) {
             throw new UserManagementRuleViolationException(

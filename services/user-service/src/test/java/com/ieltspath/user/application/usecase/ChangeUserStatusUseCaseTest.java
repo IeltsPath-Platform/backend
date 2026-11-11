@@ -4,6 +4,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.ieltspath.user.domain.exception.InvalidUserStatusException;
 import com.ieltspath.user.application.command.ChangeUserStatusCommand;
+import com.ieltspath.user.application.port.UserLock;
 import com.ieltspath.user.domain.aggregate.User;
 import com.ieltspath.user.domain.repository.UserRepository;
 import com.ieltspath.user.domain.vo.Email;
@@ -25,6 +26,8 @@ import static org.mockito.Mockito.when;
 class ChangeUserStatusUseCaseTest {
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private UserLock userLock;
     @InjectMocks
     private ChangeUserStatusUseCase useCase;
 

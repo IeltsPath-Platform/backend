@@ -1,0 +1,5 @@
+Xin chào [(${displayName})],
+
+Tài khoản IELTSPath của bạn vừa được liên kết với Google, nên từ nay bạn có thể đăng nhập bằng Google. Nếu tài khoản này trước đó chưa xác minh email, mật khẩu cũ đã được gỡ để bảo vệ tài khoản; bạn có thể đặt mật khẩu mới bằng chức năng quên mật khẩu.
+
+Nếu đây không phải bạn thực hiện, hãy liên hệ đội ngũ hỗ trợ ngay.

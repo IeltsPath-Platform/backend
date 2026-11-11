@@ -1,7 +1,9 @@
 package com.ieltspath.user.infrastructure.persistence;
 
 import com.ieltspath.user.application.command.ChangePasswordCommand;
+import com.ieltspath.user.application.port.UserLock;
 import com.ieltspath.user.application.usecase.ChangePasswordUseCase;
+import com.ieltspath.user.application.usecase.UserNoticeOutbox;
 import com.ieltspath.user.domain.aggregate.User;
 import com.ieltspath.user.domain.exception.PasswordChangeException;
 import com.ieltspath.user.domain.repository.RefreshTokenRepository;
@@ -65,11 +67,15 @@ class PasswordChangeAttemptsPersistenceTest {
 
     @TestConfiguration
     static class Fakes {
+        @Bean UserNoticeOutbox userNoticeOutbox() {
+            return mock(UserNoticeOutbox.class);
+        }
+
         @Bean UserRepository users() {
             UserRepository users = mock(UserRepository.class);
             when(users.findById(USER_ID)).thenAnswer(inv -> Optional.of(User.builder().id(USER_ID)
                     .email(new Email("person@example.com")).fullName("Person").status(UserStatus.ACTIVE)
-                    .passwordHash(ENCODER.encode("right-password")).build()));
+                    .passwordHash(ENCODER.encode("right-password")).emailVerifiedAt(java.time.LocalDateTime.now()).build()));
             return users;
         }
         @Bean RefreshTokenRepository refreshTokens() { return mock(RefreshTokenRepository.class); }
@@ -113,7 +119,7 @@ class PasswordChangeAttemptsPersistenceTest {
         // Another instance has no memory of its own: only the database can tell it the user is locked.
         ChangePasswordUseCase otherInstance = new ChangePasswordUseCase(
                 mock(UserRepository.class), mock(RefreshTokenRepository.class), ENCODER,
-                userId -> { }, new PasswordChangeAttemptRepositoryAdapter(jdbc));
+                mock(UserLock.class), new PasswordChangeAttemptRepositoryAdapter(jdbc), mock(UserNoticeOutbox.class));
         var limited = assertThrows(PasswordChangeException.class,
                 () -> otherInstance.execute(new ChangePasswordCommand(USER_ID, "right-password", "next-password")));
 

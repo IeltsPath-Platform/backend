@@ -30,6 +30,7 @@ public class User {
     private Set<Role> roles = new HashSet<>();
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private LocalDateTime emailVerifiedAt;
 
     public void updateProfile(String fullName, PhoneNumber phoneNumber) {
         this.fullName = new FullName(fullName).value();
@@ -61,6 +62,23 @@ public class User {
         }
         this.passwordHash = newPasswordHash;
         touch();
+    }
+
+    public void clearPassword() {
+        this.passwordHash = null;
+        touch();
+    }
+
+    /** Marks the address as proven by the owner (verification link, completed reset, or Google sign-up). Idempotent. */
+    public void markEmailVerified(LocalDateTime at) {
+        if (emailVerifiedAt == null) {
+            this.emailVerifiedAt = at;
+            touch();
+        }
+    }
+
+    public boolean isEmailVerified() {
+        return emailVerifiedAt != null;
     }
 
     public Set<Role> getRoles() {

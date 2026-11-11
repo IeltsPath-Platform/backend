@@ -5,6 +5,7 @@ import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.commonsecurity.role.CanonicalRoles;
 import com.ieltspath.notification.api.exception.GlobalExceptionHandler;
 import com.ieltspath.notification.application.NotificationInboxUseCase;
+import com.ieltspath.notification.application.NotificationRetentionUseCase;
 import com.ieltspath.notification.application.NotificationPreferenceService;
 import com.ieltspath.notification.infrastructure.persistence.NotificationPreferenceRepositoryAdapter;
 import com.ieltspath.notification.infrastructure.persistence.NotificationRepositoryAdapter;
@@ -28,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -54,6 +56,18 @@ class NotificationReadIntegrationTest {
     @BeforeEach
     void cleanUp() {
         jdbc.execute("DELETE FROM notifications");
+        jdbc.execute("DELETE FROM notification_preferences");
+    }
+
+    @Test
+    void migrationAllowsPreferencesForEveryCurrentlyStoredNotificationType() {
+        UUID recipient = UUID.randomUUID();
+        NotificationPreferenceService preferences = new NotificationPreferenceService(new NotificationPreferenceRepositoryAdapter(jdbc));
+        for (String eventType : com.ieltspath.notification.application.NotificationEventTypes.ORDERED) {
+            preferences.update(recipient, eventType, false);
+        }
+        org.junit.jupiter.api.Assertions.assertEquals(com.ieltspath.notification.application.NotificationEventTypes.ORDERED.size(),
+                preferences.list(recipient).size());
     }
 
     private MockMvc createMockMvc(UUID callerId) {
@@ -123,6 +137,56 @@ class NotificationReadIntegrationTest {
                 notificationId
         );
         assertNotNull(readAt);
+    }
+
+    @Test
+    void deleteReturnsNotFoundForAnotherRecipientsNotification() throws Exception {
+        UUID callerId = UUID.randomUUID();
+        UUID id = UUID.randomUUID();
+        jdbc.update("INSERT INTO notifications(id, source_event_id, recipient_id, actor_id, event_type, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                id, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "community.post-reacted.v1", java.sql.Timestamp.from(Instant.now()));
+
+        createMockMvc(callerId).perform(delete("/api/notifications/{id}", id)).andExpect(status().isNotFound());
+        org.junit.jupiter.api.Assertions.assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM notifications WHERE id=?", Integer.class, id));
+    }
+
+    @Test
+    void deleteReadRemovesOnlyTheCallersReadNotifications() throws Exception {
+        UUID callerId = UUID.randomUUID();
+        UUID otherId = UUID.randomUUID();
+        Instant now = Instant.now();
+        insert(callerId, now, now);
+        insert(callerId, now, null);
+        insert(otherId, now, now);
+
+        createMockMvc(callerId).perform(delete("/api/notifications/read"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.count").value(1));
+        org.junit.jupiter.api.Assertions.assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM notifications", Integer.class));
+    }
+
+    @Test
+    void retentionDeletesOnlyAConfiguredBoundedBatchOfExpiredRows() {
+        Instant now = Instant.now();
+        Instant oldRead = now.minus(91, java.time.temporal.ChronoUnit.DAYS);
+        Instant oldUnread = now.minus(181, java.time.temporal.ChronoUnit.DAYS);
+        insert(UUID.randomUUID(), oldRead, oldRead);
+        insert(UUID.randomUUID(), oldRead.minusSeconds(1), oldRead.minusSeconds(1));
+        insert(UUID.randomUUID(), oldUnread, null);
+        insert(UUID.randomUUID(), oldUnread.minusSeconds(1), null);
+        insert(UUID.randomUUID(), now.minus(30, java.time.temporal.ChronoUnit.DAYS), now);
+        insert(UUID.randomUUID(), now.minus(30, java.time.temporal.ChronoUnit.DAYS), null);
+
+        NotificationRetentionUseCase retention = new NotificationRetentionUseCase(new NotificationRepositoryAdapter(jdbc));
+        org.junit.jupiter.api.Assertions.assertEquals(2, retention.deleteExpiredBatch(now, 2));
+        org.junit.jupiter.api.Assertions.assertEquals(4, jdbc.queryForObject("SELECT count(*) FROM notifications", Integer.class));
+        org.junit.jupiter.api.Assertions.assertEquals(2, retention.deleteExpiredBatch(now, 2));
+        org.junit.jupiter.api.Assertions.assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM notifications", Integer.class));
+    }
+
+    private void insert(UUID recipientId, Instant createdAt, Instant readAt) {
+        jdbc.update("INSERT INTO notifications(id, source_event_id, recipient_id, actor_id, event_type, created_at, read_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                UUID.randomUUID(), UUID.randomUUID(), recipientId, UUID.randomUUID(), "community.post-commented.v1",
+                java.sql.Timestamp.from(createdAt), readAt == null ? null : java.sql.Timestamp.from(readAt));
     }
 }
 

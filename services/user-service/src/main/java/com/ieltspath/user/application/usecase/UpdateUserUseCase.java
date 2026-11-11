@@ -6,6 +6,7 @@ import com.ieltspath.user.domain.exception.PhoneAlreadyExistsException;
 import com.ieltspath.user.domain.exception.UserNotFoundException;
 import com.ieltspath.user.domain.repository.UserRepository;
 import com.ieltspath.user.domain.vo.PhoneNumber;
+import com.ieltspath.user.application.port.UserLock;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,10 +15,14 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class UpdateUserUseCase {
     private final UserRepository userRepository;
+    private final UserLock userLock;
 
     @Transactional
     public User execute(UpdateUserCommand command) {
         User user = userRepository.findById(command.userId())
+                .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng: " + command.userId()));
+        userLock.lock(user.getId());
+        user = userRepository.findById(command.userId())
                 .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng: " + command.userId()));
         PhoneNumber phoneNumber = PhoneNumber.parse(command.phoneNumber());
         if (phoneNumber.value() != null && userRepository.existsByPhoneNumberAndIdNot(phoneNumber.value(), command.userId())) {
