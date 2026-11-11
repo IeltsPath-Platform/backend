@@ -85,3 +85,6 @@ scripts/listening-test/node_modules/
 
 # Reference clones kept on a developer's machine to read, never tracked (AGENTS.md: third_party/ is not part of the build)
 third_party/
+
+# Service-account keys, never tracked (point FIREBASE_CREDENTIALS_FILE at a file here)
+secrets/
