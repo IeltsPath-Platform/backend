@@ -88,6 +88,13 @@ Response 200:
 - `corrections`: at most 10; `excerpt` is an exact substring of the essay; `category` remains the broad category
   (`GRAMMAR`, `VOCABULARY`, `COHERENCE`, `TASK` or `OTHER`) and the additive `errorCode` identifies a matching active,
   human-approved Content error type. A correction with an unknown, inactive or unapproved `errorCode` is omitted.
+  Each correction also carries `errorName`, `fixHint` and `severity` (1–3) copied from that error type when the grade
+  is stored, and `practiceKnowledgePointId` only when the error type maps to a knowledge point that has a practice set.
+  These fields are absent (not null) on grades stored before they were added and are not backfilled.
+- `model` is stored with the grade for audit (value of `LEARNING_LLM_MODEL`); the learner API does not return it.
+- Quota: a grading that fails for a system reason (`LLM_UNAVAILABLE`, `AI_BUSY`, `RUBRIC_UNAVAILABLE`,
+  `PROMPT_VERSION_UNAVAILABLE`) gives its daily grading unit back. `INVALID_GRADE` keeps the unit, because a malformed
+  output may be caused by the essay itself.
 - `summary` ≤ 600 characters. `passed = overallBand ≥ passBand`. `sampleAnswer` only when `passed` or the block was
   passed before.
 
