@@ -132,6 +132,8 @@ class ProductionEnvironmentTest(unittest.TestCase):
             self.assertEqual(user['APP_AUTH_COOKIE_DOMAIN'], '')
             self.assertEqual(user['DEMO_DATA_ENABLED'], 'false')
             self.assertEqual(user['USER_DB_USERNAME'], 'user_app')
+            self.assertIn('RABBITMQ_PASSWORD', user)
+            self.assertNotIn('RABBITMQ_PASSWORD', gateway)
             if os.name != 'nt':
                 self.assertEqual((root / 'user-service.env').stat().st_mode & 0o777, 0o600)
 

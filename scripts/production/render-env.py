@@ -9,7 +9,7 @@ import sys
 BUSINESS = {'user': 8085, 'content': 8082, 'library': 8081, 'assessment': 8083,
             'access': 8084, 'learning': 8086, 'game': 8087, 'notification': 8088, 'community': 8089}
 REDIS = {'api-gateway', 'user-service', 'game-service', 'notification-service', 'community-service'}
-BROKER = {'assessment', 'access', 'learning', 'notification', 'community'}
+BROKER = {'user', 'assessment', 'access', 'learning', 'notification', 'community'}
 STORAGE = {'user', 'content', 'library', 'assessment', 'learning', 'community'}
 LINKS = {'content': ['library'], 'library': ['access'], 'assessment': ['content', 'user'],
          'learning': ['assessment', 'content', 'access', 'user'], 'game': ['content', 'library'],
