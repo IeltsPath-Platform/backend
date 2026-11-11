@@ -1,7 +1,7 @@
 ---
 title: "Platform hardening: secrets, dead outbox, architecture tests"
 description: "Bỏ secret dự phòng trong config-repo, dọn outbox không có người nhận, thêm test kiến trúc chạy ở CI, và vài chỗ lệch nhỏ"
-status: pending
+status: done
 priority: P1
 branch: "fix/grade-writting-llm"
 tags: [security, config, outbox, archunit, ci, docs]
@@ -44,10 +44,10 @@ nào sai, cái nào bỏ. Chưa có code nào được viết.
 
 | Phase | Việc | Phạm vi | Phụ thuộc | Status |
 | --- | --- | --- | --- | --- |
-| 1 | [Bỏ secret dự phòng](./phase-01-remove-secret-fallbacks.md) | config-repo, docs | - | Pending |
-| 2 | [Dọn outbox không có người nhận](./phase-02-dead-outbox-cleanup.md) | game, content, docs | - | Pending |
-| 3 | [Test kiến trúc ở CI](./phase-03-architecture-tests.md) | pom, test mọi service Java | - | Pending |
-| 4 | [Chỗ lệch nhỏ và tài liệu](./phase-04-small-fixes-and-docs.md) | frontend, docs | - | Pending |
+| 1 | [Bỏ secret dự phòng](./phase-01-remove-secret-fallbacks.md) | config-repo, docs | - | Done |
+| 2 | [Dọn outbox không có người nhận](./phase-02-dead-outbox-cleanup.md) | game, content, docs | - | Done |
+| 3 | [Test kiến trúc ở CI](./phase-03-architecture-tests.md) | pom, test mọi service Java | - | Done (baseline vi phạm cũ chờ backend owner duyệt) |
+| 4 | [Chỗ lệch nhỏ và tài liệu](./phase-04-small-fixes-and-docs.md) | frontend, docs | - | Done |
 
 Các phase độc lập; làm 1 trước vì rủi ro cao nhất và rẻ nhất.
 

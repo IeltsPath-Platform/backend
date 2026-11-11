@@ -1,7 +1,7 @@
 ---
 title: "Production deployment: VPS + Docker Compose, GitHub secrets, frontend on Vercel/Cloudflare Pages"
 description: "CD lần đầu cho IELTSPath: image lên GHCR, deploy qua SSH, secret theo từng service, HTTPS, sao lưu DB, frontend tĩnh trên CDN"
-status: pending
+status: in-progress
 priority: P1
 branch: "chore/production-deployment"
 tags: [deploy, ci-cd, secrets, docker, vercel, security]
@@ -48,11 +48,11 @@ Pages**. Chưa có code nào được viết.
 
 | Phase | Việc | Phụ thuộc | Status |
 | --- | --- | --- | --- |
-| 1 | [Build image lên GHCR](./phase-01-build-images.md) | - | Pending |
-| 2 | [Compose production và reverse proxy](./phase-02-production-compose.md) | 1 | Pending |
-| 3 | [Secret theo từng service](./phase-03-secrets-per-service.md) | hardening phase 1 | Pending |
-| 4 | [Workflow deploy, sao lưu, quay lui](./phase-04-deploy-backup-rollback.md) | 1, 2, 3 | Pending |
-| 5 | [Frontend trên CDN và cookie/CORS](./phase-05-frontend-cdn.md) | 4, tên miền | Pending |
+| 1 | [Build image lên GHCR](./phase-01-build-images.md) | - | Done |
+| 2 | [Compose production và reverse proxy](./phase-02-production-compose.md) | 1 | Done |
+| 3 | [Secret theo từng service](./phase-03-secrets-per-service.md) | hardening phase 1 | Done |
+| 4 | [Workflow deploy, sao lưu, quay lui](./phase-04-deploy-backup-rollback.md) | 1, 2, 3 | File đã viết; chưa chạy thật, chờ VPS, secret, backup |
+| 5 | [Frontend trên CDN và cookie/CORS](./phase-05-frontend-cdn.md) | 4, tên miền | File cấu hình đã viết; chờ tên miền và deploy |
 
 ## Rủi ro
 
