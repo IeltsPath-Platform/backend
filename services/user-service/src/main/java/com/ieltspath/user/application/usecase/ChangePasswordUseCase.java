@@ -1,9 +1,11 @@
 package com.ieltspath.user.application.usecase;
 
+import com.ieltspath.events.user.PasswordChangedV1;
 import com.ieltspath.user.application.command.ChangePasswordCommand;
 import com.ieltspath.user.application.port.UserLock;
 import com.ieltspath.user.domain.aggregate.PasswordChangeAttempts;
 import com.ieltspath.user.domain.aggregate.User;
+import com.ieltspath.user.domain.exception.EmailNotVerifiedException;
 import com.ieltspath.user.domain.exception.PasswordChangeException;
 import com.ieltspath.user.domain.exception.PasswordNotConfiguredException;
 import com.ieltspath.user.domain.exception.UserNotFoundException;
@@ -16,6 +18,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -27,6 +30,7 @@ public class ChangePasswordUseCase {
     private final PasswordEncoder encoder;
     private final UserLock userLock;
     private final PasswordChangeAttemptRepository attemptsRepository;
+    private final UserNoticeOutbox notices;
 
     /**
      * A wrong password ends in an exception, and the failure it just counted must still be saved, so that exception
@@ -47,6 +51,7 @@ public class ChangePasswordUseCase {
                     "Đã nhập sai mật khẩu quá nhiều lần. Vui lòng thử lại sau 15 phút.", true);
         }
         User user = users.findById(userId).orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng"));
+        if (!user.isEmailVerified()) throw new EmailNotVerifiedException();
         if (user.getPasswordHash() == null || user.getPasswordHash().isBlank()) throw new PasswordNotConfiguredException();
         if (!encoder.matches(command.currentPassword(), user.getPasswordHash())) {
             attempts.recordFailure(now);
@@ -60,5 +65,8 @@ public class ChangePasswordUseCase {
         users.save(user);
         refreshTokens.revokeAllActiveForUser(userId, LocalDateTime.now());
         attemptsRepository.deleteByUserId(userId);
+        UUID eventId = UUID.randomUUID();
+        notices.enqueue(eventId, userId, PasswordChangedV1.EVENT_TYPE, new PasswordChangedV1(eventId,
+                PasswordChangedV1.EVENT_TYPE, Instant.now(), userId, user.getEmail().value(), user.getFullName()));
     }
 }

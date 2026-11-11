@@ -11,6 +11,8 @@ import com.ieltspath.access.domain.entity.OutboxEvent;
 import com.ieltspath.access.domain.entity.PointLedgerEntry;
 import com.ieltspath.access.domain.exception.ActivationKeyNotFoundException;
 import com.ieltspath.access.domain.exception.KeyProductNotFoundException;
+import com.ieltspath.access.domain.exception.EmailNotVerifiedException;
+import com.ieltspath.access.domain.repository.UserEmailVerificationRepository;
 import com.ieltspath.access.domain.repository.*;
 import com.ieltspath.access.domain.vo.ActivationKeyCode;
 import com.ieltspath.access.domain.vo.KeyType;
@@ -34,6 +36,7 @@ public class ActivateKeyUseCase {
     private final PointLedgerRepository pointLedgerRepository;
     private final SubscriptionRepository subscriptionRepository;
     private final OutboxEventRepository outboxEventRepository;
+    private final UserEmailVerificationRepository userEmailVerificationRepository;
 
     public ActivateKeyUseCase(
             ActivationKeyRepository activationKeyRepository,
@@ -42,7 +45,8 @@ public class ActivateKeyUseCase {
             PointWalletRepository pointWalletRepository,
             PointLedgerRepository pointLedgerRepository,
             SubscriptionRepository subscriptionRepository,
-            OutboxEventRepository outboxEventRepository
+            OutboxEventRepository outboxEventRepository,
+            UserEmailVerificationRepository userEmailVerificationRepository
     ) {
         this.activationKeyRepository = activationKeyRepository;
         this.keyProductRepository = keyProductRepository;
@@ -51,6 +55,7 @@ public class ActivateKeyUseCase {
         this.pointLedgerRepository = pointLedgerRepository;
         this.subscriptionRepository = subscriptionRepository;
         this.outboxEventRepository = outboxEventRepository;
+        this.userEmailVerificationRepository = userEmailVerificationRepository;
     }
 
     public ActivationResult execute(ActivateKeyCommand command) {
@@ -69,6 +74,11 @@ public class ActivateKeyUseCase {
                     act.getPointsGranted(), act.getPremiumDaysGranted(), act.getHumanGradingCreditsGranted(),
                     act.getActivatedAt(), balance, endsAt
             );
+        }
+
+        // Redeeming a key grants access: the learner must have proven the email address first.
+        if (!userEmailVerificationRepository.isVerified(command.userId())) {
+            throw new EmailNotVerifiedException();
         }
 
         ActivationKeyCode keyCode = ActivationKeyCode.fromRawKey(command.rawKey());

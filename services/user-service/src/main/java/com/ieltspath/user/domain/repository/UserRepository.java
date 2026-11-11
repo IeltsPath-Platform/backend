@@ -16,4 +16,6 @@ public interface UserRepository {
     boolean existsByPhoneNumberAndIdNot(String phoneNumber, UUID id);
     List<UUID> lockActiveAdminUserIds();
     List<User> findAll();
+    /** Up to {@code limit} users whose id sorts after {@code lastId}, in id order, for walking all accounts in batches. */
+    List<User> findAfterId(UUID lastId, int limit);
 }

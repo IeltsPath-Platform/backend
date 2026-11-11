@@ -14,6 +14,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class RegisterUseCase {
     private final CreateUserUseCase createUserUseCase;
+    private final EmailVerificationUseCase emailVerificationUseCase;
 
     @Transactional
     public User execute(RegisterCommand command) {
@@ -24,12 +25,14 @@ public class RegisterUseCase {
             throw new IllegalArgumentException("Public registration only supports the CUSTOMER role");
         }
 
-        return createUserUseCase.execute(new CreateUserCommand(
+        User user = createUserUseCase.execute(new CreateUserCommand(
                 command.email(),
                 command.password(),
                 command.fullName(),
                 command.phoneNumber(),
                 Set.of(RoleName.CUSTOMER.name())
         ));
+        emailVerificationUseCase.issue(user);
+        return user;
     }
 }

@@ -27,8 +27,10 @@ public interface OutboxEventJpaRepository extends JpaRepository<OutboxEventJpaEn
     int recordFailure(@Param("id") UUID id, @Param("error") String error, @Param("maxAttempts") int maxAttempts);
 
     @Modifying
-    @Query(value = "UPDATE outbox_events SET payload = NULL WHERE status = 'FAILED' " +
-            "AND event_type = 'user.password-reset-requested.v1' AND created_at < :olderThan AND payload IS NOT NULL",
+    @Query(value = "UPDATE outbox_events SET payload = NULL, status = 'FAILED' " +
+            "WHERE payload IS NOT NULL AND status <> 'PUBLISHED' AND (" +
+            "(event_type = 'user.password-reset-requested.v1' AND created_at < :resetBefore) OR " +
+            "(event_type = 'user.email-verification-requested.v1' AND created_at < :verificationBefore))",
             nativeQuery = true)
-    int clearExpiredFailedPayloads(@Param("olderThan") Instant olderThan);
+    int expireLinkPayloads(@Param("resetBefore") Instant resetBefore, @Param("verificationBefore") Instant verificationBefore);
 }

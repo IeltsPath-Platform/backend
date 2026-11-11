@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Bài viết của bạn đang được chấm chậm</title>
+</head>
+<body>
+<th:block th:replace="~{_layout :: header}"></th:block>
+  <p>Xin chào <span th:text="${displayName}">bạn</span>,</p>
+  <p>Giáo viên chưa chấm xong bài của bạn đúng hạn. Bạn có thể chờ tiếp hoặc đổi giáo viên.</p>
+  <p><a th:href="${actionLink}">Xem bài chấm</a></p>
+  <p style="font-size:12px;color:#6b7280">Bạn có thể <a th:href="${unsubscribeLink}">tắt email học tập</a> bất cứ lúc nào.</p>
+<th:block th:replace="~{_layout :: footer}"></th:block>
+</body>
+</html>

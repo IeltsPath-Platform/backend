@@ -1,0 +1,6 @@
+Xin chào [(${displayName})],
+
+Dùng liên kết sau để đặt lại mật khẩu trong vòng [(${expiresInMinutes})] phút:
+[(${resetLink})]
+
+Nếu bạn không yêu cầu, hãy bỏ qua email này.

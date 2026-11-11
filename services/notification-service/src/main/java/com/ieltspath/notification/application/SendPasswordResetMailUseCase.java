@@ -8,16 +8,22 @@ import org.springframework.stereotype.Service;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
-import java.util.UUID;
+import java.util.Map;
 
 @Service
 @ConditionalOnExpression("${notification.mail.enabled:false} and '${spring.mail.host:}' != '' and '${notification.mail.from:}' != '' and '${notification.mail.frontend-base-url:}' != ''")
 @RequiredArgsConstructor
 public class SendPasswordResetMailUseCase {
-    private final PasswordResetMailer mailer;
+    private static final String DEFAULT_NAME = "bạn";
+
+    private final MailTemplateRenderer renderer;
+    private final MailSender sender;
     private final MailDeliveryRepository deliveries;
+
     @Value("${notification.mail.frontend-base-url:}") private String frontendBaseUrl;
+    @Value("${notification.mail.templates.password-reset.enabled:true}") private boolean enabled;
 
     public void execute(PasswordResetRequestedV1 event) {
         if (event == null || event.eventId() == null || !PasswordResetRequestedV1.EVENT_TYPE.equals(event.eventType())
@@ -25,11 +31,19 @@ public class SendPasswordResetMailUseCase {
                 || event.resetToken() == null || event.resetToken().isBlank() || event.expiresAt() == null) {
             throw new IllegalArgumentException("Password reset mail event is invalid");
         }
-        if (deliveries.exists(event.eventId()) || !event.expiresAt().isAfter(Instant.now())) return;
+        if (!enabled || !event.expiresAt().isAfter(Instant.now())) return;
+        String templateKey = MailTemplate.PASSWORD_RESET.key();
+        if (deliveries.exists(event.eventId(), templateKey)) return;
+
         String base = frontendBaseUrl == null ? "" : frontendBaseUrl.trim().replaceAll("/+$", "");
         if (base.isBlank()) throw new IllegalArgumentException("Password reset frontend URL is not configured");
         String link = base + "/reset-password?token=" + URLEncoder.encode(event.resetToken(), StandardCharsets.UTF_8);
-        mailer.send(event.email(), event.displayName(), link);
-        deliveries.recordSent(event.eventId(), Instant.now());
+
+        String name = event.displayName() == null || event.displayName().isBlank() ? DEFAULT_NAME : event.displayName();
+        long minutes = Math.max(1, (Duration.between(Instant.now(), event.expiresAt()).getSeconds() + 59) / 60);
+        RenderedMail mail = renderer.render(MailTemplate.PASSWORD_RESET,
+                Map.of("displayName", name, "resetLink", link, "expiresInMinutes", minutes));
+        sender.send(event.email(), mail);
+        deliveries.recordSent(event.eventId(), templateKey, Instant.now());
     }
 }

@@ -56,4 +56,29 @@ public class NotificationRepositoryAdapter implements NotificationRepository {
         return jdbc.update("UPDATE notifications SET read_at=? WHERE recipient_id=? AND read_at IS NULL",
                 Timestamp.from(readAt), recipientId);
     }
+
+    @Override
+    public boolean deleteByRecipient(UUID id, UUID recipientId) {
+        return jdbc.update("DELETE FROM notifications WHERE id=? AND recipient_id=?", id, recipientId) > 0;
+    }
+
+    @Override
+    public int deleteReadByRecipient(UUID recipientId) {
+        return jdbc.update("DELETE FROM notifications WHERE recipient_id=? AND read_at IS NOT NULL", recipientId);
+    }
+
+    @Override
+    public int deleteExpiredBatch(Instant readBefore, Instant unreadBefore, int batchSize) {
+        return jdbc.update("""
+                WITH expired AS (
+                    SELECT id FROM notifications
+                    WHERE (read_at IS NOT NULL AND created_at < ?)
+                       OR (read_at IS NULL AND created_at < ?)
+                    ORDER BY created_at, id
+                    LIMIT ?
+                    FOR UPDATE SKIP LOCKED
+                )
+                DELETE FROM notifications n USING expired e WHERE n.id=e.id
+                """, Timestamp.from(readBefore), Timestamp.from(unreadBefore), batchSize);
+    }
 }

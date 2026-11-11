@@ -40,7 +40,9 @@ public class OutboxEventRepositoryAdapter implements OutboxEventRepository {
         jpa.recordFailure(id, safe.substring(0, Math.min(safe.length(), MAX_ERROR_LENGTH)), maxAttempts);
     }
 
-    @Override public int clearExpiredFailedPayloads(Instant olderThan) { return jpa.clearExpiredFailedPayloads(olderThan); }
+    @Override public int expireLinkPayloads(Instant resetBefore, Instant verificationBefore) {
+        return jpa.expireLinkPayloads(resetBefore, verificationBefore);
+    }
 
     private OutboxEvent toDomain(OutboxEventJpaEntity row) {
         return new OutboxEvent(row.getId(), row.getAggregateType(), row.getAggregateId(), row.getEventType(),

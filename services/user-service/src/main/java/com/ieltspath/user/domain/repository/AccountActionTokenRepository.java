@@ -14,6 +14,8 @@ public interface AccountActionTokenRepository {
     Optional<AccountActionToken> findByTokenHash(String tokenHash);
     Optional<AccountActionToken> findByTokenHashAndPurpose(String tokenHash, ActionTokenPurpose purpose);
     boolean consumePasswordResetToken(String tokenHash, java.time.LocalDateTime consumedAt);
+    /** Marks an unused, unexpired token of the given purpose as used. Returns false when it was not consumable. */
+    boolean consumeToken(String tokenHash, ActionTokenPurpose purpose, LocalDateTime consumedAt);
     int invalidateUnusedForUser(UUID userId, ActionTokenPurpose purpose, LocalDateTime invalidatedAt);
     Optional<LocalDateTime> findLatestCreatedAt(UUID userId, ActionTokenPurpose purpose);
     List<AccountActionToken> findByUserId(UUID userId);

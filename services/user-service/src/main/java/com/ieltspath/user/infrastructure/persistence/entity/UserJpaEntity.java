@@ -68,6 +68,9 @@ public class UserJpaEntity {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    @Column(name = "email_verified_at")
+    private LocalDateTime emailVerifiedAt;
+
     @PrePersist
     void prePersist() {
         LocalDateTime now = LocalDateTime.now();

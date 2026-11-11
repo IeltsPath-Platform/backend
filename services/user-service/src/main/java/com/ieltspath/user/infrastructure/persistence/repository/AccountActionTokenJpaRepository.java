@@ -19,6 +19,11 @@ public interface AccountActionTokenJpaRepository extends JpaRepository<AccountAc
     @Query("update AccountActionTokenJpaEntity token set token.usedAt = :consumedAt where token.tokenHash = :tokenHash and token.purpose = com.ieltspath.user.domain.vo.ActionTokenPurpose.PASSWORD_RESET and token.usedAt is null and token.expiresAt > :consumedAt")
     int consumePasswordResetToken(@Param("tokenHash") String tokenHash, @Param("consumedAt") java.time.LocalDateTime consumedAt);
     @Modifying
+    @Query("update AccountActionTokenJpaEntity token set token.usedAt = :consumedAt where token.tokenHash = :tokenHash and token.purpose = :purpose and token.usedAt is null and token.expiresAt > :consumedAt")
+    int consumeToken(@Param("tokenHash") String tokenHash, @Param("purpose") ActionTokenPurpose purpose,
+                     @Param("consumedAt") LocalDateTime consumedAt);
+
+    @Modifying
     @Query("update AccountActionTokenJpaEntity token set token.usedAt = :invalidatedAt " +
             "where token.user.id = :userId and token.purpose = :purpose and token.usedAt is null")
     int invalidateUnusedForUser(@Param("userId") UUID userId, @Param("purpose") ActionTokenPurpose purpose,

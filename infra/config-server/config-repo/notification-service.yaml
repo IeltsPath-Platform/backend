@@ -49,12 +49,44 @@ app:
         patterns:
           - /actuator/health
           - /actuator/info
+          - /mail/unsubscribe
 
 notification:
+  retention:
+    cleanup-interval: ${NOTIFICATION_RETENTION_CLEANUP_INTERVAL:PT6H}
+    initial-delay: ${NOTIFICATION_RETENTION_INITIAL_DELAY:PT2M}
+    batch-size: ${NOTIFICATION_RETENTION_BATCH_SIZE:500}
   mail:
     enabled: ${NOTIFICATION_MAIL_ENABLED:false}
     from: ${MAIL_FROM:}
     frontend-base-url: ${FRONTEND_BASE_URL:}
+    templates:
+      password-reset:
+        enabled: ${NOTIFICATION_MAIL_PASSWORD_RESET_ENABLED:true}
+      password-changed:
+        enabled: ${NOTIFICATION_MAIL_PASSWORD_CHANGED_ENABLED:true}
+      google-account-linked:
+        enabled: ${NOTIFICATION_MAIL_GOOGLE_ACCOUNT_LINKED_ENABLED:true}
+      email-verification:
+        enabled: ${NOTIFICATION_MAIL_EMAIL_VERIFICATION_ENABLED:true}
+      subscription-expiring:
+        enabled: ${NOTIFICATION_MAIL_SUBSCRIPTION_EXPIRING_ENABLED:true}
+      subscription-expired:
+        enabled: ${NOTIFICATION_MAIL_SUBSCRIPTION_EXPIRED_ENABLED:true}
+      essay-graded:
+        enabled: ${NOTIFICATION_MAIL_ESSAY_GRADED_ENABLED:true}
+      grading-overdue:
+        enabled: ${NOTIFICATION_MAIL_GRADING_OVERDUE_ENABLED:true}
+      result-ready:
+        enabled: ${NOTIFICATION_MAIL_RESULT_READY_ENABLED:true}
+      examiner-due-soon:
+        enabled: ${NOTIFICATION_MAIL_EXAMINER_DUE_SOON_ENABLED:true}
+      examiner-new-jobs:
+        enabled: ${NOTIFICATION_MAIL_EXAMINER_NEW_JOBS_ENABLED:true}
+      subscription-granted:
+        enabled: ${NOTIFICATION_MAIL_SUBSCRIPTION_GRANTED_ENABLED:true}
+    unsubscribe-secret: ${NOTIFICATION_MAIL_UNSUBSCRIBE_SECRET:}
+    api-base-url: ${NOTIFICATION_API_BASE_URL:http://localhost:8080}
   push:
     enqueue-enabled: ${NOTIFICATION_PUSH_ENQUEUE_ENABLED:false}
     worker-enabled: ${NOTIFICATION_PUSH_WORKER_ENABLED:false}

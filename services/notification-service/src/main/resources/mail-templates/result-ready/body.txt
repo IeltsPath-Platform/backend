@@ -1,0 +1,7 @@
+Xin chào [(${displayName})],
+
+Kết quả bài đầu vào hoặc bài thi thử của bạn đã được chấm xong. Xem band và phân tích chi tiết.
+
+Xem kết quả: [(${actionLink})]
+
+Bạn có thể tắt email học tập bất cứ lúc nào tại đây: [(${unsubscribeLink})]

@@ -26,8 +26,15 @@ the User Service verifies it against Google's JWKS before looking up any account
 ## Account matching and sessions
 
 The service looks up `(GOOGLE, sub)` first, then the verified email, and creates a `CUSTOMER` account if neither exists.
-When linking to an existing password account, the service clears its password and revokes all active refresh tokens while
-holding the per-user lock. Password sign-in then fails until the user sets a new password through the reset email flow.
+Google has already confirmed the email (`email_verified`), so linking to an existing account that was not yet verified marks
+it verified and publishes `user.email-verification-state.v1` with `verified=true`; a newly created Google account publishes
+the same state.
+
+When the existing account was **unverified** and has a password, that password may have been set by someone other than the
+address owner, so the service clears it and revokes all active refresh tokens while holding the per-user lock. Password
+sign-in then fails until the user sets a new password through the reset email flow. A **verified** account keeps its
+password and can sign in with either method. A `user.google-account-linked.v1` event is published whenever a Google identity
+is newly linked to an account that already existed.
 
 An access token issued before linking remains valid until it expires (at most one hour). Access tokens are not revoked by
 this flow. Unlinking the only login identity remains prohibited by the existing OAuth unlink rule.

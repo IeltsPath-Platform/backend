@@ -52,6 +52,11 @@ public class AccountActionTokenRepositoryAdapter implements AccountActionTokenRe
     }
 
     @Override
+    public boolean consumeToken(String tokenHash, ActionTokenPurpose purpose, LocalDateTime consumedAt) {
+        return accountActionTokenJpaRepository.consumeToken(tokenHash, purpose, consumedAt) == 1;
+    }
+
+    @Override
     public int invalidateUnusedForUser(UUID userId, ActionTokenPurpose purpose, LocalDateTime invalidatedAt) {
         return accountActionTokenJpaRepository.invalidateUnusedForUser(userId, purpose, invalidatedAt);
     }

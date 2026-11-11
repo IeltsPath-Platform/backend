@@ -21,6 +21,9 @@ public interface UserJpaRepository extends JpaRepository<UserJpaEntity, UUID> {
     @EntityGraph(attributePaths = "roles")
     List<UserJpaEntity> findAll();
 
+    // No entity graph: fetching the roles collection together with a page limit would page in memory.
+    List<UserJpaEntity> findByIdGreaterThanOrderByIdAsc(UUID id, org.springframework.data.domain.Pageable pageable);
+
     boolean existsByEmail(String email);
     boolean existsByPhoneNumber(String phoneNumber);
     boolean existsByPhoneNumberAndIdNot(String phoneNumber, UUID id);
