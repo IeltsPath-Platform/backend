@@ -64,12 +64,15 @@ class AiEvaluationControllerWebMvcTest {
     }
 
     @Test @WithMockUser(roles = "CUSTOMER") void internalLookupDistinguishesBootstrapAndActivatedTasks() throws Exception {
-        when(activations.activatedVersion("TASK_2")).thenReturn("IELTS_WRITING_TASK_2@1+tplv1");
+        when(activations.activation("TASK_2")).thenReturn(new PromptActivationProvider.Activation(
+                "IELTS_WRITING_TASK_2@1+tplv1", "gpt-test", "low"));
         mvc.perform(get("/internal/assessments/ai-prompt-activations").param("task", "TASK_1"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.task").value("TASK_1"))
                 .andExpect(jsonPath("$.promptVersion").isEmpty());
         mvc.perform(get("/internal/assessments/ai-prompt-activations").param("task", "TASK_2"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.promptVersion").value("IELTS_WRITING_TASK_2@1+tplv1"));
+                .andExpect(status().isOk()).andExpect(jsonPath("$.promptVersion").value("IELTS_WRITING_TASK_2@1+tplv1"))
+                .andExpect(jsonPath("$.model").value("gpt-test"))
+                .andExpect(jsonPath("$.reasoningEffort").value("low"));
     }
 
     @Test @WithMockUser(roles = "CONTENT_AUTHOR") void activationOfUnpassedRunReturnsConflictWithStableCode() throws Exception {
