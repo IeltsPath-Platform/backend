@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Writing error catalog"
-status: pending
+status: code done, chờ chuyên gia duyệt mã mới và bước eval (số nền)
 priority: P1
 dependencies: []
 ---

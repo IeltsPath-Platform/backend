@@ -76,7 +76,7 @@ examiner là một bài trong bộ (quyết định 9).
 | 0b | [Thư viện LLM dùng chung, template một nguồn](./phase-00b-shared-llm-client.md) | shared, learning, assessment, content | 0 | Không (request Assessment đổi có chủ đích) | In progress |
 | 1 | [Đo độ bao phủ lỗi](./phase-01-error-coverage-metric.md) | assessment, frontend | 0b | Có (admin API) | Code xong, chờ bộ bài examiner (số nền) |
 | 2 | [Sửa nhỏ không đổi prompt](./phase-02-quick-fixes-without-prompt-change.md) | learning | 0b | Không (khớp lại contract) | Xong, chờ 0b cho metric LLM |
-| 3 | [Danh mục lỗi Writing](./phase-03-writing-error-catalog.md) | content, learning, assessment | duyệt chuyên gia | Có | Pending |
+| 3 | [Danh mục lỗi Writing](./phase-03-writing-error-catalog.md) | content, learning, assessment | duyệt chuyên gia | Có | Code xong, chờ chuyên gia duyệt mã mới |
 | 4 | [Prompt v2](./phase-04-prompt-v2.md) | learning, assessment, docs | 1, 2, 3 | Có | Pending |
 | 5 | [Kiểm số liệu Task 1](./phase-05-task-1-data-checks.md) | learning, assessment (template) | 4 | Có | Pending |
 | 6 | [Luật cứng cho band](./phase-06-band-caps.md) | learning (domain) | 4, examiner duyệt ngưỡng | Có | Pending |
