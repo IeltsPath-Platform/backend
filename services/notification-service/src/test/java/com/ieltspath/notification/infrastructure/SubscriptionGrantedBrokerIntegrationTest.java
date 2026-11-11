@@ -80,6 +80,10 @@ class SubscriptionGrantedBrokerIntegrationTest {
     @BeforeEach
     void clean() {
         jdbc.update("DELETE FROM notifications");
+        // The queues live as long as the broker container, so a message dead-lettered late by one test must not reach the next.
+        for (String queue : new String[] {SubscriptionGrantedTopology.RETRY_QUEUE, SubscriptionGrantedTopology.DLQ}) {
+            rabbit.execute(channel -> channel.queuePurge(queue));
+        }
     }
 
     private static SubscriptionGrantedV1 event(UUID learner) {
