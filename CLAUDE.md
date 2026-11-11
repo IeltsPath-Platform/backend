@@ -111,8 +111,8 @@ CI (`.github/workflows/ci.yml`) chạy `mvn -B -ntp verify` cả reactor và `do
 - Mặc định `*_DB_URL` trong config-repo của mọi service nghiệp vụ trỏ `localhost:5440`, cổng PostgreSQL của Compose; chỉ cần đặt
   `<SERVICE>_DB_PASSWORD` trong `.env` khi chạy trên host. Nếu DB chạy nơi khác, đặt thêm `<SERVICE>_DB_URL`.
 - assessment dùng RabbitMQ với `RABBITMQ_USERNAME`/`RABBITMQ_PASSWORD` từ `.env`; mặc định `guest` sẽ bị broker từ chối.
-- `GATEWAY_INTERNAL_JWT_SECRET` phải giống nhau ở Gateway, mọi service Java, lệch là 401. Config-repo có giá
-  trị fallback cho secret (thiếu biến env thì chạy bằng secret công khai trong repo): không dựa vào, không tự sửa, báo người dùng.
+- `GATEWAY_INTERNAL_JWT_SECRET` phải giống nhau ở Gateway, mọi service Java, lệch là 401. Config-repo không còn giá
+  trị dự phòng cho JWT, mật khẩu DB, RabbitMQ hoặc Redis: thiếu biến bắt buộc thì service không khởi động. Copy `.env.example` thành `.env` rồi điền giá trị riêng.
 - Assessment phát `COURSE_GATE` cho bài thi `COURSE_TEST`; Learning phải được cập nhật để nhận type này trước khi Assessment
   phát event. Nếu event đến Learning bản cũ, nó vào DLQ; restart Learning rồi replay theo quy trình trong contract.
 - Essay đã nộp trong `TOPIC_GATE`/`COURSE_GATE` được chấm LLM miễn phí; thiếu cấu hình, LLM lỗi hoặc hết quota ngày thì

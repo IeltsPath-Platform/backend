@@ -3,11 +3,11 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
+      password: ${REDIS_PASSWORD}
   datasource:
     url: ${COMMUNITY_DB_URL:jdbc:postgresql://localhost:5440/community_db}
     username: ${COMMUNITY_DB_USERNAME:postgres}
-    password: ${COMMUNITY_DB_PASSWORD:123456}
+    password: ${COMMUNITY_DB_PASSWORD}
   jpa:
     hibernate:
       ddl-auto: validate
@@ -55,7 +55,7 @@ app:
       secret-key: ${SUPABASE_SECRET_KEY:}
   auth:
     internal-jwt-issuer: ${INTERNAL_JWT_ISSUER:urn:code-base:api-gateway}
-    internal-jwt-secret: ${GATEWAY_INTERNAL_JWT_SECRET:HK5r8WcYA8J8jo2ruIBCEXRcHhUfSDUqP16H29P1sxo=}
+    internal-jwt-secret: ${GATEWAY_INTERNAL_JWT_SECRET}
   security:
     public-endpoints:
       - method: GET
