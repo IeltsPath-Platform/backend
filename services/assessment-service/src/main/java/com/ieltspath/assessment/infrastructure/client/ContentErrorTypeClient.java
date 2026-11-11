@@ -59,6 +59,12 @@ public class ContentErrorTypeClient implements ErrorTypeCatalog {
         return fetch("/internal/learning-content/error-types");
     }
 
+    /** {@code skill} is a fixed enum name from the grader, so it needs no escaping in the query. */
+    @Override
+    public List<ErrorType> activeErrorTypes(String skill) {
+        return fetch("/internal/learning-content/error-types?skill=" + skill);
+    }
+
     private List<ErrorType> fetch(String path) {
         List<ErrorTypeResponse> response;
         try {

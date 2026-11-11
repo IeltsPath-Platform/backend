@@ -87,7 +87,7 @@ public class OpenAiCompatibleEssayGrader implements EssayGradingPort {
         }
         try {
             ActiveRubricProvider.Rubric rubric = resolveRubric(prompt);
-            var activeErrorTypes = errorTypes.activeErrorTypes();
+            var activeErrorTypes = errorTypes.activeErrorTypes("WRITING");
             Set<String> allowedErrorCodes = activeErrorTypes.stream().map(ErrorTypeCatalog.ErrorType::code)
                     .filter(java.util.Objects::nonNull).collect(java.util.stream.Collectors.toSet());
             String response = client.chat(new ChatRequest("writing-grading",
