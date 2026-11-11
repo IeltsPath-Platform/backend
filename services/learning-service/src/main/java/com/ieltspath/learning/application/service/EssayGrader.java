@@ -313,14 +313,19 @@ public class EssayGrader {
                     || code == null || !allowedCodes.containsKey(code)) continue;
             ErrorType errorType = allowedCodes.get(code);
             UUID practiceKnowledgePointId = errorType.knowledgePointId();
+            String practiceKnowledgePointCode = null;
             if (practiceKnowledgePointId != null) {
                 if (knowledgePoints == null) knowledgePoints = catalog.get();
                 LearningContentClient.KnowledgePoint knowledgePoint = knowledgePoints.get(practiceKnowledgePointId);
-                if (knowledgePoint == null || !knowledgePoint.hasPracticeSet()) practiceKnowledgePointId = null;
+                if (knowledgePoint == null || !knowledgePoint.hasPracticeSet()) {
+                    practiceKnowledgePointId = null;
+                } else {
+                    practiceKnowledgePointCode = knowledgePoint.code();
+                }
             }
             values.add(new WritingGrade.Correction(truncate(excerpt, MAX_ITEM_CHARS),
                     truncate(suggestion, MAX_ITEM_CHARS), errorType.category(), code, errorType.name(),
-                    errorType.fixHint(), errorType.severity(), practiceKnowledgePointId));
+                    errorType.fixHint(), errorType.severity(), practiceKnowledgePointId, practiceKnowledgePointCode));
         }
         return List.copyOf(values);
     }

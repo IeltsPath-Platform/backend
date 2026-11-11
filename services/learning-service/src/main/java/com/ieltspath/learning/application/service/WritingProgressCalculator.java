@@ -95,7 +95,8 @@ public final class WritingProgressCalculator {
     private static RecurringError recurringError(String code, Tally tally, int essaysTotal,
                                                  Map<String, ErrorTypeTexts.Text> texts) {
         return new RecurringError(code, nameOf(code, tally.latest, texts), fixHintOf(code, tally.latest, texts),
-                tally.latest.practiceKnowledgePointId(), tally.essayIndexes.size(), essaysTotal, tally.lastSeen);
+                tally.latest.practiceKnowledgePointId(), tally.latest.practiceKnowledgePointCode(),
+                tally.essayIndexes.size(), essaysTotal, tally.lastSeen);
     }
 
     private static Point point(WritingProgressEssay essay) {

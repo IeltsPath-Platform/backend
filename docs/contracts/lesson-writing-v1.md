@@ -89,7 +89,7 @@ Response 200:
   (`GRAMMAR`, `VOCABULARY`, `COHERENCE`, `TASK` or `OTHER`) and the additive `errorCode` identifies a matching active,
   human-approved Content error type. A correction with an unknown, inactive or unapproved `errorCode` is omitted.
   Each correction also carries `errorName`, `fixHint` and `severity` (1–3) copied from that error type when the grade
-  is stored, and `practiceKnowledgePointId` only when the error type maps to a knowledge point that has a practice set.
+  is stored, and `practiceKnowledgePointId` with `practiceKnowledgePointCode` only when the error type maps to a knowledge point that has a practice set.
   These fields are absent (not null) on grades stored before they were added and are not backfilled.
 - `model` is stored with the grade for audit (value of `LEARNING_LLM_MODEL`); the learner API does not return it.
 - Quota: a grading that fails for a system reason (`LLM_UNAVAILABLE`, `AI_BUSY`, `RUBRIC_UNAVAILABLE`,

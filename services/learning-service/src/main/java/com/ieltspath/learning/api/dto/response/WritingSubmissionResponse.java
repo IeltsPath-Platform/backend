@@ -25,7 +25,8 @@ public record WritingSubmissionResponse(UUID submissionId, String status, String
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record Correction(String excerpt, String suggestion, String category, String errorCode, String errorName,
-                             String fixHint, Integer severity, UUID practiceKnowledgePointId) {}
+                             String fixHint, Integer severity, UUID practiceKnowledgePointId,
+                             String practiceKnowledgePointCode) {}
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record StudyPoint(String kind, String criterionCode, BigDecimal band, UUID knowledgePointId, String code,
@@ -44,7 +45,7 @@ public record WritingSubmissionResponse(UUID submissionId, String status, String
                 grade == null ? null : grade.corrections().stream().map(correction -> new Correction(
                         correction.excerpt(), correction.suggestion(), correction.category(), correction.errorCode(),
                         correction.errorName(), correction.fixHint(), correction.severity(),
-                        correction.practiceKnowledgePointId())).toList(),
+                        correction.practiceKnowledgePointId(), correction.practiceKnowledgePointCode())).toList(),
                 grade == null ? null : grade.studyPoints().stream().map(point -> new StudyPoint(point.kind(),
                         point.criterionCode(), point.band(), point.knowledgePointId(), point.code(), point.name(),
                         point.title(), point.reason(), point.excerpt(), point.practiceKnowledgePointId())).toList(),

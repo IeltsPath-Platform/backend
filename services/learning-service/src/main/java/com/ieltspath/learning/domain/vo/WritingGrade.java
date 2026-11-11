@@ -62,14 +62,21 @@ public record WritingGrade(List<Criterion> criteria, List<Correction> correction
     }
 
     /** {@code excerpt} is an exact substring of the essay. */
+    /** {@code practiceKnowledgePointCode} is set with {@code practiceKnowledgePointId}; null for grades stored before it. */
     public record Correction(String excerpt, String suggestion, String category, String errorCode, String errorName,
-                             String fixHint, Integer severity, UUID practiceKnowledgePointId) {
+                             String fixHint, Integer severity, UUID practiceKnowledgePointId,
+                             String practiceKnowledgePointCode) {
+        public Correction(String excerpt, String suggestion, String category, String errorCode, String errorName,
+                          String fixHint, Integer severity, UUID practiceKnowledgePointId) {
+            this(excerpt, suggestion, category, errorCode, errorName, fixHint, severity, practiceKnowledgePointId, null);
+        }
+
         public Correction(String excerpt, String suggestion, String category) {
-            this(excerpt, suggestion, category, null, null, null, null, null);
+            this(excerpt, suggestion, category, null, null, null, null, null, null);
         }
 
         public Correction(String excerpt, String suggestion, String category, String errorCode) {
-            this(excerpt, suggestion, category, errorCode, null, null, null, null);
+            this(excerpt, suggestion, category, errorCode, null, null, null, null, null);
         }
     }
 

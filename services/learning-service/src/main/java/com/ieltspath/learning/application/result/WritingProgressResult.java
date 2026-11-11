@@ -19,7 +19,8 @@ public record WritingProgressResult(List<TaskProgress> tasks) {
 
     /** An error code seen in the window; {@code essaysWithError} counts essays, not corrections. */
     public record RecurringError(String errorCode, String errorName, String fixHint, UUID practiceKnowledgePointId,
-                                 int essaysWithError, int essaysTotal, Instant lastSeenAt) {}
+                                 String practiceKnowledgePointCode, int essaysWithError, int essaysTotal,
+                                 Instant lastSeenAt) {}
 
     /** An error code absent from the last {@code cleanEssaysSince} essays of its task. A signal, not a mastery verdict. */
     public record FixedError(String errorCode, String errorName, Instant lastSeenAt, int cleanEssaysSince) {}

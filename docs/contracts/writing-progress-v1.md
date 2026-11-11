@@ -60,8 +60,9 @@ LLM, change mastery, evidence, gates or quota, and it does not return essay text
 
 - `points`: one per essay, criteria keyed `TA`/`TR`, `CC`, `LR`, `GRA`. Bands are the stored bands.
 - `recurringErrors`: at most 10. Counted per essay: an error code listed twice in one grade counts once.
-  Sorted by `essaysWithError` descending, then by severity descending. `practiceKnowledgePointId` is present only when
-  the error type maps to a knowledge point with a practice set.
+  Sorted by `essaysWithError` descending, then by severity descending. `practiceKnowledgePointId` and
+  `practiceKnowledgePointCode` are present only when the error type maps to a knowledge point with a practice set.
+  The code is copied into the grade when it is graded; grades stored before that have neither field.
 - `fixedErrors`: a code whose last occurrence is followed by at least `learning.writing.progress-fixed-after` clean
   essays of the same task (default 2). `cleanEssaysSince` counts those essays. This is a signal, not a mastery verdict.
 - `insufficient`: true when the task has fewer than 3 essays. The lists are then still returned.
