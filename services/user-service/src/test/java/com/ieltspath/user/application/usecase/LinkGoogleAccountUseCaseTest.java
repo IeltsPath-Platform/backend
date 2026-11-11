@@ -1,5 +1,7 @@
 package com.ieltspath.user.application.usecase;
 
+import com.ieltspath.events.user.GoogleAccountLinkedV1;
+import com.ieltspath.events.user.UserEmailVerificationStateV1;
 import com.ieltspath.user.application.exception.GoogleAccountConflictException;
 import com.ieltspath.user.application.exception.GoogleAccountNotActiveException;
 import com.ieltspath.user.application.exception.GoogleEmailNotSupportedException;
@@ -63,7 +65,7 @@ class LinkGoogleAccountUseCaseTest {
     }
 
     @Test
-    void linksMatchingPasswordAccountAndRevokesPasswordSessions() {
+    void linksAVerifiedPasswordAccountAndKeepsItsPassword() {
         when(users.findByEmail("learner@gmail.com")).thenReturn(Optional.of(customerWithPassword));
         when(identities.findByProviderAndProviderSubject(OAuthProvider.GOOGLE, "google-sub"))
                 .thenReturn(Optional.empty());
@@ -73,14 +75,38 @@ class LinkGoogleAccountUseCaseTest {
 
         assertThat(result.userId()).isEqualTo(userId);
         assertThat(result.tokens()).isEqualTo(tokens);
-        assertThat(customerWithPassword.getPasswordHash()).isNull();
+        assertThat(customerWithPassword.getPasswordHash()).isEqualTo("hash");
         verify(userLock).lock(userId);
-        verify(users).clearPasswordHash(userId);
-        verify(refreshTokens).revokeAllActiveForUser(eq(userId), any());
+        verify(users, never()).clearPasswordHash(userId);
+        verify(refreshTokens, never()).revokeAllActiveForUser(eq(userId), any());
+        verify(notices).enqueue(any(), eq(userId), eq(GoogleAccountLinkedV1.EVENT_TYPE), any());
+        verify(notices, never()).enqueue(any(), eq(userId), eq(UserEmailVerificationStateV1.EVENT_TYPE), any());
         ArgumentCaptor<OAuthIdentity> identity = ArgumentCaptor.forClass(OAuthIdentity.class);
         verify(identities).save(identity.capture());
         assertThat(identity.getValue().getProviderSubject()).isEqualTo("google-sub");
         assertThat(identity.getValue().getLastAuthenticatedAt()).isNotNull();
+    }
+
+    @Test
+    void verifiesAnUnverifiedAccountAndRemovesThePasswordNobodyProved() {
+        User unverified = User.builder().id(userId).email(new Email("learner@gmail.com")).passwordHash("hash")
+                .fullName("Learner").status(UserStatus.ACTIVE)
+                .roles(Set.of(Role.builder().id(UUID.randomUUID()).name(RoleName.CUSTOMER).build())).build();
+        when(users.findByEmail("learner@gmail.com")).thenReturn(Optional.of(unverified));
+        when(users.findById(userId)).thenReturn(Optional.of(unverified));
+        when(identities.findByProviderAndProviderSubject(OAuthProvider.GOOGLE, "google-sub"))
+                .thenReturn(Optional.empty());
+        when(identities.findByUserIdAndProvider(userId, OAuthProvider.GOOGLE)).thenReturn(Optional.empty());
+
+        useCase.execute(new GoogleIdentity("google-sub", "learner@gmail.com", "Learner", null));
+
+        assertThat(unverified.isEmailVerified()).isTrue();
+        assertThat(unverified.getPasswordHash()).isNull();
+        verify(users).clearPasswordHash(userId);
+        verify(refreshTokens).revokeAllActiveForUser(eq(userId), any());
+        verify(users).save(unverified);
+        verify(notices).enqueue(any(), eq(userId), eq(UserEmailVerificationStateV1.EVENT_TYPE), any());
+        verify(notices).enqueue(any(), eq(userId), eq(GoogleAccountLinkedV1.EVENT_TYPE), any());
     }
 
     @Test
@@ -99,6 +125,8 @@ class LinkGoogleAccountUseCaseTest {
         assertThat(created.getValue().getPasswordHash()).isNull();
         assertThat(created.getValue().getRoles()).extracting(Role::getName).containsExactly(RoleName.CUSTOMER);
         verify(refreshTokens, never()).revokeAllActiveForUser(eq(userId), any());
+        verify(notices).enqueue(any(), eq(userId), eq(UserEmailVerificationStateV1.EVENT_TYPE), any());
+        verify(notices, never()).enqueue(any(), any(), eq(GoogleAccountLinkedV1.EVENT_TYPE), any());
     }
 
     @Test

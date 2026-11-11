@@ -42,22 +42,67 @@ class LearningMailUseCaseTest {
         when(renderer.render(any(), anyMap())).thenReturn(RENDERED);
         when(repository.learningEnabled(any())).thenReturn(true);
         when(deliveries.reserveDailyNonSecuritySlot(any(), any(), any(), any(), any())).thenReturn(true);
+        when(deliveries.reserveDailyNonSecuritySlot(any(), any(), any(), any(), any())).thenReturn(true);
         useCase = new LearningMailUseCase(renderer, sender, deliveries, repository, new MailUnsubscribeTokens(SECRET));
         ReflectionTestUtils.setField(useCase, "frontendBaseUrl", "https://learn.example.test/");
         ReflectionTestUtils.setField(useCase, "apiBaseUrl", "https://api.example.test");
     }
 
     @Test
-    void examinerDigestSendsOneMailPerExaminerAndClearsTheJobs() {
+    void examinerDigestSendsOneMailPerExaminerAndClaimsTheJobs() {
         UUID examiner = UUID.randomUUID();
+        List<UUID> jobs = List.of(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
         when(repository.examinersWithPendingJobs()).thenReturn(List.of(examiner));
-        when(repository.pendingExaminerJobCount(examiner)).thenReturn(3);
+        when(repository.claimPendingExaminerJobs(examiner)).thenReturn(jobs);
         when(repository.findContact(examiner)).thenReturn(Optional.of(new LearningMailRepository.Contact("ex@example.test", "Cô Lan")));
 
         assertEquals(1, useCase.flushExaminerDigests(Instant.now()));
 
         verify(sender).send(eq("ex@example.test"), eq(RENDERED));
-        verify(repository).clearPendingExaminerJobs(examiner);
+        verify(repository, never()).addPendingExaminerJob(any(), any(), any());
+    }
+
+    @Test
+    void examinerDigestKeepsTheJobsWhenTheDailyCapHoldsTheMail() {
+        UUID examiner = UUID.randomUUID();
+        List<UUID> jobs = List.of(UUID.randomUUID(), UUID.randomUUID());
+        when(repository.examinersWithPendingJobs()).thenReturn(List.of(examiner));
+        when(repository.claimPendingExaminerJobs(examiner)).thenReturn(jobs);
+        when(repository.findContact(examiner)).thenReturn(Optional.of(new LearningMailRepository.Contact("ex@example.test", "Cô Lan")));
+        when(deliveries.reserveDailyNonSecuritySlot(any(), any(), any(), any(), any())).thenReturn(false);
+
+        assertEquals(0, useCase.flushExaminerDigests(Instant.now()));
+
+        verify(sender, never()).send(any(), any());
+        verify(repository).addPendingExaminerJob(eq(jobs.get(0)), eq(examiner), any());
+        verify(repository).addPendingExaminerJob(eq(jobs.get(1)), eq(examiner), any());
+    }
+
+    @Test
+    void examinerDigestDropsTheJobsWhenTheExaminerSwitchedMailOff() {
+        UUID examiner = UUID.randomUUID();
+        when(repository.examinersWithPendingJobs()).thenReturn(List.of(examiner));
+        when(repository.claimPendingExaminerJobs(examiner)).thenReturn(List.of(UUID.randomUUID()));
+        when(repository.findContact(examiner)).thenReturn(Optional.of(new LearningMailRepository.Contact("ex@example.test", "Cô Lan")));
+        when(repository.learningEnabled(examiner)).thenReturn(false);
+
+        assertEquals(0, useCase.flushExaminerDigests(Instant.now()));
+
+        verify(repository, never()).addPendingExaminerJob(any(), any(), any());
+    }
+
+    @Test
+    void mailThatLeftIsNotRetriedWhenItsRecordFails() {
+        UUID learner = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        when(deliveries.exists(eventId, "essay-graded")).thenReturn(false);
+        when(repository.findContact(learner)).thenReturn(Optional.of(new LearningMailRepository.Contact("learner@example.test", "An")));
+        org.mockito.Mockito.doThrow(new IllegalStateException("db down")).when(deliveries).recordSent(any(), any(), any());
+
+        useCase.gradingCompleted(eventId, learner);
+
+        verify(sender).send(eq("learner@example.test"), eq(RENDERED));
+        verify(deliveries, never()).releaseDailyNonSecuritySlot(any(), any(), any(), any());
     }
 
     @Test

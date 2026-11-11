@@ -77,7 +77,7 @@ public class ActivateKeyUseCase {
         }
 
         // Redeeming a key grants access: the learner must have proven the email address first.
-        if (userEmailVerificationRepository.isUnverified(command.userId())) {
+        if (!userEmailVerificationRepository.isVerified(command.userId())) {
             throw new EmailNotVerifiedException();
         }
 

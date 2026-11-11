@@ -1,6 +1,7 @@
 package com.ieltspath.user.application.usecase;
 
 import com.ieltspath.events.user.GoogleAccountLinkedV1;
+import com.ieltspath.events.user.UserEmailVerificationStateV1;
 import com.ieltspath.user.application.exception.GoogleAccountConflictException;
 import com.ieltspath.user.application.exception.GoogleAccountNotActiveException;
 import com.ieltspath.user.application.exception.GoogleEmailNotSupportedException;
@@ -11,7 +12,6 @@ import com.ieltspath.user.application.result.GoogleIdentity;
 import com.ieltspath.user.application.result.GoogleSignInResult;
 import com.ieltspath.user.domain.aggregate.OAuthIdentity;
 import com.ieltspath.user.domain.aggregate.User;
-import com.ieltspath.user.domain.exception.EmailNotVerifiedException;
 import com.ieltspath.user.domain.exception.RoleNotFoundException;
 import com.ieltspath.user.domain.exception.UserNotFoundException;
 import com.ieltspath.user.domain.repository.OAuthIdentityRepository;
@@ -56,6 +56,8 @@ public class LinkGoogleAccountUseCase {
                 .findByProviderAndProviderSubject(OAuthProvider.GOOGLE, google.subject())
                 .orElse(null);
         User user;
+        boolean createdNow = false;
+        boolean unverifiedBefore = false;
         if (identity != null) {
             user = lockAndReload(identity.getUserId());
             identity = oauthIdentityRepository.findByUserIdAndProvider(user.getId(), OAuthProvider.GOOGLE)
@@ -68,10 +70,12 @@ public class LinkGoogleAccountUseCase {
             user = userRepository.findByEmail(email).orElse(null);
             if (user == null) {
                 user = createGoogleUser(google, email);
+                createdNow = true;
             } else {
                 user = lockAndReload(user.getId());
-                // Linking a social login to an existing account needs the owner to prove the address first.
-                if (!user.isEmailVerified()) throw new EmailNotVerifiedException();
+                // Google has confirmed the address belongs to the person signing in (email_verified is checked by the
+                // token verifier), so an unverified account is verified here instead of being turned away.
+                unverifiedBefore = !user.isEmailVerified();
                 identity = oauthIdentityRepository.findByUserIdAndProvider(user.getId(), OAuthProvider.GOOGLE)
                         .orElse(null);
                 if (identity != null && !identity.getProviderSubject().equals(google.subject())) {
@@ -82,13 +86,20 @@ public class LinkGoogleAccountUseCase {
 
         requireGoogleEligible(user);
         LocalDateTime now = LocalDateTime.now();
-        if (user.getPasswordHash() != null && !user.getPasswordHash().isBlank()) {
+        // A password on an account nobody had verified may have been set by someone other than the address owner
+        // (registering first with another person's email). Google has now proven ownership, so that password goes.
+        // A verified account keeps its password: its owner already proved the address.
+        if (unverifiedBefore && user.getPasswordHash() != null && !user.getPasswordHash().isBlank()) {
             userRepository.clearPasswordHash(user.getId());
             user.clearPassword();
             refreshTokenRepository.revokeAllActiveForUser(user.getId(), now);
-            UUID noticeId = UUID.randomUUID();
-            notices.enqueue(noticeId, user.getId(), GoogleAccountLinkedV1.EVENT_TYPE, new GoogleAccountLinkedV1(noticeId,
-                    GoogleAccountLinkedV1.EVENT_TYPE, Instant.now(), user.getId(), email, user.getFullName()));
+        }
+        if (unverifiedBefore) {
+            user.markEmailVerified(now);
+            userRepository.save(user);
+        }
+        if (createdNow || unverifiedBefore) {
+            publishVerifiedState(user);
         }
         if (identity == null) {
             identity = OAuthIdentity.builder()
@@ -97,11 +108,25 @@ public class LinkGoogleAccountUseCase {
                     .providerSubject(google.subject())
                     .linkedAt(now)
                     .build();
+            if (!createdNow) {
+                // Someone signed in to an existing account through a new login method: tell the owner.
+                UUID noticeId = UUID.randomUUID();
+                notices.enqueue(noticeId, user.getId(), GoogleAccountLinkedV1.EVENT_TYPE, new GoogleAccountLinkedV1(noticeId,
+                        GoogleAccountLinkedV1.EVENT_TYPE, Instant.now(), user.getId(), email, user.getFullName()));
+            }
         }
         identity.recordAuthentication();
         oauthIdentityRepository.save(identity);
         AuthTokenResult tokens = authTokenIssuer.issue(user);
         return new GoogleSignInResult(user.getId(), tokens);
+    }
+
+    /** Tells access-service the account is verified; the consumer keeps the latest state by time. */
+    private void publishVerifiedState(User user) {
+        UUID stateId = UUID.randomUUID();
+        notices.enqueue(stateId, user.getId(), UserEmailVerificationStateV1.EVENT_TYPE, new UserEmailVerificationStateV1(
+                stateId, UserEmailVerificationStateV1.EVENT_TYPE, Instant.now(), user.getId(), true,
+                user.getEmail().value(), user.getFullName()));
     }
 
     private User createGoogleUser(GoogleIdentity google, String email) {

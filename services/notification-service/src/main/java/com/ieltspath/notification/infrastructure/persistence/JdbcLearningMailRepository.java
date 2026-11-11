@@ -65,13 +65,8 @@ public class JdbcLearningMailRepository implements LearningMailRepository {
     }
 
     @Override
-    public int pendingExaminerJobCount(UUID examinerId) {
-        Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM examiner_job_digest WHERE examiner_id = ?", Integer.class, examinerId);
-        return count == null ? 0 : count;
-    }
-
-    @Override
-    public void clearPendingExaminerJobs(UUID examinerId) {
-        jdbc.update("DELETE FROM examiner_job_digest WHERE examiner_id = ?", examinerId);
+    public List<UUID> claimPendingExaminerJobs(UUID examinerId) {
+        return jdbc.queryForList("DELETE FROM examiner_job_digest WHERE examiner_id = ? RETURNING grading_job_id",
+                UUID.class, examinerId);
     }
 }

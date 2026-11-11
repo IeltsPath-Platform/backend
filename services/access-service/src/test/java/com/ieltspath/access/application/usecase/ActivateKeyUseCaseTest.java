@@ -62,6 +62,17 @@ class ActivateKeyUseCaseTest {
         userId = UUID.randomUUID();
         rawKey = "IP-TEST-1234-ABCD-5678";
         keyCode = ActivationKeyCode.fromRawKey(rawKey);
+        org.mockito.Mockito.lenient().when(userEmailVerificationRepository.isVerified(org.mockito.ArgumentMatchers.any())).thenReturn(true);
+    }
+
+    @Test
+    @DisplayName("Should refuse a key for an account with no verified state, and never redeem it")
+    void shouldRefuseKeyWhenAccountIsNotKnownToBeVerified() {
+        when(userEmailVerificationRepository.isVerified(userId)).thenReturn(false);
+
+        assertThatThrownBy(() -> activateKeyUseCase.execute(new ActivateKeyCommand(userId, rawKey, "idem-unverified")))
+                .isInstanceOf(com.ieltspath.access.domain.exception.EmailNotVerifiedException.class);
+        verifyNoInteractions(activationKeyRepository);
     }
 
     @Test

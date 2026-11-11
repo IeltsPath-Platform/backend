@@ -40,7 +40,8 @@ public class EmailVerificationUseCase {
     /** Issues a fresh verification link for the account and queues the email. Earlier unused links stop working. */
     @Transactional
     public void issue(User user) {
-        LocalDateTime now = LocalDateTime.now();
+        // Token times are UTC: expiresAt is stored in UTC and compared against this clock when the link is used.
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         accountActionTokenRepository.invalidateUnusedForUser(user.getId(), ActionTokenPurpose.EMAIL_VERIFICATION, now);
         String rawToken = UUID.randomUUID().toString();
         Instant expiresAt = Instant.now().plusSeconds(TOKEN_LIFETIME_MINUTES * 60L);
@@ -73,11 +74,11 @@ public class EmailVerificationUseCase {
         userLock.lock(token.getUserId());
         User user = userRepository.findById(token.getUserId())
                 .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng sở hữu liên kết này"));
-        LocalDateTime now = LocalDateTime.now();
-        if (!accountActionTokenRepository.consumeToken(tokenHash, ActionTokenPurpose.EMAIL_VERIFICATION, now)) {
+        if (!accountActionTokenRepository.consumeToken(tokenHash, ActionTokenPurpose.EMAIL_VERIFICATION,
+                LocalDateTime.now(ZoneOffset.UTC))) {
             throw new InvalidActionTokenException("Liên kết xác minh đã hết hạn hoặc đã được sử dụng");
         }
-        user.markEmailVerified(now);
+        user.markEmailVerified(LocalDateTime.now());
         userRepository.save(user);
         publishState(user, true);
     }
@@ -96,7 +97,7 @@ public class EmailVerificationUseCase {
         userLock.lock(found.getId());
         User user = userRepository.findById(found.getId()).orElse(null);
         if (user == null || user.getStatus() != UserStatus.ACTIVE || user.isEmailVerified()) return;
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         if (accountActionTokenRepository.findLatestCreatedAt(user.getId(), ActionTokenPurpose.EMAIL_VERIFICATION)
                 .filter(createdAt -> createdAt.isAfter(now.minusSeconds(COOLDOWN_SECONDS))).isPresent()) {
             return;

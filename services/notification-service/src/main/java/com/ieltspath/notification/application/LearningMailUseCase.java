@@ -15,6 +15,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -74,8 +75,10 @@ public class LearningMailUseCase {
             log.info("Subscription granted mail skipped: no contact on file");
             return;
         }
-        deliver(MailTemplate.SUBSCRIPTION_GRANTED, eventId, contact.get().email(),
+        RenderedMail mail = renderer.render(MailTemplate.SUBSCRIPTION_GRANTED,
                 Map.of("displayName", name(contact.get().displayName()), "endsAt", WHEN.format(endsAt)));
+        sender.send(contact.get().email(), mail);
+        recordDelivered(MailTemplate.SUBSCRIPTION_GRANTED, eventId);
     }
 
     public void examinerDueSoon(UUID eventId, UUID examinerId) {
@@ -87,23 +90,46 @@ public class LearningMailUseCase {
         repository.addPendingExaminerJob(gradingJobId, examinerId, createdAt);
     }
 
-    /** Sends one digest for each examiner with waiting jobs, then clears them. Returns how many mails went out. */
+    /**
+     * Sends one digest for each examiner with waiting jobs. The jobs are claimed first, so a job that arrives during the
+     * run waits for the next digest. Jobs are dropped when no mail can ever reach the examiner (no address, or the
+     * examiner switched learning mail off) and put back when the mail was held back (daily cap, same-hour digest) or
+     * could not be sent, so they go out in a later run. Returns how many mails went out.
+     */
     public int flushExaminerDigests(Instant now) {
         int sent = 0;
         Instant hour = now.truncatedTo(ChronoUnit.HOURS);
         for (UUID examinerId : repository.examinersWithPendingJobs()) {
-            int jobs = repository.pendingExaminerJobCount(examinerId);
+            List<UUID> jobs = repository.claimPendingExaminerJobs(examinerId);
+            if (jobs.isEmpty()) continue; // another instance claimed them first
             UUID digestId = UUID.nameUUIDFromBytes(("examiner-digest:" + examinerId + ":" + hour)
                     .getBytes(StandardCharsets.UTF_8));
-            // Jobs are cleared even when no mail goes out (no address, or the examiner switched mail off).
-            if (examiner(MailTemplate.EXAMINER_NEW_JOBS, digestId, examinerId, "/examiner/grading/writing",
-                    Map.of("jobCount", jobs))) {
-                sent++;
+            Delivery outcome;
+            try {
+                outcome = examiner(MailTemplate.EXAMINER_NEW_JOBS, digestId, examinerId, "/examiner/grading/writing",
+                        Map.of("jobCount", jobs.size()));
+            } catch (RuntimeException failure) {
+                restoreExaminerJobs(examinerId, jobs, now);
+                log.warn("Examiner digest failed, jobs kept for the next run errorType={}", failure.getClass().getSimpleName());
+                continue;
             }
-            repository.clearPendingExaminerJobs(examinerId);
+            if (outcome == Delivery.SENT) {
+                sent++;
+            } else if (outcome == Delivery.HELD) {
+                restoreExaminerJobs(examinerId, jobs, now);
+            }
         }
         return sent;
     }
+
+    private void restoreExaminerJobs(UUID examinerId, List<UUID> jobs, Instant now) {
+        for (UUID gradingJobId : jobs) {
+            repository.addPendingExaminerJob(gradingJobId, examinerId, now);
+        }
+    }
+
+    /** What became of one learning mail: sent, dropped for good (no address or switched off), or held back to retry later. */
+    private enum Delivery { SENT, DROPPED, HELD }
 
     private void learner(MailTemplate template, UUID eventId, UUID userId, String path) {
         if (eventId == null || userId == null) throw new IllegalArgumentException("Learning mail event is invalid");
@@ -111,36 +137,47 @@ public class LearningMailUseCase {
     }
 
     /**
-     * Shared path for learner and examiner learning mails: contact, switch, unsubscribe link, render, send.
-     * Returns true only when a mail was sent.
+     * Shared path for learner and examiner learning mails: contact, switch, unsubscribe link, daily cap, render, send.
      */
-    private boolean examiner(MailTemplate template, UUID eventId, UUID recipientId, String path, Map<String, Object> extra) {
-        if (deliveries.exists(eventId, template.key())) return false;
+    private Delivery examiner(MailTemplate template, UUID eventId, UUID recipientId, String path, Map<String, Object> extra) {
+        if (deliveries.exists(eventId, template.key())) return Delivery.HELD;
         Optional<LearningMailRepository.Contact> contact = repository.findContact(recipientId);
         if (contact.isEmpty()) {
             log.info("Learning mail skipped template={}: no contact on file", template.key());
-            return false;
+            return Delivery.DROPPED;
         }
-        if (!repository.learningEnabled(recipientId)) return false;
+        if (!repository.learningEnabled(recipientId)) return Delivery.DROPPED;
         Map<String, Object> model = new HashMap<>(extra);
         model.put("displayName", name(contact.get().displayName()));
         model.put("actionLink", frontendBaseUrl.replaceAll("/+$", "") + path);
         model.put("unsubscribeLink", unsubscribeLink(recipientId));
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"));
-        if (!deliveries.reserveDailyNonSecuritySlot(recipientId, today, eventId, template.key(), Instant.now())) return false;
+        if (!deliveries.reserveDailyNonSecuritySlot(recipientId, today, eventId, template.key(), Instant.now())) {
+            return Delivery.HELD;
+        }
         try {
-            deliver(template, eventId, contact.get().email(), model);
+            RenderedMail mail = renderer.render(template, model);
+            sender.send(contact.get().email(), mail);
         } catch (RuntimeException failure) {
+            // Only a failure before the send gives the slot back: the mail certainly did not leave.
             deliveries.releaseDailyNonSecuritySlot(recipientId, today, eventId, template.key());
             throw failure;
         }
-        return true;
+        recordDelivered(template, eventId);
+        return Delivery.SENT;
     }
 
-    private void deliver(MailTemplate template, UUID eventId, String email, Map<String, Object> model) {
-        RenderedMail mail = renderer.render(template, model);
-        sender.send(email, mail);
-        deliveries.recordSent(eventId, template.key(), Instant.now());
+    /**
+     * The mail has already left, so a failure here must not release the daily slot or rethrow: a retry would send it
+     * again. Losing this record only costs the duplicate check, which is the smaller harm.
+     */
+    private void recordDelivered(MailTemplate template, UUID eventId) {
+        try {
+            deliveries.recordSent(eventId, template.key(), Instant.now());
+        } catch (RuntimeException failure) {
+            log.warn("Learning mail sent but its record failed template={} errorType={}", template.key(),
+                    failure.getClass().getSimpleName());
+        }
     }
 
     private String unsubscribeLink(UUID userId) {

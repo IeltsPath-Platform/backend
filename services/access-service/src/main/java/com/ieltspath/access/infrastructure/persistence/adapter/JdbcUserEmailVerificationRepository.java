@@ -33,11 +33,11 @@ public class JdbcUserEmailVerificationRepository implements UserEmailVerificatio
     }
 
     @Override
-    public boolean isUnverified(UUID userId) {
-        Boolean unverified = jdbc.queryForObject("""
-                SELECT EXISTS (SELECT 1 FROM user_email_verification_state WHERE user_id = ? AND verified = FALSE)
+    public boolean isVerified(UUID userId) {
+        Boolean verified = jdbc.queryForObject("""
+                SELECT EXISTS (SELECT 1 FROM user_email_verification_state WHERE user_id = ? AND verified = TRUE)
                 """, Boolean.class, userId);
-        return Boolean.TRUE.equals(unverified);
+        return Boolean.TRUE.equals(verified);
     }
 
     @Override

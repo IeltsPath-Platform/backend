@@ -21,9 +21,11 @@ public interface LearningMailRepository {
 
     List<UUID> examinersWithPendingJobs();
 
-    int pendingExaminerJobCount(UUID examinerId);
-
-    void clearPendingExaminerJobs(UUID examinerId);
+    /**
+     * Removes and returns every job waiting for this examiner in one statement. Two instances claiming at once never
+     * both get the same job, and a job added after the claim stays for the next digest.
+     */
+    List<UUID> claimPendingExaminerJobs(UUID examinerId);
 
     record Contact(String email, String displayName) { }
 }

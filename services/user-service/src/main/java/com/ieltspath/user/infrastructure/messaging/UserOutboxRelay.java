@@ -47,7 +47,9 @@ public class UserOutboxRelay {
                 scope.close();
             }
         }
-        outbox.clearExpiredFailedPayloads(Instant.now().minusSeconds(15 * 60L));
+        // A raw link token must not outlive its link: 15 minutes for a reset link, 60 for a verification link.
+        Instant now = Instant.now();
+        outbox.expireLinkPayloads(now.minusSeconds(15 * 60L), now.minusSeconds(60 * 60L));
         return published;
     }
 }

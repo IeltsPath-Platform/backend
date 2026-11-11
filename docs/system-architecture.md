@@ -308,7 +308,7 @@ cùng course mở theo trạng thái suy ra khi đọc. Course test không chặ
 
 ## Scheduler và nhiều instance
 
-Backend hiện có 22 phương thức `@Scheduled` trong 21 job. Cơ chế chống xử lý trùng theo mã đang chạy:
+Backend hiện có 29 phương thức `@Scheduled` trong 28 file. Cơ chế chống xử lý trùng theo mã đang chạy:
 
 | Service | Job / lịch | Cơ chế cạnh tranh | HTTP/LLM khi giữ khóa hoặc transaction |
 |---|---|---|---|
@@ -322,6 +322,9 @@ Backend hiện có 22 phương thức `@Scheduled` trong 21 job. Cơ chế chố
 | assessment | `OutboxRelayScheduler` | `FOR UPDATE SKIP LOCKED`; publish broker trong transaction ngắn để giữ claim tới khi gửi xong | Broker trong transaction ngắn |
 | access | `AccessOutboxRelayScheduler` | `FOR UPDATE SKIP LOCKED`; publish broker trong transaction ngắn | Broker trong transaction ngắn |
 | user | `UserOutboxRelayScheduler` | `FOR UPDATE SKIP LOCKED`; publish broker trong transaction ngắn | Broker trong transaction ngắn |
+| access | `SubscriptionExpiryNoticeScheduler` | Mỗi cặp (subscription, stage) được giành bằng `INSERT ... ON CONFLICT DO NOTHING` trước khi phát event; hai lịch trùng chỉ phát một lần | Không |
+| notification | `LearningMailScheduler` | Mỗi giám khảo được nhận job bằng một lệnh `DELETE ... RETURNING`; hai instance không nhận cùng job, job đến sau nằm cho lần sau | SMTP ngoài claim; job bị giữ lại nếu gửi lỗi hoặc chạm giới hạn ngày |
+| notification | `NotificationRetentionScheduler` | Xóa theo cutoff và lô giới hạn; chạy lặp an toàn | Không |
 | community | `CommunityOutboxRelayScheduler` | `FOR UPDATE SKIP LOCKED`; publish broker trong transaction ngắn | Broker trong transaction ngắn |
 | assessment | `GateEssayGradingScheduler` | Claim batch bằng `FOR UPDATE SKIP LOCKED` trong transaction; cập nhật job hoàn tất trong transaction riêng | LLM ngoài transaction claim và transaction ghi kết quả |
 | assessment | `GradingDeadlineScheduler` | Store chọn các job bằng `FOR UPDATE SKIP LOCKED`; ghi thông báo/outbox trong transaction | Không |
