@@ -431,10 +431,16 @@ mvn -q -pl shared/common-security test
 mvn -q -pl shared/common-events test
 mvn -q -pl shared/common-storage test                # contract test với Supabase thật chỉ chạy khi có STORAGE_CONTRACT_*
 mvn -q -pl infra/api-gateway test
+mvn -q -pl services/<name>-service -am -Dtest=ArchitectureTest -Dsurefire.failIfNoSpecifiedTests=false test
 mvn -q -pl services/<name>-service -am test      # -am build kèm các module shared cần thiết
 mvn -q compile -DskipTests                        # cả reactor; không dùng clean khi service đang chạy từ IDE
 docker compose config --quiet
 ```
+
+Kiểm tra kiến trúc (ArchUnit): sáu luật layer và pattern, vi phạm cũ nằm trong `src/test/resources/archunit_store`.
+Chỉ vi phạm mới làm đỏ. Không tự tạo hay cập nhật store khi chạy thường; xem `archunit.properties` của từng service.
+
+Không kiểm tĩnh được: HTTP/LLM có nằm ngoài transaction và khóa không, ResilientCall có bọc mọi lời gọi không, URL HTTP cụ thể.
 
    Build boot jar để chạy (`package`) thì dùng `mvn clean package`: `target/classes` cũ còn class của code đã xóa
    (ví dụ catalog từ vựng chuyển sang library) và làm service không khởi động.
