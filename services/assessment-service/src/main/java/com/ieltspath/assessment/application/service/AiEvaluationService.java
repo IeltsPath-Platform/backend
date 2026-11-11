@@ -109,6 +109,15 @@ public class AiEvaluationService {
 
     @Transactional
     public UUID start(String requestedTask) {
+        return start(requestedTask, null);
+    }
+
+    /** {@code templateVersion} runs a prompt template before it is activated; null means the first one. */
+    @Transactional
+    public UUID start(String requestedTask, String templateVersion) {
+        String template = templateVersion == null || templateVersion.isBlank()
+                ? RubricPromptBuilder.TEMPLATE_VERSION : templateVersion;
+        if (!RubricPromptBuilder.isKnownTemplate(template)) throw new IllegalArgumentException("UNKNOWN_TEMPLATE_VERSION");
         if (!grader.available()) throw new IllegalStateException("LLM_UNAVAILABLE");
         String task = requestedTask;
         if (task == null || task.isBlank()) task = jdbc.queryForObject(
@@ -116,7 +125,7 @@ public class AiEvaluationService {
         if (task == null) throw new IllegalStateException("GOLD_SET_EMPTY");
         String finalTask = task;
         ActiveRubricProvider.Rubric activeRubric = rubrics.getActive(finalTask);
-        String expectedPromptVersion = RubricPromptBuilder.promptVersion(activeRubric);
+        String expectedPromptVersion = RubricPromptBuilder.promptVersion(activeRubric, template);
         List<GoldEssay> gold = jdbc.query("""
                 SELECT id,task,prompt,chart_facts,essay,examiner_band,examiner_error_codes,
                        examiner_criteria::text AS criteria,examiner_errors::text AS examiner_errors

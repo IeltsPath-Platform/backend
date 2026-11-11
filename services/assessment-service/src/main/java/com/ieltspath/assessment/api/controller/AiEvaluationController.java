@@ -42,7 +42,8 @@ public class AiEvaluationController {
     @PostMapping("/ai-evaluations")
     @ResponseStatus(HttpStatus.ACCEPTED)
     public Map<String,UUID> start(@Valid @RequestBody(required = false) CreateAiEvaluationRequest request) {
-        return Map.of("id", service.start(request == null ? null : request.task()));
+        return Map.of("id", service.start(request == null ? null : request.task(),
+                request == null ? null : request.templateVersion()));
     }
 
     @GetMapping("/ai-evaluations/{id}")

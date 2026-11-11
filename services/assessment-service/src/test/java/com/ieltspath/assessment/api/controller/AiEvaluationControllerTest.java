@@ -36,7 +36,7 @@ class AiEvaluationControllerTest {
 
     @Test void startsEvaluationAndReadsItsResult() {
         UUID run = UUID.randomUUID();
-        when(service.start("TASK_1")).thenReturn(run);
+        when(service.start("TASK_1", null)).thenReturn(run);
         when(service.getRun(run)).thenReturn(Map.of("id", run, "status", "DONE", "passed", true));
         assertEquals(run, controller.start(new CreateAiEvaluationRequest("TASK_1")).get("id"));
         assertEquals("DONE", controller.get(run).get("status"));

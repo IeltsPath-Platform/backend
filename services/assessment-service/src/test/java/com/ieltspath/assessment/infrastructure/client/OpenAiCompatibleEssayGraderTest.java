@@ -199,6 +199,41 @@ class OpenAiCompatibleEssayGraderTest {
     }
 
     @Test
+    void anActivatedSecondTemplateIsUsedAndASuggestionIsNotCountedAsAnError() throws Exception {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        ActiveRubricProvider provider = mock(ActiveRubricProvider.class);
+        when(provider.getVersion("PINNED", "1")).thenReturn(pinnedRubric("PINNED", 1));
+        String reply = "{\"criteria\":[{\"code\":\"TR\",\"evidence\":[\"x\"],\"descriptor\":\"d\",\"band\":6},"
+                + "{\"code\":\"CC\",\"band\":6},{\"code\":\"LR\",\"band\":6},{\"code\":\"GRA\",\"band\":6}],"
+                + "\"corrections\":[{\"excerpt\":\"writed\",\"suggestion\":\"wrote\",\"errorCode\":\"GRAMMAR\","
+                + "\"reason\":\"r\",\"certainty\":\"ERROR\"},"
+                + "{\"excerpt\":\"it\",\"suggestion\":\"this\",\"errorCode\":\"GRAMMAR\",\"certainty\":\"SUGGESTION\"}]}";
+        server.expect(requestTo("https://llm.example/v1/chat/completions"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("priorities")))
+                .andRespond(withSuccess(new ObjectMapper().writeValueAsString(Map.of("choices", List.of(Map.of(
+                        "message", Map.of("content", reply))))), MediaType.APPLICATION_JSON));
+        var grader = new OpenAiCompatibleEssayGrader(builder.build(), properties(), new ObjectMapper(), provider,
+                () -> Set.of("GRAMMAR"));
+
+        var grade = grader.grade(new EssayGradingPort.Prompt("Discuss", "TASK_2", 250, null, "PINNED@1+tplv2"),
+                "I writed it.");
+
+        assertEquals("PINNED@1+tplv2", grade.promptVersion());
+        assertEquals(0, new BigDecimal("6").compareTo(grade.band()));
+        assertEquals(1, new ObjectMapper().readTree(grade.feedback()).path("corrections").size());
+        server.verify();
+    }
+
+    @Test
+    void anUnknownTemplateVersionIsNotActivated() {
+        var grader = grader(RestClient.builder().build(), properties(), new ObjectMapper());
+
+        assertEquals("PROMPT_NOT_ACTIVATED", assertThrows(EssayGradingException.class, () -> grader.grade(
+                new EssayGradingPort.Prompt("Discuss", "TASK_2", 250, null, "PINNED@1+tplv9"), "essay")).getCode());
+    }
+
+    @Test
     void removesCorrectionsWithErrorCodesOutsideTheCatalog() throws Exception {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
