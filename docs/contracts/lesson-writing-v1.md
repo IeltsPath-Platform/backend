@@ -95,6 +95,11 @@ Response 200:
 - Quota: a grading that fails for a system reason (`LLM_UNAVAILABLE`, `AI_BUSY`, `RUBRIC_UNAVAILABLE`,
   `PROMPT_VERSION_UNAVAILABLE`) gives its daily grading unit back. `INVALID_GRADE` keeps the unit, because a malformed
   output may be caused by the essay itself.
+- `bandLimits` (optional, present only when a cap lowered a band): `[{reason, criterion, cap, message}]`, the same shape
+  as Speaking's `bandLimits` plus `criterion` (TA or TR). `reason` is `TOO_SHORT`, `OFF_TOPIC`, `T1_NO_OVERVIEW`,
+  `PARTIAL_ANSWER` or `NO_POSITION`. A criterion lowered by a cap carries `limited: true`. Caps are off until
+  `learning.writing.band-caps-enabled` is true and the thresholds are set; while off, responses carry neither field.
+  Only the length rule can fire from the grade alone; the other rules need the flags of prompt v2.
 - `summary` ≤ 600 characters. `passed = overallBand ≥ passBand`. `sampleAnswer` only when `passed` or the block was
   passed before.
 
