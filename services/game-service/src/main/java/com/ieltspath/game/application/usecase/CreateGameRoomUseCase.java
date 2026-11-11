@@ -2,7 +2,6 @@ package com.ieltspath.game.application.usecase;
 
 import com.ieltspath.game.application.command.CreateGameRoomCommand;
 import com.ieltspath.game.application.port.GameContentProvider;
-import com.ieltspath.game.application.port.OutboxWriter;
 import com.ieltspath.game.application.result.GameRoomResult;
 import com.ieltspath.game.domain.aggregate.GameRoom;
 import com.ieltspath.game.domain.aggregate.GameType;
@@ -26,14 +25,12 @@ public class CreateGameRoomUseCase {
     private final SecureRandom random = new SecureRandom();
     private final GameRoomRepository roomRepository;
     private final GameContentProvider contentProvider;
-    private final OutboxWriter outboxWriter;
 
     public CreateGameRoomUseCase(GameRoomRepository roomRepository, GameContentProvider contentProvider,
-                                 OutboxWriter outboxWriter, CurrentPlayerProfile profile) {
+                                 CurrentPlayerProfile profile) {
         this.profile = profile;
         this.roomRepository = roomRepository;
         this.contentProvider = contentProvider;
-        this.outboxWriter = outboxWriter;
     }
 
     @Transactional
@@ -74,8 +71,6 @@ public class CreateGameRoomUseCase {
                 command.gameType(), command.learningDomain(), command.mode(), snapshot, now, null, UUID.randomUUID());
         room.setMemberDisplayName(command.hostUserId(), profile.displayName());
         GameRoom saved = roomRepository.save(room);
-        outboxWriter.append("GameRoom", roomId.toString(), "GameRoomCreated",
-                Map.of("roomId", roomId.toString(), "hostUserId", command.hostUserId().toString(), "roomCode", roomCode));
         return GameRoomResult.from(saved);
     }
 

@@ -157,7 +157,7 @@ Luồng `SubscriptionGranted` của Access thông báo cho người dùng khi ad
 | Access `GrantSubscriptionUseCase` ghi `SubscriptionGranted` vào `outbox_events` cùng transaction; `AccessOutboxRelay` publish với confirm tới exchange `access.events`, routing key `access.subscription-granted.v1` | Notification `SubscriptionGrantedListener` gọi `RecordSubscriptionGrantedUseCase`; `eventId` chống ghi thông báo trùng | `notification.subscription-granted.v1`; retry `notification.subscription-granted.v1.retry`; DLQ `notification.subscription-granted.v1.dlq` | [`subscription-granted-v1.md`](contracts/subscription-granted-v1.md) |
 | User `ForgotPasswordUseCase` ghi token hash và `PasswordResetRequestedV1` trong cùng transaction; `UserOutboxRelay` publish có confirm, sau đó xóa payload | Notification `PasswordResetRequestedListener` gửi SMTP và deduplicates bằng `eventId` | `notification.password-reset-requested.v1` (+ retry, DLQ) | [`password-reset-requested-v1.md`](contracts/password-reset-requested-v1.md) |
 
-Lỗi xử lý tạm thời được chuyển qua retry queue; lỗi payload hoặc vi phạm contract được dead-letter. Retry queue trả message về đúng exchange nguồn với routing key ban đầu, nên consumer nhận lại đúng contract (`RetryTopologyTest`). Khi Community park message vào DLQ, consumer ghi routing key gốc vào header `x-original-routing-key`, vì routing key của dead-letter là tên DLQ; replay đọc header này để gửi lại đúng đường. Content và Game hiện vẫn ghi outbox cho event riêng nhưng chưa có relay.
+Lỗi xử lý tạm thời được chuyển qua retry queue; lỗi payload hoặc vi phạm contract được dead-letter. Retry queue trả message về đúng exchange nguồn với routing key ban đầu, nên consumer nhận lại đúng contract (`RetryTopologyTest`). Khi Community park message vào DLQ, consumer ghi routing key gốc vào header `x-original-routing-key`, vì routing key của dead-letter là tên DLQ; replay đọc header này để gửi lại đúng đường. Content và Game không có outbox: bảng đã bị xóa vì không có service nào đọc event của hai bên.
 
 ### Correlation ID và metric
 
@@ -410,7 +410,7 @@ Bảng tổng hợp đầy đủ theo nhóm (resilience, idempotency, claim `SKI
 | API Gateway, Configuration Server, Service Discovery | `infra/*` |
 | Repository Adapter, Aggregate/Value Object, Mapper | Service Java |
 | Ports & adapters (`application/port`) | assessment, game, library, learning, content (đọc nội dung học) |
-| Transactional outbox + relay có publisher confirm | assessment, access, community, learning (`reward_grants`); content và game mới có phần ghi, chưa có relay |
+| Transactional outbox + relay có publisher confirm | assessment, access, community, learning (`reward_grants`); content và game không có outbox (đã bỏ) |
 | Consumer với retry queue TTL và dead-letter queue | learning, access (grant), notification |
 | Shared auto-configuration | `common-security` |
 | Global exception handler → `ErrorResponse` | Service Java |
@@ -452,7 +452,7 @@ hoạt động upload.
 | Secret có giá trị fallback trong config-repo được track | Thiếu biến env thì service dùng secret công khai trong repo |
 | `.sdd/global/system-architecture.md`, `.sdd/constraints/global.md` (baseline 2026-09-18) ghi không có broker/outbox/learning service | Lỗi thời; `.sdd/global/constitution.md` vẫn là invariant cao nhất. Dữ kiện: code, `AGENTS.md`, tài liệu này |
 | Gateway CORS chỉ expose `Authorization`, `Content-Type` | Browser không đọc được header khác (ví dụ `Retry-After`) |
-| community có bảng `outbox_events` (V1) nhưng không dùng | Library không tạo bảng này; outbox của access/content/game chưa có relay |
+| community có bảng `outbox_events` (V1) và relay (`CommunityOutboxRelay`) | Library không tạo bảng này; content và game đã bỏ bảng outbox |
 | Consumer học chưa có automated integration test với RabbitMQ thật | Logic ack/nack/DLQ có unit test với channel giả; áp kết quả có test Postgres thật. [Live E2E 2026-10-02](../plans/260929-1640-lesson-learning-pipeline-mvp/reports/e2e-261002-foundation-learning-pipeline.md) đã kiểm outbox → broker → consumer và replay DLQ với broker thật |
 | Giá chấm Writing nằm ở hai nơi | Learning `learning.writing.point-cost` (3) cho bài luận trong bài học; assessment `grading_point_costs.WRITING` cho chấm qua `grading_jobs`. Đổi giá phải sửa cả hai |
 | Bài Writing lưu ở hai nơi | Bài luận trong bài học ở `learning_db.lesson_writing_submissions`; Writing trong đề (sau MVP) ở `assessment_db.learner_submissions` |

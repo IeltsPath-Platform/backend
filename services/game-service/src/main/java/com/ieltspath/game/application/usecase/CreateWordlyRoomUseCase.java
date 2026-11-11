@@ -1,7 +1,6 @@
 package com.ieltspath.game.application.usecase;
 
 import com.ieltspath.game.application.command.CreateWordlyRoomCommand;
-import com.ieltspath.game.application.port.OutboxWriter;
 import com.ieltspath.game.application.result.GameRoomResult;
 import com.ieltspath.game.domain.aggregate.GameRoom;
 import com.ieltspath.game.domain.repository.GameRoomRepository;
@@ -12,7 +11,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.Instant;
-import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -21,15 +19,13 @@ public class CreateWordlyRoomUseCase {
     private final SecureRandom random = new SecureRandom();
     private final GameRoomRepository rooms;
     private final CurrentPlayerProfile profile;
-    private final OutboxWriter outbox;
     private final WordlyRoomAdmission admission;
 
-    public CreateWordlyRoomUseCase(GameRoomRepository rooms, OutboxWriter outbox, CurrentPlayerProfile profile,
+    public CreateWordlyRoomUseCase(GameRoomRepository rooms, CurrentPlayerProfile profile,
                                    WordlyRoomAdmission admission) {
         this.admission = admission;
         this.profile = profile;
         this.rooms = rooms;
-        this.outbox = outbox;
     }
 
     @Transactional
@@ -45,9 +41,6 @@ public class CreateWordlyRoomUseCase {
         var room = GameRoom.open(UUID.randomUUID(), code, hostUserId, settings, Instant.now());
         room.setMemberDisplayName(hostUserId, profile.displayName());
         var saved = rooms.save(room);
-        outbox.append("GameRoom", room.id().toString(), "GameRoomCreated", Map.of(
-                "roomId", room.id().toString(), "hostUserId", room.hostUserId().toString(),
-                "roomCode", code, "playerMode", room.playerMode(), "gameType", room.gameType()));
         return GameRoomResult.from(saved);
     }
 

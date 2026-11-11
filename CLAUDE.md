@@ -118,7 +118,7 @@ CI (`.github/workflows/ci.yml`) chạy `mvn -B -ntp verify` cả reactor và `do
 - Essay đã nộp trong `TOPIC_GATE`/`COURSE_GATE` được chấm LLM miễn phí; thiếu cấu hình, LLM lỗi hoặc hết quota ngày thì
   chuyển sang hàng chờ EXAMINER. Essay không được nộp qua `/api/assessments/submissions` sẽ nhận 0 điểm và không tạo job.
   `MOCK` vẫn do EXAMINER chấm.
-- Outbox của content và game chỉ ghi, chưa có relay: event của hai service này không tới consumer. Access, assessment, community và learning (`reward_grants`) có relay.
+- Content và game không còn bảng outbox (đã xóa). Access, assessment, community và learning (`reward_grants`) có outbox và relay.
 - Role chuẩn là `ADMIN`, `CUSTOMER`, `CONTENT_AUTHOR`, `EXAMINER`, `SALES_STAFF` (`LEARNER` cũ đã đổi thành `CUSTOMER`).
 - `graphify-out/` không được commit.
 - Bài Listening seed (content V12, reference dạng key) trả 500 `INVALID_MEDIA_REFERENCE` khi thiếu `CONTENT_MEDIA_BASE_URL`;
