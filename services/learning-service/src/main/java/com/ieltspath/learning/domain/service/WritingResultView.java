@@ -33,6 +33,28 @@ public final class WritingResultView {
     public record PriorityItem(String title, String explanation, List<String> excerpts, String action,
                                List<String> errorCodes, UUID practiceKnowledgePointId, String source) {}
 
+    /** How the error kinds of a revision compare with the version before it. */
+    public record RevisionDelta(List<String> fixedCodes, List<String> repeatedCodes, List<String> newCodes) {}
+
+    /**
+     * The error kinds that were in the earlier version and are gone ({@code fixed}), that are in both ({@code repeated})
+     * and that only the new version has ({@code new}). Only errors count: a suggestion is not an error, and a fallback
+     * code names no kind a learner could fix or repeat.
+     */
+    public static RevisionDelta revisionDelta(WritingGrade previous, WritingGrade current) {
+        List<String> before = errorCodes(previous);
+        List<String> after = errorCodes(current);
+        List<String> fixed = before.stream().filter(code -> !after.contains(code)).toList();
+        List<String> repeated = before.stream().filter(after::contains).toList();
+        List<String> added = after.stream().filter(code -> !before.contains(code)).toList();
+        return new RevisionDelta(fixed, repeated, added);
+    }
+
+    private static List<String> errorCodes(WritingGrade grade) {
+        return grade.corrections().stream().filter(item -> !item.isSuggestion()).map(Correction::errorCode)
+                .filter(code -> code != null && !code.endsWith(FALLBACK_SUFFIX)).distinct().toList();
+    }
+
     /**
      * Where each correction's quotation sits in the essay, in the order of the corrections. A quotation takes the first
      * occurrence that no earlier correction with the same quotation has taken; one with no free occurrence has no

@@ -1,7 +1,7 @@
 ---
 phase: 8
 title: "Task 2 requirement checks"
-status: pending
+status: code-done-pending-eval
 priority: P1
 dependencies: [4]
 ---

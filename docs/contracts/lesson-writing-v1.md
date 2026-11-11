@@ -130,6 +130,13 @@ Response 200:
   when the grade is read, from what is stored; no call to Content or the model is made.
 - `criteria[].evidence` and `criteria[].descriptor` (second prompt template only, omitted when empty): the quotations that
   support the band and the rubric descriptor that matched.
+- `criteria[].nextBand` (`{band, descriptor}`, omitted at the top of the rubric and for grades stored before it was kept):
+  the lowest band the rubric describes above the band shown, which is the capped band when a cap applied. It is
+  taken from the rubric at grading time and stored with the grade.
+- `revision` (only for an essay sent again, see [essay-revision-v1](essay-revision-v1.md)):
+  `{previousSubmissionId, fixedCodes, repeatedCodes, newCodes}`. The error codes of the version before are compared with
+  those of this one: fixed (gone), repeated (in both), new (only here). Suggestions and fallback codes (`*_OTHER`) do not
+  count. Omitted when the earlier version cannot be read.
 - Every quotation in these fields is an exact part of `essayText`; one that was not is dropped. A reply with a missing or
   malformed `taskChecks` gives empty lists and unknown flags, and never fails the grade.
 - `summary` ≤ 600 characters. `passed = overallBand ≥ passBand`. `sampleAnswer` only when `passed` or the block was

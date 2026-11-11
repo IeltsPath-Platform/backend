@@ -159,6 +159,36 @@ class WritingSubmissionResponseTest {
     }
 
     @Test
+    void aCriterionCarriesTheNextBandWhenOneIsKept() throws Exception {
+        var criterion = new WritingGrade.Criterion("TR", new BigDecimal("6.0"), List.of(), List.of(), null, List.of(),
+                List.of(), null, new WritingGrade.NextBand(new BigDecimal("7.0"), "Band 7 descriptor"));
+        var grade = new WritingGrade(List.of(criterion), List.of(), "Summary", new BigDecimal("6.0"));
+
+        var tree = json.readTree(json.writeValueAsString(
+                WritingSubmissionResponse.from(graded("TASK_2", grade)))).get("criteria").get(0);
+
+        assertTrue(tree.get("nextBand").get("band").decimalValue().compareTo(new BigDecimal("7.0")) == 0);
+        assertTrue(tree.get("nextBand").get("descriptor").asText().equals("Band 7 descriptor"));
+    }
+
+    @Test
+    void aRevisionCarriesTheComparisonWithTheEarlierVersion() throws Exception {
+        UUID previous = UUID.randomUUID();
+        var result = new WritingSubmissionResult(UUID.randomUUID(), "GRADED", "TASK_2", 250, new BigDecimal("6.0"), true,
+                gradeWith(null, null), 3, null, null, null, "essay text",
+                new WritingSubmissionResult.Revision(previous, List.of("PLURAL"), List.of("TENSE"), List.of("WORD")));
+
+        var tree = json.readTree(json.writeValueAsString(WritingSubmissionResponse.from(result)));
+
+        assertTrue(tree.get("revision").get("previousSubmissionId").asText().equals(previous.toString()));
+        assertTrue(tree.get("revision").get("fixedCodes").get(0).asText().equals("PLURAL"));
+        assertTrue(tree.get("revision").get("repeatedCodes").get(0).asText().equals("TENSE"));
+        assertTrue(tree.get("revision").get("newCodes").get(0).asText().equals("WORD"));
+        assertFalse(json.readTree(json.writeValueAsString(WritingSubmissionResponse.from(
+                graded("TASK_2", gradeWith(null, null))))).has("revision"));
+    }
+
+    @Test
     void gradesWithoutErrorsReturnNoGroupsOrPriorities() throws Exception {
         var tree = json.readTree(json.writeValueAsString(WritingSubmissionResponse.from(
                 graded("TASK_2", gradeWith(null, null)))));

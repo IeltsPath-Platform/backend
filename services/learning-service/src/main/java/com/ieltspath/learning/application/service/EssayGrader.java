@@ -138,7 +138,8 @@ public class EssayGrader {
                 TEMPLATE_VERSION_2.equals(templateVersion))
                 .orElseThrow(() -> new WritingGradingException("INVALID_GRADE"));
         WritingGrade grade = applyBandCaps(parsed, task, essay, prompt.minWords(), settings);
-        WritingGrade withCriteria = withCriterionStudyPoints(grade, rubric, prompt.passBand(), catalog);
+        WritingGrade withCriteria = withNextBands(withCriterionStudyPoints(grade, rubric, prompt.passBand(), catalog),
+                rubric);
         WritingGrade judged = knowledgeJudge.judge(task, essay, withCriteria, rubric.criteria(), allowedCodes,
                 root.path("judgments"), catalog);
         return new GradedEssay(judged.withModel(model), promptVersion);
@@ -403,6 +404,26 @@ public class EssayGrader {
         return new WritingGrade(criteria, grade.corrections(), grade.summary(), overall, grade.studyPoints(),
                 grade.judgmentVersion(), grade.model(), applied, grade.priorities(), grade.errorExamples(),
                 grade.task1Checks(), grade.task2Checks());
+    }
+
+    /**
+     * Each criterion with the lowest band the rubric describes above the band it shows. Kept with the grade, so reading
+     * the result never needs the rubric again.
+     */
+    static WritingGrade withNextBands(WritingGrade grade, Rubric rubric) {
+        Map<String, List<LearningContentClient.RubricBandDescriptor>> descriptors = new HashMap<>();
+        for (RubricCriterion criterion : rubric.criteria()) {
+            if (criterion != null && criterion.code() != null && criterion.bandDescriptors() != null) {
+                descriptors.putIfAbsent(criterion.code(), criterion.bandDescriptors());
+            }
+        }
+        return grade.withCriteria(grade.criteria().stream().map(criterion -> criterion.withNextBand(
+                descriptors.getOrDefault(criterion.code(), List.of()).stream()
+                        .filter(item -> item != null && item.band() != null && item.descriptor() != null
+                                && item.band().compareTo(criterion.band()) > 0)
+                        .min(Comparator.comparing(LearningContentClient.RubricBandDescriptor::band))
+                        .map(item -> new WritingGrade.NextBand(item.band(), truncate(item.descriptor(), MAX_ITEM_CHARS)))
+                        .orElse(null))).toList());
     }
 
     private WritingGrade withCriterionStudyPoints(WritingGrade grade, Rubric rubric, BigDecimal passBand,

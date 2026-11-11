@@ -1,7 +1,7 @@
 ---
 phase: 5
 title: "Task 1 data checks"
-status: pending
+status: code-done-pending-eval
 priority: P1
 dependencies: [4]
 ---

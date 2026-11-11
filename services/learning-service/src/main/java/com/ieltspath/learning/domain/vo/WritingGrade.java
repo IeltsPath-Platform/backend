@@ -63,6 +63,12 @@ public record WritingGrade(List<Criterion> criteria, List<Correction> correction
                 bandLimits, priorities, errorExamples, task1Checks, task2Checks);
     }
 
+    /** The same grade with other criteria, for example after their bands or next bands changed. */
+    public WritingGrade withCriteria(List<Criterion> criteria) {
+        return new WritingGrade(criteria, corrections, summary, overallBand, studyPoints, judgmentVersion, model,
+                bandLimits, priorities, errorExamples, task1Checks, task2Checks);
+    }
+
     /** The same grade with the whole-essay checks of its task; the other task's checks stay null. */
     public WritingGrade withChecks(Task1Checks task1Checks, Task2Checks task2Checks) {
         return new WritingGrade(criteria, corrections, summary, overallBand, studyPoints, judgmentVersion, model,
@@ -143,13 +149,26 @@ public record WritingGrade(List<Criterion> criteria, List<Correction> correction
     public record AppliedBandLimit(String reason, String criterion, BigDecimal cap, BigDecimal bandBeforeLimit,
                                    String message) {}
 
-    /** {@code knowledgePointId} is the point this criterion is evidence for; null for grades stored before the mapping. */
+    /** The next band the rubric describes above the one shown, and what it asks for. */
+    public record NextBand(BigDecimal band, String descriptor) {}
+
+    /**
+     * {@code knowledgePointId} is the point this criterion is evidence for; null for grades stored before the mapping.
+     * {@code nextBand} is null at the top of the rubric and for grades stored before it was kept.
+     */
     public record Criterion(String code, BigDecimal band, List<String> strengths, List<String> improvements,
                             UUID knowledgePointId, List<KnowledgeJudgment> knowledgePointJudgments,
-                            List<String> evidence, String descriptor) {
+                            List<String> evidence, String descriptor, NextBand nextBand) {
         public Criterion {
             knowledgePointJudgments = knowledgePointJudgments == null ? List.of() : List.copyOf(knowledgePointJudgments);
             evidence = evidence == null ? List.of() : List.copyOf(evidence);
+        }
+
+        public Criterion(String code, BigDecimal band, List<String> strengths, List<String> improvements,
+                         UUID knowledgePointId, List<KnowledgeJudgment> knowledgePointJudgments,
+                         List<String> evidence, String descriptor) {
+            this(code, band, strengths, improvements, knowledgePointId, knowledgePointJudgments, evidence, descriptor,
+                    null);
         }
 
         /** {@code evidence} and {@code descriptor} are only returned by the second prompt template. */
@@ -168,12 +187,18 @@ public record WritingGrade(List<Criterion> criteria, List<Correction> correction
         }
 
         public Criterion withKnowledgePointJudgments(List<KnowledgeJudgment> judgments) {
-            return new Criterion(code, band, strengths, improvements, knowledgePointId, judgments, evidence, descriptor);
+            return new Criterion(code, band, strengths, improvements, knowledgePointId, judgments, evidence, descriptor,
+                    nextBand);
+        }
+
+        public Criterion withNextBand(NextBand next) {
+            return new Criterion(code, band, strengths, improvements, knowledgePointId, knowledgePointJudgments,
+                    evidence, descriptor, next);
         }
 
         public Criterion withBand(BigDecimal newBand) {
             return new Criterion(code, newBand, strengths, improvements, knowledgePointId, knowledgePointJudgments,
-                    evidence, descriptor);
+                    evidence, descriptor, nextBand);
         }
     }
 

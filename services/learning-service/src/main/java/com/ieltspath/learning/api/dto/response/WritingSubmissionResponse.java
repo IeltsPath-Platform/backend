@@ -19,7 +19,11 @@ public record WritingSubmissionResponse(UUID submissionId, String status, String
                                         List<Correction> corrections, List<StudyPoint> studyPoints, String summary, Integer pointsCharged,
                                         String sampleAnswer, String code, String failureCode, String essayText,
                                         List<BandLimit> bandLimits, DataChecks dataChecks, TaskChecks taskChecks,
-                                        List<ErrorGroup> errorGroups, List<Priority> priorities) {
+                                        List<ErrorGroup> errorGroups, List<Priority> priorities, Revision revision) {
+    /** Only for an essay sent again: the version it follows and how its error kinds compare with that version. */
+    public record Revision(UUID previousSubmissionId, List<String> fixedCodes, List<String> repeatedCodes,
+                           List<String> newCodes) {}
+
     /**
      * {@code limited} is true only when a band cap lowered this criterion; absent otherwise. {@code evidence} and
      * {@code descriptor} come only from a grade made with the second prompt template.
@@ -27,7 +31,10 @@ public record WritingSubmissionResponse(UUID submissionId, String status, String
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record Criterion(String code, BigDecimal band, List<String> strengths, List<String> improvements,
                             List<KnowledgeJudgment> knowledgePointJudgments, Boolean limited, List<String> evidence,
-                            String descriptor) {}
+                            String descriptor, NextBand nextBand) {}
+
+    /** The next band the rubric describes above the one shown, and what it asks for; absent at the top. */
+    public record NextBand(BigDecimal band, String descriptor) {}
 
     /** The errors of one kind, worst first; suggestions are not counted. */
     @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -98,14 +105,22 @@ public record WritingSubmissionResponse(UUID submissionId, String status, String
                                 judgment.knowledgePointId(), judgment.code(), judgment.name(),
                                 judgment.judgment().name(), judgment.excerpt(), judgment.reason())).toList(),
                         limited(grade, criterion.code()),
-                        criterion.evidence().isEmpty() ? null : criterion.evidence(), criterion.descriptor())).toList(),
+                        criterion.evidence().isEmpty() ? null : criterion.evidence(), criterion.descriptor(),
+                        criterion.nextBand() == null ? null : new NextBand(criterion.nextBand().band(),
+                                criterion.nextBand().descriptor()))).toList(),
                 grade == null ? null : corrections(grade, result.essayText()),
                 grade == null ? null : grade.studyPoints().stream().map(point -> new StudyPoint(point.kind(),
                         point.criterionCode(), point.band(), point.knowledgePointId(), point.code(), point.name(),
                         point.title(), point.reason(), point.excerpt(), point.practiceKnowledgePointId())).toList(),
                 grade == null ? null : grade.summary(), result.pointsCharged(), result.sampleAnswer(), result.code(),
                 result.failureCode(), result.essayText(), bandLimits(grade), dataChecks(grade), taskChecks(grade),
-                errorGroups(grade), priorities(grade));
+                errorGroups(grade), priorities(grade), revision(result));
+    }
+
+    private static Revision revision(WritingSubmissionResult result) {
+        var revision = result.revision();
+        return revision == null ? null : new Revision(revision.previousSubmissionId(), revision.fixedCodes(),
+                revision.repeatedCodes(), revision.newCodes());
     }
 
     private static List<Correction> corrections(WritingGrade grade, String essay) {

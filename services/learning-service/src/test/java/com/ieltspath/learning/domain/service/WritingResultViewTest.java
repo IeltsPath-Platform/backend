@@ -150,6 +150,32 @@ class WritingResultViewTest {
     }
 
     @Test
+    void aRevisionSplitsTheErrorCodesIntoFixedRepeatedAndNew() {
+        WritingGrade before = grade(List.of(error("a", "PLURAL", 1), error("b", "TENSE", 1), error("c", "PLURAL", 1),
+                error("d", "ORDER", 1)), List.of(), List.of());
+        WritingGrade after = grade(List.of(error("a", "TENSE", 1), error("b", "WORD", 1)), List.of(), List.of());
+
+        var delta = WritingResultView.revisionDelta(before, after);
+
+        assertEquals(List.of("PLURAL", "ORDER"), delta.fixedCodes());
+        assertEquals(List.of("TENSE"), delta.repeatedCodes());
+        assertEquals(List.of("WORD"), delta.newCodes());
+    }
+
+    @Test
+    void suggestionsAndFallbackCodesDoNotCountAsFixedOrNew() {
+        WritingGrade before = grade(List.of(error("a", "GRAMMAR_OTHER", 1),
+                correction("b", "WORD", 1, "SUGGESTION", null)), List.of(), List.of());
+        WritingGrade after = grade(List.of(error("a", "VOCABULARY_OTHER", 1), error("b", "TENSE", 1)), List.of(), List.of());
+
+        var delta = WritingResultView.revisionDelta(before, after);
+
+        assertTrue(delta.fixedCodes().isEmpty());
+        assertTrue(delta.repeatedCodes().isEmpty());
+        assertEquals(List.of("TENSE"), delta.newCodes());
+    }
+
+    @Test
     void anEssayWithoutErrorsHasNoPriorities() {
         assertTrue(WritingResultView.priorities(grade(List.of(), List.of(), List.of())).isEmpty());
     }
