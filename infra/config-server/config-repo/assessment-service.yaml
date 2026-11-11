@@ -34,6 +34,8 @@ assessment:
     base-url: ${ASSESSMENT_LLM_BASE_URL:}
     api-key: ${ASSESSMENT_LLM_API_KEY:}
     model: ${ASSESSMENT_LLM_MODEL:}
+    reasoning-effort: ${ASSESSMENT_LLM_REASONING_EFFORT:}
+    max-tokens: ${ASSESSMENT_LLM_MAX_TOKENS:8192}
     poll-interval: PT5S
     batch-size: 10
     daily-limit: ${ASSESSMENT_LLM_DAILY_LIMIT:20}

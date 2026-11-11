@@ -104,6 +104,9 @@ Rubrics without sub-points do not require `judgments`. `promptVersion` remains
 sub-points (the prompt was extended), even if the response has no judgments array, otherwise null. This version is not
 exposed by the API. `EssayKnowledgeJudge` validates the received data without LLM or clock
 dependencies; the grader supplies a lazy Content catalog, loaded at most once when needed for practice targets.
+The essay template's single source is `docs/contracts/essay-prompt-template-v*.txt`; Maven copies it to the root
+classpath of Learning and Assessment. Each grader owns the `<rubricCode>@<rubricVersion>+tpl<templateVersion>`
+identifier; the shared LLM transport does not construct or interpret it.
 Missing or malformed judgments preserve a valid band and leave the affected model
 judgments `NOT_ASSESSED`; validated corrections whose active error type maps to a knowledge point can still produce
 `FAIL`. Corrections and judgments come from the same model response and are checked against application rules.

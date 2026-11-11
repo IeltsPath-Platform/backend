@@ -25,10 +25,10 @@ flowchart LR
 | Nhóm | Module | Vai trò |
 | :-- | :-- | :-- |
 | `infra/` | `api-gateway` :8080, `config-server` :8888, `eureka-server` :8761 | Ingress WebFlux, cấu hình tập trung (`config-repo/`), service registry |
-| `shared/` | `common-security`, `common-events`, `common-resilience`, `common-observability`, `common-storage` | Thư viện dùng chung, tự cấu hình bằng Spring Boot auto-configuration, không deploy độc lập |
+| `shared/` | `common-security`, `common-events`, `common-resilience`, `common-observability`, `common-storage`, `common-llm` | Thư viện dùng chung, tự cấu hình bằng Spring Boot auto-configuration, không deploy độc lập |
 | `services/` | `user` :8085, `content` :8082, `library` :8081, `assessment` :8083, `access` :8084, `learning` :8086, `game` :8087, `notification` :8088, `community` :8089 | Business service, mỗi service một bounded context và một database |
 
-Reactor Maven gồm 17 module (3 infra, 5 shared, 9 business). Kiến trúc chi tiết, luồng nghiệp vụ và quyết định thiết kế: [`docs/system-architecture.md`](docs/system-architecture.md).
+Reactor Maven gồm 18 module (3 infra, 6 shared, 9 business). Kiến trúc chi tiết, luồng nghiệp vụ và quyết định thiết kế: [`docs/system-architecture.md`](docs/system-architecture.md).
 
 ---
 
@@ -61,6 +61,7 @@ Chỉ liệt kê pattern đã có trong code. Cột "Xem" trỏ tới nơi đọ
 | Pattern | Cách áp dụng | Xem |
 | :-- | :-- | :-- |
 | **Circuit Breaker + Retry + Bulkhead** | `ResilientCall` bọc mọi lời gọi HTTP giữa service. Breaker theo service đích (mở 30 giây); retry tối đa một lần sau 200 ms, chỉ cho `READ` và `IDEMPOTENT_WRITE`, chỉ với lỗi kết nối, timeout, 5xx; LLM giới hạn 4 lời gọi đồng thời. Lỗi được đổi về contract lỗi của service gọi | `shared/common-resilience` |
+| **Client LLM dùng chung** | Learning, Assessment, Content dùng `common-llm`: luật theo model, lỗi an toàn, timer `llm.call.duration` và counter `llm.tokens`; prompt và parser ở service | `shared/common-llm` |
 | **Gọi ngoài transaction** | HTTP và LLM không chạy trong transaction hay khi giữ khóa | mục 3 của system-architecture |
 
 ### Giao tiếp bất đồng bộ

@@ -19,6 +19,11 @@
     <dependencies>
         <dependency>
             <groupId>com.ieltspath</groupId>
+            <artifactId>common-llm</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.ieltspath</groupId>
             <artifactId>common-events</artifactId>
             <version>${project.version}</version>
         </dependency>
@@ -154,7 +159,20 @@
 </dependencies>
 
     <build>
+        <resources>
+            <resource><directory>src/main/resources</directory></resource>
+            <resource>
+                <directory>${maven.multiModuleProjectDirectory}/docs/contracts</directory>
+                <includes><include>essay-prompt-template-*.txt</include></includes>
+            </resource>
+        </resources>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.3.1</version>
+                <configuration><overwrite>true</overwrite></configuration>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>

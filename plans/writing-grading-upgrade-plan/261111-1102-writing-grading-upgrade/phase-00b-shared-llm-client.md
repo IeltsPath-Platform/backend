@@ -1,7 +1,7 @@
 ---
 phase: 0b
 title: "Shared LLM client and single-source essay template"
-status: pending
+status: in-progress
 priority: P1
 dependencies: [0]
 ---
