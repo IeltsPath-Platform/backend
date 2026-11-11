@@ -55,6 +55,7 @@ learning:
     api-key: ${LEARNING_LLM_API_KEY:}
     model: ${LEARNING_LLM_MODEL:}
     reasoning-effort: ${LEARNING_LLM_REASONING_EFFORT:}
+    max-tokens: ${LEARNING_LLM_MAX_TOKENS:8192}
   writing:
     point-cost: ${LEARNING_WRITING_POINT_COST:3}
     # LLM gradings per learner and calendar day in quota-timezone.

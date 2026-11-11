@@ -23,6 +23,20 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 class OpenAiCompatibleEssayGraderTest {
     @Test
+    void whitespaceEndpointKeepsTheOptionalGraderUnavailableWithoutCallingHttp() {
+        var builder = RestClient.builder();
+        var server = MockRestServiceServer.bindTo(builder).build();
+        var properties = new AssessmentLlmProperties();
+        properties.setBaseUrl(" \t ");
+        var grader = new OpenAiCompatibleEssayGrader(builder.build(), properties, new ObjectMapper(),
+                mock(ActiveRubricProvider.class), () -> Set.of());
+        assertFalse(grader.available());
+        assertEquals("LLM_UNAVAILABLE", assertThrows(EssayGradingException.class, () -> grader.grade(
+                new EssayGradingPort.Prompt("Discuss", "TASK_2", 250, null), "essay")).getCode());
+        server.verify();
+    }
+
+    @Test
     void activatedPromptReadsOnlyItsPinnedPublishedRubric() throws Exception {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
@@ -86,6 +100,8 @@ class OpenAiCompatibleEssayGraderTest {
         server.expect(requestTo("https://llm.example/v1/chat/completions"))
                 .andExpect(method(org.springframework.http.HttpMethod.POST))
                 .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer test-key"))
+                .andExpect(jsonPath("$.max_tokens").value(8192))
+                .andExpect(jsonPath("$.response_format.type").value("json_object"))
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("candidate essay")))
                 .andRespond(withSuccess(new ObjectMapper().writeValueAsString(Map.of("choices", List.of(Map.of(
@@ -197,6 +213,28 @@ class OpenAiCompatibleEssayGraderTest {
                 new EssayGradingPort.Prompt("Discuss", "TASK_2", 250, null), "I writed it.");
         assertEquals(List.of("GRAMMAR"), grade.errorCodes());
         assertEquals(1, new ObjectMapper().readTree(grade.feedback()).path("corrections").size());
+        server.verify();
+    }
+
+    @Test
+    void reasoningModelUsesSharedCompletionBudgetAndEffortRules() throws Exception {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        var properties = properties();
+        properties.setModel("gpt-5-mini");
+        properties.setReasoningEffort("low");
+        properties.setMaxTokens(12000);
+        String reply = "{\"criteria\":[{\"code\":\"TR\",\"band\":6},{\"code\":\"CC\",\"band\":6},"
+                + "{\"code\":\"LR\",\"band\":6},{\"code\":\"GRA\",\"band\":6}]}";
+        server.expect(requestTo("https://llm.example/v1/chat/completions"))
+                .andExpect(jsonPath("$.max_completion_tokens").value(12000))
+                .andExpect(jsonPath("$.max_tokens").doesNotExist())
+                .andExpect(jsonPath("$.temperature").doesNotExist())
+                .andExpect(jsonPath("$.reasoning_effort").value("low"))
+                .andRespond(withSuccess(new ObjectMapper().writeValueAsString(Map.of("choices", List.of(Map.of(
+                        "message", Map.of("content", reply))))), MediaType.APPLICATION_JSON));
+        assertEquals(new BigDecimal("6.0"), grader(builder.build(), properties, new ObjectMapper()).grade(
+                new EssayGradingPort.Prompt("Discuss", "TASK_2", 250, null), "candidate essay").band());
         server.verify();
     }
 

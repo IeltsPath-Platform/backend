@@ -26,7 +26,7 @@ class OpenAiCompatibleLlmClientBulkheadTest {
         bulkheads.bulkhead("llm");
         var resilience = new ResilientCall(CircuitBreakerRegistry.ofDefaults(), RetryRegistry.ofDefaults(), bulkheads);
         var client = new OpenAiCompatibleLlmClient(RestClient.builder().baseUrl("http://unused").build(),
-                "key", "model", "", resilience);
+                "http://unused", "key", "model", "", resilience);
         CountDownLatch entered = new CountDownLatch(4);
         CountDownLatch release = new CountDownLatch(1);
         List<Thread> held = new ArrayList<>();
