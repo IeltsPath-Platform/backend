@@ -115,6 +115,21 @@ Response 200:
   when some part is not `FULL`; `noPosition` when the question asks for an opinion and the essay gives none;
   `noConclusion` only when an outline was returned and has no `CONCLUSION`. These checks add no evidence and no
   correction; they are shown to the learner and feed the band caps.
+- `corrections[]` also carries `start` and `end` (the character range `[start, end)` of `excerpt` in `essayText`) and,
+  from the second prompt template, `reason` (one Vietnamese sentence naming the broken rule) and `certainty` (`ERROR` or
+  `SUGGESTION`; a missing value reads as `ERROR`). Each quotation takes the first occurrence that no earlier correction
+  with the same quotation took; a quotation with no free occurrence has no `start`/`end`. Overlapping quotations of
+  different corrections each keep their own range; the client decides which one to draw.
+- `errorGroups` (absent when there are no errors): `[{errorCode, errorName, category, count, severity, fixHint,
+  example?: {wrong, right}, practiceKnowledgePointId?}]`, worst first by `count x severity`, fallback codes (`*_OTHER`) last.
+  Only `ERROR` corrections count; a `SUGGESTION` never starts a group.
+- `priorities` (absent when there is nothing to prioritise): at most 3 items
+  `{title, explanation, excerpts, action, errorCodes, practiceKnowledgePointId?, source}`. `source = AI` when the model
+  chose them (second prompt template); otherwise `RULE`: the three worst `errorGroups`, with `title = errorName`,
+  `action = fixHint` and the first correction of the group as the excerpt. `errorGroups` and `priorities` are worked out
+  when the grade is read, from what is stored; no call to Content or the model is made.
+- `criteria[].evidence` and `criteria[].descriptor` (second prompt template only, omitted when empty): the quotations that
+  support the band and the rubric descriptor that matched.
 - Every quotation in these fields is an exact part of `essayText`; one that was not is dropped. A reply with a missing or
   malformed `taskChecks` gives empty lists and unknown flags, and never fails the grade.
 - `summary` ≤ 600 characters. `passed = overallBand ≥ passBand`. `sampleAnswer` only when `passed` or the block was

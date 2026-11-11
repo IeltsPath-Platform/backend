@@ -102,6 +102,71 @@ class WritingSubmissionResponseTest {
         }
     }
 
+    private static WritingGrade detailedGrade() {
+        var practice = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        var first = new WritingGrade.Correction("He go", "He goes", "GRAMMAR", "SVA", "Subject-verb", "Match the verb",
+                2, practice, "KP_SVA", "Chủ ngữ số ít", "ERROR");
+        var second = new WritingGrade.Correction("He go", "He goes", "GRAMMAR", "SVA", "Subject-verb", "Match the verb",
+                2, practice, "KP_SVA", null, "ERROR");
+        var tip = new WritingGrade.Correction("big", "huge", "VOCABULARY", "WORD", "Word choice", "Pick a precise word",
+                1, null, null, "Từ chính xác hơn", "SUGGESTION");
+        var criterion = new WritingGrade.Criterion("TR", new BigDecimal("6.0"), List.of(), List.of(), null, List.of(),
+                List.of("He go"), "Band 6 descriptor");
+        return new WritingGrade(List.of(criterion), List.of(first, second, tip), "Summary", new BigDecimal("6.0"),
+                List.of(), null, null, List.of(), List.of(),
+                List.of(new WritingGrade.ErrorExample("SVA", "She go", "She goes")));
+    }
+
+    private static final String DETAILED_ESSAY = "He go. It is big. He go.";
+
+    private com.fasterxml.jackson.databind.JsonNode detailedResponse() throws Exception {
+        var result = new WritingSubmissionResult(UUID.randomUUID(), "GRADED", "TASK_2", 250, new BigDecimal("6.0"), true,
+                detailedGrade(), 3, null, null, null, DETAILED_ESSAY);
+        return json.readTree(json.writeValueAsString(WritingSubmissionResponse.from(result)));
+    }
+
+    @Test
+    void correctionsCarryTheirPositionReasonAndCertainty() throws Exception {
+        var corrections = detailedResponse().get("corrections");
+
+        assertTrue(corrections.get(0).get("start").asInt() == 0 && corrections.get(0).get("end").asInt() == 5);
+        assertTrue(corrections.get(1).get("start").asInt() == 18, "the second mention takes the second occurrence");
+        assertTrue(corrections.get(0).get("reason").asText().equals("Chủ ngữ số ít"));
+        assertFalse(corrections.get(1).has("reason"));
+        assertTrue(corrections.get(2).get("certainty").asText().equals("SUGGESTION"));
+    }
+
+    @Test
+    void criteriaCarryTheirEvidenceAndDescriptorWhenThereAreAny() throws Exception {
+        var criterion = detailedResponse().get("criteria").get(0);
+
+        assertTrue(criterion.get("evidence").get(0).asText().equals("He go"));
+        assertTrue(criterion.get("descriptor").asText().equals("Band 6 descriptor"));
+    }
+
+    @Test
+    void errorGroupsAndPrioritiesComeFromTheStoredCorrections() throws Exception {
+        var tree = detailedResponse();
+
+        var groups = tree.get("errorGroups");
+        assertTrue(groups.size() == 1, "a suggestion does not make a group");
+        assertTrue(groups.get(0).get("count").asInt() == 2);
+        assertTrue(groups.get(0).get("example").get("right").asText().equals("She goes"));
+        assertTrue(groups.get(0).get("practiceKnowledgePointId").asText().endsWith("1"));
+        var priority = tree.get("priorities").get(0);
+        assertTrue(priority.get("source").asText().equals("RULE"));
+        assertTrue(priority.get("title").asText().equals("Subject-verb"));
+    }
+
+    @Test
+    void gradesWithoutErrorsReturnNoGroupsOrPriorities() throws Exception {
+        var tree = json.readTree(json.writeValueAsString(WritingSubmissionResponse.from(
+                graded("TASK_2", gradeWith(null, null)))));
+
+        assertFalse(tree.has("errorGroups"));
+        assertFalse(tree.has("priorities"));
+    }
+
     @Test
     void theChecksSurviveTheJsonStoredWithTheGrade() throws Exception {
         var task1 = new WritingGrade.Task1Checks(List.of(new WritingGrade.DataCheck("s", "WRONG", "e")), 0, true, null,

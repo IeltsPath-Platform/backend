@@ -2,6 +2,7 @@ package com.ieltspath.learning.api.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.ieltspath.learning.application.result.WritingSubmissionResult;
+import com.ieltspath.learning.domain.service.WritingResultView;
 import com.ieltspath.learning.domain.vo.WritingGrade;
 
 import java.math.BigDecimal;
@@ -17,10 +18,28 @@ public record WritingSubmissionResponse(UUID submissionId, String status, String
                                         BigDecimal overallBand, Boolean passed, List<Criterion> criteria,
                                         List<Correction> corrections, List<StudyPoint> studyPoints, String summary, Integer pointsCharged,
                                         String sampleAnswer, String code, String failureCode, String essayText,
-                                        List<BandLimit> bandLimits, DataChecks dataChecks, TaskChecks taskChecks) {
-    /** {@code limited} is true only when a band cap lowered this criterion; absent otherwise. */
+                                        List<BandLimit> bandLimits, DataChecks dataChecks, TaskChecks taskChecks,
+                                        List<ErrorGroup> errorGroups, List<Priority> priorities) {
+    /**
+     * {@code limited} is true only when a band cap lowered this criterion; absent otherwise. {@code evidence} and
+     * {@code descriptor} come only from a grade made with the second prompt template.
+     */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public record Criterion(String code, BigDecimal band, List<String> strengths, List<String> improvements,
-                            List<KnowledgeJudgment> knowledgePointJudgments, Boolean limited) {}
+                            List<KnowledgeJudgment> knowledgePointJudgments, Boolean limited, List<String> evidence,
+                            String descriptor) {}
+
+    /** The errors of one kind, worst first; suggestions are not counted. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record ErrorGroup(String errorCode, String errorName, String category, int count, int severity,
+                             String fixHint, Example example, UUID practiceKnowledgePointId) {}
+
+    public record Example(String wrong, String right) {}
+
+    /** A problem to work on first. {@code source} is AI when the model chose it, RULE when it was derived from the errors. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record Priority(String title, String explanation, List<String> excerpts, String action,
+                           List<String> errorCodes, UUID practiceKnowledgePointId, String source) {}
 
     /**
      * Task 1 only. The sentences the essay got wrong about the chart, with what the chart shows, and how many were right.
@@ -54,10 +73,15 @@ public record WritingSubmissionResponse(UUID submissionId, String status, String
     public record KnowledgeJudgment(UUID knowledgePointId, String code, String name, String judgment, String excerpt,
                                     String reason) {}
 
+    /**
+     * {@code start} and {@code end} are the character range of {@code excerpt} in {@code essayText}, absent when it has
+     * none. {@code reason} and {@code certainty} come only from the second prompt template.
+     */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record Correction(String excerpt, String suggestion, String category, String errorCode, String errorName,
                              String fixHint, Integer severity, UUID practiceKnowledgePointId,
-                             String practiceKnowledgePointCode) {}
+                             String practiceKnowledgePointCode, Integer start, Integer end, String reason,
+                             String certainty) {}
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record StudyPoint(String kind, String criterionCode, BigDecimal band, UUID knowledgePointId, String code,
@@ -73,16 +97,48 @@ public record WritingSubmissionResponse(UUID submissionId, String status, String
                         criterion.knowledgePointJudgments().stream().map(judgment -> new KnowledgeJudgment(
                                 judgment.knowledgePointId(), judgment.code(), judgment.name(),
                                 judgment.judgment().name(), judgment.excerpt(), judgment.reason())).toList(),
-                        limited(grade, criterion.code()))).toList(),
-                grade == null ? null : grade.corrections().stream().map(correction -> new Correction(
-                        correction.excerpt(), correction.suggestion(), correction.category(), correction.errorCode(),
-                        correction.errorName(), correction.fixHint(), correction.severity(),
-                        correction.practiceKnowledgePointId(), correction.practiceKnowledgePointCode())).toList(),
+                        limited(grade, criterion.code()),
+                        criterion.evidence().isEmpty() ? null : criterion.evidence(), criterion.descriptor())).toList(),
+                grade == null ? null : corrections(grade, result.essayText()),
                 grade == null ? null : grade.studyPoints().stream().map(point -> new StudyPoint(point.kind(),
                         point.criterionCode(), point.band(), point.knowledgePointId(), point.code(), point.name(),
                         point.title(), point.reason(), point.excerpt(), point.practiceKnowledgePointId())).toList(),
                 grade == null ? null : grade.summary(), result.pointsCharged(), result.sampleAnswer(), result.code(),
-                result.failureCode(), result.essayText(), bandLimits(grade), dataChecks(grade), taskChecks(grade));
+                result.failureCode(), result.essayText(), bandLimits(grade), dataChecks(grade), taskChecks(grade),
+                errorGroups(grade), priorities(grade));
+    }
+
+    private static List<Correction> corrections(WritingGrade grade, String essay) {
+        var spans = WritingResultView.locate(essay, grade.corrections());
+        var corrections = new java.util.ArrayList<Correction>();
+        for (int i = 0; i < grade.corrections().size(); i++) {
+            var correction = grade.corrections().get(i);
+            var span = spans.get(i);
+            corrections.add(new Correction(correction.excerpt(), correction.suggestion(), correction.category(),
+                    correction.errorCode(), correction.errorName(), correction.fixHint(), correction.severity(),
+                    correction.practiceKnowledgePointId(), correction.practiceKnowledgePointCode(),
+                    span == null ? null : span.start(), span == null ? null : span.end(), correction.reason(),
+                    correction.certainty()));
+        }
+        return corrections;
+    }
+
+    private static List<ErrorGroup> errorGroups(WritingGrade grade) {
+        if (grade == null) return null;
+        var groups = WritingResultView.errorGroups(grade.corrections(), grade.errorExamples());
+        if (groups.isEmpty()) return null;
+        return groups.stream().map(group -> new ErrorGroup(group.errorCode(), group.errorName(), group.category(),
+                group.count(), group.severity(), group.fixHint(),
+                group.example() == null ? null : new Example(group.example().wrong(), group.example().right()),
+                group.practiceKnowledgePointId())).toList();
+    }
+
+    private static List<Priority> priorities(WritingGrade grade) {
+        if (grade == null) return null;
+        var priorities = WritingResultView.priorities(grade);
+        if (priorities.isEmpty()) return null;
+        return priorities.stream().map(item -> new Priority(item.title(), item.explanation(), item.excerpts(),
+                item.action(), item.errorCodes(), item.practiceKnowledgePointId(), item.source())).toList();
     }
 
     private static DataChecks dataChecks(WritingGrade grade) {
