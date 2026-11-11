@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -24,8 +25,12 @@ public class AiEvaluationController {
     @PostMapping("/ai-gold-essays")
     @ResponseStatus(HttpStatus.CREATED)
     public Map<String,UUID> addGold(@Valid @RequestBody CreateAiGoldEssayRequest request) {
+        List<AiEvaluationService.ExaminerError> errors = request.examinerErrors() == null ? List.of()
+                : request.examinerErrors().stream().map(error -> new AiEvaluationService.ExaminerError(
+                        error.excerpt(), error.errorCode(), error.kind())).toList();
         UUID id = service.addManual(request.task(), request.prompt(), request.chartFacts(), request.essay(),
-                request.examinerBand(), request.examinerCriteria(), request.examinerErrorCodes(), currentUser.requireUserId());
+                request.examinerBand(), request.examinerCriteria(), request.examinerErrorCodes(), errors,
+                currentUser.requireUserId());
         return Map.of("id", id);
     }
 

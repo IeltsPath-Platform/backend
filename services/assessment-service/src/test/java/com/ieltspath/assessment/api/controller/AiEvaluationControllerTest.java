@@ -22,7 +22,7 @@ class AiEvaluationControllerTest {
         UUID id = UUID.randomUUID();
         when(currentUser.requireUserId()).thenReturn(actor);
         when(service.addManual(eq("TASK_2"), eq("prompt"), isNull(), eq("essay"), eq(new BigDecimal("6.5")),
-                any(), eq(List.of("GRAMMAR")), eq(actor))).thenReturn(id);
+                any(), eq(List.of("GRAMMAR")), any(), eq(actor))).thenReturn(id);
         var response = controller.addGold(new CreateAiGoldEssayRequest("TASK_2", "prompt", null, "essay",
                 new BigDecimal("6.5"), List.of(), List.of("GRAMMAR")));
         assertEquals(id, response.get("id"));

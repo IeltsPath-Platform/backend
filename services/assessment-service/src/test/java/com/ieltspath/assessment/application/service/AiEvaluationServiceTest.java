@@ -22,7 +22,7 @@ class AiEvaluationServiceTest {
         when(jdbc.update(anyString(), any(Object[].class))).thenReturn(0);
         AiEvaluationService service = new AiEvaluationService(jdbc, mock(EssayGradingPort.class),
                 mock(ActiveRubricProvider.class), new AssessmentLlmProperties(), new ObjectMapper(),
-                100, new java.math.BigDecimal("0.80"), new java.math.BigDecimal("0.60"), "Asia/Ho_Chi_Minh");
+                100, new java.math.BigDecimal("0.80"), new java.math.BigDecimal("0.60"), "Asia/Ho_Chi_Minh", new BigDecimal("0.05"));
 
         ResponseStatusException error = assertThrows(ResponseStatusException.class,
                 () -> service.activate(UUID.randomUUID(), UUID.randomUUID()));
@@ -36,7 +36,7 @@ class AiEvaluationServiceTest {
         when(jdbc.update(anyString(), any(Object[].class))).thenReturn(1);
         AiEvaluationService service = new AiEvaluationService(jdbc, mock(EssayGradingPort.class),
                 mock(ActiveRubricProvider.class), new AssessmentLlmProperties(), new ObjectMapper(),
-                100, new BigDecimal("0.80"), new BigDecimal("0.60"), "Asia/Ho_Chi_Minh");
+                100, new BigDecimal("0.80"), new BigDecimal("0.60"), "Asia/Ho_Chi_Minh", new BigDecimal("0.05"));
 
         UUID runId = UUID.randomUUID();
         UUID actor = UUID.randomUUID();
@@ -56,12 +56,14 @@ class AiEvaluationServiceTest {
                 new BigDecimal("6.5"), criterionTwo, "rubric@1+tplv1", List.of()));
         AiEvaluationService service = new AiEvaluationService(jdbc, grader, mock(ActiveRubricProvider.class),
                 new AssessmentLlmProperties(), new ObjectMapper(), 100, new BigDecimal("0.80"),
-                new BigDecimal("0.60"), "Asia/Ho_Chi_Minh");
+                new BigDecimal("0.60"), "Asia/Ho_Chi_Minh", new BigDecimal("0.05"));
         List<AiEvaluationService.GoldEssay> gold = List.of(
                 new AiEvaluationService.GoldEssay(UUID.randomUUID(), "TASK_2", "prompt", null, "essay one",
-                        new BigDecimal("6.0"), new String[]{"GRAMMAR"}, "[{\"code\":\"TR\",\"band\":6.0,\"comment\":\"ok\"}]"),
+                        new BigDecimal("6.0"), new String[]{"GRAMMAR"}, "[{\"code\":\"TR\",\"band\":6.0,\"comment\":\"ok\"}]",
+                        List.of()),
                 new AiEvaluationService.GoldEssay(UUID.randomUUID(), "TASK_2", "prompt", null, "essay two",
-                        new BigDecimal("6.5"), new String[0], "[{\"code\":\"TR\",\"band\":6.5,\"comment\":\"ok\"}]"));
+                        new BigDecimal("6.5"), new String[0], "[{\"code\":\"TR\",\"band\":6.5,\"comment\":\"ok\"}]",
+                        List.of()));
         UUID runId = UUID.randomUUID();
 
         service.evaluate(runId, "TASK_2", gold, "rubric@1+tplv1");
@@ -80,6 +82,7 @@ class AiEvaluationServiceTest {
         assertTrue(persisted[6].toString().contains("\"TR\""));
         assertTrue(persisted[6].toString().contains("\"n\":2"));
         assertTrue(persisted[6].toString().contains("\"withinHalfBand\":1.000000"));
-        assertEquals(runId, persisted[7]);
+        // Columns added after per_criterion: error recall (LANGUAGE, DATA), corrections, p95, invalid rate; then the run id.
+        assertEquals(runId, persisted[12]);
     }
 }
