@@ -34,13 +34,14 @@ Thứ tự merge: `feat/common-llm` → các nhánh còn lại. `chore/productio
 | Production | `test-production.py` | 8 test xanh |
 | Compose production | `scripts/production/compose.py config` với env rỗng trong thư mục tạm | xanh |
 | Workflow | parse `images.yml`, `deploy.yml` | hợp lệ |
-| Docker | build `infra/config-server/Dockerfile` | xanh |
+| Reactor | `mvn -B -ntp verify -fae` cả 18 module, trên nhánh tích hợp tạm `verify/dev-b-integration` | 18/18 module xanh; notification có 2 test broker lỗi lần chạy đầu, chạy lại 4/4 xanh (flaky dưới tải) |
+| Docker | build 12 image Spring (eureka, gateway, 9 service) + config-server | 13/13 build xanh |
+| Docker | build `infra/config-server/Dockerfile`, chạy image | HTTP 200, không lỗi |
 | Docker | chạy image, gọi config | HTTP 200, không lỗi |
 
 ## Chưa chạy
 
-- `mvn -B -ntp verify` cả reactor trên các nhánh backend. Chỉ chạy test theo module.
-- Build 11 image còn lại (service nghiệp vụ, gateway, eureka). Chỉ build config-server.
+- Verify cả reactor chỉ chạy trên nhánh tích hợp tạm `verify/dev-b-integration`, không chạy trên từng nhánh riêng.
 - `actionlint` không có trên máy; workflow mới parse được nhưng chưa lint.
 - Chưa dựng stack production thật trên máy này.
 
