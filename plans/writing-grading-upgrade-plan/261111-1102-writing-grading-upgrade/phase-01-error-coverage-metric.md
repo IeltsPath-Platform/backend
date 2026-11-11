@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Error coverage metric"
-status: code done, chờ bộ 5–10 bài examiner để chạy số nền
+status: code done, số nền v1 đã chạy trên 8 bài (xem reports/phase-01-prompt-v1-baseline-numbers-261111-2145.md); chờ xác nhận bộ bài và mã dự phòng
 priority: P1
 dependencies: [0]
 ---

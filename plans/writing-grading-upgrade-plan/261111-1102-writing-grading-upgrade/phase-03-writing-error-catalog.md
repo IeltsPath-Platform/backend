@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Writing error catalog"
-status: code done, chờ chuyên gia duyệt mã mới và bước eval (số nền)
+status: code done; mã mới đã thêm ở V125 (chủ sản phẩm quyết, chưa qua examiner); chờ eval sau V125 (API Gemini đang giới hạn); điểm error-trap của mã mới hoãn
 priority: P1
 dependencies: []
 ---
@@ -55,6 +55,14 @@ bốn. Phase này thêm cột kỹ năng, bổ sung mã còn thiếu và mã d�
 2. Liệt kê toàn bộ mã active hiện có (mọi migration, không chỉ V45) và bảng xếp `skills` đề xuất; gửi người dùng xem trước khi viết migration.
 3. Test đỏ → migration và code Content → test đỏ → Learning.
 4. Chạy eval (phase 1) lần nữa với prompt v1 nhưng danh mục đã lọc: so `error_recall` và `error_code_false_positive` với số nền.
+
+## Quyết định hoãn: điểm error-trap của mã mới (2026-11-11)
+Migration V125 thêm 7 mã mới và gắn kiến thức cho `NO_CLEAR_POSITION`, nhưng **không** tạo điểm `TRAP_<mã>`. Lý do:
+`ErrorTrapCoverageMigrationTest` đòi mỗi mã có điểm trap phải có 2 bộ luyện tập đã xuất bản (mỗi bộ ít nhất 3 câu, 2 câu có
+đáp án nhiễu gắn mã đó), tức khoảng 48 câu cho 8 mã. Đây là nội dung học viên; nội dung AI soạn phải qua người duyệt
+(`AGENTS.md` §3.6) nên không đưa thẳng vào migration. Hệ quả: lỗi chấm ra các mã này hiện tên và gợi ý, nút luyện tập mở
+kiến thức cha, nhưng chưa ghi bằng chứng error-trap riêng. Làm sau: soạn bộ luyện tập ở dạng nháp, người duyệt, rồi một migration
+thêm bộ đã xuất bản cùng điểm trap (và cập nhật `GrammarErrorCodeMappingMigrationTest` cho `NO_CLEAR_POSITION`).
 
 ## Success Criteria
 - [ ] Prompt Writing ở cả Learning và Assessment chỉ chứa mã có `WRITING`.
