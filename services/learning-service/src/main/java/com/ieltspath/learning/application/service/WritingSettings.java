@@ -22,7 +22,8 @@ public record WritingSettings(
         @DefaultValue("20") @Min(1) @Max(25) int gradingTimeoutSeconds,
         @DefaultValue("120") @Min(1) int staleGradingSeconds,
         @DefaultValue("10") @Min(1) int dailyGradingLimit,
-        @DefaultValue("Asia/Ho_Chi_Minh") @NotBlank String quotaTimezone) {
+        @DefaultValue("Asia/Ho_Chi_Minh") @NotBlank String quotaTimezone,
+        @DefaultValue("2") @Min(1) int progressFixedAfter) {
 
     @AssertTrue(message = "minWords must be below maxWords")
     public boolean isWordRangeValid() {

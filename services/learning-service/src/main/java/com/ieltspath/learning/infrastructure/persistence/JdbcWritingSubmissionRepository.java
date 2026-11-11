@@ -6,6 +6,7 @@ import com.ieltspath.learning.domain.aggregate.WritingSubmission;
 import com.ieltspath.learning.domain.repository.WritingSubmissionRepository;
 import com.ieltspath.learning.domain.vo.EssayPrompt;
 import com.ieltspath.learning.domain.vo.WritingGrade;
+import com.ieltspath.learning.domain.vo.WritingProgressEssay;
 import com.ieltspath.learning.domain.vo.WritingSubmissionStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowCallbackHandler;
@@ -155,6 +156,25 @@ public class JdbcWritingSubmissionRepository implements WritingSubmissionReposit
                 SELECT EXISTS (SELECT 1 FROM lesson_writing_submissions WHERE user_id = ? AND block_id = ?
                 AND status = 'GRADED' AND passed AND id <> ?)
                 """, Boolean.class, userId, blockId, excludeId));
+    }
+
+    /** Reads only what progress needs: the stored grade, never the essay text or the prompt. */
+    @Override
+    public List<WritingProgressEssay> findFirstGradedEssays(UUID userId, String task, int limit) {
+        return jdbc.query("""
+                SELECT id, source, graded_at, overall_band, prompt_version, result::text AS result
+                FROM lesson_writing_submissions
+                WHERE user_id = ? AND status = 'GRADED' AND revision_no = 1 AND prompt_snapshot->>'task' = ?
+                ORDER BY graded_at DESC
+                LIMIT ?
+                """, (row, rowNumber) -> {
+            StoredGrade stored = read(row.getString("result"), StoredGrade.class);
+            return new WritingProgressEssay(row.getObject("id", UUID.class), row.getString("source"),
+                    row.getTimestamp("graded_at").toInstant(), row.getBigDecimal("overall_band"),
+                    row.getString("prompt_version"),
+                    stored == null || stored.criteria() == null ? List.of() : stored.criteria(),
+                    stored == null || stored.corrections() == null ? List.of() : stored.corrections());
+        }, userId, task, limit);
     }
 
     @Override
