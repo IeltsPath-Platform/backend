@@ -84,11 +84,16 @@ mvn -q -pl services/<name>-service -am test     # test một service (Testcontai
 mvn -q -pl shared/common-security test
 mvn -q -pl shared/common-events test
 mvn -q -pl shared/common-storage test
-mvn -q -pl infra/api-gateway test
-mvn -q compile -DskipTests                       # cả reactor; tránh `clean` khi service đang chạy từ IDE
+mvn -q -pl infra/api-gateway test
+mvn -q -pl services/<name>-service -am -Dtest=ArchitectureTest -Dsurefire.failIfNoSpecifiedTests=false test
 docker compose config --quiet                    # kiểm compose + .env
 docker compose ps
 ```
+
+Kiểm tra kiến trúc (ArchUnit): sáu luật layer và pattern, vi phạm cũ nằm trong `src/test/resources/archunit_store`.
+Chỉ vi phạm mới làm đỏ. Không tự tạo hay cập nhật store khi chạy thường; xem `archunit.properties` của từng service.
+Không kiểm tĩnh được: HTTP/LLM có nằm ngoài transaction và khóa không, ResilientCall có bọc mọi lời gọi không, URL HTTP cụ thể.
+mvn -q compile -DskipTests                       # cả reactor; tránh `clean` khi service đang chạy từ IDE
 
 Test service học: `mvn -q -pl services/learning-service -am test` (Testcontainers cần Docker).
 
