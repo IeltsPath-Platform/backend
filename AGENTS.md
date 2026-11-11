@@ -58,9 +58,9 @@ phần hạ tầng hoặc architectural pattern mới nếu chưa được phê 
 | API docs | springdoc-openapi 2.8.17 (duyệt 2026-10-02): `webmvc-api` ở user/access/assessment/learning, `webflux-ui` ở Gateway gom Swagger UI; chỉ route luồng chính, không `/internal/**`. |
 | Kiểm thử | JUnit Jupiter, Spring Boot Test, Mockito, Spring Security Test, Testcontainers PostgreSQL. |
 | Container | Docker Compose, `postgres:15-alpine`, `rabbitmq:3.13-management-alpine`, Eclipse Temurin 21. |
-| CI | GitHub Actions `.github/workflows/ci.yml`: mỗi PR và push vào `main` chạy `mvn -B -ntp verify` cả reactor (JDK 21, Testcontainers trên Docker của runner) và `docker compose config --quiet` với `.env` giả. Chưa có CD. |
+| CI | GitHub Actions `.github/workflows/ci.yml`: mỗi PR và push vào `main` chạy `mvn -B -ntp verify` cả reactor (JDK 21, Testcontainers trên Docker của runner) và `docker compose config --quiet` với `.env` giả. `images.yml` build image lên GHCR; `deploy.yml` chạy tay qua SSH trong environment `production` (xem `docs/deployment.md`). |
 
-Repository **chưa có**: frontend, file OpenAPI được track, CD/deploy pipeline,
+Repository **chưa có**: frontend, file OpenAPI được track,
 formatter, linter, coverage gate. Bổ sung các thành phần này là quyết định thiết kế, không phải mở rộng mặc định.
 
 ## 3. Nguyên tắc kiến trúc
@@ -467,4 +467,4 @@ Những điểm ảnh hưởng trực tiếp tới quy tắc:
   đặt `http://localhost:8082`. `LIBRARY_SERVICE_URL` đã mặc định `http://localhost:8081`.
 - Content và game không còn bảng outbox (đã xóa). Access, assessment, community và learning (`reward_grants`) có outbox và relay.
 - Config-repo yêu cầu JWT, mật khẩu DB, RabbitMQ và Redis qua biến môi trường; không thêm giá trị dự phòng. Thiếu biến bắt buộc thì service không khởi động; `.env.example` chỉ chứa tên và giá trị rỗng.
-- Chưa xác định: production deployment và CD, secret management, frontend contract, API versioning.
+- Chưa xác định: nơi lưu bản sao lưu DB ngoài VPS, tên miền production, frontend contract, API versioning. CD đã có (workflow chạy tay); chưa chạy lần nào.
