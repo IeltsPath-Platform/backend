@@ -10,6 +10,7 @@ import com.ieltspath.access.domain.entity.KeyActivation;
 import com.ieltspath.access.domain.entity.OutboxEvent;
 import com.ieltspath.access.domain.entity.PointLedgerEntry;
 import com.ieltspath.access.domain.exception.ActivationKeyNotFoundException;
+import com.ieltspath.access.domain.exception.DuplicateIdempotencyException;
 import com.ieltspath.access.domain.exception.KeyProductNotFoundException;
 import com.ieltspath.access.domain.exception.EmailNotVerifiedException;
 import com.ieltspath.access.domain.repository.UserEmailVerificationRepository;
@@ -63,6 +64,17 @@ public class ActivateKeyUseCase {
         Optional<KeyActivation> existingActivation = keyActivationRepository.findByIdempotencyKey(command.idempotencyKey());
         if (existingActivation.isPresent()) {
             KeyActivation act = existingActivation.get();
+            // A replay is only valid for the same learner redeeming the same key; anything else is key reuse.
+            if (!act.getUserId().equals(command.userId())) {
+                throw new DuplicateIdempotencyException(command.idempotencyKey());
+            }
+            UUID replayedKeyId = activationKeyRepository
+                    .findByCodeHash(ActivationKeyCode.fromRawKey(command.rawKey()).codeHash())
+                    .map(ActivationKey::getId)
+                    .orElse(null);
+            if (!act.getKeyId().equals(replayedKeyId)) {
+                throw new DuplicateIdempotencyException(command.idempotencyKey());
+            }
             Long balance = act.getProductType() == KeyType.POINTS
                     ? pointWalletRepository.findByUserId(command.userId()).map(PointWallet::getBalance).orElse(0L)
                     : null;
