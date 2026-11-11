@@ -456,6 +456,6 @@ Những điểm ảnh hưởng trực tiếp tới quy tắc:
   `infrastructure` và không đưa dependency dạng này vào `domain`.
 - `CONTENT_SERVICE_URL` của game mặc định `http://content-service:8082` trong config-repo; khi chạy game trên host,
   đặt `http://localhost:8082`. `LIBRARY_SERVICE_URL` đã mặc định `http://localhost:8081`.
-- Outbox của content và game đã ghi event nhưng chưa có relay; đừng giả định các event đó tới được consumer. Access, assessment, community và learning (`reward_grants`) có relay.
+- Content và game không còn bảng outbox (đã xóa). Access, assessment, community và learning (`reward_grants`) có outbox và relay.
 - Config-repo có giá trị fallback cho secret; không dựa vào chúng và không tự sửa như side effect, báo người dùng.
 - Chưa xác định: production deployment và CD, secret management, frontend contract, API versioning.
