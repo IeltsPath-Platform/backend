@@ -130,7 +130,8 @@ class NotificationDeviceRepositoryIntegrationTest {
         });
         java.time.Instant now = java.time.Instant.now().plusSeconds(1);
         var firstClaim = transactions.execute(tx -> deliveries.claimDue(now, 2, now.plusSeconds(120), 8).getFirst());
-        assertEquals(0, transactions.execute(tx -> deliveries.claimDue(now, 2, now.plusSeconds(120), 8).size()).intValue());
+        int secondClaimCount = transactions.execute(tx -> deliveries.claimDue(now, 2, now.plusSeconds(120), 8).size());
+        assertEquals(0, secondClaimCount);
 
         java.time.Instant afterLease = now.plusSeconds(121);
         var recovered = transactions.execute(tx -> deliveries.claimDue(afterLease, 2, afterLease.plusSeconds(120), 8).getFirst());
