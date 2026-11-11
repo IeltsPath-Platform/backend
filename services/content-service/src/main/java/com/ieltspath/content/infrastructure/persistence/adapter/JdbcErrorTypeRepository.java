@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
 public class JdbcErrorTypeRepository implements ErrorTypeRepository {
     private static final String COLUMNS = "id, code, name, category, severity, knowledge_point_id, "
             + "trap_knowledge_point_id, fix_hint, status, "
-            + "review_status, created_at, updated_at";
+            + "review_status, created_at, updated_at, skills, fallback";
 
     private final NamedParameterJdbcTemplate jdbc;
 
@@ -36,14 +36,14 @@ public class JdbcErrorTypeRepository implements ErrorTypeRepository {
         jdbc.update("""
                 INSERT INTO error_types (id, code, name, category, severity, knowledge_point_id, trap_knowledge_point_id,
                                          fix_hint, status,
-                                         review_status, created_at, updated_at)
+                                         review_status, created_at, updated_at, skills, fallback)
                 VALUES (:id, :code, :name, :category, :severity, :knowledgePointId, :trapKnowledgePointId, :fixHint, :status,
-                        :reviewStatus, :createdAt, :updatedAt)
+                        :reviewStatus, :createdAt, :updatedAt, CAST(:skills AS VARCHAR(20)[]), :fallback)
                 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, category = EXCLUDED.category,
                     severity = EXCLUDED.severity, knowledge_point_id = EXCLUDED.knowledge_point_id,
                     trap_knowledge_point_id = EXCLUDED.trap_knowledge_point_id,
                     fix_hint = EXCLUDED.fix_hint, status = EXCLUDED.status, review_status = EXCLUDED.review_status,
-                    updated_at = EXCLUDED.updated_at
+                    updated_at = EXCLUDED.updated_at, skills = EXCLUDED.skills
                 """, new MapSqlParameterSource()
                 .addValue("id", errorType.getId())
                 .addValue("code", errorType.getCode())
@@ -56,7 +56,9 @@ public class JdbcErrorTypeRepository implements ErrorTypeRepository {
                 .addValue("status", errorType.getStatus().name())
                 .addValue("reviewStatus", errorType.getReviewStatus().name())
                 .addValue("createdAt", Timestamp.from(errorType.getCreatedAt()))
-                .addValue("updatedAt", Timestamp.from(errorType.getUpdatedAt())));
+                .addValue("updatedAt", Timestamp.from(errorType.getUpdatedAt()))
+                .addValue("skills", arrayLiteral(errorType.getSkills()))
+                .addValue("fallback", errorType.isFallback()));
         return errorType;
     }
 
@@ -129,11 +131,19 @@ public class JdbcErrorTypeRepository implements ErrorTypeRepository {
 
     private static ErrorType map(ResultSet rs, int row) throws SQLException {
         UUID knowledgePointId = rs.getObject("knowledge_point_id", UUID.class);
+        java.sql.Array skills = rs.getArray("skills");
+        List<String> skillValues = skills == null ? List.of() : List.of((String[]) skills.getArray());
         return new ErrorType(rs.getObject("id", UUID.class), rs.getString("code"), rs.getString("name"),
                 ErrorCategory.valueOf(rs.getString("category")), rs.getInt("severity"), knowledgePointId,
                 rs.getObject("trap_knowledge_point_id", UUID.class),
                 rs.getString("fix_hint"), ContentStatus.valueOf(rs.getString("status")),
                 ErrorReviewStatus.valueOf(rs.getString("review_status")),
-                rs.getTimestamp("created_at").toInstant(), rs.getTimestamp("updated_at").toInstant());
+                rs.getTimestamp("created_at").toInstant(), rs.getTimestamp("updated_at").toInstant(),
+                skillValues, rs.getBoolean("fallback"));
+    }
+
+    /** PostgreSQL array text, for example {WRITING,SPEAKING}; skill names are checked by the aggregate, not here. */
+    private static String arrayLiteral(List<String> values) {
+        return "{" + String.join(",", values) + "}";
     }
 }

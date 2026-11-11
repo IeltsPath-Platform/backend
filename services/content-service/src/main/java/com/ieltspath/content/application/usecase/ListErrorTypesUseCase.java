@@ -30,4 +30,9 @@ public class ListErrorTypesUseCase {
     public List<ErrorType> executeApprovedActive() {
         return errorTypes.findApprovedActive();
     }
+
+    /** Like {@link #executeApprovedActive()}, limited to one skill; a null skill means every skill. */
+    public List<ErrorType> executeApprovedActive(String skill) {
+        return skill == null ? errorTypes.findApprovedActive() : errorTypes.findApprovedActiveForSkill(skill);
+    }
 }

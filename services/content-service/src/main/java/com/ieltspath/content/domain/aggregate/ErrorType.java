@@ -6,7 +6,9 @@ import com.ieltspath.content.domain.vo.ErrorCategory;
 import com.ieltspath.content.domain.vo.ErrorReviewStatus;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -17,6 +19,7 @@ import java.util.regex.Pattern;
 public class ErrorType {
     private static final Pattern CODE = Pattern.compile("^[A-Z][A-Z0-9_]*$");
     private static final int MAX_CODE_LENGTH = 60;
+    private static final Set<String> ALLOWED_SKILLS = Set.of("READING", "LISTENING", "WRITING", "SPEAKING");
 
     private final UUID id;
     private final String code;
@@ -28,6 +31,8 @@ public class ErrorType {
     private String fixHint;
     private ContentStatus status;
     private ErrorReviewStatus reviewStatus;
+    private List<String> skills;
+    private final boolean fallback;
     private final Instant createdAt;
     private Instant updatedAt;
 
@@ -41,6 +46,16 @@ public class ErrorType {
     public ErrorType(UUID id, String code, String name, ErrorCategory category, int severity, UUID knowledgePointId,
                      UUID trapKnowledgePointId, String fixHint, ContentStatus status, ErrorReviewStatus reviewStatus,
                      Instant createdAt, Instant updatedAt) {
+        this(id, code, name, category, severity, knowledgePointId, trapKnowledgePointId, fixHint, status, reviewStatus,
+                createdAt, updatedAt, List.of(), false);
+    }
+
+    /** {@code skills} holds READING, LISTENING, WRITING or SPEAKING; {@code fallback} marks a catch-all code. */
+    public ErrorType(UUID id, String code, String name, ErrorCategory category, int severity, UUID knowledgePointId,
+                     UUID trapKnowledgePointId, String fixHint, ContentStatus status, ErrorReviewStatus reviewStatus,
+                     Instant createdAt, Instant updatedAt, List<String> skills, boolean fallback) {
+        this.skills = requireSkills(skills);
+        this.fallback = fallback;
         this.id = Objects.requireNonNull(id, "id must not be null");
         this.code = requireCode(code);
         this.name = requireName(name);
@@ -78,6 +93,23 @@ public class ErrorType {
     public void setTrapKnowledgePointId(UUID trapKnowledgePointId) {
         this.trapKnowledgePointId = trapKnowledgePointId;
         this.updatedAt = Instant.now();
+    }
+
+    /** Replaces the skills this code applies to; an empty list means no skill, and the list is kept in a stable order. */
+    public void updateSkills(List<String> values) {
+        this.skills = requireSkills(values);
+        this.updatedAt = Instant.now();
+    }
+
+    private static List<String> requireSkills(List<String> values) {
+        if (values == null) return List.of();
+        List<String> distinct = values.stream().distinct().sorted().toList();
+        for (String skill : distinct) {
+            if (!ALLOWED_SKILLS.contains(skill)) {
+                throw new InvalidErrorTypeException("skill must be READING, LISTENING, WRITING or SPEAKING");
+            }
+        }
+        return distinct;
     }
 
     private static String requireCode(String value) {
@@ -118,6 +150,8 @@ public class ErrorType {
     public String getFixHint() { return fixHint; }
     public ContentStatus getStatus() { return status; }
     public ErrorReviewStatus getReviewStatus() { return reviewStatus; }
+    public List<String> getSkills() { return skills; }
+    public boolean isFallback() { return fallback; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }

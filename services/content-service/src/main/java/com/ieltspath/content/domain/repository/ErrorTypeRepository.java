@@ -24,6 +24,11 @@ public interface ErrorTypeRepository {
     /** Error types safe for grading output: both active and reviewed by a person. */
     List<ErrorType> findApprovedActive();
 
+    /** {@link #findApprovedActive()} limited to the codes that apply to {@code skill}. */
+    default List<ErrorType> findApprovedActiveForSkill(String skill) {
+        return findApprovedActive().stream().filter(type -> type.getSkills().contains(skill)).toList();
+    }
+
     /** Trap child ids among the requested knowledge points. */
     default Set<UUID> findTrapKnowledgePointIds(Collection<UUID> knowledgePointIds) {
         return Set.of();
