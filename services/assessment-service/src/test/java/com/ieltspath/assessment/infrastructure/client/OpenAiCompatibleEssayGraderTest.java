@@ -23,6 +23,17 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 class OpenAiCompatibleEssayGraderTest {
     @Test
+    void endpointWithSurroundingWhitespaceDoesNotStopStartup() {
+        var properties = new AssessmentLlmProperties();
+        properties.setBaseUrl("  https://llm.example.invalid/v1/  ");
+        properties.setApiKey("test-key");
+        properties.setModel("model");
+        var grader = assertDoesNotThrow(() -> new OpenAiCompatibleEssayGrader(RestClient.builder().build(), properties,
+                new ObjectMapper(), mock(ActiveRubricProvider.class), () -> Set.of()));
+        assertTrue(grader.available());
+    }
+
+    @Test
     void whitespaceEndpointKeepsTheOptionalGraderUnavailableWithoutCallingHttp() {
         var builder = RestClient.builder();
         var server = MockRestServiceServer.bindTo(builder).build();

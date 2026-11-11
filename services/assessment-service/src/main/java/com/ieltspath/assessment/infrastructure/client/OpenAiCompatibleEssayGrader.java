@@ -123,11 +123,18 @@ public class OpenAiCompatibleEssayGrader implements EssayGradingPort {
 
     /** A bare host gets the conventional {@code /v1}; a base URL that already has a path, such as {@code .../v1beta/openai}, is used as given. */
     private static String normalizeBaseUrl(String baseUrl) {
-        if (baseUrl == null || baseUrl.isBlank()) return "";
-        String base = baseUrl.replaceAll("/+$", "");
-        String path = java.net.URI.create(base).getPath();
+        if (baseUrl == null) return "";
+        String base = baseUrl.strip().replaceAll("/+$", "");
+        if (base.isEmpty()) return "";
+        String path;
+        try {
+            path = java.net.URI.create(base).getPath();
+        } catch (IllegalArgumentException malformed) {
+            // Keep the value: an unusable endpoint fails at call time, not while the service starts.
+            return base;
+        }
         boolean hostOnly = path == null || path.isEmpty();
-        return hostOnly && !base.isBlank() ? base + "/v1" : base;
+        return hostOnly ? base + "/v1" : base;
     }
 
     private static String userPrompt(Prompt prompt, String essay) {
