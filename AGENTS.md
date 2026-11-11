@@ -1,7 +1,7 @@
 # AGENTS.md - Quy tắc bắt buộc cho AI Agent
 
 - Phiên bản: 2.3
-- Cập nhật lần cuối: 2026-11-11 (thêm common-llm); 2026-11-02 (thêm §3.9 và nhóm điều cấm "Pattern hệ thống" ở §5: resilience, outbox, idempotency, scheduler, storage; bổ sung Redis, Resilience4j, Micrometer/OpenTelemetry, Supabase vào stack và hai module shared mới); 2026-10-30 (Content gọi Library một chiều, Library không gọi Content; Notification đã có DB, listener và API; mặc định DB của config-repo là `localhost:5440`); 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); dữ kiện khác giữ mốc kiểm 2026-10-07 sau course path, placement recommendation và course gate
+- Cập nhật lần cuối: 2026-11-11 (ghi chú gamification học từ vựng mobile ở §3.8; thêm common-llm); 2026-11-02 (thêm §3.9 và nhóm điều cấm "Pattern hệ thống" ở §5: resilience, outbox, idempotency, scheduler, storage; bổ sung Redis, Resilience4j, Micrometer/OpenTelemetry, Supabase vào stack và hai module shared mới); 2026-10-30 (Content gọi Library một chiều, Library không gọi Content; Notification đã có DB, listener và API; mặc định DB của config-repo là `localhost:5440`); 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); dữ kiện khác giữ mốc kiểm 2026-10-07 sau course path, placement recommendation và course gate
 - Dự án: `IELTSPath` (Maven coordinates: `com.ieltspath:code-base:1.0-SNAPSHOT`)
 - Kiến trúc chi tiết (sơ đồ, flow, data ownership, quyết định): [`docs/system-architecture.md`](docs/system-architecture.md)
 
@@ -277,6 +277,7 @@ src/main/java/com/ieltspath/<service>
 - Luyện tự do theo KP (`POST /knowledge-points/{id}/free-practice`) không bao giờ chặn đường học: trượt không sinh bài
   ôn chặn và không khóa gì; mỗi KP luôn giữ lại `learning.free-practice.reserve` gói chưa xem cho bài ôn
   (`free-practice-v1.md`). Bằng chứng luyện tự do là bằng chứng luyện tập (trọng số và trần 3 bài luyện của MP-1.0).
+- Học từ vựng trên mobile (library-service) có XP, streak (có freeze) và tim riêng, tách khỏi gamification của Learning theo plan `261106-2330-mobile-vocabulary-study`. Đây là ngoại lệ có chủ đích: "nguồn duy nhất cho thưởng" ở trên chỉ nói về web, và hai chuỗi streak có thể khác nhau.
 - Gamification (`gamification-v1.md`): XP chỉ ở lần nộp đầu, đáp án trên trần ngày là XP bóng (không tính); sai câu khách
   quan trừ tim ở bài tập lesson, Practice và luyện tự do (hết tim thì `403 HEARTS_DEPLETED`, bài ôn vẫn nộp được); streak
   tính ở server từ câu trả lời thật theo múi giờ học viên và là nguồn duy nhất cho thưởng (user-service không còn streak; hồ sơ
@@ -464,6 +465,6 @@ Những điểm ảnh hưởng trực tiếp tới quy tắc:
   `infrastructure` và không đưa dependency dạng này vào `domain`.
 - `CONTENT_SERVICE_URL` của game mặc định `http://content-service:8082` trong config-repo; khi chạy game trên host,
   đặt `http://localhost:8082`. `LIBRARY_SERVICE_URL` đã mặc định `http://localhost:8081`.
-- Outbox của content và game đã ghi event nhưng chưa có relay; đừng giả định các event đó tới được consumer. Access, assessment, community và learning (`reward_grants`) có relay.
+- Content và game không còn bảng outbox (đã xóa). Access, assessment, community và learning (`reward_grants`) có outbox và relay.
 - Config-repo yêu cầu JWT, mật khẩu DB, RabbitMQ và Redis qua biến môi trường; không thêm giá trị dự phòng. Thiếu biến bắt buộc thì service không khởi động; `.env.example` chỉ chứa tên và giá trị rỗng.
 - Chưa xác định: production deployment và CD, secret management, frontend contract, API versioning.
