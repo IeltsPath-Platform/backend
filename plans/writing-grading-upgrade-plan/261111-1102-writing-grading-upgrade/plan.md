@@ -1,7 +1,7 @@
 ---
 title: "Writing grading upgrade: error coverage, data checks, explanations"
 description: "Chấm Writing bắt đủ lỗi, kiểm số liệu Task 1, giải thích vì sao sai, bám tiêu chí bằng dẫn chứng và luật cứng; kết quả chấm dẫn tới hành động luyện"
-status: pending
+status: in-progress
 priority: P1
 branch: "fix/grade-writting-llm"
 tags: [learning-service, assessment-service, content-service, frontend, writing, llm, prompt]
@@ -73,7 +73,7 @@ examiner là một bài trong bộ (quyết định 9).
 | Phase | Việc | Service | Phụ thuộc | Đổi contract | Status |
 | --- | --- | --- | --- | --- | --- |
 | 0 | [Spike đo thời gian chấm](./phase-00-latency-spike.md) | learning (không merge) | - | Không | Pending |
-| 0b | [Thư viện LLM dùng chung, template một nguồn](./phase-00b-shared-llm-client.md) | shared, learning, assessment, content | 0 | Không (request Assessment đổi có chủ đích) | Pending |
+| 0b | [Thư viện LLM dùng chung, template một nguồn](./phase-00b-shared-llm-client.md) | shared, learning, assessment, content | 0 | Không (request Assessment đổi có chủ đích) | In progress |
 | 1 | [Đo độ bao phủ lỗi](./phase-01-error-coverage-metric.md) | assessment, frontend | 0b | Có (admin API) | Pending |
 | 2 | [Sửa nhỏ không đổi prompt](./phase-02-quick-fixes-without-prompt-change.md) | learning | 0b | Không (khớp lại contract) | Pending |
 | 3 | [Danh mục lỗi Writing](./phase-03-writing-error-catalog.md) | content, learning, assessment | duyệt chuyên gia | Có | Pending |

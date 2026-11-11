@@ -111,3 +111,9 @@ Chi tiết route: [ai-drafts-v1](contracts/ai-drafts-v1.md), [question-drafts-v1
 
 Giới hạn: kiểm tra tự động bảo đảm hình dạng, đáp án và mã lỗi, không bảo đảm đúng chuyên môn IELTS của nội dung mô hình
 viết. Đó là việc của người duyệt; chưa có gold set hay chỉ số chất lượng cho phần sinh câu hỏi.
+
+## Client và metric LLM
+
+Learning, Assessment và Content dùng `shared/common-llm` qua `ResilientCall` với `WRITE`; không retry request LLM. Content lỗi thì bản nháp chuyển FAILED để author chạy lại. Prompt và parser nghiệp vụ vẫn thuộc service; template essay có một nguồn ở `docs/contracts/` và được Maven chép vào classpath hai grader.
+
+Timer `llm.call.duration` và counter `llm.tokens` ghi service, model, purpose, outcome; token thêm direction input/output. Không ghi prompt, essay, output hay secret. Provider không trả usage thì không tăng counter token. Mặc định ngân sách 8192 token đang chờ số đo spike; chưa coi việc gom client là bằng chứng chất lượng chấm đã đạt.

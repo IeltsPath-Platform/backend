@@ -1,7 +1,7 @@
 # AGENTS.md - Quy tắc bắt buộc cho AI Agent
 
 - Phiên bản: 2.3
-- Cập nhật lần cuối: 2026-11-02 (thêm §3.9 và nhóm điều cấm "Pattern hệ thống" ở §5: resilience, outbox, idempotency, scheduler, storage; bổ sung Redis, Resilience4j, Micrometer/OpenTelemetry, Supabase vào stack và hai module shared mới); 2026-10-30 (Content gọi Library một chiều, Library không gọi Content; Notification đã có DB, listener và API; mặc định DB của config-repo là `localhost:5440`); 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); dữ kiện khác giữ mốc kiểm 2026-10-07 sau course path, placement recommendation và course gate
+- Cập nhật lần cuối: 2026-11-11 (thêm common-llm); 2026-11-02 (thêm §3.9 và nhóm điều cấm "Pattern hệ thống" ở §5: resilience, outbox, idempotency, scheduler, storage; bổ sung Redis, Resilience4j, Micrometer/OpenTelemetry, Supabase vào stack và hai module shared mới); 2026-10-30 (Content gọi Library một chiều, Library không gọi Content; Notification đã có DB, listener và API; mặc định DB của config-repo là `localhost:5440`); 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); dữ kiện khác giữ mốc kiểm 2026-10-07 sau course path, placement recommendation và course gate
 - Dự án: `IELTSPath` (Maven coordinates: `com.ieltspath:code-base:1.0-SNAPSHOT`)
 - Kiến trúc chi tiết (sơ đồ, flow, data ownership, quyết định): [`docs/system-architecture.md`](docs/system-architecture.md)
 
@@ -22,6 +22,7 @@ suy diễn khả năng nghiệp vụ ngoài các module dưới đây.
 | `shared/common-events` | Thư viện tên exchange/routing key/header, record payload và helper `MessageRetry`/`RetryTopology` dùng chung; không deploy độc lập. |
 | `shared/common-storage` | Thư viện lưu object dùng chung (`ObjectStorage`, client Supabase Storage, `ObjectKeys`, `UploadPolicy`); không deploy độc lập; service tự cấu hình bucket. |
 | `shared/common-resilience` | Thư viện `ResilientCall` (circuit breaker, retry, bulkhead bằng Resilience4j) cho lời gọi HTTP đồng bộ giữa service và tới LLM; không deploy độc lập. |
+| `shared/common-llm` | Client OpenAI-compatible dùng chung cho Learning, Assessment và Content; luật model, lỗi an toàn, metric thời gian/token; không chứa prompt hay parser nghiệp vụ. |
 | `shared/common-observability` | Thư viện `correlationId` (MDC, header HTTP, header AMQP), metric outbox và DLQ, trace context cho outbox; không deploy độc lập. |
 | `services/user-service` | Tài khoản, role, auth token, hồ sơ học viên (có múi giờ). Mục tiêu học, activity và thời gian học do learning-service giữ; streak cũng vậy. |
 | `services/content-service` | Curriculum: topic, knowledge point, câu hỏi, gói nội dung, asset. Khu author: soạn gói và đề cuối, tải audio, bản nháp AI (câu hỏi, course), dựng course từ cây tri thức, import Excel. Nội dung AI luôn qua bản nháp (`ai_drafts`) và người duyệt; sinh course chỉ chọn từ kho. |
@@ -43,7 +44,7 @@ phần hạ tầng hoặc architectural pattern mới nếu chưa được phê 
 
 | Khu vực | Công nghệ đã được xác minh |
 | --- | --- |
-| Java build | Java 21; Maven multi-module (17 module trong reactor: 3 infra, 5 shared, 9 business); Maven Compiler Plugin 3.14.0; Surefire 3.5.3 ở module đã cấu hình. |
+| Java build | Java 21; Maven multi-module (18 module trong reactor: 3 infra, 6 shared, 9 business); Maven Compiler Plugin 3.14.0; Surefire 3.5.3 ở module đã cấu hình. |
 | Java framework | Spring Boot 3.5.14; Spring Cloud 2025.0.0 (Config, Netflix Eureka, Gateway Server WebFlux + Reactor). |
 | Persistence (Java) | Spring Data JPA, Hibernate, PostgreSQL JDBC, Flyway (chạy khi service khởi động). |
 | Bảo mật | Spring Security, OAuth2 Resource Server, Nimbus JWT, HMAC-SHA256 JWT, BCrypt. |
@@ -306,7 +307,7 @@ Gặp code cũ lệch pattern: giữ nguyên hành vi, không sửa lây trong t
 
 | Khi bạn... | PHẢI | Chi tiết |
 | --- | --- | --- |
-| Gọi HTTP sang service khác hoặc LLM | Bọc trong `ResilientCall.call(target, CallKind, ...)` của `common-resilience`: `target` là tên service đích (LLM là `llm`); `READ` và `IDEMPOTENT_WRITE` được retry một lần, `WRITE` không retry; bắt `DownstreamUnavailableException` rồi đổi về contract lỗi của service gọi; chạy ngoài transaction và ngoài khóa | `docs/system-architecture.md` §3 |
+| Gọi HTTP sang service khác hoặc LLM | LLM đi qua `common-llm` (vẫn dùng `ResilientCall`); HTTP khác bọc trong `ResilientCall.call(target, CallKind, ...)` của `common-resilience`: `target` là tên service đích (LLM là `llm`); `READ` và `IDEMPOTENT_WRITE` được retry một lần, `WRITE` không retry; bắt `DownstreamUnavailableException` rồi đổi về contract lỗi của service gọi; chạy ngoài transaction và ngoài khóa | `docs/system-architecture.md` §3 |
 | Phát event | Ghi bảng outbox cùng transaction với dữ liệu, relay publish có publisher confirm; bảng outbox có `correlation_id` và `trace_context`; tên exchange, routing key, payload nằm ở `common-events`, tên có version, contract ở `docs/contracts/`; đổi hình dạng event đã có cần duyệt (§5) | §3.5 |
 | Thêm consumer | Idempotent theo khóa tự nhiên (`eventId` hoặc `(attempt, result_version)`); lỗi tạm đi retry queue có TTL, lỗi contract hoặc hết lượt vào DLQ; service consumer sở hữu queue, retry queue, DLQ; chỉ ack sau khi ghi xong; mẫu là consumer của learning-service | §3.5 |
 | Trừ hoặc cộng điểm, cấp quyền (Premium), mở khóa trả phí | Bắt buộc `Idempotency-Key` hoặc khóa ổn định tương đương (như submission ID); lưu khóa cùng thông tin để phát hiện dùng lại khác payload trong cùng transaction với tác động: cùng khóa và payload trả kết quả cũ, khác payload trả `409`. Cần gọi service khác sau khi ghi thì ghi intent `PENDING` trước rồi đối soát (reconcile) | `docs/saga-course-unlock-and-human-grading.md`, `docs/contracts/subscription-granted-v1.md` |
