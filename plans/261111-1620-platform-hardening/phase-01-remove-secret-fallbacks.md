@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Remove secret fallbacks"
-status: pending
+status: done
 priority: P1
 dependencies: []
 ---

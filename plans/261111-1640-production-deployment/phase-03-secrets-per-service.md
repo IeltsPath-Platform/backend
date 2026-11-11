@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Secrets per service"
-status: pending
+status: done
 priority: P1
 dependencies: []
 ---

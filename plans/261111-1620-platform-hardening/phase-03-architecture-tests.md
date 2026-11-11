@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Architecture tests in CI"
-status: pending
+status: done
 priority: P2
 dependencies: []
 ---

@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Deploy workflow, backup, rollback"
-status: pending
+status: done-pending-vps
 priority: P1
 dependencies: [1, 2, 3]
 ---

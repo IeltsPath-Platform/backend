@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Production compose and reverse proxy"
-status: pending
+status: done
 priority: P1
 dependencies: [1]
 ---

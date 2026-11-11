@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Build images to GHCR"
-status: pending
+status: done
 priority: P1
 dependencies: []
 ---
