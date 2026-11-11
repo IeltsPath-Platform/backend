@@ -87,7 +87,7 @@ public class EssayKnowledgeJudge {
             return parentPoints.get(judgmentCriterion(candidates, judgment));
         });
         return new WritingGrade(gradeCriteria, grade.corrections(), grade.summary(), grade.overallBand(), studyPoints,
-                VERSION);
+                VERSION, grade.model(), grade.bandLimits());
     }
 
     static String prompt(WritingTask task, List<RubricCriterion> criteria) {

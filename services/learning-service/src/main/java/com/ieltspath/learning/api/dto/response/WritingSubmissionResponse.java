@@ -2,6 +2,7 @@ package com.ieltspath.learning.api.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.ieltspath.learning.application.result.WritingSubmissionResult;
+import com.ieltspath.learning.domain.vo.WritingGrade;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -15,9 +16,14 @@ import java.util.UUID;
 public record WritingSubmissionResponse(UUID submissionId, String status, String task, Integer wordCount,
                                         BigDecimal overallBand, Boolean passed, List<Criterion> criteria,
                                         List<Correction> corrections, List<StudyPoint> studyPoints, String summary, Integer pointsCharged,
-                                        String sampleAnswer, String code, String failureCode, String essayText) {
+                                        String sampleAnswer, String code, String failureCode, String essayText,
+                                        List<BandLimit> bandLimits) {
+    /** {@code limited} is true only when a band cap lowered this criterion; absent otherwise. */
     public record Criterion(String code, BigDecimal band, List<String> strengths, List<String> improvements,
-                            List<KnowledgeJudgment> knowledgePointJudgments) {}
+                            List<KnowledgeJudgment> knowledgePointJudgments, Boolean limited) {}
+
+    /** Same shape as Speaking's {@code bandLimits}, plus {@code criterion}: the cap names the criterion it lowers. */
+    public record BandLimit(String reason, String criterion, BigDecimal cap, String message) {}
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record KnowledgeJudgment(UUID knowledgePointId, String code, String name, String judgment, String excerpt,
@@ -41,7 +47,8 @@ public record WritingSubmissionResponse(UUID submissionId, String status, String
                         criterion.band(), criterion.strengths(), criterion.improvements(),
                         criterion.knowledgePointJudgments().stream().map(judgment -> new KnowledgeJudgment(
                                 judgment.knowledgePointId(), judgment.code(), judgment.name(),
-                                judgment.judgment().name(), judgment.excerpt(), judgment.reason())).toList())).toList(),
+                                judgment.judgment().name(), judgment.excerpt(), judgment.reason())).toList(),
+                        limited(grade, criterion.code()))).toList(),
                 grade == null ? null : grade.corrections().stream().map(correction -> new Correction(
                         correction.excerpt(), correction.suggestion(), correction.category(), correction.errorCode(),
                         correction.errorName(), correction.fixHint(), correction.severity(),
@@ -50,6 +57,17 @@ public record WritingSubmissionResponse(UUID submissionId, String status, String
                         point.criterionCode(), point.band(), point.knowledgePointId(), point.code(), point.name(),
                         point.title(), point.reason(), point.excerpt(), point.practiceKnowledgePointId())).toList(),
                 grade == null ? null : grade.summary(), result.pointsCharged(), result.sampleAnswer(), result.code(),
-                result.failureCode(), result.essayText());
+                result.failureCode(), result.essayText(), bandLimits(grade));
+    }
+
+    private static Boolean limited(WritingGrade grade, String criterion) {
+        return grade != null && grade.bandLimits().stream().anyMatch(limit -> limit.criterion().equals(criterion))
+                ? Boolean.TRUE : null;
+    }
+
+    private static List<BandLimit> bandLimits(WritingGrade grade) {
+        if (grade == null || grade.bandLimits().isEmpty()) return null;
+        return grade.bandLimits().stream().map(limit -> new BandLimit(limit.reason(), limit.criterion(), limit.cap(),
+                limit.message())).toList();
     }
 }

@@ -35,7 +35,7 @@ class EssaySubmissionFlowTest {
     private final AccessClient points = mock(AccessClient.class);
     private final SimpleMeterRegistry metrics = new SimpleMeterRegistry();
     private final EssaySubmissionFlow flow = new EssaySubmissionFlow(essays, quota, grader, points,
-            new WritingSettings(3, 50, 1000, 10000, 20, 120, 10, "Asia/Ho_Chi_Minh", 2), metrics);
+            WritingSettings.defaults(), metrics);
 
     @BeforeEach
     void setUp() {

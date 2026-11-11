@@ -62,6 +62,13 @@ learning:
     daily-grading-limit: ${LEARNING_WRITING_DAILY_GRADING_LIMIT:10}
     quota-timezone: Asia/Ho_Chi_Minh
     grading-timeout-seconds: 20
+    # Band caps stay off until an examiner has set the thresholds. A cap left blank switches its rule off.
+    band-caps-enabled: ${LEARNING_WRITING_BAND_CAPS_ENABLED:false}
+    too-short-band-cap: ${LEARNING_WRITING_TOO_SHORT_BAND_CAP:}
+    off-topic-band-cap: ${LEARNING_WRITING_OFF_TOPIC_BAND_CAP:}
+    no-overview-band-cap: ${LEARNING_WRITING_NO_OVERVIEW_BAND_CAP:}
+    partial-answer-band-cap: ${LEARNING_WRITING_PARTIAL_ANSWER_BAND_CAP:}
+    no-position-band-cap: ${LEARNING_WRITING_NO_POSITION_BAND_CAP:}
   # Azure Speech: transcript and pronunciation scores of a Speaking recording. The key lives only in .env. Blank key or
   # region turns the analysis off; storing recordings still works. locale en-US also gives an intonation score.
   speech:

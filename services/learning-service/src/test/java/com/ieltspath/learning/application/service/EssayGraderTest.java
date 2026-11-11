@@ -154,6 +154,24 @@ class EssayGraderTest {
     }
 
     @Test
+    void aTooShortEssayIsCappedOnTaskTwoOnlyWhenTheBandCapsAreOn() {
+        llm.reply(reply(criterion("TR", "7"), criterion("CC", "6"), criterion("LR", "6"), criterion("GRA", "6")));
+        WritingSettings capped = new WritingSettings(3, 50, 1000, 10000, 20, 120, 10, "Asia/Ho_Chi_Minh", 2, true,
+                new BigDecimal("5.0"), null, null, null, null);
+        EssayGrader grader = new EssayGrader(llm, new ObjectMapper(), content, activations,
+                new EssayKnowledgeJudge(), "configured-model", capped);
+
+        WritingGrade grade = grader.grade(task2(), ESSAY).grade();
+
+        assertEquals(0, new BigDecimal("5.0").compareTo(grade.criteria().stream().filter(c -> c.code().equals("TR"))
+                .findFirst().orElseThrow().band()));
+        assertEquals(0, new BigDecimal("6").compareTo(grade.criteria().stream().filter(c -> c.code().equals("CC"))
+                .findFirst().orElseThrow().band()));
+        assertEquals("TOO_SHORT", grade.bandLimits().getFirst().reason());
+        assertEquals(0, new BigDecimal("7").compareTo(grade.bandLimits().getFirst().bandBeforeLimit()));
+    }
+
+    @Test
     void correctionSnapshotsCatalogDetailsAndTheConfiguredModel() {
         UUID knowledgePointId = UUID.randomUUID();
         when(content.activeErrorTypes("WRITING")).thenReturn(List.of(new LearningContentClient.ErrorType("GRAMMAR",
@@ -164,7 +182,7 @@ class EssayGraderTest {
                 false, null, null)));
         llm.reply(reply(criterion("TR", "6"), criterion("CC", "6"), criterion("LR", "6"), criterion("GRA", "6")));
         EssayGrader modelAwareGrader = new EssayGrader(llm, new ObjectMapper(), content, activations,
-                new EssayKnowledgeJudge(), "configured-model");
+                new EssayKnowledgeJudge(), "configured-model", WritingSettings.defaults());
 
         WritingGrade grade = modelAwareGrader.grade(task2(), ESSAY).grade();
 

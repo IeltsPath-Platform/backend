@@ -11,6 +11,7 @@ import com.ieltspath.learning.application.port.LearningContentClient.ErrorType;
 import com.ieltspath.learning.application.port.LearningContentClient.Rubric;
 import com.ieltspath.learning.application.port.LearningContentClient.RubricCriterion;
 import com.ieltspath.learning.application.port.LlmClient;
+import com.ieltspath.learning.domain.service.WritingBandCaps;
 import com.ieltspath.learning.domain.service.WritingScore;
 import com.ieltspath.learning.domain.vo.EssayPrompt;
 import com.ieltspath.learning.domain.vo.WritingGrade;
@@ -44,22 +45,24 @@ public class EssayGrader {
     private final EssayPromptActivationProvider activations;
     private final EssayKnowledgeJudge knowledgeJudge;
     private final String model;
+    private final WritingSettings settings;
 
     @Autowired
     public EssayGrader(LlmClient llm, ObjectMapper json, LearningContentClient content,
                        EssayPromptActivationProvider activations, EssayKnowledgeJudge knowledgeJudge,
-                       @Value("${learning.llm.model:}") String model) {
+                       @Value("${learning.llm.model:}") String model, WritingSettings settings) {
         this.llm = llm;
         this.json = json;
         this.content = content;
         this.activations = activations;
         this.knowledgeJudge = knowledgeJudge;
         this.model = model;
+        this.settings = settings;
     }
 
     public EssayGrader(LlmClient llm, ObjectMapper json, LearningContentClient content,
                        EssayPromptActivationProvider activations, EssayKnowledgeJudge knowledgeJudge) {
-        this(llm, json, content, activations, knowledgeJudge, "");
+        this(llm, json, content, activations, knowledgeJudge, "", WritingSettings.defaults());
     }
 
     /** Kept for unit tests that construct the original grader directly. */
@@ -114,8 +117,9 @@ public class EssayGrader {
         } catch (LlmUnavailableException exception) {
             throw new WritingGradingException("LLM_UNAVAILABLE");
         }
-        WritingGrade grade = parse(task, essay, allowedCodes, criterionPoints, root, catalog)
+        WritingGrade parsed = parse(task, essay, allowedCodes, criterionPoints, root, catalog)
                 .orElseThrow(() -> new WritingGradingException("INVALID_GRADE"));
+        WritingGrade grade = applyBandCaps(parsed, task, essay, prompt.minWords(), settings);
         WritingGrade withCriteria = withCriterionStudyPoints(grade, rubric, prompt.passBand(), catalog);
         WritingGrade judged = knowledgeJudge.judge(task, essay, withCriteria, rubric.criteria(), allowedCodes,
                 root.path("judgments"), catalog);
@@ -221,6 +225,35 @@ public class EssayGrader {
     }
 
     /** Weak criteria with knowledge points come first, weakest first, followed by the model's own focus. */
+    /**
+     * Applies the centre's band caps when they are on; with them off the grade is returned unchanged. Only the length
+     * rule can fire from the grade alone: the flags that need the model's reading come with prompt v2.
+     */
+    static WritingGrade applyBandCaps(WritingGrade grade, WritingTask task, String essay, Integer minWords,
+                                      WritingSettings settings) {
+        if (!settings.bandCapsEnabled() || minWords == null) return grade;
+        WritingBandCaps.Caps caps = new WritingBandCaps.Caps(settings.tooShortBandCap(), settings.offTopicBandCap(),
+                settings.noOverviewBandCap(), settings.partialAnswerBandCap(), settings.noPositionBandCap());
+        List<WritingBandCaps.Limit> limits = WritingBandCaps.evaluate(task, WritingScore.countWords(essay), minWords,
+                WritingBandCaps.Flags.NONE, caps);
+        if (limits.isEmpty()) return grade;
+        Map<String, BigDecimal> before = new LinkedHashMap<>();
+        for (WritingGrade.Criterion criterion : grade.criteria()) before.putIfAbsent(criterion.code(), criterion.band());
+        List<WritingGrade.AppliedBandLimit> applied = limits.stream()
+                .filter(limit -> before.containsKey(limit.criterion()) && before.get(limit.criterion()).compareTo(limit.cap()) > 0)
+                .map(limit -> new WritingGrade.AppliedBandLimit(limit.reason().name(), limit.criterion(), limit.cap(),
+                        before.get(limit.criterion()), limit.message()))
+                .toList();
+        if (applied.isEmpty()) return grade;
+        Map<String, BigDecimal> after = WritingBandCaps.apply(before, limits);
+        List<WritingGrade.Criterion> criteria = grade.criteria().stream().map(criterion -> new WritingGrade.Criterion(
+                criterion.code(), after.get(criterion.code()), criterion.strengths(), criterion.improvements(),
+                criterion.knowledgePointId(), criterion.knowledgePointJudgments())).toList();
+        BigDecimal overall = WritingScore.overallBand(criteria.stream().map(WritingGrade.Criterion::band).toList());
+        return new WritingGrade(criteria, grade.corrections(), grade.summary(), overall, grade.studyPoints(),
+                grade.judgmentVersion(), grade.model(), applied);
+    }
+
     private WritingGrade withCriterionStudyPoints(WritingGrade grade, Rubric rubric, BigDecimal passBand,
                                                   Supplier<Map<UUID, LearningContentClient.KnowledgePoint>> catalog) {
         if (passBand == null) return grade;
@@ -244,7 +277,8 @@ public class EssayGrader {
                     point == null ? null : point.name(), reason == null ? null : truncate(reason, MAX_ITEM_CHARS)));
         }
         points.addAll(grade.studyPoints());
-        return new WritingGrade(grade.criteria(), grade.corrections(), grade.summary(), grade.overallBand(), points);
+        return new WritingGrade(grade.criteria(), grade.corrections(), grade.summary(), grade.overallBand(), points,
+                null, null, grade.bandLimits());
     }
 
     /** Content's optional details are captured once; an unavailable catalog must not prevent grading. */

@@ -6,9 +6,16 @@ import java.util.UUID;
 
 /** A validated, normalized LLM grade. {@code overallBand} is computed by Learning Service from the criteria. */
 public record WritingGrade(List<Criterion> criteria, List<Correction> corrections, String summary,
-                           BigDecimal overallBand, List<StudyPoint> studyPoints, String judgmentVersion, String model) {
+                           BigDecimal overallBand, List<StudyPoint> studyPoints, String judgmentVersion, String model,
+                           List<AppliedBandLimit> bandLimits) {
     public WritingGrade {
         studyPoints = studyPoints == null ? List.of() : List.copyOf(studyPoints);
+        bandLimits = bandLimits == null ? List.of() : List.copyOf(bandLimits);
+    }
+
+    public WritingGrade(List<Criterion> criteria, List<Correction> corrections, String summary, BigDecimal overallBand,
+                        List<StudyPoint> studyPoints, String judgmentVersion, String model) {
+        this(criteria, corrections, summary, overallBand, studyPoints, judgmentVersion, model, List.of());
     }
 
     public WritingGrade(List<Criterion> criteria, List<Correction> corrections, String summary, BigDecimal overallBand) {
@@ -26,8 +33,16 @@ public record WritingGrade(List<Criterion> criteria, List<Correction> correction
     }
 
     public WritingGrade withModel(String model) {
-        return new WritingGrade(criteria, corrections, summary, overallBand, studyPoints, judgmentVersion, model);
+        return new WritingGrade(criteria, corrections, summary, overallBand, studyPoints, judgmentVersion, model,
+                bandLimits);
     }
+
+    /**
+     * A band cap that lowered a criterion. {@code bandBeforeLimit} is the model's band, kept so the cap can be audited
+     * and reversed; the criterion band is the capped one.
+     */
+    public record AppliedBandLimit(String reason, String criterion, BigDecimal cap, BigDecimal bandBeforeLimit,
+                                   String message) {}
 
     /** {@code knowledgePointId} is the point this criterion is evidence for; null for grades stored before the mapping. */
     public record Criterion(String code, BigDecimal band, List<String> strengths, List<String> improvements,
