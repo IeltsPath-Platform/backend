@@ -21,3 +21,17 @@ secrets
 *.key
 *.p12
 *.jks
+# Local logs, build caches, dependencies, and generated payloads must not enter images.
+*.log
+**/*.log
+.run-logs
+**/.run-logs
+.mvn-cache
+.m2-test-repository
+**/node_modules
+**/__pycache__
+**/*.pyc
+private-env
+**/private-env
+payload.json
+# docs/contracts intentionally remains available to packaged prompt resources.
