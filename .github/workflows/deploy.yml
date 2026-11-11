@@ -1,0 +1,106 @@
+name: Deploy production
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Full commit SHA already published by Images (blank selects current main)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+  packages: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: production
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Resolve and verify a successful main CI commit
+        id: commit
+        env:
+          REQUESTED_SHA: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+          sha="$REQUESTED_SHA"
+          if [ -z "$sha" ]; then
+            sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)
+          fi
+          [[ "$sha" =~ ^[a-f0-9]{40}$ ]] || { echo 'Expected full commit SHA'; exit 1; }
+          successful=$(gh api -X GET "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs" \
+            -f head_sha="$sha" -f branch=main -f event=push -f status=success --jq '.total_count')
+          test "$successful" -gt 0
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.commit.outputs.sha }}
+          persist-credentials: false
+      - name: Verify all twelve immutable images exist
+        env:
+          OWNER: ${{ steps.commit.outputs.owner }}
+          IMAGE_TAG: ${{ steps.commit.outputs.sha }}
+        run: |
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          for service in config-server eureka-server api-gateway user-service content-service library-service assessment-service access-service learning-service game-service notification-service community-service; do
+            docker manifest inspect "ghcr.io/$OWNER/ieltspath-$service:$IMAGE_TAG" > /dev/null
+          done
+      - name: Prepare private service files and pinned SSH configuration
+        env:
+          PRODUCTION_CONFIG_JSON: ${{ secrets.PRODUCTION_CONFIG_JSON }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          python3 - <<'PY'
+          import json, os
+          for value in json.loads(os.environ['PRODUCTION_CONFIG_JSON']).values():
+              if isinstance(value, str) and value:
+                  value = value.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+                  print('::add-mask::' + value)
+          PY
+          mkdir -m 700 "$RUNNER_TEMP/deploy-ssh"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$RUNNER_TEMP/deploy-ssh/key"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$RUNNER_TEMP/deploy-ssh/known_hosts"
+          printf '%s' "$PRODUCTION_CONFIG_JSON" | python3 scripts/production/render-env.py "$RUNNER_TEMP/private-env"
+      - name: Transfer and run the reviewed release
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+          SHA: ${{ steps.commit.outputs.sha }}
+          OWNER: ${{ steps.commit.outputs.owner }}
+        run: |
+          set -euo pipefail
+          [[ "$DEPLOY_HOST" =~ ^[a-zA-Z0-9.-]+$ ]]
+          [[ "$DEPLOY_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
+          incoming="/opt/ieltspath/releases/$SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          ssh_options=(-i "$RUNNER_TEMP/deploy-ssh/key" -o BatchMode=yes -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$RUNNER_TEMP/deploy-ssh/known_hosts")
+          tar -czf "$RUNNER_TEMP/release.tar.gz" docker-compose.yml docker-compose.prod.yml docker-compose.observability.yml docker-compose.prod-observability.yml Caddyfile scripts/production infra/postgres/init-production.sh infra/redis/start-production.sh infra/prometheus infra/loki infra/tempo infra/alloy infra/grafana
+          tar -czf "$RUNNER_TEMP/env.tar.gz" -C "$RUNNER_TEMP" private-env
+          cat "$RUNNER_TEMP/release.tar.gz" | ssh "${ssh_options[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "sudo -n install -d -m 700 '$incoming' && sudo -n tar -xzf - -C '$incoming'"
+          cat "$RUNNER_TEMP/env.tar.gz" | ssh "${ssh_options[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "sudo -n tar -xzf - -C '$incoming'"
+          ssh "${ssh_options[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "sudo -n python3 '$incoming/scripts/production/deploy.py' '$SHA' '$OWNER'"
+      - name: Record successful release
+        env:
+          SHA: ${{ steps.commit.outputs.sha }}
+        run: echo "Production health/login passed for \`$SHA\`." >> "$GITHUB_STEP_SUMMARY"
+      - name: Remove runner credentials
+        if: always()
+        run: |
+          rm -rf "$RUNNER_TEMP/deploy-ssh" "$RUNNER_TEMP/private-env"
+          rm -f "$RUNNER_TEMP/release.tar.gz" "$RUNNER_TEMP/env.tar.gz"
+          docker logout ghcr.io
