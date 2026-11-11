@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Error coverage metric"
-status: pending
+status: code done, chờ bộ 5–10 bài examiner để chạy số nền
 priority: P1
 dependencies: [0]
 ---
