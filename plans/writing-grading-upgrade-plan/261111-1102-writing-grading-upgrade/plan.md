@@ -52,7 +52,7 @@ Examiner chấm thử một bài Task 1 cố tình sai nặng (24 lỗi) và đ�
 | Eval fail cả run khi một bài ném lỗi | `AiEvaluationService.evaluate` (catch ngoài vòng lặp) | Không có tỷ lệ bài chấm hỏng |
 | `activeErrorTypes()` có năm chỗ gọi: `EssayGrader`, `ErrorTypeTexts`, `SpeakingGradingContextCapture` (lọc tiền tố `SPK_`), `ApplyHumanReviewResultUseCase`, và `ContentErrorTypeClient` của Assessment | Learning, Assessment | Đổi chữ ký phải rà cả năm |
 | Speaking đã có trần band: `SpeakingPracticeSettings.*BandCap`, response `bandLimits[] {reason, cap, message}` và `limited` trên tiêu chí | `SpeakingResultAssembler` | Writing theo cùng mẫu (quyết định 10) |
-| Content `V122` đã dùng (`writing_rubric_low_band_descriptors`) | migration Content | Migration mới của phase 3 từ V123 |
+| Content `V122` đã dùng (`writing_rubric_low_band_descriptors`) | migration Content | Migration mới của phase 3 từ V125 (V124 do Dev B dùng để xóa bảng outbox) |
 
 ## Mục tiêu đo được
 

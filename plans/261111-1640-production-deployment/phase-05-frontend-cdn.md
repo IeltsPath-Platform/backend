@@ -1,7 +1,7 @@
 ---
 phase: 5
 title: "Frontend on CDN, cookies and CORS"
-status: pending
+status: done-pending-vps
 priority: P1
 dependencies: [4]
 ---

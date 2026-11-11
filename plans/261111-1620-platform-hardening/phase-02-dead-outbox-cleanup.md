@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Dead outbox cleanup"
-status: pending
+status: done
 priority: P2
 dependencies: []
 ---

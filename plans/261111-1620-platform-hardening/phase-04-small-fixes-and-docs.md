@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Small fixes and docs"
-status: pending
+status: done
 priority: P3
 dependencies: []
 ---
