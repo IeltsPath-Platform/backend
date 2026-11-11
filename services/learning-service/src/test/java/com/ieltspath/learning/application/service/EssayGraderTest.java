@@ -60,7 +60,7 @@ class EssayGraderTest {
                 .toList();
         when(content.getActiveRubric(anyString())).thenAnswer(invocation -> new LearningContentClient.Rubric(
                 "IELTS_ESSAY", invocation.getArgument(0), 2, "source", criteria, List.of()));
-        when(content.activeErrorTypes()).thenReturn(List.of(new LearningContentClient.ErrorType("GRAMMAR", "Grammar",
+        when(content.activeErrorTypes("WRITING")).thenReturn(List.of(new LearningContentClient.ErrorType("GRAMMAR", "Grammar",
                 "GRAMMAR", 1, "Fix grammar")));
     }
 
@@ -156,7 +156,7 @@ class EssayGraderTest {
     @Test
     void correctionSnapshotsCatalogDetailsAndTheConfiguredModel() {
         UUID knowledgePointId = UUID.randomUUID();
-        when(content.activeErrorTypes()).thenReturn(List.of(new LearningContentClient.ErrorType("GRAMMAR",
+        when(content.activeErrorTypes("WRITING")).thenReturn(List.of(new LearningContentClient.ErrorType("GRAMMAR",
                 "Grammar", "GRAMMAR", 2, "Fix grammar", knowledgePointId)));
         when(content.getTopicSequence()).thenReturn(List.of(new LearningContentClient.Topic(UUID.randomUUID(),
                 "WRITING", "Writing", 1, null, List.of(new LearningContentClient.KnowledgePoint(knowledgePointId,

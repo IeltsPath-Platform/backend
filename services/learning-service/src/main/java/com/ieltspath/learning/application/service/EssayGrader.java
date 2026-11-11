@@ -82,7 +82,7 @@ public class EssayGrader {
         try {
             expectedVersion = activations.activatedVersion(task.name());
             rubric = resolveRubric(task, expectedVersion);
-            errorTypes = content.activeErrorTypes();
+            errorTypes = content.activeErrorTypes("WRITING");
         } catch (LearningRequestException exception) {
             throw new WritingGradingException("RUBRIC_UNAVAILABLE");
         }

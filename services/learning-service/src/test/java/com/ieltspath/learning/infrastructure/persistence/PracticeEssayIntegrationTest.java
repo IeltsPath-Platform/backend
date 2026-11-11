@@ -127,7 +127,7 @@ class PracticeEssayIntegrationTest {
                 + "assessment_result_versions CASCADE");
         reset(content, access, llm);
         when(content.getActiveRubric(anyString())).thenAnswer(invocation -> testRubric(invocation.getArgument(0)));
-        when(content.activeErrorTypes()).thenReturn(List.of(new ErrorType("GRAMMAR", "Grammar", "GRAMMAR", 1,
+        when(content.activeErrorTypes("WRITING")).thenReturn(List.of(new ErrorType("GRAMMAR", "Grammar", "GRAMMAR", 1,
                 "Fix grammar")));
         Set<LearningSkill> skills = Set.of(LearningSkill.READING, LearningSkill.WRITING);
         when(content.getTopicSequence()).thenReturn(List.of(new Topic(TOPIC, "TREES", "Trees", 955, null, List.of(
