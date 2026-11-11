@@ -2,7 +2,7 @@
 
 **Nguồn:** bản review v1 (`review-pack-261111-2010-archunit-violations-and-writing-error-codes-report.md`) đã được sửa theo phản hồi. Không có tham chiếu bộ benchmark, link ngoài hay nhãn `task_response` chưa kiểm chứng.
 
-**Trạng thái:** đề xuất để duyệt. Chưa có người nào ký. Không merge, không cập nhật store, không seed V123 trước khi có quyết định ghi ở Phần 3.
+**Trạng thái:** đề xuất để duyệt. Chưa có người nào ký. Không merge, không cập nhật store, không seed V125 trước khi có quyết định ghi ở Phần 3.
 
 Thay đổi so với v1:
 - Bỏ nhận định "chuyển `*Properties` có thể vẫn vi phạm vì `application` dùng Spring". Rule hiện tại chỉ cấm `application` → `api`/`infrastructure`.
@@ -82,6 +82,6 @@ Số liệu đã đối chiếu trực tiếp với các file store trong repo (
 | Mã Writing ứng viên | Chấp thuận sau kiểm tra schema/KP | Chưa | — | — |
 | `T2_NO_CONCLUSION` | Nhận xét cấu trúc | Chưa | — | — |
 | 4 mã dự phòng | Chờ, chưa seed | Chưa | — | — |
-| Migration Content V123 | Chỉ sau khi bảng mã được duyệt | Chưa | — | — |
+| Migration Content V125 | Chỉ sau khi bảng mã được duyệt | Chưa | — | — |
 
 File này là đề xuất, không xác nhận thay đổi code hay database nào đã thực hiện.

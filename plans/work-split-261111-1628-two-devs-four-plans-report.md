@@ -40,7 +40,7 @@ hưởng Docker build: đều là việc nền tảng.
 
 | File / chỗ | Ai | Quy tắc |
 | --- | --- | --- |
-| **Migration Content** | A (1102-3), B (1620-2) | **Giữ số:** A dùng **V123**, B dùng **V124**. Kiểm lại số trước khi merge |
+| **Migration Content** | A (1102-3), B (1620-2) | **Giữ số:** B dùng **V124** (đã có trên nhánh `chore/drop-dead-outbox`), A dùng **V125 trở đi**. Không dùng V123: nếu V124 đã được áp mà V123 xuất hiện sau, Flyway báo lỗi thứ tự. Kiểm lại số trước khi merge |
 | Migration Learning | A (1557-1) | Chỉ A |
 | Migration Assessment V23 | A (1102-1) | Chỉ A |
 | Migration Game | B (1620-2) | Chỉ B |

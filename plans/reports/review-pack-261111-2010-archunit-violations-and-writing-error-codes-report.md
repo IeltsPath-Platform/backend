@@ -90,5 +90,5 @@ Gợi ý điền:
 ## Việc tiếp theo sau khi có quyết định
 
 1. Người phụ trách kiến trúc điền Phần 1; nếu chọn A1, B1, C1 thì mở việc di chuyển package trên nhánh riêng và thu hẹp store bằng lệnh đã ghi trong `AGENTS.md`.
-2. Examiner điền bảng Phần 2; Dev A đưa các mã được duyệt vào migration Content mới (V123 theo phân công).
+2. Examiner điền bảng Phần 2; Dev A đưa các mã được duyệt vào migration Content mới (V125 theo phân công).
 3. Mã chưa duyệt giữ ở trạng thái dự phòng; không seed.

@@ -13,7 +13,7 @@ Prompt chấm đang nhận mọi mã lỗi active, kể cả của Reading, List
 bốn. Phase này thêm cột kỹ năng, bổ sung mã còn thiếu và mã dự phòng. Phần mã mới **chờ chuyên gia duyệt**; phần code không chờ.
 
 ## Requirements
-- Content migration `V123__error_type_skill.sql` (V122 đã dùng cho mô tả band thấp; kiểm lại số lúc code; không sửa V45):
+- Content migration `V125__error_type_skill.sql` (V122 đã dùng cho mô tả band thấp; kiểm lại số lúc code; không sửa V45):
   - `error_types.skills VARCHAR(20)[] NOT NULL DEFAULT '{}'`, giá trị trong `READING`, `LISTENING`, `WRITING`, `SPEAKING`.
     Dùng mảng vì một mã ngữ pháp có thể dùng cho cả Writing và Speaking.
   - Backfill theo dữ liệu hiện có: `READING_STRATEGY` → `READING`; `LISTENING_STRATEGY` → `LISTENING`; mã `SPK_*` →
