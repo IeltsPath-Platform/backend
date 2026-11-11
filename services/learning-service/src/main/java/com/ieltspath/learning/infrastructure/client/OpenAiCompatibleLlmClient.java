@@ -3,6 +3,7 @@ package com.ieltspath.learning.infrastructure.client;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.commonresilience.CallKind;
 import com.ieltspath.commonresilience.DownstreamUnavailableException;
 import com.ieltspath.commonresilience.ResilientCall;
@@ -33,6 +34,12 @@ import java.util.Locale;
 public class OpenAiCompatibleLlmClient implements LlmClient {
     private static final Logger log = LoggerFactory.getLogger(OpenAiCompatibleLlmClient.class);
     private static final int MAX_TOKENS = 4096;
+    private static final ObjectMapper ERROR_BODY = new ObjectMapper();
+    /** The request fields a provider error may name; only these names, never the message, reach the log. */
+    private static final List<String> REQUEST_FIELDS = List.of("max_tokens", "max_completion_tokens", "temperature",
+            "response_format", "reasoning_effort", "messages", "model");
+    /** OpenAI families that take no temperature and name the output budget {@code max_completion_tokens}. */
+    private static final List<String> OPENAI_REASONING_MODELS = List.of("gpt-5", "o1", "o3", "o4");
     /** Families that think by default and may spend the whole budget on it unless told not to. */
     private static final List<String> THINKING_DEFAULT_OFF = List.of("gemini-2.5", "gemini-3");
     /** The subset that rejects "none" and accepts "minimal" as the lowest level. */
@@ -110,7 +117,8 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
             throw new LlmUnavailableException(null);
         } catch (RestClientResponseException exception) {
             int status = exception.getStatusCode().value();
-            log.warn("LLM request failed: status={}", status);
+            log.warn("LLM request failed: status={}{}, model={}, reasoningEffort={}", status, rejectedField(exception),
+                    model, resolveReasoningEffort(model, reasoningEffort));
             throw new LlmUnavailableException(status);
         } catch (RestClientException exception) {
             log.warn("LLM request failed: {}", exception.getClass().getSimpleName());
@@ -119,9 +127,35 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
     }
 
     private Request request(String systemPrompt, String userPrompt) {
+        boolean completionTokens = usesCompletionTokens(model);
         return new Request(model, List.of(new Message("system", systemPrompt), new Message("user", userPrompt)),
-                MAX_TOKENS, supportsTemperature(model, reasoningEffort) ? 0.0 : null, new ResponseFormat("json_object"),
+                completionTokens ? null : MAX_TOKENS, completionTokens ? MAX_TOKENS : null,
+                supportsTemperature(model, reasoningEffort) ? 0.0 : null, new ResponseFormat("json_object"),
                 resolveReasoningEffort(model, reasoningEffort));
+    }
+
+    /**
+     * What a provider's error body says about a rejected request, without its text: the short machine-readable
+     * {@code error.code}, {@code error.param}, {@code error.type} and {@code error.status}, and which of the request's own
+     * field names the error message mentions. The message itself and the rest of the body stay out of the log. Gemini
+     * wraps the error object in an array; a body that is not a JSON error adds nothing.
+     */
+    private static String rejectedField(RestClientResponseException exception) {
+        try {
+            JsonNode body = ERROR_BODY.readTree(exception.getResponseBodyAsString());
+            JsonNode error = (body.isArray() ? body.path(0) : body).path("error");
+            StringBuilder hint = new StringBuilder();
+            for (String field : List.of("code", "param", "type", "status")) {
+                String value = error.path(field).asText("");
+                if (value.matches("[A-Za-z0-9_.\\-\\[\\]]{1,60}")) hint.append(", ").append(field).append('=').append(value);
+            }
+            String message = error.path("message").asText("");
+            List<String> mentioned = REQUEST_FIELDS.stream().filter(message::contains).toList();
+            if (!mentioned.isEmpty()) hint.append(", mentions=").append(String.join("|", mentioned));
+            return hint.toString();
+        } catch (Exception unreadable) {
+            return "";
+        }
     }
 
     private String requestContent(Request body) {
@@ -151,7 +185,12 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
     static boolean supportsTemperature(String model, String requested) {
         String effort = requested == null ? "" : requested.strip().toLowerCase(Locale.ROOT);
         if (!effort.isEmpty() && !effort.equals("none")) return false;
-        return !matches(model, List.of("gpt-5", "o1", "o3", "o4"));
+        return !matches(model, OPENAI_REASONING_MODELS);
+    }
+
+    /** These models reject {@code max_tokens} and take {@code max_completion_tokens} instead. */
+    static boolean usesCompletionTokens(String model) {
+        return matches(model, OPENAI_REASONING_MODELS);
     }
 
     private static boolean matches(String model, List<String> patterns) {
@@ -160,13 +199,14 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
     }
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
-    record Request(String model, List<Message> messages, @JsonProperty("max_tokens") int maxTokens,
+    record Request(String model, List<Message> messages, @JsonProperty("max_tokens") Integer maxTokens,
+                   @JsonProperty("max_completion_tokens") Integer maxCompletionTokens,
                    Double temperature, @JsonProperty("response_format") ResponseFormat responseFormat,
                    @JsonProperty("reasoning_effort") String reasoningEffort) {
         /** Spring's HTTP debug log renders the body with toString; message content must stay private. */
         @Override
         public String toString() {
-            return "LLM request[model=" + model + ", maxTokens=" + maxTokens + "]";
+            return "LLM request[model=" + model + ", maxTokens=" + (maxTokens != null ? maxTokens : maxCompletionTokens) + "]";
         }
     }
 

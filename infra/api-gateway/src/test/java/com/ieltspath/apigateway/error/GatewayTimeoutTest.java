@@ -37,7 +37,8 @@ class GatewayTimeoutTest {
         int route = yaml.indexOf("- id: learning-ai-writing-limited");
         assertTrue(route >= 0);
         String routeBlock = yaml.substring(route, yaml.indexOf("- id: learning-service", route));
-        assertTrue(routeBlock.contains("response-timeout: 60s"));
+        // Route metadata is read as a number of milliseconds; "60s" is not a valid value there.
+        assertTrue(routeBlock.contains("response-timeout: 60000"));
     }
 
     @Test

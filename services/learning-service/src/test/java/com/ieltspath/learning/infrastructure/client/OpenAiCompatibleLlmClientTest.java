@@ -60,7 +60,7 @@ class OpenAiCompatibleLlmClientTest {
         var request = new OpenAiCompatibleLlmClient.Request("model", java.util.List.of(
                 new OpenAiCompatibleLlmClient.Message("system", "private system prompt"),
                 new OpenAiCompatibleLlmClient.Message("user", "private learner essay")),
-                4096, 0.0, new OpenAiCompatibleLlmClient.ResponseFormat("json_object"), null);
+                4096, null, 0.0, new OpenAiCompatibleLlmClient.ResponseFormat("json_object"), null);
 
         assertFalse(request.toString().contains("private system prompt"));
         assertFalse(request.toString().contains("private learner essay"));
@@ -119,6 +119,54 @@ class OpenAiCompatibleLlmClientTest {
         LlmUnavailableException failure = assertThrows(LlmUnavailableException.class,
                 () -> setup.client().completeJson("s", "u"));
         assertTrue(failure.getMessage().contains("400"));
+        setup.server().verify();
+    }
+
+    @Test
+    void openAiReasoningModelsGetMaxCompletionTokensInsteadOfMaxTokens() {
+        Setup reasoning = client("gpt-5-mini", "");
+        reasoning.server().expect(requestTo(BASE_URL + "/chat/completions"))
+                .andExpect(jsonPath("$.max_completion_tokens").value(4096))
+                .andExpect(jsonPath("$.max_tokens").doesNotExist())
+                .andRespond(withSuccess(reply("\"x\""), MediaType.APPLICATION_JSON));
+        assertEquals("x", reasoning.client().completeJson("s", "u"));
+        reasoning.server().verify();
+
+        Setup classic = client("gpt-4o-mini", "");
+        classic.server().expect(requestTo(BASE_URL + "/chat/completions"))
+                .andExpect(jsonPath("$.max_tokens").value(4096))
+                .andExpect(jsonPath("$.max_completion_tokens").doesNotExist())
+                .andRespond(withSuccess(reply("\"y\""), MediaType.APPLICATION_JSON));
+        assertEquals("y", classic.client().completeJson("s", "u"));
+        classic.server().verify();
+    }
+
+    @Test
+    void aBadRequestNamesTheRejectedFieldButNeverTheProviderMessage(CapturedOutput output) {
+        Setup setup = client("gpt-5-mini", "");
+        setup.server().expect(once(), requestTo(BASE_URL + "/chat/completions"))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"error\":{\"message\":\"private essay echoed here\",\"type\":\"invalid_request_error\","
+                                + "\"param\":\"reasoning_effort\",\"code\":\"unsupported_value\"}}"));
+
+        assertThrows(LlmUnavailableException.class, () -> setup.client().completeJson("s", "u"));
+        assertTrue(output.getAll().contains("status=400, code=unsupported_value, param=reasoning_effort, "
+                + "type=invalid_request_error"));
+        assertFalse(output.getAll().contains("private essay echoed here"));
+        setup.server().verify();
+    }
+
+    @Test
+    void aGeminiStyleErrorArrayNamesTheMentionedFieldWithoutItsMessage(CapturedOutput output) {
+        Setup setup = client("gemini-3.8-flash", "");
+        setup.server().expect(once(), requestTo(BASE_URL + "/chat/completions"))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_JSON)
+                        .body("[{\"error\":{\"code\":400,\"status\":\"INVALID_ARGUMENT\","
+                                + "\"message\":\"Invalid value for reasoning_effort near private learner essay\"}}]"));
+
+        assertThrows(LlmUnavailableException.class, () -> setup.client().completeJson("s", "u"));
+        assertTrue(output.getAll().contains("status=400, code=400, status=INVALID_ARGUMENT, mentions=reasoning_effort"));
+        assertFalse(output.getAll().contains("private learner essay"));
         setup.server().verify();
     }
 
