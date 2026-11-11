@@ -377,6 +377,7 @@ Khi không có convention cụ thể, theo code lân cận trong cùng module.
 - TUYỆT ĐỐI KHÔNG commit, hardcode, log, expose hoặc ghi giá trị secret vào tài liệu.
 - TUYỆT ĐỐI KHÔNG coi raw identity header là danh tính đã xác thực.
 - TUYỆT ĐỐI KHÔNG dùng external JWT secret làm internal JWT secret.
+- TUYỆT ĐỐI KHÔNG thêm giá trị dự phòng cho secret trong config-repo. Giá trị cũ trong lịch sử git coi là đã lộ; production phải dùng secret mới.
 - TUYỆT ĐỐI KHÔNG tắt JWT validation, method authorization hoặc request validation để feature chạy hay test pass.
 - TUYỆT ĐỐI KHÔNG thêm role ngoài `CanonicalRoles.ALL` khi chưa review.
 - TUYỆT ĐỐI KHÔNG log nội dung hội thoại, câu trả lời, prompt hay API key của LLM; log chỉ mang id, loại event, mã lỗi.
@@ -457,5 +458,5 @@ Những điểm ảnh hưởng trực tiếp tới quy tắc:
 - `CONTENT_SERVICE_URL` của game mặc định `http://content-service:8082` trong config-repo; khi chạy game trên host,
   đặt `http://localhost:8082`. `LIBRARY_SERVICE_URL` đã mặc định `http://localhost:8081`.
 - Outbox của content và game đã ghi event nhưng chưa có relay; đừng giả định các event đó tới được consumer. Access, assessment, community và learning (`reward_grants`) có relay.
-- Config-repo có giá trị fallback cho secret; không dựa vào chúng và không tự sửa như side effect, báo người dùng.
+- Config-repo yêu cầu JWT, mật khẩu DB, RabbitMQ và Redis qua biến môi trường; không thêm giá trị dự phòng. Thiếu biến bắt buộc thì service không khởi động; `.env.example` chỉ chứa tên và giá trị rỗng.
 - Chưa xác định: production deployment và CD, secret management, frontend contract, API versioning.

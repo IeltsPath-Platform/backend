@@ -3,11 +3,11 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
+      password: ${REDIS_PASSWORD}
   datasource:
     url: ${NOTIFICATION_DB_URL:jdbc:postgresql://localhost:5440/notification_db}
     username: ${NOTIFICATION_DB_USERNAME:postgres}
-    password: ${NOTIFICATION_DB_PASSWORD:123456}
+    password: ${NOTIFICATION_DB_PASSWORD}
   jpa:
     hibernate:
       ddl-auto: validate
@@ -27,7 +27,7 @@ spring:
 app:
   auth:
     internal-jwt-issuer: ${INTERNAL_JWT_ISSUER:urn:code-base:api-gateway}
-    internal-jwt-secret: ${GATEWAY_INTERNAL_JWT_SECRET:HK5r8WcYA8J8jo2ruIBCEXRcHhUfSDUqP16H29P1sxo=}
+    internal-jwt-secret: ${GATEWAY_INTERNAL_JWT_SECRET}
   frontend-origin: ${FRONTEND_ORIGIN:http://localhost:5173}
   security:
     public-endpoints:

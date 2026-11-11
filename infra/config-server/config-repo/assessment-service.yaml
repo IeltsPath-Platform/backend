@@ -6,7 +6,7 @@ spring:
   datasource:
     url: ${ASSESSMENT_DB_URL:jdbc:postgresql://localhost:5440/assessment_db}
     username: ${ASSESSMENT_DB_USERNAME:postgres}
-    password: ${ASSESSMENT_DB_PASSWORD:123456}
+    password: ${ASSESSMENT_DB_PASSWORD}
   jpa:
     hibernate:
       ddl-auto: validate
@@ -17,7 +17,7 @@ spring:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USERNAME:guest}
-    password: ${RABBITMQ_PASSWORD:guest}
+    password: ${RABBITMQ_PASSWORD}
     # An outbox row is marked published only after a positive confirm for a routed message.
     publisher-confirm-type: correlated
     publisher-returns: true
@@ -67,7 +67,7 @@ app:
       secret-key: ${SUPABASE_SECRET_KEY:}
   auth:
     internal-jwt-issuer: ${INTERNAL_JWT_ISSUER:urn:code-base:api-gateway}
-    internal-jwt-secret: ${GATEWAY_INTERNAL_JWT_SECRET:HK5r8WcYA8J8jo2ruIBCEXRcHhUfSDUqP16H29P1sxo=}
+    internal-jwt-secret: ${GATEWAY_INTERNAL_JWT_SECRET}
   security:
     public-endpoints:
       - method: GET

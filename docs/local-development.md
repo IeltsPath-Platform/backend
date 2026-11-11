@@ -65,6 +65,10 @@ KP yếu (`/api/learning/reviews/**`) → nhận mã đề (`POST /api/learning/
 Java chạy trên host (IDE hoặc `java -jar`); Compose chỉ chạy DB và RabbitMQ. Contract: `docs/contracts/lesson-learning-v1.md`,
 `lesson-writing-v1.md`, `assessment-completed-v2.md`.
 
+Copy `.env.example` thành `.env` rồi điền giá trị riêng. JWT, mật khẩu DB, RabbitMQ và Redis không có giá trị dự phòng trong config-repo: thiếu biến bắt buộc thì service không khởi động. Các khóa LLM, Speech và Storage vẫn tùy chọn; thiếu thì tính năng tương ứng không khả dụng.
+
+Chạy trên host: mỗi service đọc `.env` gốc (đánh đổi của môi trường dev). Trong Docker, `.env` không vào image; mỗi container chỉ nhận biến Compose truyền. Giá trị bí mật cũ trong lịch sử git coi là đã lộ: mọi môi trường ngoài máy dev phải dùng giá trị mới; thao tác này không tự xoay khóa.
+
 **Biến môi trường** (đặt trong `.env` ở root, file này đã được gitignore; không commit giá trị):
 
 | Biến                                                                        | Dùng cho                                                                                                                                                                                                                                                                                                              |
