@@ -10,14 +10,18 @@ import com.ieltspath.learning.application.result.WritingSubmissionResult;
 import com.ieltspath.learning.domain.aggregate.WritingSubmission;
 import com.ieltspath.learning.domain.repository.WritingSubmissionRepository;
 import com.ieltspath.learning.domain.service.WritingScore;
+import io.micrometer.core.instrument.DistributionSummary;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.UUID;
+import java.util.Set;
 import java.util.function.BiFunction;
 
 /**
@@ -28,6 +32,8 @@ import java.util.function.BiFunction;
 @Component
 public class EssaySubmissionFlow {
     public static final String USAGE_KIND = "writing_grading";
+    private static final Set<String> QUOTA_RELEASE_CODES = Set.of(
+            "LLM_UNAVAILABLE", "AI_BUSY", "RUBRIC_UNAVAILABLE", "PROMPT_VERSION_UNAVAILABLE");
     private static final Logger log = LoggerFactory.getLogger(EssaySubmissionFlow.class);
 
     private final WritingSubmissionRepository essays;
@@ -35,15 +41,18 @@ public class EssaySubmissionFlow {
     private final EssayGrader grader;
     private final AccessClient points;
     private final WritingSettings settings;
+    private final MeterRegistry metrics;
     private final Clock clock = Clock.systemUTC();
 
+    @Autowired
     public EssaySubmissionFlow(WritingSubmissionRepository essays, LlmUsageQuota quota, EssayGrader grader,
-                               AccessClient points, WritingSettings settings) {
+                               AccessClient points, WritingSettings settings, MeterRegistry metrics) {
         this.essays = essays;
         this.quota = quota;
         this.grader = grader;
         this.points = points;
         this.settings = settings;
+        this.metrics = metrics;
     }
 
     /** The word count of a valid essay. */
@@ -80,10 +89,11 @@ public class EssaySubmissionFlow {
 
     /** Daily quota, then the LLM grade stored as PAYMENT_PENDING; no transaction or lock is held. */
     public void grade(WritingSubmission grading) {
-        if (!quota.tryConsume(grading.userId(), LocalDate.now(clock.withZone(ZoneId.of(settings.quotaTimezone()))),
-                USAGE_KIND, settings.dailyGradingLimit())) {
+        LocalDate quotaDay = LocalDate.now(clock.withZone(ZoneId.of(settings.quotaTimezone())));
+        if (!quota.tryConsume(grading.userId(), quotaDay, USAGE_KIND, settings.dailyGradingLimit())) {
             grading.fail("DAILY_LIMIT_REACHED");
             essays.save(grading);
+            recordOutcome("DAILY_LIMIT_REACHED", grading);
             throw new LearningRequestException(429, "DAILY_LIMIT_REACHED", "Daily grading limit reached");
         }
         EssayGrader.GradedEssay graded;
@@ -93,11 +103,24 @@ public class EssaySubmissionFlow {
             grading.fail(exception.getCode());
             essays.save(grading);
             log.warn("Essay grading failed: submissionId={}, code={}", grading.id(), exception.getCode());
+            if (QUOTA_RELEASE_CODES.contains(exception.getCode())) releaseQuota(grading.userId(), quotaDay);
+            recordOutcome(exception.getCode(), grading);
             throw gradingUnavailable(grading.id());
+        } catch (LearningRequestException exception) {
+            if (!"AI_BUSY".equals(exception.getCode())) throw exception;
+            grading.fail("AI_BUSY");
+            essays.save(grading);
+            log.warn("Essay grading failed: submissionId={}, code=AI_BUSY", grading.id());
+            releaseQuota(grading.userId(), quotaDay);
+            recordOutcome("AI_BUSY", grading);
+            throw exception;
         }
         grading.recordGrade(graded.grade(), graded.promptVersion());
         // False when the grading was abandoned and taken over by another request meanwhile.
         if (!essays.save(grading)) throw gradingInProgress();
+        recordOutcome("GRADED", grading);
+        DistributionSummary.builder("learning.writing.corrections")
+                .register(metrics).record(graded.grade().corrections().size());
     }
 
     /**
@@ -130,6 +153,20 @@ public class EssaySubmissionFlow {
 
     public long staleGradingSeconds() {
         return settings.staleGradingSeconds();
+    }
+
+    private void releaseQuota(UUID userId, LocalDate day) {
+        try {
+            quota.release(userId, day, USAGE_KIND);
+        } catch (RuntimeException exception) {
+            log.warn("Writing quota could not be given back: reason={}", exception.getClass().getSimpleName());
+        }
+    }
+
+    private void recordOutcome(String outcome, WritingSubmission submission) {
+        String source = submission.isFree() ? "free"
+                : submission.practiceAttemptId() == null ? "lesson" : "practice";
+        metrics.counter("learning.writing.grading", "outcome", outcome, "source", source).increment();
     }
 
     private static LearningRequestException essayTooLong() {

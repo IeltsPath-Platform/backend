@@ -6,18 +6,27 @@ import java.util.UUID;
 
 /** A validated, normalized LLM grade. {@code overallBand} is computed by Learning Service from the criteria. */
 public record WritingGrade(List<Criterion> criteria, List<Correction> corrections, String summary,
-                           BigDecimal overallBand, List<StudyPoint> studyPoints, String judgmentVersion) {
+                           BigDecimal overallBand, List<StudyPoint> studyPoints, String judgmentVersion, String model) {
     public WritingGrade {
         studyPoints = studyPoints == null ? List.of() : List.copyOf(studyPoints);
     }
 
     public WritingGrade(List<Criterion> criteria, List<Correction> corrections, String summary, BigDecimal overallBand) {
-        this(criteria, corrections, summary, overallBand, List.of(), null);
+        this(criteria, corrections, summary, overallBand, List.of(), null, null);
     }
 
     public WritingGrade(List<Criterion> criteria, List<Correction> corrections, String summary, BigDecimal overallBand,
                         List<StudyPoint> studyPoints) {
-        this(criteria, corrections, summary, overallBand, studyPoints, null);
+        this(criteria, corrections, summary, overallBand, studyPoints, null, null);
+    }
+
+    public WritingGrade(List<Criterion> criteria, List<Correction> corrections, String summary, BigDecimal overallBand,
+                        List<StudyPoint> studyPoints, String judgmentVersion) {
+        this(criteria, corrections, summary, overallBand, studyPoints, judgmentVersion, null);
+    }
+
+    public WritingGrade withModel(String model) {
+        return new WritingGrade(criteria, corrections, summary, overallBand, studyPoints, judgmentVersion, model);
     }
 
     /** {@code knowledgePointId} is the point this criterion is evidence for; null for grades stored before the mapping. */
@@ -53,9 +62,14 @@ public record WritingGrade(List<Criterion> criteria, List<Correction> correction
     }
 
     /** {@code excerpt} is an exact substring of the essay. */
-    public record Correction(String excerpt, String suggestion, String category, String errorCode) {
+    public record Correction(String excerpt, String suggestion, String category, String errorCode, String errorName,
+                             String fixHint, Integer severity, UUID practiceKnowledgePointId) {
         public Correction(String excerpt, String suggestion, String category) {
-            this(excerpt, suggestion, category, null);
+            this(excerpt, suggestion, category, null, null, null, null, null);
+        }
+
+        public Correction(String excerpt, String suggestion, String category, String errorCode) {
+            this(excerpt, suggestion, category, errorCode, null, null, null, null);
         }
     }
 

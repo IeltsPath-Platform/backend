@@ -23,7 +23,9 @@ public record WritingSubmissionResponse(UUID submissionId, String status, String
     public record KnowledgeJudgment(UUID knowledgePointId, String code, String name, String judgment, String excerpt,
                                     String reason) {}
 
-    public record Correction(String excerpt, String suggestion, String category) {}
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record Correction(String excerpt, String suggestion, String category, String errorCode, String errorName,
+                             String fixHint, Integer severity, UUID practiceKnowledgePointId) {}
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record StudyPoint(String kind, String criterionCode, BigDecimal band, UUID knowledgePointId, String code,
@@ -40,7 +42,9 @@ public record WritingSubmissionResponse(UUID submissionId, String status, String
                                 judgment.knowledgePointId(), judgment.code(), judgment.name(),
                                 judgment.judgment().name(), judgment.excerpt(), judgment.reason())).toList())).toList(),
                 grade == null ? null : grade.corrections().stream().map(correction -> new Correction(
-                        correction.excerpt(), correction.suggestion(), correction.category())).toList(),
+                        correction.excerpt(), correction.suggestion(), correction.category(), correction.errorCode(),
+                        correction.errorName(), correction.fixHint(), correction.severity(),
+                        correction.practiceKnowledgePointId())).toList(),
                 grade == null ? null : grade.studyPoints().stream().map(point -> new StudyPoint(point.kind(),
                         point.criterionCode(), point.band(), point.knowledgePointId(), point.code(), point.name(),
                         point.title(), point.reason(), point.excerpt(), point.practiceKnowledgePointId())).toList(),

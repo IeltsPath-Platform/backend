@@ -16,6 +16,7 @@ import com.ieltspath.learning.domain.vo.EssayPrompt;
 import com.ieltspath.learning.domain.vo.WritingGrade;
 import com.ieltspath.learning.domain.vo.WritingTask;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -42,15 +43,23 @@ public class EssayGrader {
     private final LearningContentClient content;
     private final EssayPromptActivationProvider activations;
     private final EssayKnowledgeJudge knowledgeJudge;
+    private final String model;
 
     @Autowired
     public EssayGrader(LlmClient llm, ObjectMapper json, LearningContentClient content,
-                       EssayPromptActivationProvider activations, EssayKnowledgeJudge knowledgeJudge) {
+                       EssayPromptActivationProvider activations, EssayKnowledgeJudge knowledgeJudge,
+                       @Value("${learning.llm.model:}") String model) {
         this.llm = llm;
         this.json = json;
         this.content = content;
         this.activations = activations;
         this.knowledgeJudge = knowledgeJudge;
+        this.model = model;
+    }
+
+    public EssayGrader(LlmClient llm, ObjectMapper json, LearningContentClient content,
+                       EssayPromptActivationProvider activations, EssayKnowledgeJudge knowledgeJudge) {
+        this(llm, json, content, activations, knowledgeJudge, "");
     }
 
     /** Kept for unit tests that construct the original grader directly. */
@@ -105,12 +114,12 @@ public class EssayGrader {
         } catch (LlmUnavailableException exception) {
             throw new WritingGradingException("LLM_UNAVAILABLE");
         }
-        WritingGrade grade = parse(task, essay, allowedCodes, criterionPoints, root)
+        WritingGrade grade = parse(task, essay, allowedCodes, criterionPoints, root, catalog)
                 .orElseThrow(() -> new WritingGradingException("INVALID_GRADE"));
         WritingGrade withCriteria = withCriterionStudyPoints(grade, rubric, prompt.passBand(), catalog);
         WritingGrade judged = knowledgeJudge.judge(task, essay, withCriteria, rubric.criteria(), allowedCodes,
                 root.path("judgments"), catalog);
-        return new GradedEssay(judged, promptVersion);
+        return new GradedEssay(judged.withModel(model), promptVersion);
     }
 
     private Rubric resolveRubric(WritingTask task, String expectedVersion) {
@@ -168,7 +177,8 @@ public class EssayGrader {
     }
 
     private Optional<WritingGrade> parse(WritingTask task, String essay, Map<String, ErrorType> allowedCodes,
-                                         Map<String, UUID> criterionPoints, JsonNode root) {
+                                         Map<String, UUID> criterionPoints, JsonNode root,
+                                         Supplier<Map<UUID, LearningContentClient.KnowledgePoint>> catalog) {
         if (root == null || !root.path("criteria").isArray()) return Optional.empty();
         Map<String, WritingGrade.Criterion> byCode = new LinkedHashMap<>();
         for (JsonNode node : root.get("criteria")) {
@@ -186,7 +196,8 @@ public class EssayGrader {
         if (byCode.size() != task.criteria().size()) return Optional.empty();
         List<WritingGrade.Criterion> criteria = task.criteria().stream().map(byCode::get).toList();
         String summary = truncate(root.path("summary").asText(""), MAX_SUMMARY_CHARS);
-        return Optional.of(new WritingGrade(criteria, corrections(root.path("corrections"), essay, allowedCodes),
+        return Optional.of(new WritingGrade(criteria, corrections(root.path("corrections"), essay, allowedCodes,
+                catalog),
                 summary, WritingScore.overallBand(criteria.stream().map(WritingGrade.Criterion::band).toList()),
                 focusPoints(root.path("focus"))));
     }
@@ -287,10 +298,12 @@ public class EssayGrader {
         };
     }
 
-    private static List<WritingGrade.Correction> corrections(JsonNode node, String essay,
-                                                              Map<String, ErrorType> allowedCodes) {
+    private List<WritingGrade.Correction> corrections(JsonNode node, String essay,
+                                                     Map<String, ErrorType> allowedCodes,
+                                                     Supplier<Map<UUID, LearningContentClient.KnowledgePoint>> catalog) {
         if (!node.isArray()) return List.of();
         List<WritingGrade.Correction> values = new ArrayList<>();
+        Map<UUID, LearningContentClient.KnowledgePoint> knowledgePoints = null;
         for (JsonNode item : node) {
             if (values.size() == MAX_CORRECTIONS) break;
             String excerpt = item.path("excerpt").isTextual() ? item.get("excerpt").asText() : null;
@@ -299,8 +312,15 @@ public class EssayGrader {
             if (excerpt == null || excerpt.isBlank() || !essay.contains(excerpt) || suggestion == null
                     || code == null || !allowedCodes.containsKey(code)) continue;
             ErrorType errorType = allowedCodes.get(code);
+            UUID practiceKnowledgePointId = errorType.knowledgePointId();
+            if (practiceKnowledgePointId != null) {
+                if (knowledgePoints == null) knowledgePoints = catalog.get();
+                LearningContentClient.KnowledgePoint knowledgePoint = knowledgePoints.get(practiceKnowledgePointId);
+                if (knowledgePoint == null || !knowledgePoint.hasPracticeSet()) practiceKnowledgePointId = null;
+            }
             values.add(new WritingGrade.Correction(truncate(excerpt, MAX_ITEM_CHARS),
-                    truncate(suggestion, MAX_ITEM_CHARS), errorType.category(), code));
+                    truncate(suggestion, MAX_ITEM_CHARS), errorType.category(), code, errorType.name(),
+                    errorType.fixHint(), errorType.severity(), practiceKnowledgePointId));
         }
         return List.copyOf(values);
     }
