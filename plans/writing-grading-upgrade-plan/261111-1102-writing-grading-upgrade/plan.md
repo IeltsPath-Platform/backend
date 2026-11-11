@@ -72,7 +72,7 @@ examiner là một bài trong bộ (quyết định 9).
 
 | Phase | Việc | Service | Phụ thuộc | Đổi contract | Status |
 | --- | --- | --- | --- | --- | --- |
-| 0 | [Spike đo thời gian chấm](./phase-00-latency-spike.md) | learning (không merge) | - | Không | Pending |
+| 0 | [Spike đo thời gian chấm](./phase-00-latency-spike.md) | learning (không merge) | - | Không | BLOCKED: chưa có 3 bài examiner và bản nháp v2 (xem báo cáo) |
 | 0b | [Thư viện LLM dùng chung, template một nguồn](./phase-00b-shared-llm-client.md) | shared, learning, assessment, content | 0 | Không (request Assessment đổi có chủ đích) | In progress |
 | 1 | [Đo độ bao phủ lỗi](./phase-01-error-coverage-metric.md) | assessment, frontend | 0b | Có (admin API) | Pending |
 | 2 | [Sửa nhỏ không đổi prompt](./phase-02-quick-fixes-without-prompt-change.md) | learning | 0b | Không (khớp lại contract) | Xong, chờ 0b cho metric LLM |
