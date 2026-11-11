@@ -31,12 +31,13 @@ public record WritingSettings(
         BigDecimal offTopicBandCap,
         BigDecimal noOverviewBandCap,
         BigDecimal partialAnswerBandCap,
-        BigDecimal noPositionBandCap) {
+        BigDecimal noPositionBandCap,
+        @DefaultValue("30") @Min(1) @Max(50) int maxCorrections) {
 
     /** The settings the grader uses when the configuration is not given: caps off. */
     public static WritingSettings defaults() {
         return new WritingSettings(3, 50, 1000, 10000, 20, 120, 10, "Asia/Ho_Chi_Minh", 2, false,
-                null, null, null, null, null);
+                null, null, null, null, null, 30);
     }
 
     @AssertTrue(message = "minWords must be below maxWords")

@@ -144,7 +144,8 @@ public class JdbcWritingSubmissionRepository implements WritingSubmissionReposit
                 WHERE id = ? AND status = ?
                 """, submission.status().name(), submission.failureCode(),
                 grade == null ? null : write(new StoredGrade(grade.criteria(), grade.corrections(), grade.summary(),
-                        grade.studyPoints(), grade.judgmentVersion(), grade.model(), grade.bandLimits())),
+                        grade.studyPoints(), grade.judgmentVersion(), grade.model(), grade.bandLimits(), grade.priorities(),
+                        grade.errorExamples())),
                 submission.overallBand(), submission.passed(), submission.ledgerEntryId(),
                 Timestamp.from(submission.gradingStartedAt()), submission.promptVersion(), submission.status().name(), submission.id(),
                 submission.persistedStatus().name()) == 1;
@@ -211,7 +212,8 @@ public class JdbcWritingSubmissionRepository implements WritingSubmissionReposit
                 read(row.getString("prompt"), EssayPrompt.class), row.getInt("point_cost"),
                 WritingSubmissionStatus.valueOf(row.getString("status")), row.getString("failure_code"),
                 stored == null ? null : new WritingGrade(stored.criteria(), stored.corrections(), stored.summary(), band,
-                        stored.studyPoints(), stored.judgmentVersion(), stored.model(), stored.bandLimits()),
+                        stored.studyPoints(), stored.judgmentVersion(), stored.model(), stored.bandLimits(), stored.priorities(),
+                        stored.errorExamples()),
                 row.getString("prompt_version"), (Boolean) row.getObject("passed"), row.getObject("debit_ledger_entry_id", UUID.class),
                 row.getTimestamp("grading_started_at").toInstant());
         return previous == null ? restored : restored.revising(previous, row.getInt("revision_no"));
@@ -252,5 +254,7 @@ public class JdbcWritingSubmissionRepository implements WritingSubmissionReposit
     /** The overall band lives in its own column; the JSON keeps the criteria and feedback. */
     private record StoredGrade(List<WritingGrade.Criterion> criteria, List<WritingGrade.Correction> corrections,
                                String summary, List<WritingGrade.StudyPoint> studyPoints, String judgmentVersion,
-                               String model, List<WritingGrade.AppliedBandLimit> bandLimits) {}
+                               String model, List<WritingGrade.AppliedBandLimit> bandLimits,
+                               List<WritingGrade.Priority> priorities,
+                               List<WritingGrade.ErrorExample> errorExamples) {}
 }
