@@ -173,6 +173,11 @@ class SubscriptionGrantedBrokerIntegrationTest {
         rabbit.send("", SubscriptionGrantedTopology.DLQ, MessageBuilder.withBody(json.writeValueAsBytes(event))
                 .setContentType(MessageProperties.CONTENT_TYPE_JSON).setMessageId(event.eventId().toString()).build());
 
+        // The send is not confirmed, and replay only takes the messages the queue already reports.
+        assertTrue(eventually(() -> replayer.counts().stream().anyMatch(count ->
+                count.deadLetterQueue().equals(SubscriptionGrantedTopology.DLQ) && count.messages() == 1)),
+                "the message reached the dead-letter queue");
+
         var result = replayer.replay(SubscriptionGrantedTopology.DLQ, 10);
 
         assertEquals(1, result.moved());
