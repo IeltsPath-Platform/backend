@@ -3,6 +3,7 @@ package com.ieltspath.notification.application;
 import com.ieltspath.notification.domain.repository.PushDeliveryRepository;
 import com.ieltspath.notification.domain.vo.Notification;
 import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -12,6 +13,7 @@ public class EnqueueNotificationPushUseCase {
     private final boolean enabled;
     private final MeterRegistry metrics;
 
+    @Autowired
     public EnqueueNotificationPushUseCase(PushDeliveryRepository deliveries,
             @Value("${notification.push.enqueue-enabled:false}") boolean enabled, MeterRegistry metrics) {
         this.deliveries = deliveries;

@@ -396,6 +396,13 @@ services:
       MAIL_FROM: "${MAIL_FROM:-no-reply@ieltspath.local}"
       FRONTEND_BASE_URL: "${FRONTEND_BASE_URL:-http://localhost:5173}"
       NOTIFICATION_MAIL_ENABLED: "${NOTIFICATION_MAIL_ENABLED:-false}"
+      NOTIFICATION_PUSH_ENQUEUE_ENABLED: "${NOTIFICATION_PUSH_ENQUEUE_ENABLED:-false}"
+      NOTIFICATION_PUSH_WORKER_ENABLED: "${NOTIFICATION_PUSH_WORKER_ENABLED:-false}"
+      FIREBASE_PROJECT_ID: "${FIREBASE_PROJECT_ID:-}"
+      # Set only when FIREBASE_CREDENTIALS_FILE (host path to the service-account JSON) is provided.
+      GOOGLE_APPLICATION_CREDENTIALS: "${FIREBASE_CREDENTIALS_FILE:+/run/secrets/firebase-service-account.json}"
+    volumes:
+      - "${FIREBASE_CREDENTIALS_FILE:-/dev/null}:/run/secrets/firebase-service-account.json:ro"
     depends_on:
       <<: *after-infra
       rabbitmq:
