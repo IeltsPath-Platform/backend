@@ -57,7 +57,7 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
     public String completeJson(String systemPrompt, String userPrompt) {
         if (!configured()) throw new LlmUnavailableException(null);
         try {
-            return client.chat(new ChatRequest("grading", systemPrompt, userPrompt, true, null)).content();
+            return client.chat(new ChatRequest("writing-grading", systemPrompt, userPrompt, true, null)).content();
         } catch (LlmCallException failure) {
             if ("bulkhead-full".equals(failure.reason()))
                 throw new LearningRequestException(503, "AI_BUSY", "AI grading is busy; try again shortly");
