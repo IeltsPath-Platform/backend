@@ -6,7 +6,6 @@ import com.ieltspath.game.application.port.CurrentPlayerProfile;
 import com.ieltspath.game.application.port.GameContentProvider;
 import com.ieltspath.game.domain.repository.GameRoomRepository;
 import com.ieltspath.game.domain.repository.GameSessionRepository;
-import com.ieltspath.game.application.port.OutboxWriter;
 import com.ieltspath.game.application.port.WebSocketTicketStore;
 import com.ieltspath.game.application.port.WordlyMatchStore;
 import com.ieltspath.game.application.port.WordlyRankingRepository;
@@ -39,9 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -52,14 +49,13 @@ import static org.mockito.Mockito.when;
 
 class RoomAndSessionUseCasesTest {
     private final GameRoomRepository rooms = mock(GameRoomRepository.class);
-    private final OutboxWriter outbox = mock(OutboxWriter.class);
     private final CurrentPlayerProfile profile = mock(CurrentPlayerProfile.class);
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
     private final WordlyRoomAdmission admission = mock(WordlyRoomAdmission.class);
     private final GameContentProvider content = mock(GameContentProvider.class);
     private final GameSessionRepository sessions = mock(GameSessionRepository.class);
     private final ChangeGameRoomMembershipUseCase membership =
-            new ChangeGameRoomMembershipUseCase(rooms, outbox, profile, events, admission);
+            new ChangeGameRoomMembershipUseCase(rooms, profile, events, admission);
     private final UUID host = UUID.randomUUID();
     private final UUID guest = UUID.randomUUID();
 
@@ -94,7 +90,6 @@ class RoomAndSessionUseCasesTest {
         order.verify(admission).requireNoActiveGame(guest);
         order.verify(rooms).findForUpdate(room.id());
         assertEquals("Guest", room.members().get(guest).displayName());
-        verify(outbox).append(eq("GameRoom"), eq(room.id().toString()), eq("GameRoomMemberJoined"), anyMap());
         verify(events).publishEvent(new RoomUpdatedEvent(result));
     }
 
@@ -107,26 +102,28 @@ class RoomAndSessionUseCasesTest {
 
         assertEquals("ACTIVE_GAME_EXISTS", error.code());
         verify(rooms, never()).findForUpdate(any());
-        verifyNoInteractions(outbox, events);
+        verifyNoInteractions(events);
     }
 
     @Test
     void joiningByAnUnknownCodeIsNotFound() {
         when(rooms.findByCode("ZZZZZZ")).thenReturn(Optional.empty());
         assertThrows(GameRoomNotFoundException.class, () -> membership.joinByCode("ZZZZZZ", guest));
-        verifyNoInteractions(outbox, events);
+        verifyNoInteractions(events);
     }
 
     @Test
-    void readyAndNotReadyWriteTheirOwnEvents() {
+    void readyAndNotReadyPersistAndBroadcastTheirOwnStates() {
         var room = wordlyRoom();
         room.join(guest, Instant.now());
 
-        membership.ready(room.id(), guest, true);
-        membership.ready(room.id(), guest, false);
+        var ready = membership.ready(room.id(), guest, true);
+        var notReady = membership.ready(room.id(), guest, false);
 
-        verify(outbox).append(eq("GameRoom"), anyString(), eq("GameRoomMemberReady"), anyMap());
-        verify(outbox).append(eq("GameRoom"), anyString(), eq("GameRoomMemberNotReady"), anyMap());
+        assertEquals("READY", ready.members().stream().filter(member -> member.userId().equals(guest)).findFirst().orElseThrow().status());
+        assertEquals("JOINED", notReady.members().stream().filter(member -> member.userId().equals(guest)).findFirst().orElseThrow().status());
+        verify(events).publishEvent(new RoomUpdatedEvent(ready));
+        verify(events).publishEvent(new RoomUpdatedEvent(notReady));
     }
 
     @Test
@@ -148,7 +145,6 @@ class RoomAndSessionUseCasesTest {
         assertEquals("CLOSED", result.status());
         verify(events).publishEvent(new RoomClosedEvent(room.id(), "Chủ phòng Lan đã đóng phòng"));
         verify(events, never()).publishEvent(new RoomUpdatedEvent(result));
-        verify(outbox).append(eq("GameRoom"), anyString(), eq("GameRoomMemberLeft"), anyMap());
     }
 
     @Test
@@ -160,7 +156,6 @@ class RoomAndSessionUseCasesTest {
 
         assertEquals("Only the host can perform this action", error.getMessage());
         verify(rooms, never()).save(any());
-        verifyNoInteractions(outbox);
     }
 
     @Test
@@ -168,13 +163,14 @@ class RoomAndSessionUseCasesTest {
         var room = wordlyRoom();
         var result = membership.close(room.id(), host);
         assertEquals("CLOSED", result.status());
-        verify(outbox).append(eq("GameRoom"), anyString(), eq("GameRoomClosed"), anyMap());
+        verify(rooms).save(room);
+        verify(events).publishEvent(any(RoomClosedEvent.class));
     }
 
     // ---- create a classic room ---------------------------------------------------------------------------------
 
     private CreateGameRoomUseCase createRoom() {
-        return new CreateGameRoomUseCase(rooms, content, outbox, profile);
+        return new CreateGameRoomUseCase(rooms, content, profile);
     }
 
     private static CreateGameRoomCommand roomCommand(UUID host, String type, int maxPlayers, List<UUID> ids) {
@@ -193,7 +189,7 @@ class RoomAndSessionUseCasesTest {
 
         assertEquals(2, result.maxPlayers());
         assertEquals(8, result.roomCode().length());
-        verify(outbox).append(eq("GameRoom"), anyString(), eq("GameRoomCreated"), anyMap());
+        verify(rooms).save(any());
     }
 
     @Test
@@ -235,7 +231,7 @@ class RoomAndSessionUseCasesTest {
     // ---- practice sessions -------------------------------------------------------------------------------------
 
     private StartGameSessionUseCase startSession() {
-        return new StartGameSessionUseCase(content, sessions, outbox);
+        return new StartGameSessionUseCase(content, sessions);
     }
 
     private static StartGameSessionCommand sessionCommand(UUID user, String type, String domain, List<UUID> ids) {
@@ -252,7 +248,7 @@ class RoomAndSessionUseCasesTest {
         var result = startSession().execute(sessionCommand(user, "WORD_MEANING_MATCH", "VOCABULARY", contentIds));
 
         assertEquals("IN_PROGRESS", result.status());
-        verify(outbox).append(eq("GameSession"), anyString(), eq("GameSessionStarted"), anyMap());
+        verify(sessions).save(any());
     }
 
     @Test
@@ -296,15 +292,15 @@ class RoomAndSessionUseCasesTest {
         when(sessions.findOwned(session.id(), user)).thenReturn(Optional.of(session));
         when(sessions.save(session)).thenReturn(session);
 
-        var result = new AbandonGameSessionUseCase(sessions, outbox).execute(session.id(), user);
+        var result = new AbandonGameSessionUseCase(sessions).execute(session.id(), user);
 
         assertEquals("ABANDONED", result.status());
         assertEquals(GameSessionStatus.ABANDONED, session.status());
-        verify(outbox).append(eq("GameSession"), eq(session.id().toString()), eq("GameSessionAbandoned"), anyMap());
+        verify(sessions).save(session);
 
         UUID other = UUID.randomUUID();
         when(sessions.findOwned(session.id(), other)).thenReturn(Optional.empty());
-        assertThrows(GameSessionNotFoundException.class, () -> new AbandonGameSessionUseCase(sessions, outbox).execute(session.id(), other));
+        assertThrows(GameSessionNotFoundException.class, () -> new AbandonGameSessionUseCase(sessions).execute(session.id(), other));
         assertThrows(GameSessionNotFoundException.class, () -> new GetGameSessionUseCase(sessions).execute(session.id(), other));
     }
 

@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-import com.ieltspath.game.application.port.OutboxWriter;
 import com.ieltspath.game.application.port.WordlyMatchStore;
 import com.ieltspath.game.application.port.WordlyWordProvider;
 import com.ieltspath.game.application.result.GameMatchResult;
@@ -72,7 +71,7 @@ class StartRocketMatchUseCaseTest {
         var expected = new GameMatchResult(UUID.randomUUID(), room.id(), null, "IN_PROGRESS", Instant.now(), List.of());
         when(rocket.execute(any(), any())).thenReturn(expected);
         var start = new StartGameMatchUseCase(rooms, mock(GameMatchRepository.class), mock(GameMatchPlayerRepository.class),
-                mock(GameSessionRepository.class), mock(OutboxWriter.class), mock(ApplicationEventPublisher.class),
+                mock(GameSessionRepository.class), mock(ApplicationEventPublisher.class),
                 mock(WordlyWordProvider.class), mock(WordlyMatchStore.class), mock(PlatformTransactionManager.class),
                 Clock.systemUTC(), rocket);
         assertSame(expected, start.execute(room.id(), host));

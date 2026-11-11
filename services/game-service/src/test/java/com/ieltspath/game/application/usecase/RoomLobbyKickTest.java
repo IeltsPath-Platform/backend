@@ -1,7 +1,6 @@
 package com.ieltspath.game.application.usecase;
 
 import com.ieltspath.game.application.port.CurrentPlayerProfile;
-import com.ieltspath.game.application.port.OutboxWriter;
 import com.ieltspath.game.application.result.RoomMemberKickedEvent;
 import com.ieltspath.game.application.result.RoomUpdatedEvent;
 import com.ieltspath.game.domain.aggregate.GameRoom;
@@ -20,9 +19,8 @@ class RoomLobbyKickTest {
     @Test
     void locksAndSavesBeforePublishingRemovalAndUpdatedSnapshot() {
         var repository = mock(GameRoomRepository.class);
-        var outbox = mock(OutboxWriter.class);
         var events = mock(ApplicationEventPublisher.class);
-        var useCase = new ChangeGameRoomMembershipUseCase(repository, outbox, mock(CurrentPlayerProfile.class), events, mock(WordlyRoomAdmission.class));
+        var useCase = new ChangeGameRoomMembershipUseCase(repository, mock(CurrentPlayerProfile.class), events, mock(WordlyRoomAdmission.class));
         var host = UUID.randomUUID();
         var guest = UUID.randomUUID();
         var room = new GameRoom(UUID.randomUUID(), "AB7K2Q", host, 4, Instant.EPOCH);
@@ -41,13 +39,12 @@ class RoomLobbyKickTest {
     @Test
     void unauthorizedKickDoesNotSaveOrPublish() {
         var repository = mock(GameRoomRepository.class);
-        var outbox = mock(OutboxWriter.class);
         var events = mock(ApplicationEventPublisher.class);
-        var useCase = new ChangeGameRoomMembershipUseCase(repository, outbox, mock(CurrentPlayerProfile.class), events, mock(WordlyRoomAdmission.class));
+        var useCase = new ChangeGameRoomMembershipUseCase(repository, mock(CurrentPlayerProfile.class), events, mock(WordlyRoomAdmission.class));
         var room = new GameRoom(UUID.randomUUID(), "AB7K2Q", UUID.randomUUID(), 4, Instant.EPOCH);
         when(repository.findForUpdate(room.id())).thenReturn(Optional.of(room));
         assertThrows(GameRoomForbiddenException.class, () -> useCase.kick(room.id(), UUID.randomUUID(), UUID.randomUUID()));
         verify(repository, never()).save(any());
-        verifyNoInteractions(events, outbox);
+        verifyNoInteractions(events);
     }
 }

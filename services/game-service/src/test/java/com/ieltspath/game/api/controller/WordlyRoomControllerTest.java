@@ -3,7 +3,6 @@ package com.ieltspath.game.api.controller;
 import com.ieltspath.commonsecurity.config.CommonSecurityAutoConfiguration;
 import com.ieltspath.game.application.usecase.CreateWordlyRoomUseCase;
 import com.ieltspath.game.domain.repository.GameRoomRepository;
-import com.ieltspath.game.application.port.OutboxWriter;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -54,7 +53,6 @@ class WordlyRoomControllerTest {
 
     @MockBean com.ieltspath.game.application.port.CurrentPlayerProfile profile;
     @MockBean GameRoomRepository rooms;
-    @MockBean OutboxWriter outbox;
     @MockBean com.ieltspath.game.application.usecase.WordlyRoomAdmission admission;
 
     @Test
@@ -104,7 +102,7 @@ class WordlyRoomControllerTest {
                 .header("Authorization", "Bearer " + token("urn:code-base:api-gateway", Instant.now().plusSeconds(300)))
                 .content(body)).andExpect(status().isBadRequest());
         }
-        verifyNoInteractions(rooms, outbox);
+        verifyNoInteractions(rooms);
     }
 
     private String token(String issuer, Instant expiresAt) {

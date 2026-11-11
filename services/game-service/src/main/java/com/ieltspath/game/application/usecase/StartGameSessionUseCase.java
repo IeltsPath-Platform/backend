@@ -3,7 +3,6 @@ package com.ieltspath.game.application.usecase;
 import com.ieltspath.game.application.command.StartGameSessionCommand;
 import com.ieltspath.game.application.port.GameContentProvider;
 import com.ieltspath.game.application.port.GameContentProvider.GameContentItem;
-import com.ieltspath.game.application.port.OutboxWriter;
 import com.ieltspath.game.application.result.GameSessionResult;
 import com.ieltspath.game.domain.aggregate.GameSession;
 import com.ieltspath.game.domain.aggregate.GameType;
@@ -18,13 +17,10 @@ import java.util.*;
 public class StartGameSessionUseCase {
     private final GameContentProvider contentProvider;
     private final GameSessionRepository sessionRepository;
-    private final OutboxWriter outboxWriter;
 
-    public StartGameSessionUseCase(GameContentProvider contentProvider, GameSessionRepository sessionRepository,
-                                   OutboxWriter outboxWriter) {
+    public StartGameSessionUseCase(GameContentProvider contentProvider, GameSessionRepository sessionRepository) {
         this.contentProvider = contentProvider;
         this.sessionRepository = sessionRepository;
-        this.outboxWriter = outboxWriter;
     }
 
     @Transactional
@@ -63,9 +59,6 @@ public class StartGameSessionUseCase {
         GameSession session = new GameSession(UUID.randomUUID(), command.userId(), command.topicId(), null,
                 command.gameType(), command.learningDomain(), command.mode(), startedAt, snapshot, "PENDING");
         GameSession saved = sessionRepository.save(session);
-        outboxWriter.append("GameSession", saved.id().toString(), "GameSessionStarted",
-                Map.of("sessionId", saved.id().toString(), "userId", saved.userId().toString(),
-                        "learningDomain", saved.learningDomain(), "gameType", saved.gameType()));
         return GameSessionResult.from(saved);
     }
 
