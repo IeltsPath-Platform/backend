@@ -1,0 +1,8 @@
+#
+#Wed Nov 11 18:23:41 ICT 2026
+AMQP\ templates\ are\ used\ only\ in\ infrastructure=361249af-4c3f-4b72-9a62-99d3efb1a283
+API\ does\ not\ access\ persistence\ or\ Spring\ Data\ repositories=89063194-b70b-487e-b6bc-09e12f5c3875
+HTTP\ clients\ stay\ in\ infrastructure\ and\ client\ adapters\ use\ resilience=8ea6e748-ce29-4d7d-95b1-62446cff827a
+Supabase\ SDK\ and\ storage\ provider\ internals\ stay\ in\ common-storage=9940d789-b819-4aa4-948a-a868970678ff
+application\ does\ not\ depend\ on\ API\ or\ infrastructure=980d59fe-2894-469c-833a-ff07699f9f0a
+domain\ depends\ only\ on\ domain\ and\ technical\ libraries=4c023c0d-86fc-4f9a-a1b5-a308f69b785b
