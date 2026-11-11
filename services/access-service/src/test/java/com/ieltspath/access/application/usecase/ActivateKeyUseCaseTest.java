@@ -130,15 +130,41 @@ class ActivateKeyUseCaseTest {
     @Test
     @DisplayName("Should return existing result on duplicate idempotency key")
     void shouldReturnExistingResultOnDuplicateIdempotency() {
-        KeyActivation existing = KeyActivation.create(UUID.randomUUID(), userId, KeyType.POINTS, 50, 0, 0, "idem-dup");
+        ActivationKey key = ActivationKey.create(UUID.randomUUID(), keyCode.codeHash(), keyCode.codeHint(), null, null);
+        KeyActivation existing = KeyActivation.create(key.getId(), userId, KeyType.POINTS, 50, 0, 0, "idem-dup");
         when(keyActivationRepository.findByIdempotencyKey("idem-dup")).thenReturn(Optional.of(existing));
+        when(activationKeyRepository.findByCodeHash(keyCode.codeHash())).thenReturn(Optional.of(key));
         when(pointWalletRepository.findByUserId(userId)).thenReturn(Optional.of(new PointWallet(userId, 50, 50, 0, 0, null)));
 
         ActivationResult result = activateKeyUseCase.execute(new ActivateKeyCommand(userId, rawKey, "idem-dup"));
 
         assertThat(result.activationId()).isEqualTo(existing.getId());
         assertThat(result.pointsGranted()).isEqualTo(50);
-        verifyNoInteractions(activationKeyRepository);
+        verify(activationKeyRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Should reject a replayed idempotency key from a different user")
+    void shouldRejectReplayFromDifferentUser() {
+        KeyActivation existing = KeyActivation.create(UUID.randomUUID(), UUID.randomUUID(), KeyType.POINTS, 50, 0, 0, "idem-other-user");
+        when(keyActivationRepository.findByIdempotencyKey("idem-other-user")).thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> activateKeyUseCase.execute(new ActivateKeyCommand(userId, rawKey, "idem-other-user")))
+                .isInstanceOf(com.ieltspath.access.domain.exception.DuplicateIdempotencyException.class);
+        verifyNoInteractions(pointWalletRepository, subscriptionRepository);
+    }
+
+    @Test
+    @DisplayName("Should reject a replayed idempotency key sent with a different activation key")
+    void shouldRejectReplayWithDifferentKey() {
+        KeyActivation existing = KeyActivation.create(UUID.randomUUID(), userId, KeyType.POINTS, 50, 0, 0, "idem-other-key");
+        ActivationKey otherKey = ActivationKey.create(UUID.randomUUID(), keyCode.codeHash(), keyCode.codeHint(), null, null);
+        when(keyActivationRepository.findByIdempotencyKey("idem-other-key")).thenReturn(Optional.of(existing));
+        when(activationKeyRepository.findByCodeHash(keyCode.codeHash())).thenReturn(Optional.of(otherKey));
+
+        assertThatThrownBy(() -> activateKeyUseCase.execute(new ActivateKeyCommand(userId, rawKey, "idem-other-key")))
+                .isInstanceOf(com.ieltspath.access.domain.exception.DuplicateIdempotencyException.class);
+        verifyNoInteractions(pointWalletRepository, subscriptionRepository);
     }
 
     @Test
