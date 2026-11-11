@@ -1,6 +1,8 @@
 package com.ieltspath.learning.application.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.exception.LlmUnavailableException;
@@ -35,6 +37,8 @@ public class EssayGrader {
     static final int MAX_FOCUS_POINTS = 4;
     static final int MAX_FOCUS_TITLE_CHARS = 80;
     static final int MAX_CORRECTIONS = 10;
+    /** Error code of a figure the essay reports wrongly; the catalog decides whether it exists. */
+    static final String DATA_MISREPORTED_CODE = "T1_DATA_MISREPORTED";
     static final int MAX_SUMMARY_CHARS = 600;
     static final int MAX_REASON_CHARS = 300;
     static final int MAX_EVIDENCE = 3;
@@ -177,7 +181,8 @@ public class EssayGrader {
                 .map(error -> error.code() + " — " + error.name() + ": " + error.fixHint())
                 .collect(Collectors.joining("\n"));
         String taskName = task == WritingTask.TASK_1 ? "Academic Writing Task 1" : "Writing Task 2";
-        String template = TEMPLATE_VERSION_2.equals(templateVersion) ? PROMPT_TEMPLATE_2 : PROMPT_TEMPLATE;
+        String template = forTask(TEMPLATE_VERSION_2.equals(templateVersion) ? PROMPT_TEMPLATE_2 : PROMPT_TEMPLATE,
+                task == WritingTask.TASK_1);
         return template.replace("{{task}}", taskName)
                 .replace("{{criteria}}", criterionText)
                 .replace("{{error_codes}}", errorCodes.isBlank() ? "(none)" : errorCodes)
@@ -238,7 +243,18 @@ public class EssayGrader {
         if (byCode.size() != task.criteria().size()) return Optional.empty();
         List<WritingGrade.Criterion> criteria = task.criteria().stream().map(byCode::get).toList();
         String summary = truncate(root.path("summary").asText(""), MAX_SUMMARY_CHARS);
-        List<WritingGrade.Correction> corrections = corrections(root.path("corrections"), essay, allowedCodes, catalog,
+        WritingGrade.Task1Checks task1Checks = null;
+        WritingGrade.Task2Checks task2Checks = null;
+        JsonNode correctionNodes = root.path("corrections");
+        if (secondTemplate) {
+            if (task == WritingTask.TASK_1) {
+                task1Checks = TaskChecksParser.task1(root.path("taskChecks"), essay);
+                correctionNodes = withDataCorrections(correctionNodes, task1Checks, essay);
+            } else {
+                task2Checks = TaskChecksParser.task2(root.path("taskChecks"), essay);
+            }
+        }
+        List<WritingGrade.Correction> corrections = corrections(correctionNodes, essay, allowedCodes, catalog,
                 secondTemplate);
         WritingGrade grade = new WritingGrade(criteria, corrections,
                 summary, WritingScore.overallBand(criteria.stream().map(WritingGrade.Criterion::band).toList()),
@@ -246,7 +262,42 @@ public class EssayGrader {
         if (!secondTemplate) return Optional.of(grade);
         Set<String> codes = corrections.stream().map(WritingGrade.Correction::errorCode).collect(Collectors.toSet());
         return Optional.of(grade.withDetails(priorities(root.path("priorities"), essay, codes),
-                errorExamples(root.path("errorExamples"), codes)));
+                errorExamples(root.path("errorExamples"), codes)).withChecks(task1Checks, task2Checks));
+    }
+
+    /**
+     * The model's corrections plus one for every figure it judged WRONG that none of them covers, so a wrong figure
+     * always reaches the learner as a correction of its own kind. A figure is covered only by a correction of that
+     * kind whose quotation overlaps the sentence: a grammar correction on the same words does not say the figure is
+     * wrong. Nothing is added without a statement of what the chart shows.
+     */
+    private JsonNode withDataCorrections(JsonNode modelCorrections, WritingGrade.Task1Checks checks, String essay) {
+        ArrayNode merged = json.createArrayNode();
+        if (modelCorrections.isArray()) merged.addAll((ArrayNode) modelCorrections);
+        for (WritingGrade.DataCheck check : checks.dataChecks()) {
+            if (!WritingGrade.DataCheck.WRONG.equals(check.verdict()) || check.expected() == null
+                    || covered(merged, check.excerpt(), essay)) continue;
+            ObjectNode item = json.createObjectNode();
+            item.put("excerpt", check.excerpt());
+            item.put("suggestion", check.expected());
+            item.put("errorCode", DATA_MISREPORTED_CODE);
+            item.put("certainty", WritingGrade.Correction.ERROR);
+            merged.add(item);
+        }
+        return merged;
+    }
+
+    private static boolean covered(ArrayNode corrections, String sentence, String essay) {
+        int sentenceStart = essay.indexOf(sentence);
+        if (sentenceStart < 0) return false;
+        int sentenceEnd = sentenceStart + sentence.length();
+        for (JsonNode item : corrections) {
+            if (!DATA_MISREPORTED_CODE.equals(item.path("errorCode").asText(null))) continue;
+            String excerpt = item.path("excerpt").isTextual() ? item.get("excerpt").asText() : "";
+            int start = excerpt.isBlank() ? -1 : essay.indexOf(excerpt);
+            if (start >= 0 && start < sentenceEnd && sentenceStart < start + excerpt.length()) return true;
+        }
+        return false;
     }
 
     /** Quotations the model gave that are not exact parts of the essay are dropped; at most three are kept. */
@@ -321,16 +372,21 @@ public class EssayGrader {
 
     /** Weak criteria with knowledge points come first, weakest first, followed by the model's own focus. */
     /**
-     * Applies the centre's band caps when they are on; with them off the grade is returned unchanged. Only the length
-     * rule can fire from the grade alone: the flags that need the model's reading come with prompt v2.
+     * Applies the centre's band caps when they are on; with them off the grade is returned unchanged. The length rule
+     * needs only the essay; the overview, partial-answer and position rules read the checks of the second template.
+     * The off-topic rule has no check behind it yet, so it never fires.
      */
     static WritingGrade applyBandCaps(WritingGrade grade, WritingTask task, String essay, Integer minWords,
                                       WritingSettings settings) {
         if (!settings.bandCapsEnabled() || minWords == null) return grade;
         WritingBandCaps.Caps caps = new WritingBandCaps.Caps(settings.tooShortBandCap(), settings.offTopicBandCap(),
                 settings.noOverviewBandCap(), settings.partialAnswerBandCap(), settings.noPositionBandCap());
+        WritingBandCaps.Flags flags = new WritingBandCaps.Flags(false,
+                grade.task1Checks() != null && Boolean.FALSE.equals(grade.task1Checks().hasOverview()),
+                grade.task2Checks() != null && grade.task2Checks().partialAnswer(),
+                grade.task2Checks() != null && grade.task2Checks().noPosition());
         List<WritingBandCaps.Limit> limits = WritingBandCaps.evaluate(task, WritingScore.countWords(essay), minWords,
-                WritingBandCaps.Flags.NONE, caps);
+                flags, caps);
         if (limits.isEmpty()) return grade;
         Map<String, BigDecimal> before = new LinkedHashMap<>();
         for (WritingGrade.Criterion criterion : grade.criteria()) before.putIfAbsent(criterion.code(), criterion.band());
@@ -345,7 +401,8 @@ public class EssayGrader {
                 .map(criterion -> criterion.withBand(after.get(criterion.code()))).toList();
         BigDecimal overall = WritingScore.overallBand(criteria.stream().map(WritingGrade.Criterion::band).toList());
         return new WritingGrade(criteria, grade.corrections(), grade.summary(), overall, grade.studyPoints(),
-                grade.judgmentVersion(), grade.model(), applied, grade.priorities(), grade.errorExamples());
+                grade.judgmentVersion(), grade.model(), applied, grade.priorities(), grade.errorExamples(),
+                grade.task1Checks(), grade.task2Checks());
     }
 
     private WritingGrade withCriterionStudyPoints(WritingGrade grade, Rubric rubric, BigDecimal passBand,
@@ -372,7 +429,8 @@ public class EssayGrader {
         }
         points.addAll(grade.studyPoints());
         return new WritingGrade(grade.criteria(), grade.corrections(), grade.summary(), grade.overallBand(), points,
-                null, null, grade.bandLimits(), grade.priorities(), grade.errorExamples());
+                null, null, grade.bandLimits(), grade.priorities(), grade.errorExamples(), grade.task1Checks(),
+                grade.task2Checks());
     }
 
     /** Content's optional details are captured once; an unavailable catalog must not prevent grading. */
@@ -475,10 +533,23 @@ public class EssayGrader {
     private static String loadTemplate(String version) {
         try (InputStream input = EssayGrader.class.getResourceAsStream("/essay-prompt-template-" + version + ".txt")) {
             if (input == null) throw new IllegalStateException("Essay prompt template missing");
-            return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+            return withoutNotes(new String(input.readAllBytes(), StandardCharsets.UTF_8));
         } catch (IOException exception) {
             throw new IllegalStateException("Essay prompt template unreadable", exception);
         }
+    }
+
+    /** Lines that start with "#" at the top of a template are notes for people; the model never sees them. */
+    private static String withoutNotes(String template) {
+        return template.replaceFirst("\\A(?:#[^\\r\\n]*\\R)+\\s*", "");
+    }
+
+    /** The template with only the section of the given task kept; a template without sections is unchanged. */
+    static String forTask(String template, boolean taskOne) {
+        String drop = taskOne ? "TASK_2" : "TASK_1";
+        String keep = taskOne ? "TASK_1" : "TASK_2";
+        return template.replaceAll("(?s)\\[\\[" + drop + "\\]\\].*?\\[\\[/" + drop + "\\]\\]\\R*", "")
+                .replaceAll("\\[\\[/?" + keep + "\\]\\]\\R?", "");
     }
 
     public record GradedEssay(WritingGrade grade, String promptVersion) {}

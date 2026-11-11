@@ -1,7 +1,7 @@
 # AGENTS.md - Quy tắc bắt buộc cho AI Agent
 
 - Phiên bản: 2.3
-- Cập nhật lần cuối: 2026-11-11 (ghi chú gamification học từ vựng mobile ở §3.8; thêm common-llm); 2026-11-02 (thêm §3.9 và nhóm điều cấm "Pattern hệ thống" ở §5: resilience, outbox, idempotency, scheduler, storage; bổ sung Redis, Resilience4j, Micrometer/OpenTelemetry, Supabase vào stack và hai module shared mới); 2026-10-30 (Content gọi Library một chiều, Library không gọi Content; Notification đã có DB, listener và API; mặc định DB của config-repo là `localhost:5440`); 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); dữ kiện khác giữ mốc kiểm 2026-10-07 sau course path, placement recommendation và course gate
+- Cập nhật lần cuối: 2026-11-12 (ngoại lệ `chartFacts`: học viên nhận phát biểu đúng cho câu số liệu viết sai); 2026-11-11 (ghi chú gamification học từ vựng mobile ở §3.8; thêm common-llm); 2026-11-02 (thêm §3.9 và nhóm điều cấm "Pattern hệ thống" ở §5: resilience, outbox, idempotency, scheduler, storage; bổ sung Redis, Resilience4j, Micrometer/OpenTelemetry, Supabase vào stack và hai module shared mới); 2026-10-30 (Content gọi Library một chiều, Library không gọi Content; Notification đã có DB, listener và API; mặc định DB của config-repo là `localhost:5440`); 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); dữ kiện khác giữ mốc kiểm 2026-10-07 sau course path, placement recommendation và course gate
 - Dự án: `IELTSPath` (Maven coordinates: `com.ieltspath:code-base:1.0-SNAPSHOT`)
 - Kiến trúc chi tiết (sơ đồ, flow, data ownership, quyết định): [`docs/system-architecture.md`](docs/system-architecture.md)
 
@@ -293,7 +293,9 @@ src/main/java/com/ieltspath/<service>
 - Mọi lượt ghi của một học viên chạy trong một `@Transactional` mở đầu bằng `pg_advisory_xact_lock` theo user.
 - Bằng chứng bài học chỉ ghi ở lần nộp đầu của mỗi khối; bài ôn ghi mỗi set (nộp một lần); kết quả thi ghi theo
   `(attempt_id, result_version)`, chấm lại thì thay bằng chứng của version cũ.
-- Học viên không bao giờ nhận `answerSpec` hay `chartFacts`. `explanation` và transcript chỉ có sau khi đạt, **trừ**
+- Học viên không bao giờ nhận `answerSpec` hay `chartFacts` nguyên văn. Ngoại lệ có chủ đích: sau khi bài Task 1 được
+  chấm, học viên nhận phát biểu đúng cho từng câu số liệu họ viết sai (`dataChecks[].expected`, một câu ngắn do model
+  viết, tối đa 200 ký tự); không bao giờ trả cả bảng dữ kiện. `explanation` và transcript chỉ có sau khi đạt, **trừ**
   practice attempt, set ôn và quick-check của bài ôn: có ngay sau khi nộp. Essay trong practice attempt còn mang
   `sampleAnswer` (lấy từ `explanation`) ngay khi mở bài, để học viên bật xem bài mẫu trong lúc viết; essay của lesson thì
   vẫn chỉ có sau khi block đạt. Package đã nộp ở Practice hoặc đã giao trong
