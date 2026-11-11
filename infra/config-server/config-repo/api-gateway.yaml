@@ -260,7 +260,7 @@ spring:
               uri: lb://learning-service
               metadata:
                 connect-timeout: 2000
-                response-timeout: 60s
+                response-timeout: 60000
               predicates:
                 - Path=/api/learning/free-writing/submissions,/api/learning/lessons/*/essays/*/submissions,/api/learning/practice-attempts/*/essays/*/submissions,/api/learning/writing-submissions/*/revisions
               filters:
