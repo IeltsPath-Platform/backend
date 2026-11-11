@@ -55,9 +55,14 @@ public class ErrorTypeController {
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public ErrorTypeResponse update(@PathVariable UUID id, @Valid @RequestBody UpdateErrorTypeRequest request) {
-        return ErrorTypeResponse.from(updateErrorType.execute(id, request.name(), request.category(),
+        ErrorType updated = updateErrorType.execute(id, request.name(), request.category(),
                 request.severity(), request.knowledgePointId(), request.fixHint(), request.status(),
-                request.reviewStatus()));
+                request.reviewStatus());
+        // Skills are optional: a request without them keeps the stored skills.
+        if (request.skills() != null) {
+            updated = updateErrorType.updateSkills(id, request.skills());
+        }
+        return ErrorTypeResponse.from(updated);
     }
 
     public record CreateErrorTypeRequest(
@@ -76,7 +81,8 @@ public class ErrorTypeController {
             UUID knowledgePointId,
             @NotBlank String fixHint,
             ContentStatus status,
-            ErrorReviewStatus reviewStatus) {}
+            ErrorReviewStatus reviewStatus,
+            List<String> skills) {}
 
     public record LearnerErrorTypeResponse(String code, String name, ErrorCategory category, String fixHint) {
         static LearnerErrorTypeResponse from(ErrorType errorType) {
@@ -87,11 +93,12 @@ public class ErrorTypeController {
 
     public record ErrorTypeResponse(UUID id, String code, String name, ErrorCategory category, int severity,
                                     UUID knowledgePointId, String fixHint, ContentStatus status,
-                                    ErrorReviewStatus reviewStatus) {
+                                    ErrorReviewStatus reviewStatus, List<String> skills, boolean fallback) {
         static ErrorTypeResponse from(ErrorType errorType) {
             return new ErrorTypeResponse(errorType.getId(), errorType.getCode(), errorType.getName(),
                     errorType.getCategory(), errorType.getSeverity(), errorType.getKnowledgePointId(),
-                    errorType.getFixHint(), errorType.getStatus(), errorType.getReviewStatus());
+                    errorType.getFixHint(), errorType.getStatus(), errorType.getReviewStatus(),
+                    errorType.getSkills(), errorType.isFallback());
         }
     }
 }
