@@ -177,6 +177,24 @@ public class RestLearningContentClient implements LearningContentClient {
     }
 
     @Override
+    public PracticeTestKeys practiceTestKeys(List<UUID> packageVersionIds, List<UUID> questionVersionIds) {
+        if (packageVersionIds.isEmpty() && questionVersionIds.isEmpty()) return new PracticeTestKeys(Map.of(), Map.of());
+        KeysResponse response = response(CallKind.READ, () -> restClient.post()
+                .uri(INTERNAL_PATH + "/practice-test-keys")
+                .headers(this::forwardRequestHeaders)
+                .body(new KeysRequest(packageVersionIds, questionVersionIds))
+                .retrieve().body(KeysResponse.class));
+        Map<UUID, UUID> packageByVersion = new java.util.HashMap<>();
+        if (response.versions() != null) response.versions().forEach(item -> packageByVersion.put(item.packageVersionId(), item.packageId()));
+        Map<UUID, PracticeTestQuestionKey> byQuestion = new java.util.HashMap<>();
+        if (response.questions() != null) {
+            response.questions().forEach(item -> byQuestion.put(item.questionVersionId(),
+                    new PracticeTestQuestionKey(item.packageId(), item.partNo())));
+        }
+        return new PracticeTestKeys(packageByVersion, byQuestion);
+    }
+
+    @Override
     public List<PracticeSet> searchPracticeSets(UUID knowledgePointId, List<UUID> excludePackageIds,
                                                int minQuestions, int limit) {
         return searchPracticeSets(knowledgePointId, excludePackageIds, minQuestions, limit, null);
@@ -322,4 +340,8 @@ public class RestLearningContentClient implements LearningContentClient {
     private record SuggestionRequest(List<UUID> knowledgePointIds, java.math.BigDecimal maxBand) {}
     private record PrerequisitesRequest(List<UUID> ids) {}
     private record Availability(Map<UUID, Integer> counts) {}
+    private record KeysRequest(List<UUID> packageVersionIds, List<UUID> questionVersionIds) {}
+    private record KeysResponse(List<VersionKey> versions, List<QuestionKey> questions) {}
+    private record VersionKey(UUID packageVersionId, UUID packageId) {}
+    private record QuestionKey(UUID questionVersionId, UUID packageId, Integer partNo) {}
 }

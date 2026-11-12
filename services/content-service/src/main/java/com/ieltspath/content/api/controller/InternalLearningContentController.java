@@ -11,6 +11,8 @@ import com.ieltspath.content.api.dto.internal.LessonSummaryResponse;
 import com.ieltspath.content.api.dto.internal.PackageVersionContentResponse;
 import com.ieltspath.content.api.dto.internal.PracticeSetResponse;
 import com.ieltspath.content.api.dto.internal.PracticeSetSearchRequest;
+import com.ieltspath.content.api.dto.internal.PracticeTestKeysRequest;
+import com.ieltspath.content.api.dto.internal.PracticeTestKeysResponse;
 import com.ieltspath.content.api.dto.internal.TopicSequenceResponse;
 import com.ieltspath.content.api.dto.internal.TopicTestPackageResponse;
 import com.ieltspath.content.application.command.CountPracticeSetsCommand;
@@ -29,6 +31,7 @@ import com.ieltspath.content.application.usecase.GetTopicTestPackagesUseCase;
 import com.ieltspath.content.application.usecase.GetCourseTestPackagesUseCase;
 import com.ieltspath.content.application.usecase.GetPlacementTestPackagesUseCase;
 import com.ieltspath.content.application.usecase.ListErrorTypesUseCase;
+import com.ieltspath.content.application.usecase.ResolvePracticeTestKeysUseCase;
 import com.ieltspath.content.application.usecase.SearchPracticeSetsUseCase;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -67,6 +70,7 @@ public class InternalLearningContentController {
     private final GetPlacementTestPackagesUseCase getPlacementTestPackages;
     private final ListErrorTypesUseCase listErrorTypes;
     private final GetActiveKnowledgePrerequisitesUseCase getActiveKnowledgePrerequisites;
+    private final ResolvePracticeTestKeysUseCase resolvePracticeTestKeys;
     private final MediaReferencePolicy mediaPolicy;
 
     @PostMapping("/knowledge-points/prerequisites")
@@ -188,6 +192,16 @@ public class InternalLearningContentController {
             @Valid @RequestBody PracticeSetAvailabilityRequest request) {
         return new PracticeSetAvailabilityResponse(countAvailablePracticeSets.execute(new CountPracticeSetsCommand(
                 request.knowledgePointIds(), request.excludePackageIds(), request.minQuestions())));
+    }
+
+    /**
+     * The practice test (package and part) behind package versions and Writing questions, so the learning flow can say
+     * which tests of the catalog a learner has done. Ids that match no practice test are left out.
+     */
+    @PostMapping("/practice-test-keys")
+    public PracticeTestKeysResponse practiceTestKeys(@Valid @RequestBody PracticeTestKeysRequest request) {
+        return PracticeTestKeysResponse.from(resolvePracticeTestKeys.execute(request.packageVersionIds(),
+                request.questionVersionIds()));
     }
 
     @GetMapping("/package-versions/{id}")

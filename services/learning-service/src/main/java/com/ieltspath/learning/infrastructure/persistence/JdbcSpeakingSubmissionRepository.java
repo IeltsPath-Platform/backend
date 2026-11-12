@@ -73,12 +73,14 @@ public class JdbcSpeakingSubmissionRepository implements SpeakingSubmissionRepos
     }
 
     @Override
-    public Optional<SpeakingSubmission> claimNext(Instant staleBefore, int maxAttempts) {
-        Timestamp cutoff = Timestamp.from(staleBefore);
+    public Optional<SpeakingSubmission> claimNext(Instant staleBefore, Instant retryBefore, int maxAttempts) {
+        Timestamp staleCutoff = Timestamp.from(staleBefore);
+        Timestamp retryCutoff = Timestamp.from(retryBefore);
         jdbc.update("UPDATE speaking_submissions SET status='NEEDS_EXAMINER', failure_code='MAX_ATTEMPTS_REACHED', "
-                        + "updated_at=CURRENT_TIMESTAMP WHERE status IN ('QUEUED','FAILED_RETRYABLE','ANALYZING','GRADING') "
-                        + "AND grading_attempts >= ? AND (status = 'QUEUED' OR updated_at < ?)",
-                maxAttempts, cutoff);
+                        + "updated_at=CURRENT_TIMESTAMP WHERE grading_attempts >= ? AND (status = 'QUEUED' "
+                        + "OR (status = 'FAILED_RETRYABLE' AND updated_at < ?) "
+                        + "OR (status IN ('ANALYZING','GRADING') AND updated_at < ?))",
+                maxAttempts, retryCutoff, staleCutoff);
         List<UUID> ids = jdbc.query("""
                 WITH candidate AS (
                     SELECT id FROM speaking_submissions
@@ -94,7 +96,7 @@ public class JdbcSpeakingSubmissionRepository implements SpeakingSubmissionRepos
                     grading_started_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
                 FROM candidate WHERE s.id = candidate.id
                 RETURNING s.id
-                """, (rs, row) -> rs.getObject(1, UUID.class), cutoff, cutoff);
+                """, (rs, row) -> rs.getObject(1, UUID.class), retryCutoff, staleCutoff);
         return ids.stream().findFirst().flatMap(this::findById);
     }
 

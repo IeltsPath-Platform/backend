@@ -33,6 +33,41 @@ class SpeakingResultValidatorTest {
     }
 
     @Test
+    void keepsAThoroughListOfErrorsUpToTheLimitAndNoFurther() {
+        String error = "{\"code\":\"SPK_NO_LINKER\",\"partNo\":1,\"excerpt\":\"she taught me English\",\"suggestion\":\"add because\"}";
+        String many = SpeakingTestData.goodAnswer("6.0", "6.0", "6.0").replaceFirst("\"errors\":\\[[^\\]]*\\]",
+                "\"errors\":[" + String.join(",", java.util.Collections.nCopies(SpeakingResultValidator.MAX_ERRORS + 10, error)) + "]");
+
+        assertThat(validator.validate(many, input, kps).errors()).hasSize(SpeakingResultValidator.MAX_ERRORS);
+        assertThat(SpeakingResultValidator.MAX_ERRORS).isGreaterThan(10);
+    }
+
+    @Test
+    void keepsMoreThanFourWeaknessesAndFiveEvidenceEntriesPerCriterion() {
+        String quote = "{\"quote\":\"my teacher was very kind\",\"note\":\"clear\"}";
+        String answer = SpeakingTestData.goodAnswer("6.0", "6.0", "6.0")
+                .replace("\"weaknesses\":[\"b\"]", "\"weaknesses\":[\"1\",\"2\",\"3\",\"4\",\"5\",\"6\",\"7\"]")
+                .replaceFirst("\"evidence\":\\[[^\\]]*\\]", "\"evidence\":[" + String.join(",", java.util.Collections.nCopies(10, quote)) + "]");
+
+        var first = validator.validate(answer, input, kps).criteria().get(0);
+
+        assertThat(first.weaknesses()).hasSize(SpeakingResultValidator.MAX_POINTS);
+        assertThat(first.evidence()).hasSize(SpeakingResultValidator.MAX_EVIDENCE);
+    }
+
+    @Test
+    void aWeaknessKeepsRoomForTheCountTheQuotedPlacesAndTheirFixes() {
+        String longWeakness = "x".repeat(650);
+        String answer = SpeakingTestData.goodAnswer("6.0", "6.0", "6.0")
+                .replace("\"weaknesses\":[\"b\"]", "\"weaknesses\":[\"" + longWeakness + "\"]");
+
+        var first = validator.validate(answer, input, kps).criteria().get(0);
+
+        assertThat(first.weaknesses()).containsExactly(longWeakness);
+        assertThat(SpeakingResultValidator.MAX_WEAKNESS_CHARS).isGreaterThan(300);
+    }
+
+    @Test
     void dropsObservationsThatNameAKnowledgePointThatWasNotOffered() {
         ValidatedGrade grade = validator.validate(SpeakingTestData.goodAnswer("6.0", "6.0", "6.0"), input, Set.of());
 

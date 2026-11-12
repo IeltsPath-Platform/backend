@@ -40,6 +40,22 @@ in the learner's request, the active rubric (as before) and the Speaking error t
 stores the latter two in `speaking_grading_contexts` (V45). The job reads them from there. If Content cannot be reached at
 that moment the context is stored empty: the grade is still given, without error codes or personal advice.
 
+Listing mistakes. The grader reports a mistake in `display.errors` only with an offered `SPK_*` code, so every grammar and
+vocabulary mistake it has to list needs one (V115 and V124: tense, verb form, agreement, plural and past endings, articles,
+prepositions, word order, missing subject or verb, run-on sentences, complex structures, word choice, word form, translation
+from Vietnamese, repeated words, misused idioms, register; V125 adds wandering sentence, repeated idea and undeveloped idea
+for coherence). Prompt version `spk5` asks each criterion call for every place a mistake happens, one entry per place with
+its own part, exact excerpt and a solution, never only the fault: the corrected sentence and rule for GRA, the better word
+and alternatives for LR, and for FC how to cut, link, develop or replace the sentence, written about the learner's own topic.
+Up to 15 entries per criterion and 45 in all; a weakness may be up to 700 characters. Entries that carry a code, a part or an
+excerpt that is not valid are dropped as before. A code without a trap point only explains the result and adds no evidence.
+
+Busy provider. A grade is five model calls (FC, LR, GRA, overview, synthesis) and one failed call spoils it, so each call is
+asked again, up to three tries two seconds apart, when the provider answers 5xx (Google's "high demand" 503) or the
+connection fails. A 429 is never asked again because it means the quota is gone. Writing and every other LLM call keep their
+single request. When the tries run out the submission is `FAILED_RETRYABLE` with `LLM_UNAVAILABLE` and the job tries the
+whole grade again as before.
+
 Recordings without speech. When the speech analysis finds no spoken word in any recording, the submission ends as
 `ABANDONED` with failure code `NO_SPEECH` before any quota, LLM call or charge, and the learner may record again.
 

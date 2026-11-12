@@ -23,8 +23,12 @@ public interface SpeakingSubmissionRepository {
     /** The learner's newest submission for a practice attempt, whatever its status. */
     Optional<SpeakingSubmission> findLatestForAttempt(UUID userId, UUID practiceAttemptId);
 
-    /** Claims one queued or stale grading row atomically across service instances. */
-    Optional<SpeakingSubmission> claimNext(Instant staleBefore, int maxAttempts);
+    /**
+     * Claims one queued, retryable or stale grading row atomically across service instances. A retryable row is claimed
+     * once it has not changed since {@code retryBefore}; a row still marked as being worked on, once it has not changed
+     * since {@code staleBefore}.
+     */
+    Optional<SpeakingSubmission> claimNext(Instant staleBefore, Instant retryBefore, int maxAttempts);
 
     /** Moves {@code updated_at} of a submission being graded to now, so a long run is not taken for a stuck one. */
     void touch(UUID id);

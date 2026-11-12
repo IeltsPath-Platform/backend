@@ -86,6 +86,16 @@ public interface LearningContentClient {
     Map<UUID, Integer> practiceSetAvailability(List<UUID> knowledgePointIds, List<UUID> excludePackageIds,
                                                 int minQuestions);
 
+    /**
+     * The practice test (package and part) that package versions and Writing questions belong to, as the catalog knows it.
+     * Ids that match no practice test are missing from the answer.
+     */
+    PracticeTestKeys practiceTestKeys(List<UUID> packageVersionIds, List<UUID> questionVersionIds);
+
+    record PracticeTestKeys(Map<UUID, UUID> packageByVersion, Map<UUID, PracticeTestQuestionKey> byQuestion) {}
+
+    record PracticeTestQuestionKey(UUID packageId, Integer partNo) {}
+
     List<PracticeSet> searchPracticeSets(UUID knowledgePointId, List<UUID> excludePackageIds,
                                        int minQuestions, int limit);
 

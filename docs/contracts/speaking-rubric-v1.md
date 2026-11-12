@@ -40,3 +40,10 @@ through 9.0 for each criterion. PR is stored for learner feedback but is not an 
 Migration V116 creates `IELTS_SPEAKING@1` as a starter `DRAFT`. Its prompt and paraphrased descriptors are authoring
 notes, not approved IELTS guidance; an IELTS-qualified reviewer must revise and activate it before AI grading can use
 it.
+
+Later versions are added by migration, never by editing an applied one: V117 (`@2`, first active), V122 (`@3`, deeper
+feedback), V123 (`@4`, stricter marking: band 5 as the starting point, the lower band wins when two are close, concrete
+limits for bands 4 to 9 of FC, LR and GRA) and V125 (`@5`, FC only: coherence is read sentence by sentence and sentences
+that wander away from the question cap the band at 4.5 for three or more, 5.5 for one or two). Each new version retires the
+previous one; grades keep the version they were marked with. The thresholds in `@4` and `@5` are proposals and must be
+re-checked against the examiner calibration set.

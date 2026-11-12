@@ -480,7 +480,7 @@ class SpeakingPracticeUseCasesTest {
 
         // The grading queue and the stored analyses are exercised by their own tests, not by these use cases.
         @Override
-        public Optional<SpeakingSubmission> claimNext(java.time.Instant staleBefore, int maxAttempts) {
+        public Optional<SpeakingSubmission> claimNext(java.time.Instant staleBefore, java.time.Instant retryBefore, int maxAttempts) {
             return Optional.empty();
         }
 

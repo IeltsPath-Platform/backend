@@ -171,7 +171,7 @@ class SpeakingLessonMasteryIntegrationTest {
         when(storage.download(anyString(), anyString())).thenReturn(wav());
         when(grader.prepare(any(), any())).thenReturn(new SpeakingPromptAssembler.Prepared(
                 new LearningContentClient.Rubric("SPEAKING_V1", "SPEAKING", 1, "", List.of(), List.of()),
-                "a".repeat(64), "system", "user"));
+                "a".repeat(64), "user"));
     }
 
     /** The grader's answer: a band, and whether the speech could be trusted as evidence. */

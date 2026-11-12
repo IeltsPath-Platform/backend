@@ -86,7 +86,7 @@ Gateway giữ các path công khai nhưng trỏ từng nhóm tới chủ sở h�
 | learning | Azure Speech (ngoài hệ thống) | Speech SDK (`client-sdk` 1.53.0), một lượt nhận dạng liên tục cho cả ghi âm, đẩy audio qua stream (không ghi file); chạy ngoài transaction. Không qua `ResilientCall` (SDK tự mở kết nối); số phân tích chạy cùng lúc bị giới hạn bằng `learning.speech.max-concurrent` | `LEARNING_SPEECH_KEY`, `LEARNING_SPEECH_REGION`, `LEARNING_SPEECH_LOCALE` |
 | assessment | LLM (ngoài hệ thống) | `POST {base}/chat/completions` cho essay đã nộp trong `TOPIC_GATE`/`COURSE_GATE`, ngoài transaction | `ASSESSMENT_LLM_BASE_URL`, `ASSESSMENT_LLM_API_KEY`, `ASSESSMENT_LLM_MODEL`; quota ngày `ASSESSMENT_LLM_DAILY_LIMIT` |
 
-Learning, Assessment và Content gọi LLM qua `shared/common-llm`, giữ cấu hình, port, prompt và parser ở từng service. Thư viện áp luật token/reasoning theo họ model, gọi `ResilientCall("llm", WRITE)` và không retry; Content không còn vòng retry riêng. Template essay gốc chỉ ở `docs/contracts/essay-prompt-template-v*.txt`, Maven chép vào classpath Learning và Assessment.
+Assessment và Content gọi LLM qua `shared/common-llm`; cấu hình, port, prompt và parser vẫn thuộc từng service. Learning giữ OpenAI-compatible client riêng để hỗ trợ ngân sách token/timeout theo từng lượt và retry transient chỉ cho các lượt chấm Speaking; các lượt chấm khác không retry. Template essay gốc chỉ ở `docs/contracts/essay-prompt-template-v*.txt`, Maven chép vào classpath Learning và Assessment.
 
 Timer `llm.call.duration` và counter `llm.tokens` mang nhãn `service`, `model`, `purpose`, `outcome`; token thêm `direction=input|output`. Không có user hay nội dung trong metric. Provider thiếu `usage` thì không tăng counter token.
 
