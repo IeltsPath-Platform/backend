@@ -1,13 +1,13 @@
 # Kiến trúc hệ thống IELTSPath (backend)
 
-- Cập nhật lần cuối: 2026-10-25; thêm KP con theo mã lỗi, bằng chứng `error_trap`, chọn bộ theo bẫy, phản hồi `fixHint` và `ERROR_PATTERN` cho Learning
+- Cập nhật lần cuối: 2026-11-11 (common-llm); 2026-10-25; thêm KP con theo mã lỗi, bằng chứng `error_trap`, chọn bộ theo bẫy, phản hồi `fixHint` và `ERROR_PATTERN` cho Learning
 - Đọc khi cần hiểu toàn hệ thống. Quy tắc bắt buộc nằm ở [`AGENTS.md`](../AGENTS.md); hướng dẫn chạy chi tiết ở
   [`local-development.md`](local-development.md); tổng quan và bảng pattern ở [`README.md`](../README.md).
   Code là nguồn đúng khi tài liệu này lệch.
 
 ## 1. Tổng quan
 
-IELTSPath là backend microservices cho nền tảng học IELTS: 3 service hạ tầng Spring Cloud, 1 thư viện bảo mật dùng
+IELTSPath là backend microservices cho nền tảng học IELTS: 3 service hạ tầng Spring Cloud, 6 thư viện kỹ thuật dùng
 chung và 9 business service Java (Spring Boot, Maven reactor). Service học AI Learning viết bằng Python đã được thay bằng
 `learning-service` Java ngày 2026-10-01. Mỗi business service sở hữu database PostgreSQL riêng. Client chỉ gọi qua API Gateway.
 
@@ -47,6 +47,7 @@ content --HTTP--> library                 learning --HTTP--> content (/internal/
 | `game-service` | Phòng game, trận, phiên chơi, WebSocket realtime | `game_db` (Compose PostgreSQL host 5440) | `/api/games/**`, `/ws/games/**` |
 | `community-service` | Bài viết, bình luận, reaction, kiểm duyệt | `community_db` (Compose PostgreSQL host 5440) | `/api/community/**` |
 | `notification-service` | Thông báo bền vững từ Community events, REST unread/read và STOMP push | `notification_db` (Compose PostgreSQL host 5440) | `/api/notifications/**`, `/ws/notifications` |
+| `writing` (bài đã chấm) | Có hai nơi lưu, có chủ đích: bài luyện (lesson, Practice, tự do) ở learning-service; bài thi gate và EXAMINER ở assessment-service. Lịch sử Writing của học viên chỉ lấy từ learning-service. |
 | `learning-service` | Placement recommendation; topic path theo course (một chuỗi cho mọi skill), bài học, Practice theo bài, mastery theo KP và KP con mã lỗi, phản hồi fix hint, thang ôn tập, course/topic progress và giao mã đề cuối; mục tiêu học, activity, thời gian học và streak; nhận kết quả thi chính thức | `learning_db` (Compose PostgreSQL host 5440; `learner_placements`, `course_progress`, `course_test_assignments`, `learning_goals`, `learning_activities`, `practice_sessions`, `study_*`; V40 tạo các bảng goal/activity/study, V51 tạo practice sessions) | `/api/learning/**`; Gateway viết lại `/api/users/me/learning-goals/**`, `/api/users/{id}/learning-goals/**`, `/api/users/me/study-sessions/**`, `/api/users/me/statistics/study-time`, `/api/learning-support/activities/**` sang đây |
 
 Learning cấp `practice_sessions` cho Writing, Speaking và Vocabulary với thời hạn sáu giờ. Khi ghi thời gian, service xác minh ID, chủ sở hữu, loại và hạn phiên ngay trong `learning_db`; các nguồn này không gắn course và chỉ cộng vào tổng `ALL`. Endpoint cấp phiên là `POST /api/learning/practice-sessions`, dùng rate-limit tier `default` của route `/api/learning/**`.
@@ -84,6 +85,10 @@ Gateway giữ các path công khai nhưng trỏ từng nhóm tới chủ sở h�
 | learning | LLM (ngoài hệ thống) | `POST {base}/chat/completions` (OpenAI-compatible) khi chấm bài luận, ngoài mọi transaction | `LEARNING_LLM_BASE_URL`, `LEARNING_LLM_API_KEY`, `LEARNING_LLM_MODEL` |
 | learning | Azure Speech (ngoài hệ thống) | Speech SDK (`client-sdk` 1.53.0), một lượt nhận dạng liên tục cho cả ghi âm, đẩy audio qua stream (không ghi file); chạy ngoài transaction. Không qua `ResilientCall` (SDK tự mở kết nối); số phân tích chạy cùng lúc bị giới hạn bằng `learning.speech.max-concurrent` | `LEARNING_SPEECH_KEY`, `LEARNING_SPEECH_REGION`, `LEARNING_SPEECH_LOCALE` |
 | assessment | LLM (ngoài hệ thống) | `POST {base}/chat/completions` cho essay đã nộp trong `TOPIC_GATE`/`COURSE_GATE`, ngoài transaction | `ASSESSMENT_LLM_BASE_URL`, `ASSESSMENT_LLM_API_KEY`, `ASSESSMENT_LLM_MODEL`; quota ngày `ASSESSMENT_LLM_DAILY_LIMIT` |
+
+Learning, Assessment và Content gọi LLM qua `shared/common-llm`, giữ cấu hình, port, prompt và parser ở từng service. Thư viện áp luật token/reasoning theo họ model, gọi `ResilientCall("llm", WRITE)` và không retry; Content không còn vòng retry riêng. Template essay gốc chỉ ở `docs/contracts/essay-prompt-template-v*.txt`, Maven chép vào classpath Learning và Assessment.
+
+Timer `llm.call.duration` và counter `llm.tokens` mang nhãn `service`, `model`, `purpose`, `outcome`; token thêm `direction=input|output`. Không có user hay nội dung trong metric. Provider thiếu `usage` thì không tăng counter token.
 
 Các lời gọi HTTP đồng bộ dùng `shared/common-resilience`: retry tối đa một lần sau 200 ms chỉ cho lỗi kết nối/timeout và HTTP 5xx; chỉ `READ` và `IDEMPOTENT_WRITE` được retry. Circuit breaker dùng chung theo dịch vụ đích (content, access, user, assessment, library, learning, llm), mở 30 giây sau ngưỡng lỗi cấu hình; LLM có semaphore tối đa bốn lời gọi đồng thời. Lỗi breaker/bulkhead được client ánh xạ về contract lỗi của service gọi.
 
@@ -153,7 +158,7 @@ Luồng `SubscriptionGranted` của Access thông báo cho người dùng khi ad
 | Access `GrantSubscriptionUseCase` ghi `SubscriptionGranted` vào `outbox_events` cùng transaction; `AccessOutboxRelay` publish với confirm tới exchange `access.events`, routing key `access.subscription-granted.v1` | Notification `SubscriptionGrantedListener` gọi `RecordSubscriptionGrantedUseCase`; `eventId` chống ghi thông báo trùng | `notification.subscription-granted.v1`; retry `notification.subscription-granted.v1.retry`; DLQ `notification.subscription-granted.v1.dlq` | [`subscription-granted-v1.md`](contracts/subscription-granted-v1.md) |
 | User `ForgotPasswordUseCase` ghi token hash và `PasswordResetRequestedV1` trong cùng transaction; `UserOutboxRelay` publish có confirm, sau đó xóa payload | Notification `PasswordResetRequestedListener` gửi SMTP và deduplicates bằng `eventId` | `notification.password-reset-requested.v1` (+ retry, DLQ) | [`password-reset-requested-v1.md`](contracts/password-reset-requested-v1.md) |
 
-Lỗi xử lý tạm thời được chuyển qua retry queue; lỗi payload hoặc vi phạm contract được dead-letter. Retry queue trả message về đúng exchange nguồn với routing key ban đầu, nên consumer nhận lại đúng contract (`RetryTopologyTest`). Khi Community park message vào DLQ, consumer ghi routing key gốc vào header `x-original-routing-key`, vì routing key của dead-letter là tên DLQ; replay đọc header này để gửi lại đúng đường. Content và Game hiện vẫn ghi outbox cho event riêng nhưng chưa có relay.
+Lỗi xử lý tạm thời được chuyển qua retry queue; lỗi payload hoặc vi phạm contract được dead-letter. Retry queue trả message về đúng exchange nguồn với routing key ban đầu, nên consumer nhận lại đúng contract (`RetryTopologyTest`). Khi Community park message vào DLQ, consumer ghi routing key gốc vào header `x-original-routing-key`, vì routing key của dead-letter là tên DLQ; replay đọc header này để gửi lại đúng đường. Content và Game không có outbox: bảng đã bị xóa vì không có service nào đọc event của hai bên.
 
 ### Correlation ID và metric
 
@@ -406,7 +411,7 @@ Bảng tổng hợp đầy đủ theo nhóm (resilience, idempotency, claim `SKI
 | API Gateway, Configuration Server, Service Discovery | `infra/*` |
 | Repository Adapter, Aggregate/Value Object, Mapper | Service Java |
 | Ports & adapters (`application/port`) | assessment, game, library, learning, content (đọc nội dung học) |
-| Transactional outbox + relay có publisher confirm | assessment, access, community, learning (`reward_grants`); content và game mới có phần ghi, chưa có relay |
+| Transactional outbox + relay có publisher confirm | assessment, access, community, learning (`reward_grants`); content và game không có outbox (đã bỏ) |
 | Consumer với retry queue TTL và dead-letter queue | learning, access (grant), notification |
 | Shared auto-configuration | `common-security` |
 | Global exception handler → `ErrorResponse` | Service Java |
@@ -448,7 +453,7 @@ hoạt động upload.
 | Secret có giá trị fallback trong config-repo được track | Thiếu biến env thì service dùng secret công khai trong repo |
 | `.sdd/global/system-architecture.md`, `.sdd/constraints/global.md` (baseline 2026-09-18) ghi không có broker/outbox/learning service | Lỗi thời; `.sdd/global/constitution.md` vẫn là invariant cao nhất. Dữ kiện: code, `AGENTS.md`, tài liệu này |
 | Gateway CORS chỉ expose `Authorization`, `Content-Type` | Browser không đọc được header khác (ví dụ `Retry-After`) |
-| community có bảng `outbox_events` (V1) nhưng không dùng | Library không tạo bảng này; outbox của access/content/game chưa có relay |
+| community có bảng `outbox_events` (V1) và relay (`CommunityOutboxRelay`) | Library không tạo bảng này; content và game đã bỏ bảng outbox |
 | Consumer học chưa có automated integration test với RabbitMQ thật | Logic ack/nack/DLQ có unit test với channel giả; áp kết quả có test Postgres thật. [Live E2E 2026-10-02](../plans/260929-1640-lesson-learning-pipeline-mvp/reports/e2e-261002-foundation-learning-pipeline.md) đã kiểm outbox → broker → consumer và replay DLQ với broker thật |
 | Giá chấm Writing nằm ở hai nơi | Learning `learning.writing.point-cost` (3) cho bài luận trong bài học; assessment `grading_point_costs.WRITING` cho chấm qua `grading_jobs`. Đổi giá phải sửa cả hai |
 | Bài Writing lưu ở hai nơi | Bài luận trong bài học ở `learning_db.lesson_writing_submissions`; Writing trong đề (sau MVP) ở `assessment_db.learner_submissions` |

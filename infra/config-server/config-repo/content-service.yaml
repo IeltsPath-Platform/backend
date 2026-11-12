@@ -2,7 +2,7 @@ spring:
   datasource:
     url: ${CONTENT_DB_URL:jdbc:postgresql://localhost:5440/content_db}
     username: ${CONTENT_DB_USERNAME:postgres}
-    password: ${CONTENT_DB_PASSWORD:123456}
+    password: ${CONTENT_DB_PASSWORD}
   jpa:
     hibernate:
       ddl-auto: validate
@@ -33,6 +33,8 @@ content:
     base-url: ${CONTENT_LLM_BASE_URL:${LEARNING_LLM_BASE_URL:}}
     api-key: ${CONTENT_LLM_API_KEY:${LEARNING_LLM_API_KEY:}}
     model: ${CONTENT_LLM_MODEL:${LEARNING_LLM_MODEL:}}
+    reasoning-effort: ${CONTENT_LLM_REASONING_EFFORT:${LEARNING_LLM_REASONING_EFFORT:}}
+    max-tokens: ${CONTENT_LLM_MAX_TOKENS:${LEARNING_LLM_MAX_TOKENS:8192}}
   ai:
     batch-size: 2
     stale-after: PT10M
@@ -50,7 +52,7 @@ app:
       secret-key: ${SUPABASE_SECRET_KEY:}
   auth:
     internal-jwt-issuer: ${INTERNAL_JWT_ISSUER:urn:code-base:api-gateway}
-    internal-jwt-secret: ${GATEWAY_INTERNAL_JWT_SECRET:HK5r8WcYA8J8jo2ruIBCEXRcHhUfSDUqP16H29P1sxo=}
+    internal-jwt-secret: ${GATEWAY_INTERNAL_JWT_SECRET}
   security:
     public-endpoints:
       - method: GET

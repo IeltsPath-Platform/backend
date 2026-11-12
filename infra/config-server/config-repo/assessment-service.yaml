@@ -6,7 +6,7 @@ spring:
   datasource:
     url: ${ASSESSMENT_DB_URL:jdbc:postgresql://localhost:5440/assessment_db}
     username: ${ASSESSMENT_DB_USERNAME:postgres}
-    password: ${ASSESSMENT_DB_PASSWORD:123456}
+    password: ${ASSESSMENT_DB_PASSWORD}
   jpa:
     hibernate:
       ddl-auto: validate
@@ -17,7 +17,7 @@ spring:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USERNAME:guest}
-    password: ${RABBITMQ_PASSWORD:guest}
+    password: ${RABBITMQ_PASSWORD}
     # An outbox row is marked published only after a positive confirm for a routed message.
     publisher-confirm-type: correlated
     publisher-returns: true
@@ -34,6 +34,8 @@ assessment:
     base-url: ${ASSESSMENT_LLM_BASE_URL:}
     api-key: ${ASSESSMENT_LLM_API_KEY:}
     model: ${ASSESSMENT_LLM_MODEL:}
+    reasoning-effort: ${ASSESSMENT_LLM_REASONING_EFFORT:}
+    max-tokens: ${ASSESSMENT_LLM_MAX_TOKENS:8192}
     poll-interval: PT5S
     batch-size: 10
     daily-limit: ${ASSESSMENT_LLM_DAILY_LIMIT:20}
@@ -43,6 +45,9 @@ assessment:
     daily-limit: ${ASSESSMENT_AI_EVAL_DAILY_LIMIT:100}
     min-within-half-band: ${ASSESSMENT_AI_EVAL_MIN_WITHIN_HALF_BAND:0.80}
     min-qwk: ${ASSESSMENT_AI_EVAL_MIN_QWK:0.60}
+    max-invalid-rate: ${ASSESSMENT_AI_EVAL_MAX_INVALID_RATE:0.05}
+    # Same default as learning.writing.grading-timeout-seconds, so the evaluation measures what learners get.
+    grading-timeout-seconds: ${ASSESSMENT_AI_EVAL_GRADING_TIMEOUT_SECONDS:20}
     quota-timezone: Asia/Ho_Chi_Minh
   content:
     base-url: ${CONTENT_SERVICE_URL:http://localhost:8082}
@@ -67,7 +72,7 @@ app:
       secret-key: ${SUPABASE_SECRET_KEY:}
   auth:
     internal-jwt-issuer: ${INTERNAL_JWT_ISSUER:urn:code-base:api-gateway}
-    internal-jwt-secret: ${GATEWAY_INTERNAL_JWT_SECRET:HK5r8WcYA8J8jo2ruIBCEXRcHhUfSDUqP16H29P1sxo=}
+    internal-jwt-secret: ${GATEWAY_INTERNAL_JWT_SECRET}
   security:
     public-endpoints:
       - method: GET

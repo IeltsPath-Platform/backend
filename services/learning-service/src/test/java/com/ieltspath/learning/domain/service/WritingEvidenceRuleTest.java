@@ -64,6 +64,21 @@ class WritingEvidenceRuleTest {
         return new WritingGrade.Correction("excerpt", "fix", "GRAMMAR", errorCode);
     }
 
+    /** A catch-all code has no knowledge point, so it adds no evidence: the knowledge point decisions stay the same. */
+    @Test
+    void aCatchAllCorrectionAddsNoKnowledgePointEvidence() {
+        UUID point = UUID.randomUUID();
+        List<WritingGrade.Criterion> criteria = List.of(criterion("TR", "6.5", TR), criterion("CC", "5.5", CC),
+                criterion("LR", "6.0", LR), criterion("GRA", "5.0", GRA));
+
+        var withoutCorrections = rule.derive(List.of(point), new BigDecimal("5.5"), true, grade(criteria, List.of()));
+        var withCatchAll = rule.derive(List.of(point), new BigDecimal("5.5"), true,
+                grade(criteria, List.of(correction("GRAMMAR_OTHER"))));
+
+        assertEquals(withoutCorrections.correctByKnowledgePoint(), withCatchAll.correctByKnowledgePoint());
+        assertEquals(withoutCorrections.criterionKnowledgePoints(), withCatchAll.criterionKnowledgePoints());
+    }
+
     @Test
     void eachCriterionIsCorrectAtOrAboveThePassBandAndTheQuestionPointTakesThePass() {
         WritingGrade grade = grade(List.of(criterion("TR", "6.5", TR), criterion("CC", "5.5", CC),

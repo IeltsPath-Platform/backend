@@ -2,7 +2,6 @@ package com.ieltspath.game.application.usecase;
 
 import com.ieltspath.game.application.port.GameAnswerEvaluator;
 import com.ieltspath.game.application.port.GameMatchEventWriter;
-import com.ieltspath.game.application.port.OutboxWriter;
 import com.ieltspath.game.application.result.GameAnswerResult;
 import com.ieltspath.game.domain.aggregate.GameAnswer;
 import com.ieltspath.game.domain.aggregate.GameMatchPlayer;
@@ -23,18 +22,16 @@ import java.util.*;
 public class SubmitGameAnswerUseCase {
     private final GameSessionRepository sessionRepository;
     private final GameAnswerEvaluator answerEvaluator;
-    private final OutboxWriter outboxWriter;
     private final GameMatchEventWriter matchEventWriter;
     private final GameMatchRepository matchRepository;
     private final GameMatchPlayerRepository matchPlayerRepository;
 
     public SubmitGameAnswerUseCase(GameSessionRepository sessionRepository, GameAnswerEvaluator answerEvaluator,
-                                   OutboxWriter outboxWriter, GameMatchEventWriter matchEventWriter,
+                                   GameMatchEventWriter matchEventWriter,
                                    GameMatchRepository matchRepository,
                                    GameMatchPlayerRepository matchPlayerRepository) {
         this.sessionRepository = sessionRepository;
         this.answerEvaluator = answerEvaluator;
-        this.outboxWriter = outboxWriter;
         this.matchEventWriter = matchEventWriter;
         this.matchRepository = matchRepository;
         this.matchPlayerRepository = matchPlayerRepository;
@@ -67,14 +64,7 @@ public class SubmitGameAnswerUseCase {
                 item, responsePayload, correct, durationMilliseconds);
         sessionRepository.saveAnswer(answer);
         GameSession saved = sessionRepository.save(session);
-        boolean matchCompleted = session.matchPlayerId() != null && updateMatchAfterAnswer(answer, saved);
-        outboxWriter.append("GameSession", sessionId.toString(), "GameAnswerSubmitted",
-                Map.of("sessionId", sessionId.toString(), "itemSequence", itemSequence,
-                        "isCorrect", correct, "score", saved.score()));
-        if (matchCompleted) {
-            outboxWriter.append("GameMatch", session.matchPlayerId().toString(), "GameMatchCompleted",
-                    Map.of("matchPlayerId", session.matchPlayerId().toString()));
-        }
+        if (session.matchPlayerId() != null) updateMatchAfterAnswer(answer, saved);
         return new GameAnswerResult(answer.id(), itemSequence, correct, saved.score(), saved.status().name(), false);
     }
 

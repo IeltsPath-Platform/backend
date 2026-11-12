@@ -47,6 +47,8 @@ public class ContentAiProperties {
         private String baseUrl = "";
         private String apiKey = "";
         private String model = "";
+        private String reasoningEffort = "";
+        private int maxTokens = 8192;
         /** How long to wait for the model's answer. A course plan with vocabulary is a long reply from a reasoning model. */
         private Duration timeout = Duration.ofSeconds(180);
 
@@ -56,6 +58,10 @@ public class ContentAiProperties {
         public void setApiKey(String apiKey) { this.apiKey = apiKey == null ? "" : apiKey; }
         public String getModel() { return model; }
         public void setModel(String model) { this.model = model == null ? "" : model; }
+        public String getReasoningEffort() { return reasoningEffort; }
+        public void setReasoningEffort(String reasoningEffort) { this.reasoningEffort = reasoningEffort; }
+        public int getMaxTokens() { return maxTokens; }
+        public void setMaxTokens(int maxTokens) { this.maxTokens = maxTokens; }
         public Duration getTimeout() { return timeout; }
         public void setTimeout(Duration timeout) { this.timeout = timeout; }
     }

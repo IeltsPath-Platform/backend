@@ -2,7 +2,7 @@ spring:
   datasource:
     url: ${ACCESS_DB_URL:jdbc:postgresql://localhost:5440/access_db}
     username: ${ACCESS_DB_USERNAME:postgres}
-    password: ${ACCESS_DB_PASSWORD:123456}
+    password: ${ACCESS_DB_PASSWORD}
   jpa:
     hibernate:
       ddl-auto: validate
@@ -38,7 +38,7 @@ access:
 app:
   auth:
     internal-jwt-issuer: ${INTERNAL_JWT_ISSUER:urn:code-base:api-gateway}
-    internal-jwt-secret: ${GATEWAY_INTERNAL_JWT_SECRET:HK5r8WcYA8J8jo2ruIBCEXRcHhUfSDUqP16H29P1sxo=}
+    internal-jwt-secret: ${GATEWAY_INTERNAL_JWT_SECRET}
   security:
     public-endpoints:
       - method: GET

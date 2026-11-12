@@ -1,6 +1,6 @@
 # CLAUDE.md — IELTSPath backend
 
-- Cập nhật lần cuối: 2026-11-02 (thêm hai module shared, trỏ tới pattern bắt buộc ở `AGENTS.md` §3.9, sửa trạng thái relay outbox); 2026-10-30 (Content gọi Library một chiều, Library không gọi Content; Notification đã có DB, listener và API; mặc định DB của config-repo là `localhost:5440`); 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); thay đổi URL service giữ mốc 2026-10-15; dữ kiện kiến trúc khác đã kiểm ngày 2026-10-07 sau course path, placement recommendation và course gate. Về dữ kiện, code là nguồn đúng khi tài
+- Cập nhật lần cuối: 2026-11-11 (thêm common-llm); 2026-11-02 (thêm hai module shared, trỏ tới pattern bắt buộc ở `AGENTS.md` §3.9, sửa trạng thái relay outbox); 2026-10-30 (Content gọi Library một chiều, Library không gọi Content; Notification đã có DB, listener và API; mặc định DB của config-repo là `localhost:5440`); 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); thay đổi URL service giữ mốc 2026-10-15; dữ kiện kiến trúc khác đã kiểm ngày 2026-10-07 sau course path, placement recommendation và course gate. Về dữ kiện, code là nguồn đúng khi tài
   liệu lệch; về quy tắc, xem thứ tự ưu tiên đầu `AGENTS.md`.
 - Quy tắc bắt buộc (stack, layer, bảo mật, điều cấm, quy trình) nằm trong `AGENTS.md`, được nạp ngay dưới đây.
 - Kiến trúc, flow, quyết định: `docs/system-architecture.md`.
@@ -18,7 +18,7 @@ và DLQ). Mỗi service sở hữu một PostgreSQL DB.
 
 ## 2. Module
 
-Reactor gồm 17 module: 3 infra, 5 shared, 9 business. Năm module shared là thư viện, không deploy độc lập.
+Reactor gồm 18 module: 3 infra, 6 shared, 9 business. Sáu module shared là thư viện, không deploy độc lập.
 
 | Module | Ngôn ngữ | Cổng | DB (nơi chạy) | Route Gateway |
 | --- | --- | --- | --- | --- |
@@ -28,6 +28,7 @@ Reactor gồm 17 module: 3 infra, 5 shared, 9 business. Năm module shared là t
 | `shared/common-security` | Java lib | — | — | — |
 | `shared/common-events` | Java lib (tên/hình dạng event, `MessageRetry`, `RetryTopology`) | — | — | — |
 | `shared/common-storage` | Java lib | — | — | — |
+| `shared/common-llm` | Java lib (client LLM, metric thời gian/token) | — | — | — |
 | `shared/common-resilience` | Java lib (`ResilientCall`: circuit breaker, retry, bulkhead) | — | — | — |
 | `shared/common-observability` | Java lib (`correlationId`, metric outbox/DLQ, trace context) | — | — | — |
 | `services/user-service` | Java | 8085 | `user_db` (Compose PostgreSQL host 5440) | `/auth/**`, `/api/users/**` (trừ goal và study-time đã chuyển sang learning) |
@@ -83,11 +84,17 @@ mvn -q -pl services/<name>-service -am test     # test một service (Testcontai
 mvn -q -pl shared/common-security test
 mvn -q -pl shared/common-events test
 mvn -q -pl shared/common-storage test
-mvn -q -pl infra/api-gateway test
+mvn -q -pl infra/api-gateway test
+mvn -q -pl services/<name>-service -am -Dtest=ArchitectureTest -Dsurefire.failIfNoSpecifiedTests=false test
 mvn -q compile -DskipTests                       # cả reactor; tránh `clean` khi service đang chạy từ IDE
 docker compose config --quiet                    # kiểm compose + .env
 docker compose ps
-```
+```
+
+Kiểm tra kiến trúc (ArchUnit): sáu luật layer và pattern, vi phạm cũ nằm trong `src/test/resources/archunit_store`.
+Chỉ vi phạm mới làm đỏ. Không tự tạo hay cập nhật store khi chạy thường; xem `archunit.properties` của từng service.
+
+Không kiểm tĩnh được: HTTP/LLM có nằm ngoài transaction và khóa không, ResilientCall có bọc mọi lời gọi không, URL HTTP cụ thể.
 
 Test service học: `mvn -q -pl services/learning-service -am test` (Testcontainers cần Docker).
 
@@ -110,14 +117,14 @@ CI (`.github/workflows/ci.yml`) chạy `mvn -B -ntp verify` cả reactor và `do
 - Mặc định `*_DB_URL` trong config-repo của mọi service nghiệp vụ trỏ `localhost:5440`, cổng PostgreSQL của Compose; chỉ cần đặt
   `<SERVICE>_DB_PASSWORD` trong `.env` khi chạy trên host. Nếu DB chạy nơi khác, đặt thêm `<SERVICE>_DB_URL`.
 - assessment dùng RabbitMQ với `RABBITMQ_USERNAME`/`RABBITMQ_PASSWORD` từ `.env`; mặc định `guest` sẽ bị broker từ chối.
-- `GATEWAY_INTERNAL_JWT_SECRET` phải giống nhau ở Gateway, mọi service Java, lệch là 401. Config-repo có giá
-  trị fallback cho secret (thiếu biến env thì chạy bằng secret công khai trong repo): không dựa vào, không tự sửa, báo người dùng.
+- `GATEWAY_INTERNAL_JWT_SECRET` phải giống nhau ở Gateway, mọi service Java, lệch là 401. Config-repo không còn giá
+  trị dự phòng cho JWT, mật khẩu DB, RabbitMQ hoặc Redis: thiếu biến bắt buộc thì service không khởi động. Copy `.env.example` thành `.env` rồi điền giá trị riêng.
 - Assessment phát `COURSE_GATE` cho bài thi `COURSE_TEST`; Learning phải được cập nhật để nhận type này trước khi Assessment
   phát event. Nếu event đến Learning bản cũ, nó vào DLQ; restart Learning rồi replay theo quy trình trong contract.
 - Essay đã nộp trong `TOPIC_GATE`/`COURSE_GATE` được chấm LLM miễn phí; thiếu cấu hình, LLM lỗi hoặc hết quota ngày thì
   chuyển sang hàng chờ EXAMINER. Essay không được nộp qua `/api/assessments/submissions` sẽ nhận 0 điểm và không tạo job.
   `MOCK` vẫn do EXAMINER chấm.
-- Outbox của content và game chỉ ghi, chưa có relay: event của hai service này không tới consumer. Access, assessment, community và learning (`reward_grants`) có relay.
+- Content và game không còn bảng outbox (đã xóa). Access, assessment, community và learning (`reward_grants`) có outbox và relay.
 - Role chuẩn là `ADMIN`, `CUSTOMER`, `CONTENT_AUTHOR`, `EXAMINER`, `SALES_STAFF` (`LEARNER` cũ đã đổi thành `CUSTOMER`).
 - `graphify-out/` không được commit.
 - Bài Listening seed (content V12, reference dạng key) trả 500 `INVALID_MEDIA_REFERENCE` khi thiếu `CONTENT_MEDIA_BASE_URL`;

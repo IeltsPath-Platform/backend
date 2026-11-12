@@ -8,7 +8,7 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
+      password: ${REDIS_PASSWORD}
   cloud:
     loadbalancer:
       cache:
@@ -265,7 +265,7 @@ spring:
               uri: lb://learning-service
               metadata:
                 connect-timeout: 2000
-                response-timeout: 60s
+                response-timeout: 60000
               predicates:
                 - Path=/api/learning/free-writing/submissions,/api/learning/lessons/*/essays/*/submissions,/api/learning/practice-attempts/*/essays/*/submissions,/api/learning/writing-submissions/*/revisions
               filters:
@@ -342,10 +342,10 @@ spring:
 app:
   auth:
     external-jwt-issuer: ${EXTERNAL_JWT_ISSUER:urn:code-base:auth}
-    external-jwt-secret: ${EXTERNAL_JWT_SECRET:FaU24nQz6jxA6m3ihV49zlGXoncSfkNMgYpgC7XPKXc=}
+    external-jwt-secret: ${EXTERNAL_JWT_SECRET}
 
     internal-jwt-issuer: ${INTERNAL_JWT_ISSUER:urn:code-base:api-gateway}
-    internal-jwt-secret: ${GATEWAY_INTERNAL_JWT_SECRET:HK5r8WcYA8J8jo2ruIBCEXRcHhUfSDUqP16H29P1sxo=}
+    internal-jwt-secret: ${GATEWAY_INTERNAL_JWT_SECRET}
     internal-token-max-age-seconds: ${INTERNAL_TOKEN_MAX_AGE_SECONDS:60}
 
     internal-jwt-paths:

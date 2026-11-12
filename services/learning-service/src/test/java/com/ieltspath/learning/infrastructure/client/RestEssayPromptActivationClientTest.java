@@ -52,6 +52,41 @@ class RestEssayPromptActivationClientTest {
         assertEquals("RUBRIC@2+tplv1", client.activatedVersion("TASK_2"));
     }
 
+    @Test void countsAModelThatDiffersFromThisServiceButStillReturnsTheVersion() {
+        io.micrometer.core.instrument.simple.SimpleMeterRegistry metrics = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        RestClient.Builder other = RestClient.builder().baseUrl("http://assessment.test");
+        MockRestServiceServer otherServer = MockRestServiceServer.bindTo(other).build();
+        RestEssayPromptActivationClient checking = new RestEssayPromptActivationClient(other.build(),
+                com.ieltspath.commonresilience.ResilientCall.isolatedDefault(), "gpt-local", "low", metrics);
+        otherServer.expect(requestTo("http://assessment.test/internal/assessments/ai-prompt-activations?task=TASK_2"))
+                .andRespond(withSuccess("{\"task\":\"TASK_2\",\"promptVersion\":\"RUBRIC@2+tplv1\",\"model\":\"gpt-other\","
+                        + "\"reasoningEffort\":\"low\"}", MediaType.APPLICATION_JSON));
+
+        assertEquals("RUBRIC@2+tplv1", checking.activatedVersion("TASK_2"));
+
+        otherServer.verify();
+        assertEquals(1.0, metrics.counter(RestEssayPromptActivationClient.MISMATCH_METRIC,
+                "task", "TASK_2", "field", "model").count());
+        assertEquals(0.0, metrics.counter(RestEssayPromptActivationClient.MISMATCH_METRIC,
+                "task", "TASK_2", "field", "reasoning_effort").count());
+    }
+
+    @Test void runsWithoutRecordedSettingsAreNotCompared() {
+        io.micrometer.core.instrument.simple.SimpleMeterRegistry metrics = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        RestClient.Builder other = RestClient.builder().baseUrl("http://assessment.test");
+        MockRestServiceServer otherServer = MockRestServiceServer.bindTo(other).build();
+        RestEssayPromptActivationClient checking = new RestEssayPromptActivationClient(other.build(),
+                com.ieltspath.commonresilience.ResilientCall.isolatedDefault(), "gpt-local", "low", metrics);
+        otherServer.expect(requestTo("http://assessment.test/internal/assessments/ai-prompt-activations?task=TASK_1"))
+                .andRespond(withSuccess("{\"task\":\"TASK_1\",\"promptVersion\":\"RUBRIC@1+tplv1\"}", MediaType.APPLICATION_JSON));
+
+        assertEquals("RUBRIC@1+tplv1", checking.activatedVersion("TASK_1"));
+
+        otherServer.verify();
+        assertEquals(0.0, metrics.counter(RestEssayPromptActivationClient.MISMATCH_METRIC,
+                "task", "TASK_1", "field", "model").count());
+    }
+
     @Test void outageCannotBeMistakenForMissingActivation() {
         server.expect(times(2), requestTo("http://assessment.test/internal/assessments/ai-prompt-activations?task=TASK_2"))
                 .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));

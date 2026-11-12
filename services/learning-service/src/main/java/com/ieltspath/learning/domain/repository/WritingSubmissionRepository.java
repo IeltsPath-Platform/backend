@@ -1,6 +1,7 @@
 package com.ieltspath.learning.domain.repository;
 
 import com.ieltspath.learning.domain.aggregate.WritingSubmission;
+import com.ieltspath.learning.domain.vo.WritingProgressEssay;
 import com.ieltspath.learning.domain.vo.WritingSubmissionStatus;
 
 import java.math.BigDecimal;
@@ -48,6 +49,12 @@ public interface WritingSubmissionRepository {
 
     /** The graded revision of the submission, if any. */
     Optional<WritingSubmission> findGradedRevision(UUID submissionId);
+
+    /**
+     * The learner's newest GRADED first submissions of one task, newest first, at most {@code limit}. Revisions are
+     * left out: a revised essay shows the feedback, not the level the learner wrote at unaided.
+     */
+    List<WritingProgressEssay> findFirstGradedEssays(UUID userId, String task, int limit);
 
     /** Whether the learner has a GRADED, passed submission for the block, other than {@code excludeId}. */
     boolean blockPassed(UUID userId, UUID blockId, UUID excludeId);

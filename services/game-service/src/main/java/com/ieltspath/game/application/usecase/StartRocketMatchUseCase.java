@@ -1,6 +1,5 @@
 package com.ieltspath.game.application.usecase;
 
-import com.ieltspath.game.application.port.OutboxWriter;
 import com.ieltspath.game.application.port.WordlyWordProvider;
 import com.ieltspath.game.application.result.MatchStartedEvent;
 import com.ieltspath.game.application.result.RocketRoundEvents;
@@ -47,20 +46,18 @@ public class StartRocketMatchUseCase {
     private final GameMatchPlayerRepository players;
     private final RocketRoundRepository rounds;
     private final WordlyWordProvider words;
-    private final OutboxWriter outbox;
     private final ApplicationEventPublisher events;
     private final TransactionTemplate tx;
     private final Clock clock;
 
     public StartRocketMatchUseCase(GameRoomRepository rooms, GameMatchRepository matches,
             GameMatchPlayerRepository players, RocketRoundRepository rounds, WordlyWordProvider words,
-            OutboxWriter outbox, ApplicationEventPublisher events, PlatformTransactionManager manager, Clock clock) {
+            ApplicationEventPublisher events, PlatformTransactionManager manager, Clock clock) {
         this.rooms = rooms;
         this.matches = matches;
         this.players = players;
         this.rounds = rounds;
         this.words = words;
-        this.outbox = outbox;
         this.events = events;
         this.tx = new TransactionTemplate(manager);
         this.clock = clock;
@@ -97,8 +94,6 @@ public class StartRocketMatchUseCase {
             RocketRound first = prepared.getFirst();
             first.open(now, settings.timeLimit());
             rounds.save(first);
-            outbox.append("GameMatch", matchId.toString(), "GameMatchStarted",
-                    Map.of("matchId", matchId.toString(), "roomId", room.id().toString(), "gameType", room.gameType()));
             events.publishEvent(new MatchStartedEvent(room.id(), matchId));
             // After MATCH_STARTED, so a lobby has moved into the match before the first round arrives.
             events.publishEvent(RocketRoundEvents.Started.of(room.id(), matchId,

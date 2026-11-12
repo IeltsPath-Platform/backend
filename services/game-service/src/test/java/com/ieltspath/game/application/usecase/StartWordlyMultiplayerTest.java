@@ -56,8 +56,7 @@ class StartWordlyMultiplayerTest {
             protected void doCommit(DefaultTransactionStatus s){}
             protected void doRollback(DefaultTransactionStatus s){}
         };
-        start=new StartGameMatchUseCase(rooms,matches,players,sessions,mock(OutboxWriter.class),
-            mock(ApplicationEventPublisher.class),provider,store,manager,clock);
+        start=new StartGameMatchUseCase(rooms,matches,players,sessions,mock(ApplicationEventPublisher.class),provider,store,manager,clock);
     }
     private GameRoom readyRoom() {
         var value=GameRoom.wordly(roomId,"ABC123",host,new WordlyRoomSettings(
