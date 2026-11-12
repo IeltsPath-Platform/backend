@@ -17,6 +17,7 @@ import com.ieltspath.content.application.usecase.GetPackageVersionContentUseCase
 import com.ieltspath.content.application.usecase.GetTopicLessonsUseCase;
 import com.ieltspath.content.application.usecase.GetTopicSequenceUseCase;
 import com.ieltspath.content.application.usecase.GetTopicTestPackagesUseCase;
+import com.ieltspath.content.application.usecase.ResolvePracticeTestKeysUseCase;
 import com.ieltspath.content.application.usecase.SearchPracticeSetsUseCase;
 import com.ieltspath.content.domain.exception.LessonNotFoundException;
 import com.ieltspath.content.domain.exception.TopicNotFoundException;
@@ -145,6 +146,7 @@ class InternalLearningContentControllerTest {
             mock(GetActiveKnowledgePrerequisitesUseCase.class);
     private final com.ieltspath.content.application.usecase.GetPlacementTestPackagesUseCase placementTests =
             mock(com.ieltspath.content.application.usecase.GetPlacementTestPackagesUseCase.class);
+    private final ResolvePracticeTestKeysUseCase resolvePracticeTestKeys = mock(ResolvePracticeTestKeysUseCase.class);
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -154,7 +156,7 @@ class InternalLearningContentControllerTest {
         mockMvc = MockMvcBuilders.standaloneSetup(new InternalLearningContentController(topicSequence, freeCourseIds, topicLessons,
                         lessonContent, testPackages, search, packageVersion, lessonPracticeSets, topicPracticeSets,
                         availability, courseTests, placementTests, errorTypes, activeKnowledgePrerequisites,
-                        new MediaReferencePolicy("")))
+                        resolvePracticeTestKeys, new MediaReferencePolicy("")))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setValidator(validator)
                 .build();
