@@ -1,0 +1,45 @@
+{$API_HOST} {
+    header {
+        Strict-Transport-Security "max-age=31536000"
+        X-Content-Type-Options nosniff
+        Referrer-Policy strict-origin-when-cross-origin
+    }
+    # Public health is intentionally limited to the gateway health endpoint.
+    @private path /internal /internal/* /actuator /actuator/*
+    @health path /actuator/health
+    handle @health {
+        reverse_proxy api-gateway:8080
+    }
+    handle @private {
+        respond 404
+    }
+    # Match current servlet multipart request ceilings (including form overhead).
+    @small path /api/users/* /api/content/videos/* /api/content/vocabulary/* /api/content/admin/vocabulary/* /api/learning-support/*
+    @medium path /api/assessments/* /api/community/*
+    @learning path /api/learning/*
+    handle @small {
+        request_body {
+            max_size 3MiB
+        }
+        reverse_proxy api-gateway:8080
+    }
+    handle @medium {
+        request_body {
+            max_size 6MiB
+        }
+        reverse_proxy api-gateway:8080
+    }
+    handle @learning {
+        request_body {
+            max_size 11MiB
+        }
+        reverse_proxy api-gateway:8080
+    }
+    handle {
+        request_body {
+            max_size 26MiB
+        }
+        # Caddy forwards WebSocket upgrades, including /ws/games/**.
+        reverse_proxy api-gateway:8080
+    }
+}

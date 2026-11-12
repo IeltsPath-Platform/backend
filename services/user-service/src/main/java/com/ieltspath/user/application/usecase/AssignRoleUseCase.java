@@ -11,6 +11,7 @@ import com.ieltspath.user.domain.repository.UserRepository;
 import com.ieltspath.user.domain.service.RoleAssignmentPolicy;
 import com.ieltspath.user.domain.vo.RoleName;
 import com.ieltspath.user.domain.vo.UserStatus;
+import com.ieltspath.user.application.port.UserLock;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,11 +25,15 @@ import java.util.stream.Collectors;
 public class AssignRoleUseCase {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
+    private final UserLock userLock;
 
     @Transactional
     public User execute(AssignRoleCommand command) {
         var activeAdminIds = userRepository.lockActiveAdminUserIds();
         User user = userRepository.findById(command.userId())
+                .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng: " + command.userId()));
+        userLock.lock(user.getId());
+        user = userRepository.findById(command.userId())
                 .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng: " + command.userId()));
         if (command.roles() == null || command.roles().isEmpty()) {
             throw new RoleNotFoundException("Cần chọn ít nhất một vai trò");

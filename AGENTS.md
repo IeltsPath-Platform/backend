@@ -1,7 +1,7 @@
 # AGENTS.md - Quy tắc bắt buộc cho AI Agent
 
 - Phiên bản: 2.3
-- Cập nhật lần cuối: 2026-11-02 (thêm §3.9 và nhóm điều cấm "Pattern hệ thống" ở §5: resilience, outbox, idempotency, scheduler, storage; bổ sung Redis, Resilience4j, Micrometer/OpenTelemetry, Supabase vào stack và hai module shared mới); 2026-10-30 (Content gọi Library một chiều, Library không gọi Content; Notification đã có DB, listener và API; mặc định DB của config-repo là `localhost:5440`); 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); dữ kiện khác giữ mốc kiểm 2026-10-07 sau course path, placement recommendation và course gate
+- Cập nhật lần cuối: 2026-11-12 (ngoại lệ `chartFacts`: học viên nhận phát biểu đúng cho câu số liệu viết sai); 2026-11-11 (ghi chú gamification học từ vựng mobile ở §3.8; thêm common-llm); 2026-11-02 (thêm §3.9 và nhóm điều cấm "Pattern hệ thống" ở §5: resilience, outbox, idempotency, scheduler, storage; bổ sung Redis, Resilience4j, Micrometer/OpenTelemetry, Supabase vào stack và hai module shared mới); 2026-10-30 (Content gọi Library một chiều, Library không gọi Content; Notification đã có DB, listener và API; mặc định DB của config-repo là `localhost:5440`); 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); dữ kiện khác giữ mốc kiểm 2026-10-07 sau course path, placement recommendation và course gate
 - Dự án: `IELTSPath` (Maven coordinates: `com.ieltspath:code-base:1.0-SNAPSHOT`)
 - Kiến trúc chi tiết (sơ đồ, flow, data ownership, quyết định): [`docs/system-architecture.md`](docs/system-architecture.md)
 
@@ -22,6 +22,7 @@ suy diễn khả năng nghiệp vụ ngoài các module dưới đây.
 | `shared/common-events` | Thư viện tên exchange/routing key/header, record payload và helper `MessageRetry`/`RetryTopology` dùng chung; không deploy độc lập. |
 | `shared/common-storage` | Thư viện lưu object dùng chung (`ObjectStorage`, client Supabase Storage, `ObjectKeys`, `UploadPolicy`); không deploy độc lập; service tự cấu hình bucket. |
 | `shared/common-resilience` | Thư viện `ResilientCall` (circuit breaker, retry, bulkhead bằng Resilience4j) cho lời gọi HTTP đồng bộ giữa service và tới LLM; không deploy độc lập. |
+| `shared/common-llm` | Client OpenAI-compatible dùng chung cho Learning, Assessment và Content; luật model, lỗi an toàn, metric thời gian/token; không chứa prompt hay parser nghiệp vụ. |
 | `shared/common-observability` | Thư viện `correlationId` (MDC, header HTTP, header AMQP), metric outbox và DLQ, trace context cho outbox; không deploy độc lập. |
 | `services/user-service` | Tài khoản, role, auth token, hồ sơ học viên (có múi giờ). Mục tiêu học, activity và thời gian học do learning-service giữ; streak cũng vậy. |
 | `services/content-service` | Curriculum: topic, knowledge point, câu hỏi, gói nội dung, asset. Khu author: soạn gói và đề cuối, tải audio, bản nháp AI (câu hỏi, course), dựng course từ cây tri thức, import Excel. Nội dung AI luôn qua bản nháp (`ai_drafts`) và người duyệt; sinh course chỉ chọn từ kho. |
@@ -43,7 +44,7 @@ phần hạ tầng hoặc architectural pattern mới nếu chưa được phê 
 
 | Khu vực | Công nghệ đã được xác minh |
 | --- | --- |
-| Java build | Java 21; Maven multi-module (17 module trong reactor: 3 infra, 5 shared, 9 business); Maven Compiler Plugin 3.14.0; Surefire 3.5.3 ở module đã cấu hình. |
+| Java build | Java 21; Maven multi-module (18 module trong reactor: 3 infra, 6 shared, 9 business); Maven Compiler Plugin 3.14.0; Surefire 3.5.3 ở module đã cấu hình. |
 | Java framework | Spring Boot 3.5.14; Spring Cloud 2025.0.0 (Config, Netflix Eureka, Gateway Server WebFlux + Reactor). |
 | Persistence (Java) | Spring Data JPA, Hibernate, PostgreSQL JDBC, Flyway (chạy khi service khởi động). |
 | Bảo mật | Spring Security, OAuth2 Resource Server, Nimbus JWT, HMAC-SHA256 JWT, BCrypt. |
@@ -57,9 +58,9 @@ phần hạ tầng hoặc architectural pattern mới nếu chưa được phê 
 | API docs | springdoc-openapi 2.8.17 (duyệt 2026-10-02): `webmvc-api` ở user/access/assessment/learning, `webflux-ui` ở Gateway gom Swagger UI; chỉ route luồng chính, không `/internal/**`. |
 | Kiểm thử | JUnit Jupiter, Spring Boot Test, Mockito, Spring Security Test, Testcontainers PostgreSQL. |
 | Container | Docker Compose, `postgres:15-alpine`, `rabbitmq:3.13-management-alpine`, Eclipse Temurin 21. |
-| CI | GitHub Actions `.github/workflows/ci.yml`: mỗi PR và push vào `main` chạy `mvn -B -ntp verify` cả reactor (JDK 21, Testcontainers trên Docker của runner) và `docker compose config --quiet` với `.env` giả. Chưa có CD. |
+| CI | GitHub Actions `.github/workflows/ci.yml`: mỗi PR và push vào `main` chạy `mvn -B -ntp verify` cả reactor (JDK 21, Testcontainers trên Docker của runner) và `docker compose config --quiet` với `.env` giả. `images.yml` build image lên GHCR; `deploy.yml` chạy tay qua SSH trong environment `production` (xem `docs/deployment.md`). |
 
-Repository **chưa có**: frontend, file OpenAPI được track, CD/deploy pipeline,
+Repository **chưa có**: frontend, file OpenAPI được track,
 formatter, linter, coverage gate. Bổ sung các thành phần này là quyết định thiết kế, không phải mở rộng mặc định.
 
 ## 3. Nguyên tắc kiến trúc
@@ -276,6 +277,7 @@ src/main/java/com/ieltspath/<service>
 - Luyện tự do theo KP (`POST /knowledge-points/{id}/free-practice`) không bao giờ chặn đường học: trượt không sinh bài
   ôn chặn và không khóa gì; mỗi KP luôn giữ lại `learning.free-practice.reserve` gói chưa xem cho bài ôn
   (`free-practice-v1.md`). Bằng chứng luyện tự do là bằng chứng luyện tập (trọng số và trần 3 bài luyện của MP-1.0).
+- Học từ vựng trên mobile (library-service) có XP, streak (có freeze) và tim riêng, tách khỏi gamification của Learning theo plan `261106-2330-mobile-vocabulary-study`. Đây là ngoại lệ có chủ đích: "nguồn duy nhất cho thưởng" ở trên chỉ nói về web, và hai chuỗi streak có thể khác nhau.
 - Gamification (`gamification-v1.md`): XP chỉ ở lần nộp đầu, đáp án trên trần ngày là XP bóng (không tính); sai câu khách
   quan trừ tim ở bài tập lesson, Practice và luyện tự do (hết tim thì `403 HEARTS_DEPLETED`, bài ôn vẫn nộp được); streak
   tính ở server từ câu trả lời thật theo múi giờ học viên và là nguồn duy nhất cho thưởng (user-service không còn streak; hồ sơ
@@ -291,7 +293,9 @@ src/main/java/com/ieltspath/<service>
 - Mọi lượt ghi của một học viên chạy trong một `@Transactional` mở đầu bằng `pg_advisory_xact_lock` theo user.
 - Bằng chứng bài học chỉ ghi ở lần nộp đầu của mỗi khối; bài ôn ghi mỗi set (nộp một lần); kết quả thi ghi theo
   `(attempt_id, result_version)`, chấm lại thì thay bằng chứng của version cũ.
-- Học viên không bao giờ nhận `answerSpec` hay `chartFacts`. `explanation` và transcript chỉ có sau khi đạt, **trừ**
+- Học viên không bao giờ nhận `answerSpec` hay `chartFacts` nguyên văn. Ngoại lệ có chủ đích: sau khi bài Task 1 được
+  chấm, học viên nhận phát biểu đúng cho từng câu số liệu họ viết sai (`dataChecks[].expected`, một câu ngắn do model
+  viết, tối đa 200 ký tự); không bao giờ trả cả bảng dữ kiện. `explanation` và transcript chỉ có sau khi đạt, **trừ**
   practice attempt, set ôn và quick-check của bài ôn: có ngay sau khi nộp. Essay trong practice attempt còn mang
   `sampleAnswer` (lấy từ `explanation`) ngay khi mở bài, để học viên bật xem bài mẫu trong lúc viết; essay của lesson thì
   vẫn chỉ có sau khi block đạt. Package đã nộp ở Practice hoặc đã giao trong
@@ -306,7 +310,7 @@ Gặp code cũ lệch pattern: giữ nguyên hành vi, không sửa lây trong t
 
 | Khi bạn... | PHẢI | Chi tiết |
 | --- | --- | --- |
-| Gọi HTTP sang service khác hoặc LLM | Bọc trong `ResilientCall.call(target, CallKind, ...)` của `common-resilience`: `target` là tên service đích (LLM là `llm`); `READ` và `IDEMPOTENT_WRITE` được retry một lần, `WRITE` không retry; bắt `DownstreamUnavailableException` rồi đổi về contract lỗi của service gọi; chạy ngoài transaction và ngoài khóa | `docs/system-architecture.md` §3 |
+| Gọi HTTP sang service khác hoặc LLM | LLM đi qua `common-llm` (vẫn dùng `ResilientCall`); HTTP khác bọc trong `ResilientCall.call(target, CallKind, ...)` của `common-resilience`: `target` là tên service đích (LLM là `llm`); `READ` và `IDEMPOTENT_WRITE` được retry một lần, `WRITE` không retry; bắt `DownstreamUnavailableException` rồi đổi về contract lỗi của service gọi; chạy ngoài transaction và ngoài khóa | `docs/system-architecture.md` §3 |
 | Phát event | Ghi bảng outbox cùng transaction với dữ liệu, relay publish có publisher confirm; bảng outbox có `correlation_id` và `trace_context`; tên exchange, routing key, payload nằm ở `common-events`, tên có version, contract ở `docs/contracts/`; đổi hình dạng event đã có cần duyệt (§5) | §3.5 |
 | Thêm consumer | Idempotent theo khóa tự nhiên (`eventId` hoặc `(attempt, result_version)`); lỗi tạm đi retry queue có TTL, lỗi contract hoặc hết lượt vào DLQ; service consumer sở hữu queue, retry queue, DLQ; chỉ ack sau khi ghi xong; mẫu là consumer của learning-service | §3.5 |
 | Trừ hoặc cộng điểm, cấp quyền (Premium), mở khóa trả phí | Bắt buộc `Idempotency-Key` hoặc khóa ổn định tương đương (như submission ID); lưu khóa cùng thông tin để phát hiện dùng lại khác payload trong cùng transaction với tác động: cùng khóa và payload trả kết quả cũ, khác payload trả `409`. Cần gọi service khác sau khi ghi thì ghi intent `PENDING` trước rồi đối soát (reconcile) | `docs/saga-course-unlock-and-human-grading.md`, `docs/contracts/subscription-granted-v1.md` |
@@ -377,6 +381,7 @@ Khi không có convention cụ thể, theo code lân cận trong cùng module.
 - TUYỆT ĐỐI KHÔNG commit, hardcode, log, expose hoặc ghi giá trị secret vào tài liệu.
 - TUYỆT ĐỐI KHÔNG coi raw identity header là danh tính đã xác thực.
 - TUYỆT ĐỐI KHÔNG dùng external JWT secret làm internal JWT secret.
+- TUYỆT ĐỐI KHÔNG thêm giá trị dự phòng cho secret trong config-repo. Giá trị cũ trong lịch sử git coi là đã lộ; production phải dùng secret mới.
 - TUYỆT ĐỐI KHÔNG tắt JWT validation, method authorization hoặc request validation để feature chạy hay test pass.
 - TUYỆT ĐỐI KHÔNG thêm role ngoài `CanonicalRoles.ALL` khi chưa review.
 - TUYỆT ĐỐI KHÔNG log nội dung hội thoại, câu trả lời, prompt hay API key của LLM; log chỉ mang id, loại event, mã lỗi.
@@ -429,10 +434,16 @@ mvn -q -pl shared/common-security test
 mvn -q -pl shared/common-events test
 mvn -q -pl shared/common-storage test                # contract test với Supabase thật chỉ chạy khi có STORAGE_CONTRACT_*
 mvn -q -pl infra/api-gateway test
+mvn -q -pl services/<name>-service -am -Dtest=ArchitectureTest -Dsurefire.failIfNoSpecifiedTests=false test
 mvn -q -pl services/<name>-service -am test      # -am build kèm các module shared cần thiết
 mvn -q compile -DskipTests                        # cả reactor; không dùng clean khi service đang chạy từ IDE
 docker compose config --quiet
 ```
+
+Kiểm tra kiến trúc (ArchUnit): sáu luật layer và pattern, vi phạm cũ nằm trong `src/test/resources/archunit_store`.
+Chỉ vi phạm mới làm đỏ. Không tự tạo hay cập nhật store khi chạy thường; xem `archunit.properties` của từng service.
+
+Không kiểm tĩnh được: HTTP/LLM có nằm ngoài transaction và khóa không, ResilientCall có bọc mọi lời gọi không, URL HTTP cụ thể.
 
    Build boot jar để chạy (`package`) thì dùng `mvn clean package`: `target/classes` cũ còn class của code đã xóa
    (ví dụ catalog từ vựng chuyển sang library) và làm service không khởi động.
@@ -456,6 +467,6 @@ Những điểm ảnh hưởng trực tiếp tới quy tắc:
   `infrastructure` và không đưa dependency dạng này vào `domain`.
 - `CONTENT_SERVICE_URL` của game mặc định `http://content-service:8082` trong config-repo; khi chạy game trên host,
   đặt `http://localhost:8082`. `LIBRARY_SERVICE_URL` đã mặc định `http://localhost:8081`.
-- Outbox của content và game đã ghi event nhưng chưa có relay; đừng giả định các event đó tới được consumer. Access, assessment, community và learning (`reward_grants`) có relay.
-- Config-repo có giá trị fallback cho secret; không dựa vào chúng và không tự sửa như side effect, báo người dùng.
-- Chưa xác định: production deployment và CD, secret management, frontend contract, API versioning.
+- Content và game không còn bảng outbox (đã xóa). Access, assessment, community và learning (`reward_grants`) có outbox và relay.
+- Config-repo yêu cầu JWT, mật khẩu DB, RabbitMQ và Redis qua biến môi trường; không thêm giá trị dự phòng. Thiếu biến bắt buộc thì service không khởi động; `.env.example` chỉ chứa tên và giá trị rỗng.
+- Chưa xác định: nơi lưu bản sao lưu DB ngoài VPS, tên miền production, frontend contract, API versioning. CD đã có (workflow chạy tay); chưa chạy lần nào.

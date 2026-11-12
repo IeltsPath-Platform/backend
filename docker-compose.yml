@@ -149,6 +149,7 @@ services:
       <<: *spring-env
       SERVER_PORT: 8085
       EXTERNAL_JWT_SECRET: "${EXTERNAL_JWT_SECRET:?Set EXTERNAL_JWT_SECRET}"
+      GOOGLE_CLIENT_IDS: "${GOOGLE_CLIENT_IDS:-}"
       REDIS_HOST: redis
       REDIS_PASSWORD: "${REDIS_PASSWORD}"
       USER_DB_URL: jdbc:postgresql://postgres:5432/user_db
@@ -157,8 +158,14 @@ services:
       SUPABASE_URL: "${SUPABASE_URL:-}"
       SUPABASE_SECRET_KEY: "${SUPABASE_SECRET_KEY:-}"
       USER_AVATAR_BUCKET: "${USER_AVATAR_BUCKET:-avatars}"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: "${RABBITMQ_USERNAME}"
+      RABBITMQ_PASSWORD: "${RABBITMQ_PASSWORD}"
     depends_on:
       <<: *after-infra
+      rabbitmq:
+        condition: service_healthy
       redis:
         condition: service_healthy
 
@@ -247,6 +254,7 @@ services:
       ASSESSMENT_LLM_BASE_URL: "${ASSESSMENT_LLM_BASE_URL:-}"
       ASSESSMENT_LLM_API_KEY: "${ASSESSMENT_LLM_API_KEY:-}"
       ASSESSMENT_LLM_MODEL: "${ASSESSMENT_LLM_MODEL:-}"
+      ASSESSMENT_LLM_REASONING_EFFORT: "${ASSESSMENT_LLM_REASONING_EFFORT:-}"
       ASSESSMENT_LLM_DAILY_LIMIT: "${ASSESSMENT_LLM_DAILY_LIMIT:-20}"
     depends_on:
       <<: *after-infra
@@ -318,6 +326,7 @@ services:
       REDIS_PASSWORD: "${REDIS_PASSWORD}"
       CONTENT_SERVICE_URL: http://content-service:8082
       LIBRARY_SERVICE_URL: http://library-service:8081
+      USER_SERVICE_URL: http://user-service:8085
       GAME_WEBSOCKET_ALLOWED_ORIGINS: "${GAME_WEBSOCKET_ALLOWED_ORIGINS:-http://localhost:5173}"
     depends_on:
       <<: *after-infra
@@ -326,6 +335,8 @@ services:
       content-service:
         condition: service_healthy
       library-service:
+        condition: service_healthy
+      user-service:
         condition: service_healthy
 
   community-service:
@@ -377,12 +388,35 @@ services:
       RABBITMQ_USERNAME: "${RABBITMQ_USERNAME}"
       RABBITMQ_PASSWORD: "${RABBITMQ_PASSWORD}"
       FRONTEND_ORIGIN: "${FRONTEND_ORIGIN:-http://localhost:5173}"
+      SMTP_HOST: "${SMTP_HOST:-mailpit}"
+      SMTP_PORT: "${SMTP_PORT:-1025}"
+      SMTP_USERNAME: "${SMTP_USERNAME:-}"
+      SMTP_PASSWORD: "${SMTP_PASSWORD:-}"
+      SMTP_AUTH: "${SMTP_AUTH:-false}"
+      SMTP_STARTTLS: "${SMTP_STARTTLS:-false}"
+      MAIL_FROM: "${MAIL_FROM:-no-reply@ieltspath.local}"
+      FRONTEND_BASE_URL: "${FRONTEND_BASE_URL:-http://localhost:5173}"
+      NOTIFICATION_MAIL_ENABLED: "${NOTIFICATION_MAIL_ENABLED:-false}"
+      NOTIFICATION_PUSH_ENQUEUE_ENABLED: "${NOTIFICATION_PUSH_ENQUEUE_ENABLED:-false}"
+      NOTIFICATION_PUSH_WORKER_ENABLED: "${NOTIFICATION_PUSH_WORKER_ENABLED:-false}"
+      FIREBASE_PROJECT_ID: "${FIREBASE_PROJECT_ID:-}"
+      # Set only when FIREBASE_CREDENTIALS_FILE (host path to the service-account JSON) is provided.
+      GOOGLE_APPLICATION_CREDENTIALS: "${FIREBASE_CREDENTIALS_FILE:+/run/secrets/firebase-service-account.json}"
+    volumes:
+      - "${FIREBASE_CREDENTIALS_FILE:-/dev/null}:/run/secrets/firebase-service-account.json:ro"
     depends_on:
       <<: *after-infra
       rabbitmq:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  mailpit:
+    image: axllent/mailpit:v1.27
+    profiles: ["dev-mail"]
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
 
   # Optional metrics scraper. Start with: docker compose --profile observability up -d prometheus
   prometheus:

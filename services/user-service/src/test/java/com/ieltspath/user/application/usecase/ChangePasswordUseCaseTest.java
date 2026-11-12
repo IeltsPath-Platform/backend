@@ -40,6 +40,7 @@ class ChangePasswordUseCaseTest {
     @Mock RefreshTokenRepository tokens;
     @Mock PasswordEncoder encoder;
     @Mock UserLock userLock;
+    @Mock UserNoticeOutbox notices;
 
     private final Map<UUID, PasswordChangeAttempts> stored = new HashMap<>();
     private ChangePasswordUseCase useCase;
@@ -50,11 +51,11 @@ class ChangePasswordUseCaseTest {
             @Override public Optional<PasswordChangeAttempts> findByUserId(UUID userId) { return Optional.ofNullable(stored.get(userId)); }
             @Override public void save(PasswordChangeAttempts attempts) { stored.put(attempts.getUserId(), attempts); }
             @Override public void deleteByUserId(UUID userId) { stored.remove(userId); }
-        });
+        }, notices);
     }
 
     private User userWithHash(UUID id) {
-        return User.builder().id(id).email(new Email("person@example.com")).passwordHash("old-hash")
+        return User.builder().id(id).email(new Email("person@example.com")).passwordHash("old-hash").emailVerifiedAt(java.time.LocalDateTime.now())
                 .fullName("Person").status(UserStatus.ACTIVE).build();
     }
 

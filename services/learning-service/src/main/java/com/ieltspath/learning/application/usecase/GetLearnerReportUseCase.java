@@ -89,7 +89,7 @@ public class GetLearnerReportUseCase {
     public LearnerReportResult execute(UUID userId) {
         Instant now = clock.instant();
         List<MasteryProfile> stored = profiles.findAll(userId);
-        if (stored.isEmpty()) return withSummary(userId, now, List.of());
+        if (stored.isEmpty()) return withSummary(userId, now, List.of(), new BandEstimator.Catalog());
 
         List<UUID> pointIds = stored.stream().map(MasteryProfile::knowledgePointId).toList();
         Map<UUID, EventStats> stats = events.statsByKnowledgePoint(userId, pointIds,
@@ -139,7 +139,11 @@ public class GetLearnerReportUseCase {
         }).sorted(Comparator.<KnowledgePointReport>comparingInt(point -> MasteryTier.valueOf(point.score().tier()).ordinal())
                 .thenComparingDouble(point -> point.score().mastery())
                 .thenComparing(point -> point.code() == null ? "￿" : point.code())).toList();
-        return withSummary(userId, now, report);
+        // Error-trap children are nested under their parent and never count toward a band's coverage.
+        Set<UUID> trapKps = trapCatalogEntries == null ? Set.of() : trapCatalogEntries.parentByTrapKp().keySet();
+        BandEstimator.Catalog catalog = new BandEstimator.Catalog();
+        pointDirectory.forEach((id, meta) -> { if (!trapKps.contains(id)) catalog.add(meta.skill(), meta.band()); });
+        return withSummary(userId, now, report, catalog);
     }
 
     private static List<ErrorEntry> mainErrorEntries(UUID parentId, EventStats stats,
@@ -155,13 +159,14 @@ public class GetLearnerReportUseCase {
     }
 
     /** Adds the per-skill view, the points to focus on, the estimated band and the learner's target to the report. */
-    private LearnerReportResult withSummary(UUID userId, Instant generatedAt, List<KnowledgePointReport> report) {
+    private LearnerReportResult withSummary(UUID userId, Instant generatedAt, List<KnowledgePointReport> report,
+                                            BandEstimator.Catalog catalog) {
         BigDecimal placement = placements.find(userId).map(found -> found.band().value()).orElse(null);
         List<BandEstimator.Point> points = report.stream().filter(point -> point.skill() != null)
                 .map(point -> new BandEstimator.Point(point.knowledgeId(), point.skill().toUpperCase(Locale.ROOT),
                         point.band(), MasteryTier.valueOf(point.score().tier()), point.score().mastery()))
                 .toList();
-        BandEstimator.Estimate estimate = BandEstimator.estimate(points, placement);
+        BandEstimator.Estimate estimate = BandEstimator.estimate(points, placement, catalog);
         EstimatedBand band = new EstimatedBand(estimate.overall(), true, estimate.speakingIncluded(),
                 estimate.hints().stream()
                         .map(hint -> new NextBandHint(hint.skill(), hint.nextBand(), hint.pointIds())).toList());
@@ -173,7 +178,7 @@ public class GetLearnerReportUseCase {
                         projection(userId, goal.targetBand())))
                 .orElse(null);
         return new LearnerReportResult(userId, generatedAt, report, skillSummaries(report, estimate),
-                focus(report), band, target);
+                focus(report), band, target, placement);
     }
 
     /** The date the target is reached at the pace of the last weeks, from the weekly snapshots; null without a target. */

@@ -10,6 +10,7 @@ import com.ieltspath.content.domain.vo.ErrorReviewStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
 
 /** Revises an error type. The code is not part of the update: stored answer specs refer to it. */
@@ -29,6 +30,13 @@ public class UpdateErrorTypeUseCase {
         ErrorType errorType = errorTypes.findById(id).orElseThrow(() -> new ErrorTypeNotFoundException(id));
         errorType.update(name, category, severity, knowledgePointId, fixHint, status, reviewStatus);
         trapKnowledgePointSync.sync(errorType);
+        return errorTypes.save(errorType);
+    }
+
+    /** Replaces the skills of an error type; the code, the name and the review state stay as they are. */
+    public ErrorType updateSkills(UUID id, List<String> skills) {
+        ErrorType errorType = errorTypes.findById(id).orElseThrow(() -> new ErrorTypeNotFoundException(id));
+        errorType.updateSkills(skills);
         return errorTypes.save(errorType);
     }
 }

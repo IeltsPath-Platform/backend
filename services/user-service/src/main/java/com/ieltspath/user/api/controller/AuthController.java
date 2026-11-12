@@ -2,21 +2,28 @@ package com.ieltspath.user.api.controller;
 
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.user.api.dto.request.ForgotPasswordRequest;
+import com.ieltspath.user.api.dto.request.GoogleLoginRequest;
 import com.ieltspath.user.api.dto.request.LoginRequest;
 import com.ieltspath.user.api.dto.request.LogoutRequest;
 import com.ieltspath.user.api.dto.request.RefreshRequest;
+import com.ieltspath.user.api.dto.request.ResendVerificationRequest;
 import com.ieltspath.user.api.dto.request.ResetPasswordRequest;
+import com.ieltspath.user.api.dto.request.VerifyEmailRequest;
 import com.ieltspath.user.api.dto.response.AuthTokenResponse;
 import com.ieltspath.user.api.dto.response.CurrentUserResponse;
 import com.ieltspath.user.api.dto.response.MessageResponse;
 import com.ieltspath.user.application.command.ForgotPasswordCommand;
 import com.ieltspath.user.application.command.ResetPasswordCommand;
+import com.ieltspath.user.application.command.LoginContext;
 import com.ieltspath.user.application.result.AuthTokenResult;
+import com.ieltspath.user.application.result.GoogleSignInResult;
 import com.ieltspath.user.application.usecase.ForgotPasswordUseCase;
+import com.ieltspath.user.application.usecase.GoogleSignInUseCase;
 import com.ieltspath.user.application.usecase.GetUserByIdUseCase;
 import com.ieltspath.user.application.usecase.AuditedLoginUseCase;
 import com.ieltspath.user.application.usecase.LogoutUseCase;
 import com.ieltspath.user.application.usecase.RefreshTokenUseCase;
+import com.ieltspath.user.application.usecase.EmailVerificationUseCase;
 import com.ieltspath.user.application.usecase.ResetPasswordUseCase;
 import com.ieltspath.user.api.cookie.AuthCookieService;
 import com.ieltspath.user.api.request.LoginContextResolver;
@@ -39,10 +46,12 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AuthController {
     private final AuditedLoginUseCase loginUseCase;
+    private final GoogleSignInUseCase googleSignInUseCase;
     private final RefreshTokenUseCase refreshTokenUseCase;
     private final LogoutUseCase logoutUseCase;
     private final ForgotPasswordUseCase forgotPasswordUseCase;
     private final ResetPasswordUseCase resetPasswordUseCase;
+    private final EmailVerificationUseCase emailVerificationUseCase;
     private final GetUserByIdUseCase getUserByIdUseCase;
     private final CurrentUserProvider currentUserProvider;
     private final AuthCookieService authCookieService;
@@ -50,13 +59,25 @@ public class AuthController {
     @PostMapping("/forgot-password")
     public MessageResponse forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
         forgotPasswordUseCase.execute(new ForgotPasswordCommand(request.email()));
-        return new MessageResponse("Mã xác nhận đặt lại mật khẩu đã được xử lý");
+        return new MessageResponse("Nếu email tồn tại, hướng dẫn đặt lại mật khẩu sẽ được gửi.");
     }
 
     @PostMapping("/reset-password")
     public MessageResponse resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         resetPasswordUseCase.execute(new ResetPasswordCommand(request.token(), request.newPassword()));
         return new MessageResponse("Đặt lại mật khẩu thành công");
+    }
+
+    @PostMapping("/verify-email")
+    public MessageResponse verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
+        emailVerificationUseCase.verify(request.token());
+        return new MessageResponse("Xác minh email thành công");
+    }
+
+    @PostMapping("/resend-verification")
+    public MessageResponse resendVerification(@RequestBody ResendVerificationRequest request) {
+        emailVerificationUseCase.resend(request.email());
+        return new MessageResponse("Nếu email chưa được xác minh, liên kết xác minh mới sẽ được gửi.");
     }
 
     @PostMapping("/login")
@@ -74,6 +95,20 @@ public class AuthController {
                 tokens.accessTokenExpiresInSeconds(),
                 tokens.refreshTokenExpiresInSeconds()
         );
+        return tokenResponse(tokens, "Login successful");
+    }
+
+    @PostMapping("/google")
+    public AuthTokenResponse googleLogin(
+            @Valid @RequestBody GoogleLoginRequest request,
+            HttpServletRequest httpRequest,
+            HttpServletResponse response
+    ) {
+        GoogleSignInResult result = googleSignInUseCase.execute(
+                request.idToken(), LoginContextResolver.from(httpRequest));
+        AuthTokenResult tokens = result.tokens();
+        authCookieService.addAuthCookies(response, tokens.accessToken(), tokens.refreshToken(),
+                tokens.accessTokenExpiresInSeconds(), tokens.refreshTokenExpiresInSeconds());
         return tokenResponse(tokens, "Login successful");
     }
 

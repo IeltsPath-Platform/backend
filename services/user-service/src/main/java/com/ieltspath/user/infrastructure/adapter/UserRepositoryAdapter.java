@@ -37,6 +37,11 @@ public class UserRepositoryAdapter implements UserRepository {
     }
 
     @Override
+    public void clearPasswordHash(UUID userId) {
+        userJpaRepository.clearPasswordHash(userId);
+    }
+
+    @Override
     public Optional<User> findById(UUID id) {
         return userJpaRepository.findWithRolesById(id).map(userMapper::toDomain);
     }
@@ -69,5 +74,11 @@ public class UserRepositoryAdapter implements UserRepository {
     @Override
     public List<User> findAll() {
         return userJpaRepository.findAll().stream().map(userMapper::toDomain).toList();
+    }
+
+    @Override
+    public List<User> findAfterId(UUID lastId, int limit) {
+        return userJpaRepository.findByIdGreaterThanOrderByIdAsc(lastId, org.springframework.data.domain.PageRequest.of(0, limit))
+                .stream().map(userMapper::toDomain).toList();
     }
 }

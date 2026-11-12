@@ -8,6 +8,10 @@ import java.util.UUID;
 public interface BandStatisticsStore {
     Page history(UUID user, Instant from, Instant until, String kind, String skill, Cursor cursor, int limit);
 
+    List<AvailableOption> availability(UUID user, Instant from, Instant until);
+
+    record AvailableOption(String seriesKind, String skill, Instant latestSubmittedAt) {}
+
     record Cursor(Instant submittedAt, UUID attemptId) {}
 
     record Point(UUID attemptId, UUID resultId, int resultVersion, Instant submittedAt, Instant gradedAt,

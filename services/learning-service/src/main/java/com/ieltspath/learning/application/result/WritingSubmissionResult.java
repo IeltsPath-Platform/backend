@@ -12,7 +12,18 @@ import java.util.UUID;
 public record WritingSubmissionResult(UUID submissionId, String status, String task, Integer wordCount,
                                       BigDecimal overallBand, Boolean passed, WritingGrade grade,
                                       Integer pointsCharged, String sampleAnswer, String code, String failureCode,
-                                      String essayText) {
+                                      String essayText, Revision revision) {
+    /** For a revision: the version it follows and how its error kinds compare with that version. */
+    public record Revision(UUID previousSubmissionId, java.util.List<String> fixedCodes,
+                           java.util.List<String> repeatedCodes, java.util.List<String> newCodes) {}
+
+    public WritingSubmissionResult(UUID submissionId, String status, String task, Integer wordCount,
+                                   BigDecimal overallBand, Boolean passed, WritingGrade grade, Integer pointsCharged,
+                                   String sampleAnswer, String code, String failureCode, String essayText) {
+        this(submissionId, status, task, wordCount, overallBand, passed, grade, pointsCharged, sampleAnswer, code,
+                failureCode, essayText, null);
+    }
+
     public WritingSubmissionResult(UUID submissionId, String status, String task, Integer wordCount,
                                    BigDecimal overallBand, Boolean passed, WritingGrade grade, Integer pointsCharged,
                                    String sampleAnswer, String code, String failureCode) {

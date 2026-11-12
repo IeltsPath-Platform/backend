@@ -1,32 +1,17 @@
+# syntax=docker/dockerfile:1
 FROM maven:3.9-eclipse-temurin-21 AS builder
 WORKDIR /app
-
-COPY pom.xml ./
-COPY infra/api-gateway/pom.xml infra/api-gateway/
-COPY infra/config-server/pom.xml infra/config-server/
-COPY infra/eureka-server/pom.xml infra/eureka-server/
-COPY services/user-service/pom.xml services/user-service/
-COPY services/community-service/pom.xml services/community-service/
-COPY shared/common-security/pom.xml shared/common-security/
-
-RUN set -eux; \
-    for attempt in 1 2 3 4 5; do \
-      mvn -B -Dmaven.wagon.http.retryHandler.count=5 -Dmaven.wagon.http.pool=false dependency:go-offline -pl infra/config-server -am && break; \
-      find /root/.m2/repository -name "*.lastUpdated" -delete || true; \
-      rm -rf /root/.m2/repository/com/github/luben/zstd-jni; \
-      if [ "${attempt}" -eq 5 ]; then exit 1; fi; \
-      sleep $((attempt * 5)); \
-    done
-
-COPY infra/config-server/src infra/config-server/src
-COPY infra/config-server/config-repo /app/config-repo
-
-RUN mvn -B clean package -pl infra/config-server -am -DskipTests
+COPY . .
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn -B -ntp package -pl infra/config-server -am -DskipTests && \
+    cp infra/config-server/target/*.jar /tmp/app.jar
 
 FROM eclipse-temurin:21-jre-alpine
+RUN addgroup -S -g 10001 spring && adduser -S -u 10001 -G spring spring
 WORKDIR /app
-
-COPY --from=builder /app/infra/config-server/target/*.jar ./app.jar
-COPY --from=builder /app/config-repo ./config-repo
-
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75 -Dsun.net.inetaddr.ttl=5" \
+    CONFIG_NATIVE_REPO_URI=file:/app/config-repo
+COPY --from=builder --chown=10001:10001 /tmp/app.jar ./app.jar
+COPY --chown=10001:10001 infra/config-server/config-repo ./config-repo
+USER 10001:10001
 ENTRYPOINT ["java", "-jar", "app.jar"]

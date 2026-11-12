@@ -21,6 +21,9 @@ class AuthRouteConsistencyTest {
             "/auth/refresh",
             "/auth/forgot-password",
             "/auth/reset-password",
+            "/auth/google",
+            "/auth/verify-email",
+            "/auth/resend-verification",
             "/api/users/register");
 
     @Test

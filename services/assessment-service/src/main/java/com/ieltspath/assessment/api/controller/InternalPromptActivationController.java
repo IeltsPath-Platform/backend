@@ -23,8 +23,11 @@ public class InternalPromptActivationController {
         if (!Set.of("TASK_1", "TASK_2").contains(task)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "INVALID_WRITING_TASK");
         }
-        return new ActivationResponse(task, activations.activatedVersion(task));
+        PromptActivationProvider.Activation activation = activations.activation(task);
+        if (activation == null) return new ActivationResponse(task, null, null, null);
+        return new ActivationResponse(task, activation.promptVersion(), activation.model(), activation.reasoningEffort());
     }
 
-    public record ActivationResponse(String task, String promptVersion) {}
+    /** {@code model} and {@code reasoningEffort} are what the activated run was graded with; Learning compares them with its own. */
+    public record ActivationResponse(String task, String promptVersion, String model, String reasoningEffort) {}
 }

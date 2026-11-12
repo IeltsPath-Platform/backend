@@ -8,4 +8,7 @@ import java.util.UUID;
  */
 public interface UserLock {
     void lock(UUID userId);
+
+    /** Serializes first-time external account resolution without exposing its email or provider subject in logs. */
+    void lockCreationKey(String key);
 }

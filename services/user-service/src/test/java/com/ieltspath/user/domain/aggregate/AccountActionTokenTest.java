@@ -4,6 +4,7 @@ import com.ieltspath.user.domain.vo.ActionTokenPurpose;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -18,7 +19,7 @@ class AccountActionTokenTest {
                 .userId(UUID.randomUUID())
                 .purpose(ActionTokenPurpose.PASSWORD_RESET)
                 .tokenHash("hash123")
-                .expiresAt(LocalDateTime.now().plusHours(1))
+                .expiresAt(LocalDateTime.now(ZoneOffset.UTC).plusHours(1))
                 .build();
 
         assertThat(token.isValid()).isTrue();
@@ -38,7 +39,7 @@ class AccountActionTokenTest {
                 .userId(UUID.randomUUID())
                 .purpose(ActionTokenPurpose.EMAIL_VERIFICATION)
                 .tokenHash("hash123")
-                .expiresAt(LocalDateTime.now().plusHours(1))
+                .expiresAt(LocalDateTime.now(ZoneOffset.UTC).plusHours(1))
                 .usedAt(LocalDateTime.now().minusMinutes(5))
                 .build();
 
@@ -54,7 +55,7 @@ class AccountActionTokenTest {
                 .userId(UUID.randomUUID())
                 .purpose(ActionTokenPurpose.PASSWORD_RESET)
                 .tokenHash("hash123")
-                .expiresAt(LocalDateTime.now().minusMinutes(1))
+                .expiresAt(LocalDateTime.now(ZoneOffset.UTC).minusMinutes(1))
                 .build();
 
         assertThat(token.isExpired()).isTrue();

@@ -47,16 +47,16 @@ class GetLearnerReportUseCaseTest {
 
     private final LearnerGoalClient goals = mock(LearnerGoalClient.class);
     private final SnapshotRepository snapshots = mock(SnapshotRepository.class);
+    private final LearnerPlacementRepository placements = mock(LearnerPlacementRepository.class);
+    private final MasteryProfileRepository profiles = mock(MasteryProfileRepository.class);
     private GetLearnerReportUseCase useCase;
 
     @BeforeEach
     void wire() {
-        MasteryProfileRepository profiles = mock(MasteryProfileRepository.class);
         QuestionEventLog events = mock(QuestionEventLog.class);
         ReviewItemRepository reviews = mock(ReviewItemRepository.class);
         KnowledgePointDirectory directory = mock(KnowledgePointDirectory.class);
         DiagnosticRepository diagnostics = mock(DiagnosticRepository.class);
-        LearnerPlacementRepository placements = mock(LearnerPlacementRepository.class);
 
         when(profiles.findAll(user)).thenReturn(List.of(
                 profile(readingA, 0.9, MasteryTier.MAINTAIN, 10), profile(readingB, 0.85, MasteryTier.MAINTAIN, 10),
@@ -84,6 +84,41 @@ class GetLearnerReportUseCaseTest {
     private MasteryProfile profile(UUID kp, double mastery, MasteryTier tier, int evidence) {
         return new MasteryProfile(user, kp, mastery, tier, evidence, 0, Instant.parse("2026-10-16T10:00:00Z"), null,
                 null, List.of());
+    }
+
+    @Test
+    void exposesTheStoredDiagnosticPlacementSeparatelyFromTheEstimateWithOneRead() {
+        when(placements.find(user)).thenReturn(Optional.of(
+                com.ieltspath.learning.domain.aggregate.LearnerPlacement.create(user,
+                        new com.ieltspath.learning.domain.vo.BandLevel(new BigDecimal("4.5")),
+                        UUID.randomUUID(), Instant.parse("2026-10-01T00:00:00Z"))));
+
+        var report = useCase.execute(user);
+
+        assertThat(report.placementBand()).isEqualByComparingTo("4.5");
+        assertThat(report.estimatedBand().estimated()).isTrue();
+        verify(placements, times(1)).find(user);
+    }
+
+    @Test
+    void absentPlacementRemainsNull() {
+        assertThat(useCase.execute(user).placementBand()).isNull();
+    }
+
+    @Test
+    void placementRemainsAvailableBeforeAnyMasteryEvidence() {
+        when(profiles.findAll(user)).thenReturn(List.of());
+        when(placements.find(user)).thenReturn(Optional.of(
+                com.ieltspath.learning.domain.aggregate.LearnerPlacement.create(user,
+                        new com.ieltspath.learning.domain.vo.BandLevel(new BigDecimal("5.5")),
+                        UUID.randomUUID(), Instant.parse("2026-10-01T00:00:00Z"))));
+
+        var report = useCase.execute(user);
+
+        assertThat(report.placementBand()).isEqualByComparingTo("5.5");
+        assertThat(report.knowledgePoints()).isEmpty();
+        assertThat(report.estimatedBand().value()).isNull();
+        verify(placements, times(1)).find(user);
     }
 
     @Test
@@ -120,19 +155,19 @@ class GetLearnerReportUseCaseTest {
         LearnerReportResult.EstimatedBand band = useCase.execute(user).estimatedBand();
 
         assertThat(band.estimated()).isTrue();
-        assertThat(band.value()).as("only reading has reached a band").isEqualByComparingTo(B60);
+        assertThat(band.value()).as("only reading has reached a band, one skill is not enough for an overall band").isNull();
         assertThat(band.speakingIncluded()).isFalse();
     }
 
     @Test
-    void theTargetCarriesTheGapToTheEstimatedBand() {
+    void theTargetHasNoGapWhileThereIsNoOverallBand() {
         when(goals.goal(user)).thenReturn(Optional.of(
                 new LearnerGoalClient.Goal(new BigDecimal("7.0"), LocalDate.of(2027, 1, 20))));
 
         LearnerReportResult.Target target = useCase.execute(user).target();
 
         assertThat(target.targetBand()).isEqualByComparingTo("7.0");
-        assertThat(target.gap()).isEqualByComparingTo("1.0");
+        assertThat(target.gap()).as("only one skill has a band, so there is no overall band to measure against").isNull();
         assertThat(target.examDate()).isEqualTo(LocalDate.of(2027, 1, 20));
         verify(goals, times(1)).goal(user);
     }

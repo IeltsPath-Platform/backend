@@ -10,6 +10,8 @@ public class AssessmentLlmProperties {
     private String baseUrl = "";
     private String apiKey = "";
     private String model = "";
+    private String reasoningEffort = "";
+    private int maxTokens = 8192;
 
     public String getBaseUrl() { return baseUrl; }
     public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl; }
@@ -17,6 +19,11 @@ public class AssessmentLlmProperties {
     public void setApiKey(String apiKey) { this.apiKey = apiKey; }
     public String getModel() { return model; }
     public void setModel(String model) { this.model = model; }
+
+    public String getReasoningEffort() { return reasoningEffort; }
+    public void setReasoningEffort(String reasoningEffort) { this.reasoningEffort = reasoningEffort; }
+    public int getMaxTokens() { return maxTokens; }
+    public void setMaxTokens(int maxTokens) { this.maxTokens = maxTokens; }
 
     public boolean configured() {
         return hasText(baseUrl) && hasText(apiKey) && hasText(model);

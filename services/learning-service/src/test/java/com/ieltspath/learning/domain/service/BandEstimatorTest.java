@@ -33,13 +33,72 @@ class BandEstimatorTest {
         return all;
     }
 
+    /** A catalog listing exactly the points given, so every band is fully studied. */
+    private static BandEstimator.Catalog fullyStudied(List<Point> points) {
+        BandEstimator.Catalog catalog = new BandEstimator.Catalog();
+        points.forEach(point -> catalog.add(point.skill(), point.band()));
+        return catalog;
+    }
+
+    private static Estimate estimate(List<Point> points, BigDecimal placement) {
+        return BandEstimator.estimate(points, placement, fullyStudied(points));
+    }
+
+    /** A catalog listing {@code listed} points at the band, of which the learner studied the given ones. */
+    private static BandEstimator.Catalog listing(String skill, BigDecimal band, int listed) {
+        BandEstimator.Catalog catalog = new BandEstimator.Catalog();
+        for (int i = 0; i < listed; i++) catalog.add(skill, band);
+        return catalog;
+    }
+
+    @Test
+    void aBandNeedsThirtyPercentOfItsCatalogPointsStudiedBeforeItCounts() {
+        List<Point> reading = join(points("READING", B60, MAINTAIN, MAINTAIN, MAINTAIN, MAINTAIN, MAINTAIN, MAINTAIN, MAINTAIN, MAINTAIN, MAINTAIN, MAINTAIN),
+                points("READING", B65, MAINTAIN, MAINTAIN));
+        BandEstimator.Catalog eightListed = listing("READING", B60, 10);
+        for (int i = 0; i < 8; i++) eightListed.add("READING", B65);
+        BandEstimator.Catalog fiveListed = listing("READING", B60, 10);
+        for (int i = 0; i < 5; i++) fiveListed.add("READING", B65);
+
+        assertThat(BandEstimator.estimate(reading, null, eightListed).skillBands().get("READING"))
+                .as("2 of 8 is 25%, below 30%").isEqualByComparingTo(B60);
+        assertThat(BandEstimator.estimate(reading, null, fiveListed).skillBands().get("READING"))
+                .as("2 of 5 is 40%").isEqualByComparingTo(B65);
+    }
+
+    @Test
+    void aFailedLowerBandCapsTheSkillEvenWhenAHigherBandLooksStrong() {
+        List<Point> reading = join(points("READING", B60, MAINTAIN, CONSOLIDATE, CONSOLIDATE),
+                points("READING", B65, MAINTAIN, MAINTAIN, MAINTAIN));
+
+        Estimate estimate = estimate(reading, B55);
+
+        assertThat(estimate.skillBands().get("READING")).as("6.0 fails, so 6.5 cannot count").isEqualByComparingTo(B55);
+    }
+
+    @Test
+    void aLowerBandBelowTheCoverageDoesNotBlockAHigherOne() {
+        List<Point> reading = join(points("READING", B60, CONSOLIDATE), points("READING", B65, MAINTAIN, MAINTAIN));
+        BandEstimator.Catalog catalog = listing("READING", B60, 10).add("READING", B65).add("READING", B65);
+
+        assertThat(BandEstimator.estimate(reading, null, catalog).skillBands().get("READING")).isEqualByComparingTo(B65);
+    }
+
+    @Test
+    void noOverallBandUntilTwoSkillsHaveOne() {
+        List<Point> reading = points("READING", B60, MAINTAIN, MAINTAIN);
+        assertThat(estimate(reading, null).overall()).isNull();
+        assertThat(estimate(reading, null).skillBands()).containsOnlyKeys("READING");
+        assertThat(estimate(join(reading, points("LISTENING", B60, MAINTAIN)), null).overall()).isEqualByComparingTo(B60);
+    }
+
     @Test
     void aSkillBandIsTheHighestBandWhereEightyPercentOfPointsMaintain() {
         List<Point> reading = join(
                 points("READING", B60, MAINTAIN, MAINTAIN, MAINTAIN, MAINTAIN, CONSOLIDATE),
                 points("READING", B65, MAINTAIN, MAINTAIN, CONSOLIDATE, PRIORITY));
 
-        Estimate estimate = BandEstimator.estimate(reading, null);
+        Estimate estimate = estimate(reading, null);
 
         assertThat(estimate.skillBands().get("READING")).isEqualByComparingTo(B60);
     }
@@ -48,7 +107,7 @@ class BandEstimatorTest {
     void aBandBelowEightyPercentDoesNotCount() {
         List<Point> reading = points("READING", B60, MAINTAIN, MAINTAIN, MAINTAIN, CONSOLIDATE, CONSOLIDATE);
 
-        Estimate estimate = BandEstimator.estimate(reading, null);
+        Estimate estimate = estimate(reading, null);
 
         assertThat(estimate.skillBands()).doesNotContainKey("READING");
         assertThat(estimate.overall()).isNull();
@@ -58,14 +117,14 @@ class BandEstimatorTest {
     void thePlacementBandStandsInWhenNoBandIsReached() {
         List<Point> reading = points("READING", B60, CONSOLIDATE, PRIORITY);
 
-        Estimate estimate = BandEstimator.estimate(reading, B55);
+        Estimate estimate = estimate(reading, B55);
 
         assertThat(estimate.skillBands().get("READING")).isEqualByComparingTo(B55);
     }
 
     @Test
     void aSkillWithoutPointsGetsNoBandEvenWithAPlacement() {
-        Estimate estimate = BandEstimator.estimate(points("READING", B60, MAINTAIN), B55);
+        Estimate estimate = estimate(points("READING", B60, MAINTAIN), B55);
 
         assertThat(estimate.skillBands()).containsOnlyKeys("READING");
         assertThat(estimate.speakingIncluded()).isFalse();
@@ -75,7 +134,7 @@ class BandEstimatorTest {
     void theOverallBandIsTheAverageOfTheSkillsRoundedToAHalf() {
         List<Point> all = join(points("LISTENING", B60, MAINTAIN), points("READING", B65, MAINTAIN));
 
-        Estimate estimate = BandEstimator.estimate(all, null);
+        Estimate estimate = estimate(all, null);
 
         assertThat(estimate.overall()).as("6.25 rounds up to 6.5").isEqualByComparingTo(B65);
     }
@@ -85,7 +144,7 @@ class BandEstimatorTest {
         List<Point> all = join(points("LISTENING", B60, MAINTAIN), points("READING", B60, MAINTAIN),
                 points("WRITING", B60, MAINTAIN), points("SPEAKING", B65, MAINTAIN));
 
-        Estimate estimate = BandEstimator.estimate(all, null);
+        Estimate estimate = estimate(all, null);
 
         assertThat(estimate.speakingIncluded()).isTrue();
         assertThat(estimate.overall()).as("6.125 rounds down to 6.0").isEqualByComparingTo(B60);
@@ -93,11 +152,12 @@ class BandEstimatorTest {
 
     @Test
     void grammarAndVocabularyNeverEnterTheBand() {
-        List<Point> all = join(points("GRAMMAR", B65, MAINTAIN, MAINTAIN), points("READING", B60, MAINTAIN));
+        List<Point> all = join(points("GRAMMAR", B65, MAINTAIN, MAINTAIN), points("READING", B60, MAINTAIN),
+                points("LISTENING", B60, MAINTAIN));
 
-        Estimate estimate = BandEstimator.estimate(all, null);
+        Estimate estimate = estimate(all, null);
 
-        assertThat(estimate.skillBands()).containsOnlyKeys("READING");
+        assertThat(estimate.skillBands()).containsOnlyKeys("READING", "LISTENING");
         assertThat(estimate.overall()).isEqualByComparingTo(B60);
     }
 
@@ -105,10 +165,10 @@ class BandEstimatorTest {
     void insufficientPointsCountAsNotMaintained() {
         List<Point> reading = points("READING", B60, MAINTAIN, MAINTAIN, MAINTAIN, MAINTAIN, INSUFFICIENT);
 
-        Estimate estimate = BandEstimator.estimate(reading, null);
+        Estimate estimate = estimate(reading, null);
 
         assertThat(estimate.skillBands().get("READING")).as("4 of 5 is exactly 80%").isEqualByComparingTo(B60);
-        assertThat(BandEstimator.estimate(points("READING", B60, MAINTAIN, MAINTAIN, MAINTAIN, INSUFFICIENT), null)
+        assertThat(estimate(points("READING", B60, MAINTAIN, MAINTAIN, MAINTAIN, INSUFFICIENT), null)
                 .skillBands()).as("3 of 4 is 75%").isEmpty();
     }
 
@@ -118,7 +178,7 @@ class BandEstimatorTest {
                 points("READING", B60, MAINTAIN, MAINTAIN),
                 points("READING", B65, CONSOLIDATE, CONSOLIDATE, CONSOLIDATE, CONSOLIDATE, CONSOLIDATE, PRIORITY));
 
-        Estimate estimate = BandEstimator.estimate(reading, null);
+        Estimate estimate = estimate(reading, null);
 
         assertThat(estimate.hints()).hasSize(1);
         assertThat(estimate.hints().get(0).skill()).isEqualTo("READING");
@@ -132,6 +192,6 @@ class BandEstimatorTest {
                 points("READING", B60, MAINTAIN, MAINTAIN),
                 points("READING", B65, CONSOLIDATE, PRIORITY, PRIORITY, PRIORITY));
 
-        assertThat(BandEstimator.estimate(reading, null).hints()).isEmpty();
+        assertThat(estimate(reading, null).hints()).isEmpty();
     }
 }

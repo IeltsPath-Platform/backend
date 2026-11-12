@@ -35,4 +35,25 @@ class FlashcardUnderstandingLevelTest {
         assertEquals(1, card.getLeitnerBox());
         assertEquals(now.plusSeconds(5), card.getNextReviewAt());
     }
+
+    @Test void rejectsMissingUnderstandingValuesWithoutChangingTheCard() {
+        Flashcard card = Flashcard.create(UUID.randomUUID(), FlashcardSourceType.VOCABULARY_SENSE,
+                UUID.randomUUID(), null, null, "word", "meaning");
+        Instant now = Instant.parse("2026-10-26T10:00:00Z");
+        List<Integer> intervals = List.of(1, 2, 4, 8, 16);
+
+        InvalidDataException missingLevel = assertThrows(InvalidDataException.class,
+                () -> card.setUnderstanding(null, now, intervals, UUID.randomUUID()));
+        assertEquals("understanding request is incomplete", missingLevel.getMessage());
+        InvalidDataException missingTime = assertThrows(InvalidDataException.class,
+                () -> card.setUnderstanding(UnderstandingLevel.MASTERED, null, intervals, UUID.randomUUID()));
+        assertEquals("understanding request is incomplete", missingTime.getMessage());
+        InvalidDataException missingRequestId = assertThrows(InvalidDataException.class,
+                () -> card.setUnderstanding(UnderstandingLevel.MASTERED, now, intervals, null));
+        assertEquals("understanding request is incomplete", missingRequestId.getMessage());
+
+        assertEquals(1, card.getLeitnerBox());
+        assertNull(card.getNextReviewAt());
+        assertNull(card.getLastReviewRequestId());
+    }
 }

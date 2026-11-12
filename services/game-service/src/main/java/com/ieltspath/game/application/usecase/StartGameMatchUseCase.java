@@ -1,6 +1,5 @@
 package com.ieltspath.game.application.usecase;
 
-import com.ieltspath.game.application.port.OutboxWriter;
 import com.ieltspath.game.application.result.GameMatchResult;
 import com.ieltspath.game.domain.aggregate.GameMatch;
 import com.ieltspath.game.domain.aggregate.GameMatchPlayer;
@@ -29,23 +28,22 @@ public class StartGameMatchUseCase {
     private final GameSessionRepository sessionRepository;
     private final com.ieltspath.game.application.port.WordlyWordProvider wordProvider;
     private final com.ieltspath.game.application.port.WordlyMatchStore wordStore;
-    private final OutboxWriter outboxWriter;
     private final TransactionTemplate tx;
     private final Clock clock;
     private final StartRocketMatchUseCase rocket;
     /** Without Rocket support; kept for callers that only start Wordly or legacy session matches. */
     public StartGameMatchUseCase(GameRoomRepository roomRepository, GameMatchRepository matchRepository,
-            GameMatchPlayerRepository playerRepository, GameSessionRepository sessionRepository, OutboxWriter outboxWriter, org.springframework.context.ApplicationEventPublisher events, com.ieltspath.game.application.port.WordlyWordProvider wordProvider, com.ieltspath.game.application.port.WordlyMatchStore wordStore, PlatformTransactionManager manager, Clock clock) {
-        this(roomRepository,matchRepository,playerRepository,sessionRepository,outboxWriter,events,wordProvider,wordStore,manager,clock,null);
+            GameMatchPlayerRepository playerRepository, GameSessionRepository sessionRepository, org.springframework.context.ApplicationEventPublisher events, com.ieltspath.game.application.port.WordlyWordProvider wordProvider, com.ieltspath.game.application.port.WordlyMatchStore wordStore, PlatformTransactionManager manager, Clock clock) {
+        this(roomRepository,matchRepository,playerRepository,sessionRepository,events,wordProvider,wordStore,manager,clock,null);
     }
     @org.springframework.beans.factory.annotation.Autowired
     public StartGameMatchUseCase(GameRoomRepository roomRepository, GameMatchRepository matchRepository,
-            GameMatchPlayerRepository playerRepository, GameSessionRepository sessionRepository, OutboxWriter outboxWriter, org.springframework.context.ApplicationEventPublisher events, com.ieltspath.game.application.port.WordlyWordProvider wordProvider, com.ieltspath.game.application.port.WordlyMatchStore wordStore, PlatformTransactionManager manager, Clock clock, StartRocketMatchUseCase rocket) {
+            GameMatchPlayerRepository playerRepository, GameSessionRepository sessionRepository, org.springframework.context.ApplicationEventPublisher events, com.ieltspath.game.application.port.WordlyWordProvider wordProvider, com.ieltspath.game.application.port.WordlyMatchStore wordStore, PlatformTransactionManager manager, Clock clock, StartRocketMatchUseCase rocket) {
         this.tx=new TransactionTemplate(manager); this.clock=clock; this.rocket=rocket;
         this.wordProvider=wordProvider;this.wordStore=wordStore;
         this.events = events;
         this.roomRepository=roomRepository; this.matchRepository=matchRepository; this.playerRepository=playerRepository;
-        this.sessionRepository=sessionRepository; this.outboxWriter=outboxWriter;
+        this.sessionRepository=sessionRepository;
     }
 
     public GameMatchResult execute(UUID roomId, UUID hostUserId) {
@@ -129,8 +127,6 @@ public class StartGameMatchUseCase {
         }
         if(room.wordlySettings()!=null) wordStore.initialize(matchId,words,playerIds,now,room.wordlySettings().timeEnabled());
         if(dictionary!=null)wordStore.attachDictionary(matchId,dictionary);
-        outboxWriter.append("GameMatch",matchId.toString(),"GameMatchStarted",
-                Map.of("matchId",matchId.toString(),"roomId",roomId.toString()));
         events.publishEvent(new com.ieltspath.game.application.result.MatchStartedEvent(roomId, matchId));
         return result(match,hostUserId);
     }

@@ -1,5 +1,7 @@
 package com.ieltspath.game.domain.aggregate;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.ieltspath.game.domain.vo.RoomGame;
@@ -47,5 +49,12 @@ class RoomGameSettingsTest {
         assertThrows(IllegalArgumentException.class, () -> GameRoom.reconstitute(UUID.randomUUID(), "ABC123", host, 4,
                 "ROCKET", "VOCABULARY", "PRACTICE", Map.of(), now, now, null, GameRoom.GameRoomStatus.WAITING,
                 members, settings));
+    }
+
+    @Test
+    void aRoomNeedsAtLeastOnePlace() {
+        var error = assertThrows(IllegalArgumentException.class,
+                () -> new GameRoom(UUID.randomUUID(), "ABCD12", UUID.randomUUID(), 0, now));
+        assertEquals("maxPlayers must be positive", error.getMessage());
     }
 }

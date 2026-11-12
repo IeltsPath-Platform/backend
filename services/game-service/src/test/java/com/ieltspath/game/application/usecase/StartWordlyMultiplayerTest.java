@@ -56,8 +56,7 @@ class StartWordlyMultiplayerTest {
             protected void doCommit(DefaultTransactionStatus s){}
             protected void doRollback(DefaultTransactionStatus s){}
         };
-        start=new StartGameMatchUseCase(rooms,matches,players,sessions,mock(OutboxWriter.class),
-            mock(ApplicationEventPublisher.class),provider,store,manager,clock);
+        start=new StartGameMatchUseCase(rooms,matches,players,sessions,mock(ApplicationEventPublisher.class),provider,store,manager,clock);
     }
     private GameRoom readyRoom() {
         var value=GameRoom.wordly(roomId,"ABC123",host,new WordlyRoomSettings(
@@ -116,5 +115,12 @@ class StartWordlyMultiplayerTest {
         verify(rooms,never()).findForUpdate(any());
         verify(matches,never()).save(any());
         assertEquals("WAITING",room.status().name());
+    }
+
+    @Test void aRoomThatDoesNotExistCannotBeStarted() {
+        UUID unknown=UUID.randomUUID();
+        assertThrows(com.ieltspath.game.domain.exception.GameRoomNotFoundException.class,()->start.execute(unknown,host));
+        verify(matches,never()).save(any());
+        verify(provider,never()).catalog();
     }
 }

@@ -14,6 +14,10 @@ import java.util.UUID;
 @Builder
 @AllArgsConstructor
 public class LearningGoal {
+    private static final BigDecimal MIN_TARGET_BAND = new BigDecimal("1.0");
+    private static final BigDecimal MAX_TARGET_BAND = new BigDecimal("9.0");
+    private static final int MIN_MINUTES_PER_DAY = 5;
+
     private UUID id;
     private UUID userId;
     private BigDecimal targetBand;
@@ -26,11 +30,11 @@ public class LearningGoal {
     private LocalDateTime updatedAt;
 
     public void updateGoal(BigDecimal targetBand, LocalDate examDate, Integer availableMinutesPerDay) {
-        if (targetBand == null || targetBand.compareTo(BigDecimal.ZERO) <= 0 || targetBand.compareTo(BigDecimal.valueOf(9.0)) > 0) {
-            throw new IllegalArgumentException("Target band phải nằm trong khoảng (0.0, 9.0]");
+        if (targetBand == null || targetBand.compareTo(MIN_TARGET_BAND) < 0 || targetBand.compareTo(MAX_TARGET_BAND) > 0) {
+            throw new IllegalArgumentException("Target band phải nằm trong khoảng [1.0, 9.0]");
         }
-        if (availableMinutesPerDay == null || availableMinutesPerDay <= 0) {
-            throw new IllegalArgumentException("Thời gian học mỗi ngày phải lớn hơn 0");
+        if (availableMinutesPerDay == null || availableMinutesPerDay < MIN_MINUTES_PER_DAY) {
+            throw new IllegalArgumentException("Thời gian học tối thiểu là " + MIN_MINUTES_PER_DAY + " phút mỗi ngày");
         }
         this.targetBand = targetBand;
         this.examDate = examDate;

@@ -1,6 +1,5 @@
 package com.ieltspath.game.application.usecase;
 
-import com.ieltspath.game.application.port.OutboxWriter;
 import com.ieltspath.game.application.result.GameSessionResult;
 import com.ieltspath.game.domain.exception.GameSessionNotFoundException;
 import com.ieltspath.game.domain.repository.GameSessionRepository;
@@ -13,11 +12,9 @@ import java.util.UUID;
 @Service
 public class AbandonGameSessionUseCase {
     private final GameSessionRepository sessionRepository;
-    private final OutboxWriter outboxWriter;
 
-    public AbandonGameSessionUseCase(GameSessionRepository sessionRepository, OutboxWriter outboxWriter) {
+    public AbandonGameSessionUseCase(GameSessionRepository sessionRepository) {
         this.sessionRepository = sessionRepository;
-        this.outboxWriter = outboxWriter;
     }
 
     @Transactional
@@ -26,8 +23,6 @@ public class AbandonGameSessionUseCase {
                 .orElseThrow(() -> new GameSessionNotFoundException(sessionId));
         session.abandon(Instant.now());
         var saved = sessionRepository.save(session);
-        outboxWriter.append("GameSession", sessionId.toString(), "GameSessionAbandoned",
-                java.util.Map.of("sessionId", sessionId.toString(), "userId", userId.toString()));
         return GameSessionResult.from(saved);
     }
 }

@@ -10,6 +10,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class NoteSourceTest {
     @Test
@@ -40,6 +41,22 @@ class NoteSourceTest {
         UUID sourceId = UUID.randomUUID();
         Note note = Note.create(UUID.randomUUID(), "Old", "Old body", NoteSourceType.KNOWLEDGE_POINT, sourceId);
         note.update("New", "New body", LibraryStatus.ARCHIVED);
+        assertEquals(NoteSourceType.KNOWLEDGE_POINT, note.getSourceType());
+        assertEquals(sourceId, note.getSourceReferenceId());
+    }
+
+    @Test
+    void updateRejectsNullStatusAndSignalsWhenActiveLinksMustBeRemoved() {
+        UUID sourceId = UUID.randomUUID();
+        Note note = Note.create(UUID.randomUUID(), "Lesson", "Keep this", NoteSourceType.KNOWLEDGE_POINT, sourceId);
+
+        InvalidDataException missingStatus = assertThrows(InvalidDataException.class,
+                () -> note.update("Lesson", "Keep this", null));
+        assertEquals("status không hợp lệ", missingStatus.getMessage());
+        assertEquals(LibraryStatus.ACTIVE, note.getStatus());
+
+        assertTrue(note.update("Lesson", "Updated", LibraryStatus.ARCHIVED));
+        assertEquals(LibraryStatus.ARCHIVED, note.getStatus());
         assertEquals(NoteSourceType.KNOWLEDGE_POINT, note.getSourceType());
         assertEquals(sourceId, note.getSourceReferenceId());
     }

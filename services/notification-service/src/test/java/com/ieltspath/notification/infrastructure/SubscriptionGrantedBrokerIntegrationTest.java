@@ -80,6 +80,10 @@ class SubscriptionGrantedBrokerIntegrationTest {
     @BeforeEach
     void clean() {
         jdbc.update("DELETE FROM notifications");
+        // The queues live as long as the broker container, so a message dead-lettered late by one test must not reach the next.
+        for (String queue : new String[] {SubscriptionGrantedTopology.RETRY_QUEUE, SubscriptionGrantedTopology.DLQ}) {
+            rabbit.execute(channel -> channel.queuePurge(queue));
+        }
     }
 
     private static SubscriptionGrantedV1 event(UUID learner) {
@@ -168,6 +172,11 @@ class SubscriptionGrantedBrokerIntegrationTest {
         // Parked on the dead-letter queue, as a failed delivery leaves it.
         rabbit.send("", SubscriptionGrantedTopology.DLQ, MessageBuilder.withBody(json.writeValueAsBytes(event))
                 .setContentType(MessageProperties.CONTENT_TYPE_JSON).setMessageId(event.eventId().toString()).build());
+
+        // The send is not confirmed, and replay only takes the messages the queue already reports.
+        assertTrue(eventually(() -> replayer.counts().stream().anyMatch(count ->
+                count.deadLetterQueue().equals(SubscriptionGrantedTopology.DLQ) && count.messages() == 1)),
+                "the message reached the dead-letter queue");
 
         var result = replayer.replay(SubscriptionGrantedTopology.DLQ, 10);
 

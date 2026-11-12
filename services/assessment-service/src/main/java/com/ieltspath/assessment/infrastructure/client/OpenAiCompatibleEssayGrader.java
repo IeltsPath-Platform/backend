@@ -11,15 +11,16 @@ import com.ieltspath.assessment.application.port.EssayGradingPort;
 import com.ieltspath.assessment.application.port.ActiveRubricProvider;
 import com.ieltspath.assessment.application.port.ErrorTypeCatalog;
 import com.ieltspath.assessment.infrastructure.config.AssessmentLlmProperties;
-import com.ieltspath.commonresilience.CallKind;
-import com.ieltspath.commonresilience.DownstreamUnavailableException;
+import com.ieltspath.commonllm.ChatRequest;
+import com.ieltspath.commonllm.LlmCallException;
+import com.ieltspath.commonllm.LlmChatClient;
+import com.ieltspath.commonllm.LlmClientFactory;
+import com.ieltspath.commonllm.LlmEndpoint;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import com.ieltspath.commonresilience.ResilientCall;
-import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -39,16 +40,18 @@ public class OpenAiCompatibleEssayGrader implements EssayGradingPort {
     // Descriptor wording is intentionally kept aligned with learning-service EssayGrader.
     private final AssessmentLlmProperties properties;
     private final ObjectMapper json;
-    private final RestClient restClient;
+    private final LlmChatClient client;
     private final ActiveRubricProvider rubrics;
     private final ErrorTypeCatalog errorTypes;
-    private final ResilientCall resilientCall;
 
     @Autowired
-    public OpenAiCompatibleEssayGrader(RestClient.Builder builder, AssessmentLlmProperties properties, ObjectMapper json,
-                                       ActiveRubricProvider rubrics, ErrorTypeCatalog errorTypes,
-                                       ResilientCall resilientCall) {
-        this(createClient(builder), properties, json, rubrics, errorTypes, resilientCall);
+    public OpenAiCompatibleEssayGrader(LlmClientFactory factory, AssessmentLlmProperties properties, ObjectMapper json,
+                                       ActiveRubricProvider rubrics, ErrorTypeCatalog errorTypes) {
+        this.properties = properties;
+        this.json = json;
+        this.client = factory.create(endpoint(properties), "assessment-service");
+        this.rubrics = rubrics;
+        this.errorTypes = errorTypes;
     }
 
     OpenAiCompatibleEssayGrader(RestClient restClient, AssessmentLlmProperties properties, ObjectMapper json,
@@ -60,17 +63,15 @@ public class OpenAiCompatibleEssayGrader implements EssayGradingPort {
                                 ActiveRubricProvider rubrics, ErrorTypeCatalog errorTypes, ResilientCall resilientCall) {
         this.properties = properties;
         this.json = json;
-        this.restClient = restClient;
+        this.client = new LlmClientFactory(RestClient.builder(), resilientCall, new SimpleMeterRegistry())
+                .create(endpoint(properties), "assessment-service", restClient);
         this.rubrics = rubrics;
         this.errorTypes = errorTypes;
-        this.resilientCall = resilientCall;
     }
 
-    private static RestClient createClient(RestClient.Builder builder) {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(Duration.ofSeconds(3));
-        factory.setReadTimeout(Duration.ofSeconds(45));
-        return builder.requestFactory(factory).build();
+    private static LlmEndpoint endpoint(AssessmentLlmProperties properties) {
+        return new LlmEndpoint(normalizeBaseUrl(properties.getBaseUrl()), properties.getApiKey(), properties.getModel(),
+                properties.getReasoningEffort(), Duration.ofSeconds(45), properties.getMaxTokens());
     }
 
     @Override
@@ -85,56 +86,63 @@ public class OpenAiCompatibleEssayGrader implements EssayGradingPort {
             throw new EssayGradingException("INVALID_PROMPT");
         }
         try {
-            ActiveRubricProvider.Rubric rubric = resolveRubric(prompt);
-            var activeErrorTypes = errorTypes.activeErrorTypes();
+            String templateVersion = templateVersionOf(prompt);
+            ActiveRubricProvider.Rubric rubric = resolveRubric(prompt, templateVersion);
+            var activeErrorTypes = errorTypes.activeErrorTypes("WRITING");
             Set<String> allowedErrorCodes = activeErrorTypes.stream().map(ErrorTypeCatalog.ErrorType::code)
                     .filter(java.util.Objects::nonNull).collect(java.util.stream.Collectors.toSet());
-            ObjectNode body = json.createObjectNode().put("model", properties.getModel());
-            body.putObject("response_format").put("type", "json_object");
-            body.putArray("messages")
-                    .addObject().put("role", "system").put("content", RubricPromptBuilder.build(rubric, activeErrorTypes));
-            body.withArray("messages").addObject().put("role", "user").put("content", userPrompt(prompt, essay));
-            String response = resilientCall.call("llm", CallKind.WRITE, () -> restClient.post().uri(endpoint(properties.getBaseUrl()))
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .header("Authorization", "Bearer " + properties.getApiKey())
-                    .body(body).retrieve().body(String.class));
-            return parseGrade(response, rubric, allowedErrorCodes, essay);
+            String response = client.chat(new ChatRequest("writing-grading",
+                    RubricPromptBuilder.build(rubric, activeErrorTypes, templateVersion), userPrompt(prompt, essay), true, null)).content();
+            return parseGrade(response, rubric, allowedErrorCodes, essay, templateVersion);
         } catch (EssayGradingException exception) {
             throw exception;
         } catch (ContentUnavailableException exception) {
             throw new EssayGradingException("RUBRIC_UNAVAILABLE");
-        } catch (DownstreamUnavailableException exception) {
-            throw new EssayGradingException("LLM_REQUEST_FAILED");
-        } catch (RestClientException exception) {
-            throw new EssayGradingException("LLM_REQUEST_FAILED");
+        } catch (LlmCallException exception) {
+            throw new EssayGradingException("BAD_RESPONSE".equals(exception.code()) ? "INVALID_GRADE" : "LLM_REQUEST_FAILED");
         } catch (Exception exception) {
             throw new EssayGradingException("INVALID_GRADE");
         }
     }
 
-    private ActiveRubricProvider.Rubric resolveRubric(Prompt prompt) {
+    /** Nothing activated keeps the first template; an activated version names its own. */
+    private static String templateVersionOf(Prompt prompt) {
+        if (prompt.expectedPromptVersion() == null) return RubricPromptBuilder.TEMPLATE_VERSION;
+        String[] parts = prompt.expectedPromptVersion().split("@|\\+tpl", -1);
+        if (parts.length != 3 || !RubricPromptBuilder.isKnownTemplate(parts[2]))
+            throw new EssayGradingException("PROMPT_NOT_ACTIVATED");
+        return parts[2];
+    }
+
+    private ActiveRubricProvider.Rubric resolveRubric(Prompt prompt, String templateVersion) {
         ActiveRubricProvider.Rubric rubric;
         if (prompt.expectedPromptVersion() == null) {
             rubric = rubrics.getActive(prompt.task());
         } else {
             String[] parts = prompt.expectedPromptVersion().split("@|\\+tpl", -1);
-            if (parts.length != 3 || !RubricPromptBuilder.TEMPLATE_VERSION.equals(parts[2]))
-                throw new EssayGradingException("PROMPT_NOT_ACTIVATED");
             rubric = rubrics.getVersion(parts[0], parts[1]);
         }
         if (rubric == null || !prompt.task().equals(rubric.task())) throw new EssayGradingException("RUBRIC_UNAVAILABLE");
-        String version = RubricPromptBuilder.promptVersion(rubric);
+        String version = RubricPromptBuilder.promptVersion(rubric, templateVersion);
         if (prompt.expectedPromptVersion() != null && !prompt.expectedPromptVersion().equals(version))
             throw new EssayGradingException("PROMPT_VERSION_UNAVAILABLE");
         return rubric;
     }
 
     /** A bare host gets the conventional {@code /v1}; a base URL that already has a path, such as {@code .../v1beta/openai}, is used as given. */
-    private static String endpoint(String baseUrl) {
-        String base = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
-        String path = java.net.URI.create(base).getPath();
+    private static String normalizeBaseUrl(String baseUrl) {
+        if (baseUrl == null) return "";
+        String base = baseUrl.strip().replaceAll("/+$", "");
+        if (base.isEmpty()) return "";
+        String path;
+        try {
+            path = java.net.URI.create(base).getPath();
+        } catch (IllegalArgumentException malformed) {
+            // Keep the value: an unusable endpoint fails at call time, not while the service starts.
+            return base;
+        }
         boolean hostOnly = path == null || path.isEmpty();
-        return hostOnly ? base + "/v1/chat/completions" : base + "/chat/completions";
+        return hostOnly ? base + "/v1" : base;
     }
 
     private static String userPrompt(Prompt prompt, String essay) {
@@ -149,11 +157,9 @@ public class OpenAiCompatibleEssayGrader implements EssayGradingPort {
 
     /** Bands are validated strictly; comments are optional, trimmed and capped so a chatty reply cannot bloat a row. */
     private EssayGrade parseGrade(String response, ActiveRubricProvider.Rubric rubric, Set<String> allowedErrorCodes,
-                                  String essay) {
+                                  String essay, String templateVersion) {
         try {
-            JsonNode outer = json.readTree(response);
-            String content = outer.path("choices").path(0).path("message").path("content").asText(null);
-            if (content == null) throw new EssayGradingException("INVALID_GRADE");
+            String content = response;
             int start = content.indexOf('{');
             int end = content.lastIndexOf('}');
             if (start < 0 || end <= start) throw new EssayGradingException("INVALID_GRADE");
@@ -193,10 +199,12 @@ public class OpenAiCompatibleEssayGrader implements EssayGradingPort {
                 String suggestion = text(correction.path("suggestion"), MAX_COMMENT);
                 if (errorCode == null || !allowedErrorCodes.contains(errorCode) || excerpt == null || !essay.contains(excerpt)
                         || suggestion == null) continue;
+                // Acceptable text with a better wording is not an error: it stays out of the grade and the codes.
+                if ("SUGGESTION".equals(correction.path("certainty").asText(""))) continue;
                 ObjectNode item = corrections.addObject().put("excerpt", excerpt).put("suggestion", suggestion).put("errorCode", errorCode);
                 usedCodes.add(errorCode);
             }
-            String promptVersion = RubricPromptBuilder.promptVersion(rubric);
+            String promptVersion = RubricPromptBuilder.promptVersion(rubric, templateVersion);
             return new EssayGrade(overall, feedback(reply, comments, corrections), promptVersion, List.copyOf(usedCodes));
         } catch (EssayGradingException exception) {
             throw exception;

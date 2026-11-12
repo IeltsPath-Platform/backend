@@ -1,5 +1,7 @@
 package com.ieltspath.user.application.usecase;
 
+import com.ieltspath.events.user.PasswordChangedV1;
+import com.ieltspath.events.user.UserEmailVerificationStateV1;
 import com.ieltspath.user.application.command.ResetPasswordCommand;
 import com.ieltspath.user.domain.aggregate.AccountActionToken;
 import com.ieltspath.user.domain.aggregate.User;
@@ -10,11 +12,15 @@ import com.ieltspath.user.domain.repository.UserRepository;
 import com.ieltspath.user.application.port.UserLock;
 import com.ieltspath.user.domain.repository.RefreshTokenRepository;
 import com.ieltspath.user.domain.vo.ActionTokenPurpose;
+import com.ieltspath.user.domain.vo.UserStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -26,6 +32,7 @@ public class ResetPasswordUseCase {
     private final PasswordEncoder passwordEncoder;
     private final UserLock userLock;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final UserNoticeOutbox notices;
 
     @Transactional
     public void execute(ResetPasswordCommand command) {
@@ -47,14 +54,30 @@ public class ResetPasswordUseCase {
         User user = userRepository.findById(actionToken.getUserId())
                 .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng sở hữu token này"));
         userLock.lock(user.getId());
-        if (!accountActionTokenRepository.consumePasswordResetToken(tokenHash, java.time.LocalDateTime.now())) {
+        user = userRepository.findById(user.getId())
+                .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng sở hữu token này"));
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            throw new InvalidActionTokenException("Không thể đặt lại mật khẩu cho tài khoản không hoạt động");
+        }
+        if (!accountActionTokenRepository.consumePasswordResetToken(tokenHash, java.time.LocalDateTime.now(java.time.ZoneOffset.UTC))) {
             throw new InvalidActionTokenException("Mã token đã hết hạn hoặc đã được sử dụng");
         }
 
+        boolean wasVerified = user.isEmailVerified();
+        user.markEmailVerified(java.time.LocalDateTime.now());
+        if (!wasVerified) {
+            UUID stateId = UUID.randomUUID();
+            notices.enqueue(stateId, user.getId(), UserEmailVerificationStateV1.EVENT_TYPE, new UserEmailVerificationStateV1(
+                    stateId, UserEmailVerificationStateV1.EVENT_TYPE, Instant.now(), user.getId(), true,
+                    user.getEmail().value(), user.getFullName()));
+        }
         user.changePassword(passwordEncoder.encode(command.newPassword()));
         userRepository.save(user);
         refreshTokenRepository.revokeAllActiveForUser(user.getId(), java.time.LocalDateTime.now());
 
+        UUID eventId = UUID.randomUUID();
+        notices.enqueue(eventId, user.getId(), PasswordChangedV1.EVENT_TYPE, new PasswordChangedV1(eventId,
+                PasswordChangedV1.EVENT_TYPE, Instant.now(), user.getId(), user.getEmail().value(), user.getFullName()));
         log.info("Đặt lại mật khẩu thành công cho userId={}", user.getId());
     }
 }

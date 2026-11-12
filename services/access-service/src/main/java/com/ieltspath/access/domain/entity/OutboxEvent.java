@@ -7,7 +7,7 @@ import java.util.UUID;
 public class OutboxEvent {
 
     /** Event types the relay publishes; any other type is kept as a record only and never leaves the service. */
-    public static final Set<String> RELAYED_EVENT_TYPES = Set.of("SubscriptionGranted");
+    public static final Set<String> RELAYED_EVENT_TYPES = Set.of("SubscriptionGranted", "SubscriptionExpiryNotice");
 
     private final UUID id;
     private final String aggregateType;

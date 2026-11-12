@@ -8,6 +8,7 @@ import java.util.UUID;
 
 public interface UserRepository {
     User save(User user);
+    void clearPasswordHash(UUID userId);
     Optional<User> findById(UUID id);
     Optional<User> findByEmail(String email);
     boolean existsByEmail(String email);
@@ -15,4 +16,6 @@ public interface UserRepository {
     boolean existsByPhoneNumberAndIdNot(String phoneNumber, UUID id);
     List<UUID> lockActiveAdminUserIds();
     List<User> findAll();
+    /** Up to {@code limit} users whose id sorts after {@code lastId}, in id order, for walking all accounts in batches. */
+    List<User> findAfterId(UUID lastId, int limit);
 }

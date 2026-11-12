@@ -17,11 +17,18 @@ import java.util.Optional;
 public class RecordSubscriptionGrantedUseCase {
     private final NotificationRepository notifications;
     private final EnqueueNotificationPushUseCase enqueuePush;
+    private final NotificationPreferenceService preferences;
 
     @Autowired
-    public RecordSubscriptionGrantedUseCase(NotificationRepository notifications, EnqueueNotificationPushUseCase enqueuePush) {
+    public RecordSubscriptionGrantedUseCase(NotificationRepository notifications, EnqueueNotificationPushUseCase enqueuePush,
+                                           NotificationPreferenceService preferences) {
         this.notifications = notifications;
         this.enqueuePush = enqueuePush;
+        this.preferences = preferences;
+    }
+
+    public RecordSubscriptionGrantedUseCase(NotificationRepository notifications, EnqueueNotificationPushUseCase enqueuePush) {
+        this(notifications, enqueuePush, null);
     }
 
     public RecordSubscriptionGrantedUseCase(NotificationRepository notifications) {
@@ -41,6 +48,7 @@ public class RecordSubscriptionGrantedUseCase {
                 || !event.eventType().equals(routingKey) || !event.eventId().toString().equals(messageId)) {
             throw new IllegalArgumentException("Unsupported subscription granted event");
         }
+        if (preferences != null && !preferences.isEnabled(event.userId(), event.eventType())) return Optional.empty();
         var notification = new Notification(event.eventId(), event.userId(), event.userId(), event.eventType(),
                 null, null, null, event.occurredAt(), null);
         if (!notifications.insertIfAbsent(event.eventId(), notification)) return Optional.empty();

@@ -8,6 +8,7 @@ import com.ieltspath.user.domain.exception.UserManagementRuleViolationException;
 import com.ieltspath.user.domain.repository.UserRepository;
 import com.ieltspath.user.domain.vo.RoleName;
 import com.ieltspath.user.domain.vo.UserStatus;
+import com.ieltspath.user.application.port.UserLock;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ChangeUserStatusUseCase {
     private final UserRepository userRepository;
+    private final UserLock userLock;
 
     @Transactional
     public User execute(ChangeUserStatusCommand command) {
@@ -24,6 +26,9 @@ public class ChangeUserStatusUseCase {
         }
         var activeAdminIds = userRepository.lockActiveAdminUserIds();
         User user = userRepository.findById(command.userId())
+                .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng: " + command.userId()));
+        userLock.lock(user.getId());
+        user = userRepository.findById(command.userId())
                 .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng: " + command.userId()));
         if (command.userId().equals(command.actorId()) && command.status() != UserStatus.ACTIVE) {
             throw new UserManagementRuleViolationException(

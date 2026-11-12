@@ -178,4 +178,62 @@ class BandStatisticsPersistenceTest {
                 2, "COMPLETED", 6.5);
         assertEquals(9.0, store.history(user, from, until, "MOCK", "OVERALL", null, 100).baseline());
     }
+    @Test
+    void availabilityIsolatesOwnerWindowKindAndLatestResultEligibility() {
+        assertTrue(store.availability(user, from, until).isEmpty());
+        result(attempt(from), 1, "COMPLETED", 0.0);
+        Instant latest = from.plusSeconds(100);
+        UUID retained = attempt(latest);
+        result(retained, 1, "COMPLETED", 9.0);
+        result(retained, 2, "PROCESSING", null);
+        UUID replaced = attempt(from.plusSeconds(200));
+        result(replaced, 1, "COMPLETED", 7.0);
+        result(replaced, 2, "COMPLETED", 9.5);
+        result(attempt(until), 1, "COMPLETED", 8.0);
+        result(attempt(from.minusSeconds(1)), 1, "COMPLETED", 8.0);
+        result(attempt(UUID.randomUUID(), from.plusSeconds(300), "MOCK"), 1, "COMPLETED", 8.0);
+        result(attempt(user, from.plusSeconds(300), "TOPIC_GATE"), 1, "COMPLETED", 8.0);
+        UUID ungraded = result(attempt(from.plusSeconds(400)), 1, "COMPLETED", null);
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class,
+                () -> score(ungraded, "READING", 8.0, "NONE"));
+        score(ungraded, "WRITING", null, "AI");
+        score(ungraded, "SPEAKING", 9.5, "HUMAN");
+        assertEquals(List.of(new BandStatisticsStore.AvailableOption("MOCK", "LISTENING", latest)),
+                store.availability(user, from, until));
+    }
+
+    @Test
+    void availabilitySeparatesSeriesAndExcludesPlacementSpeakingAndOverall() {
+        Instant submitted = from.plusSeconds(100);
+        for (String kind : List.of("PLACEMENT", "MOCK", "OFFICIAL_PRACTICE")) {
+            UUID full = result(attempt(user, submitted, kind), 1, "COMPLETED", 6.0, 6.5);
+            score(full, "READING", 6.0, "AUTO");
+            score(full, "WRITING", 7.0, "AI");
+            score(full, "SPEAKING", 7.0, "HUMAN");
+        }
+        var options = store.availability(user, from, until);
+        assertEquals(13, options.size());
+        assertEquals(List.of("LISTENING", "READING", "WRITING"), options.stream()
+                .filter(o -> o.seriesKind().equals("PLACEMENT")).map(BandStatisticsStore.AvailableOption::skill).toList());
+        for (var option : options) {
+            assertEquals(submitted, option.latestSubmittedAt());
+            assertNotNull(store.history(user, from, until, option.seriesKind(), option.skill(), null, 1).latest());
+        }
+    }
+
+    @Test
+    void availabilityOverallRequiresStoredBandAndFourValidSkillsOnTheSameLatestResult() {
+        Instant fullTime = from.plusSeconds(100);
+        for (int index = 0; index < 5; index++) {
+            UUID attempt = attempt(fullTime.plusSeconds(index * 100));
+            UUID result = result(attempt, 1, "COMPLETED", 6.0, index == 1 ? null : 6.5);
+            score(result, "READING", 6.0, "AUTO");
+            score(result, "WRITING", 7.0, "AI");
+            if (index != 2) score(result, "SPEAKING", index == 3 ? 9.5 : 7.0, "HUMAN");
+            if (index == 4) result(attempt, 2, "COMPLETED", 6.5, 6.5);
+        }
+        var options = store.availability(user, from, until);
+        assertEquals(fullTime, options.stream().filter(o -> o.skill().equals("OVERALL")).findFirst().orElseThrow().latestSubmittedAt());
+        assertEquals(fullTime.plusSeconds(400), options.stream().filter(o -> o.skill().equals("LISTENING")).findFirst().orElseThrow().latestSubmittedAt());
+    }
 }

@@ -1,7 +1,6 @@
 package com.ieltspath.game.application.usecase;
 
 import com.ieltspath.game.application.port.LobbySeatStore;
-import com.ieltspath.game.application.port.OutboxWriter;
 import com.ieltspath.game.application.result.GameRoomResult;
 import com.ieltspath.game.application.result.RoomClosedEvent;
 import com.ieltspath.game.application.result.RoomUpdatedEvent;
@@ -10,7 +9,6 @@ import com.ieltspath.game.domain.repository.GameRoomRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -26,15 +24,12 @@ public class LobbySeatUseCase {
 
     private final LobbySeatStore seats;
     private final GameRoomRepository rooms;
-    private final OutboxWriter outbox;
     private final ApplicationEventPublisher events;
     private final Clock clock;
 
-    public LobbySeatUseCase(LobbySeatStore seats, GameRoomRepository rooms, OutboxWriter outbox,
-            ApplicationEventPublisher events, Clock clock) {
+    public LobbySeatUseCase(LobbySeatStore seats, GameRoomRepository rooms, ApplicationEventPublisher events, Clock clock) {
         this.seats = seats;
         this.rooms = rooms;
-        this.outbox = outbox;
         this.events = events;
         this.clock = clock;
     }
@@ -68,8 +63,6 @@ public class LobbySeatUseCase {
                 || !seats.expired(roomId, userId, clock.instant())) return;
         room.leave(userId, clock.instant());
         var saved = rooms.save(room);
-        outbox.append("GameRoom", roomId.toString(), "GameRoomMemberLeft",
-                Map.of("roomId", roomId.toString(), "userId", userId.toString()));
         if (saved.status() == GameRoom.GameRoomStatus.CLOSED) {
             String name = saved.members().get(saved.hostUserId()).displayName();
             events.publishEvent(new RoomClosedEvent(roomId,

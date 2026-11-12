@@ -53,9 +53,10 @@ public class VocabularyNotebookController {
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(50) int size,
             @RequestParam(required = false) UUID topicId,
-            @RequestParam(required = false) UUID setId) {
+            @RequestParam(required = false) UUID setId,
+            @RequestParam(required = false) Boolean learned) {
         if (!List.of("RECENT", "DUE", "ALPHABET", "WEAKEST").contains(sort)) throw new InvalidDataException("sort is invalid");
-        return PageResponse.from(list.execute(currentUser.requireUserId(), new NotebookQuery(q, level, due, sort, page, size, topicId, setId)),
+        return PageResponse.from(list.execute(currentUser.requireUserId(), new NotebookQuery(q, level, due, sort, page, size, topicId, setId, learned)),
                 NotebookEntryResponse::from);
     }
 

@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Giáo viên đã chấm xong bài viết của bạn</title>
+</head>
+<body>
+<th:block th:replace="~{_layout :: header}"></th:block>
+  <p>Xin chào <span th:text="${displayName}">bạn</span>,</p>
+  <p>Giáo viên đã chấm xong bài viết của bạn. Xem nhận xét và các lỗi cần sửa.</p>
+  <p><a th:href="${actionLink}">Xem nhận xét</a></p>
+  <p style="font-size:12px;color:#6b7280">Bạn có thể <a th:href="${unsubscribeLink}">tắt email học tập</a> bất cứ lúc nào.</p>
+<th:block th:replace="~{_layout :: footer}"></th:block>
+</body>
+</html>

@@ -1,4 +1,5 @@
 package com.ieltspath.game.domain.aggregate;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import com.ieltspath.game.domain.vo.WordlyHintSelector;
 import org.junit.jupiter.api.Test;
 import java.util.List;
@@ -11,5 +12,9 @@ class WordlyHintSelectorTest {
  }
  @Test void noUnknownPositionDoesNotRevealAnotherLetter() {
   assertThrows(IllegalArgumentException.class,()->WordlyHintSelector.firstUnknown("EAR",List.of(List.of("CORRECT","CORRECT","CORRECT"))));
+ }
+
+    @Test void aWordWithNoGuessesYetRevealsTheFirstPosition() {
+  assertEquals(0,WordlyHintSelector.firstUnknown("AIR",List.of()));
  }
 }

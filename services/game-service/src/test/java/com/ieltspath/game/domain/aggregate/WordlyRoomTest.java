@@ -1,5 +1,7 @@
 package com.ieltspath.game.domain.aggregate;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import com.ieltspath.game.domain.vo.WordlyRoomSettings;
 import com.ieltspath.game.domain.exception.InvalidGameRoomStateException;
 import org.junit.jupiter.api.Test;
@@ -25,6 +27,24 @@ class WordlyRoomTest {
         for (int i = 0; i < 3; i++) room.join(UUID.randomUUID(), Instant.now());
         assertEquals(4, room.members().values().stream().map(GameRoom.Member::slotNumber).distinct().count());
         assertThrows(InvalidGameRoomStateException.class, () -> room.join(UUID.randomUUID(), Instant.now()));
+    }
+
+    @Test
+    void rejectsDuplicateMemberWithoutChangingTheirSlot() {
+        var host = UUID.randomUUID();
+        var guest = UUID.randomUUID();
+        var settings = new WordlyRoomSettings(WordlyRoomSettings.PlayerMode.MULTIPLAYER, 4,
+                WordlyRoomSettings.PlayMode.FINITE, 5);
+        var room = GameRoom.wordly(UUID.randomUUID(), "AB7K2Q", host, settings, Instant.now());
+        room.join(guest, Instant.now());
+        var original = room.members().get(guest);
+
+        var exception = assertThrows(InvalidGameRoomStateException.class,
+                () -> room.join(guest, Instant.now()));
+
+        assertEquals("User is already a member of this room", exception.getMessage());
+        assertEquals(original, room.members().get(guest));
+        assertEquals(2, room.members().size());
     }
 
     @Test
@@ -63,5 +83,20 @@ class WordlyRoomTest {
         assertThrows(IllegalArgumentException.class, () -> new WordlyRoomSettings(WordlyRoomSettings.PlayerMode.SOLO, 2, WordlyRoomSettings.PlayMode.FINITE, 5));
         assertThrows(IllegalArgumentException.class, () -> new WordlyRoomSettings(WordlyRoomSettings.PlayerMode.SOLO, 4, WordlyRoomSettings.PlayMode.FINITE, 4));
         assertThrows(IllegalArgumentException.class, () -> new WordlyRoomSettings(WordlyRoomSettings.PlayerMode.SOLO, 4, WordlyRoomSettings.PlayMode.ENDLESS, 5));
+    }
+
+    @Test
+    void livesFromThreeToSixAreAccepted() {
+        for (int lives = 3; lives <= 6; lives++) {
+            var settings = new WordlyRoomSettings(WordlyRoomSettings.PlayerMode.SOLO, lives, WordlyRoomSettings.PlayMode.FINITE, 5);
+            assertEquals(lives, settings.initialLives());
+        }
+    }
+
+    @Test
+    void sevenLivesAreRejected() {
+        var error = assertThrows(IllegalArgumentException.class,
+                () -> new WordlyRoomSettings(WordlyRoomSettings.PlayerMode.SOLO, 7, WordlyRoomSettings.PlayMode.FINITE, 5));
+        assertEquals("Initial lives must be between 3 and 6", error.getMessage());
     }
 }

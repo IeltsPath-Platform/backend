@@ -1,0 +1,3 @@
+Xin chào [(${displayName})],
+
+Gói Premium của bạn đã được kích hoạt, hiệu lực đến [(${endsAt})].

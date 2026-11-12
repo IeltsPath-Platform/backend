@@ -55,7 +55,8 @@ public class EssayKnowledgeJudge {
         List<KnowledgeJudgmentRule.CorrectionEvidence> corrections = new ArrayList<>();
         if (grade.corrections() != null) {
             for (WritingGrade.Correction correction : grade.corrections()) {
-                if (correction == null || correction.errorCode() == null) continue;
+                // A suggestion is acceptable text, so it never turns a knowledge point into a FAIL.
+                if (correction == null || correction.errorCode() == null || correction.isSuggestion()) continue;
                 ErrorType error = errorTypes.get(correction.errorCode());
                 if (error != null && error.knowledgePointId() != null) {
                     corrections.add(new KnowledgeJudgmentRule.CorrectionEvidence(error.knowledgePointId(),
@@ -87,7 +88,8 @@ public class EssayKnowledgeJudge {
             return parentPoints.get(judgmentCriterion(candidates, judgment));
         });
         return new WritingGrade(gradeCriteria, grade.corrections(), grade.summary(), grade.overallBand(), studyPoints,
-                VERSION);
+                VERSION, grade.model(), grade.bandLimits(), grade.priorities(), grade.errorExamples(),
+                grade.task1Checks(), grade.task2Checks());
     }
 
     static String prompt(WritingTask task, List<RubricCriterion> criteria) {

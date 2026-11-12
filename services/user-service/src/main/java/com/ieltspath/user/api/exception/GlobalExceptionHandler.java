@@ -3,6 +3,7 @@ package com.ieltspath.user.api.exception;
 import com.ieltspath.user.domain.exception.AuthenticationFailedException;
 import com.ieltspath.user.domain.exception.ConflictException;
 import com.ieltspath.user.domain.exception.EmailAlreadyExistsException;
+import com.ieltspath.user.domain.exception.EmailNotVerifiedException;
 import com.ieltspath.user.domain.exception.InvalidActionTokenException;
 import com.ieltspath.user.domain.exception.InvalidDataException;
 import com.ieltspath.user.domain.exception.InvalidUserStatusException;
@@ -18,6 +19,10 @@ import com.ieltspath.user.domain.exception.PasswordNotConfiguredException;
 import com.ieltspath.user.application.exception.AvatarUploadRateLimitException;
 import com.ieltspath.user.application.exception.LoginLimiterUnavailableException;
 import com.ieltspath.user.application.exception.LoginRateLimitedException;
+import com.ieltspath.user.application.exception.GoogleAccountConflictException;
+import com.ieltspath.user.application.exception.GoogleEmailNotSupportedException;
+import com.ieltspath.user.application.exception.GoogleSignInNotAllowedException;
+import com.ieltspath.user.application.exception.GoogleSignInUnavailableException;
 import com.ieltspath.commonstorage.UploadRejectedException;
 import com.ieltspath.commonstorage.StorageException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -114,6 +119,39 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AuthenticationFailedException.class)
     ResponseEntity<ErrorResponse> handleAuthenticationFailed(AuthenticationFailedException exception, HttpServletRequest request) {
         return error(HttpStatus.UNAUTHORIZED, exception.getMessage(), request, null);
+    }
+
+    @ExceptionHandler({GoogleSignInNotAllowedException.class, GoogleEmailNotSupportedException.class})
+    ResponseEntity<ErrorResponse> handleGoogleForbidden(RuntimeException exception, HttpServletRequest request) {
+        String code = exception instanceof GoogleSignInNotAllowedException
+                ? "GOOGLE_SIGNIN_NOT_ALLOWED" : "GOOGLE_EMAIL_NOT_SUPPORTED";
+        String message = exception instanceof GoogleSignInNotAllowedException
+                ? "Tài khoản này không thể đăng nhập bằng Google"
+                : "Email Google này chưa được hỗ trợ";
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(errorBody(HttpStatus.FORBIDDEN, message, request, null, code));
+    }
+
+    @ExceptionHandler(GoogleAccountConflictException.class)
+    ResponseEntity<ErrorResponse> handleGoogleConflict(GoogleAccountConflictException exception,
+                                                        HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(errorBody(HttpStatus.CONFLICT, "Tài khoản đã liên kết với một Google khác", request,
+                        null, "GOOGLE_ACCOUNT_CONFLICT"));
+    }
+
+    @ExceptionHandler(GoogleSignInUnavailableException.class)
+    ResponseEntity<ErrorResponse> handleGoogleUnavailable(GoogleSignInUnavailableException exception,
+                                                          HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(errorBody(HttpStatus.SERVICE_UNAVAILABLE, "Đăng nhập Google tạm thời không khả dụng",
+                        request, null, "GOOGLE_SIGNIN_UNAVAILABLE"));
+    }
+
+    @ExceptionHandler(EmailNotVerifiedException.class)
+    ResponseEntity<ErrorResponse> handleEmailNotVerified(EmailNotVerifiedException exception, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(errorBody(HttpStatus.FORBIDDEN, exception.getMessage(), request, null, "EMAIL_NOT_VERIFIED"));
     }
 
     @ExceptionHandler(LoginRateLimitedException.class)

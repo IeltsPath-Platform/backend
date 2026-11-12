@@ -280,6 +280,11 @@ public class RestLearningContentClient implements LearningContentClient {
         return get("/error-types", new ParameterizedTypeReference<>() { });
     }
 
+    @Override
+    public List<ErrorType> activeErrorTypes(String skill) {
+        return get("/error-types?skill={skill}", new ParameterizedTypeReference<>() { }, skill);
+    }
+
     private <T> T get(String path, ParameterizedTypeReference<T> type, Object... uriVariables) {
         return response(CallKind.READ, () -> restClient.get()
                 .uri(INTERNAL_PATH + path, uriVariables)

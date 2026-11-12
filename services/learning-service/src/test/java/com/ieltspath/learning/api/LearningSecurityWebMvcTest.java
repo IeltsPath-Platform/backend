@@ -71,6 +71,34 @@ class LearningSecurityWebMvcTest {
 
     @MockitoBean com.ieltspath.learning.application.usecase.GetLearningProgressStatisticsUseCase statistics;
     @MockitoBean com.ieltspath.learning.application.usecase.GetStudyContextUseCase studyContext;
+    @MockitoBean com.ieltspath.learning.application.usecase.GetLearningOverviewUseCase overview;
+
+    @Test
+    void anonymousOverviewIsUnauthorized() throws Exception {
+        mockMvc.perform(get("/api/learning/statistics/overview")).andExpect(status().isUnauthorized());
+        verifyNoInteractions(overview);
+    }
+
+    @Test
+    @WithMockUser(roles = "CONTENT_AUTHOR")
+    void staffCannotReadLearnerOverview() throws Exception {
+        mockMvc.perform(get("/api/learning/statistics/overview")).andExpect(status().isForbidden());
+        verifyNoInteractions(overview);
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void overviewIgnoresUntrustedUserAndPagingParameters() throws Exception {
+        when(currentUser.requireUserId()).thenReturn(userId);
+        var now = java.time.Instant.parse("2026-11-08T05:00:00Z");
+        when(overview.execute(userId)).thenReturn(
+                new com.ieltspath.learning.application.result.LearningOverviewStatistics(now, now, 120, 7));
+        mockMvc.perform(get("/api/learning/statistics/overview").param("userId", UUID.randomUUID().toString())
+                        .param("page", "100").header("X-User-Id", UUID.randomUUID().toString()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.completedLessons").value(7))
+                .andExpect(jsonPath("$.totalStudySeconds").value(120));
+        org.mockito.Mockito.verify(overview).execute(userId);
+    }
 
     @Test
     void anonymousStatisticsCannotReadProgressOrStudyContexts() throws Exception {

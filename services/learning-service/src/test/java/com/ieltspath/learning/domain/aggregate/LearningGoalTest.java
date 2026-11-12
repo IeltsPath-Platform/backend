@@ -53,6 +53,30 @@ class LearningGoalTest {
 
         assertThatThrownBy(() -> goal.updateGoal(BigDecimal.valueOf(7.0), null, 0))
                 .isInstanceOf(IllegalArgumentException.class);
+
+        assertThatThrownBy(() -> goal.updateGoal(new BigDecimal("0.5"), null, 60))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        assertThatThrownBy(() -> goal.updateGoal(BigDecimal.valueOf(7.0), null, 4))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void updateGoal_acceptsSrsBoundaries() {
+        LearningGoal goal = LearningGoal.builder()
+                .id(UUID.randomUUID())
+                .userId(UUID.randomUUID())
+                .targetBand(BigDecimal.valueOf(6.0))
+                .availableMinutesPerDay(45)
+                .status(GoalStatus.ACTIVE)
+                .build();
+
+        goal.updateGoal(new BigDecimal("1.0"), null, 5);
+        assertThat(goal.getTargetBand()).isEqualByComparingTo("1.0");
+        assertThat(goal.getAvailableMinutesPerDay()).isEqualTo(5);
+
+        goal.updateGoal(new BigDecimal("9.0"), null, 5);
+        assertThat(goal.getTargetBand()).isEqualByComparingTo("9.0");
     }
 }
 

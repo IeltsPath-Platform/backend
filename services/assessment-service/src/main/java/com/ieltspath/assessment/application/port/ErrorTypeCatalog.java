@@ -26,5 +26,10 @@ public interface ErrorTypeCatalog {
         return activeCodes().stream().sorted().map(code -> new ErrorType(code, code, "")).toList();
     }
 
+    /** The approved codes that apply to {@code skill}; the essay grader asks for WRITING. */
+    default List<ErrorType> activeErrorTypes(String skill) {
+        return activeErrorTypes();
+    }
+
     record ErrorType(String code, String name, String fixHint) {}
 }

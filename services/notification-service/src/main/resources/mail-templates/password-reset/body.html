@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Đặt lại mật khẩu IELTSPath</title>
+</head>
+<body>
+<th:block th:replace="~{_layout :: header}"></th:block>
+  <p>Xin chào <span th:text="${displayName}">bạn</span>,</p>
+  <p>Dùng liên kết sau để đặt lại mật khẩu trong vòng <span th:text="${expiresInMinutes}">15</span> phút:</p>
+  <p><a th:href="${resetLink}">Đặt lại mật khẩu</a></p>
+  <p>Nếu bạn không yêu cầu, hãy bỏ qua email này.</p>
+<th:block th:replace="~{_layout :: footer}"></th:block>
+</body>
+</html>

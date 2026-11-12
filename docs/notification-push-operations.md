@@ -17,6 +17,8 @@ Both flags are off by default. Configuration changes to `worker-enabled` control
 
 The worker uses Google Application Default Credentials. In Google-hosted environments prefer workload identity. Elsewhere mount a least-privilege service-account file read-only and set `GOOGLE_APPLICATION_CREDENTIALS` to its runtime path. `FIREBASE_PROJECT_ID` can pin the intended project. Do not log or copy the credential JSON.
 
+For local Docker Compose, set `FIREBASE_CREDENTIALS_FILE` in `.env` to the host path of the service-account file (keep it under the gitignored `secrets/` directory). Compose mounts it read-only at `/run/secrets/firebase-service-account.json` and sets `GOOGLE_APPLICATION_CREDENTIALS` only when the variable is present; both push flags and `FIREBASE_PROJECT_ID` are also read from `.env` and stay off/empty by default. Recreate notification-service after changing any of them so the Firebase client is rebuilt.
+
 ## Monitoring
 
 Metrics use bounded labels only; do not add user, device, notification, or token identifiers as labels.

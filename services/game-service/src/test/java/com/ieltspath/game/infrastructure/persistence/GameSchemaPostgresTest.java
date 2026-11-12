@@ -8,9 +8,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.sql.DriverManager;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Testcontainers(disabledWithoutDocker = true)
@@ -36,12 +36,13 @@ class GameSchemaPostgresTest {
             assertTrue(tables.containsAll(Set.of(
                     "game_sessions", "game_answers", "game_rooms", "game_room_members", "game_matches",
                     "game_match_players", "game_events", "quiz_events", "quiz_participations",
-                    "leaderboard_periods", "leaderboard_entries", "outbox_events", "flyway_schema_history",
+                    "leaderboard_periods", "leaderboard_entries", "flyway_schema_history",
                     "game_match_words", "game_player_words", "game_guesses", "game_match_word_pool", "game_guess_receipts",
                     "game_wordly_dictionaries", "game_wordly_dictionary_words",
                     "game_rocket_rounds", "game_rocket_answers"
             )));
-            assertEquals(22, tables.size());
+            assertEquals(21, tables.size());
+            assertFalse(tables.contains("outbox_events"));
         }
     }
 }

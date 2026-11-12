@@ -81,6 +81,7 @@ class WritingWebMvcTest {
     @MockitoBean SubmitLessonEssayUseCase submitLessonEssayUseCase;
     @MockitoBean com.ieltspath.learning.application.usecase.SubmitEssayRevisionUseCase submitEssayRevisionUseCase;
     @MockitoBean com.ieltspath.learning.application.usecase.GetEssayHistoryUseCase getEssayHistoryUseCase;
+    @MockitoBean com.ieltspath.learning.application.usecase.GetWritingProgressUseCase getWritingProgressUseCase;
     @MockitoBean GetTopicLessonsUseCase getTopicLessonsUseCase;
     @MockitoBean GetLessonUseCase getLessonUseCase;
     @MockitoBean SubmitLessonExerciseUseCase submitLessonExerciseUseCase;

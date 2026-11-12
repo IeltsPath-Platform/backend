@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Gói Premium của bạn đã hết hạn</title>
+</head>
+<body>
+<th:block th:replace="~{_layout :: header}"></th:block>
+  <p>Xin chào <span th:text="${displayName}">bạn</span>,</p>
+  <p>Gói Premium của bạn đã hết hạn lúc <strong th:text="${endsAt}">00:00 01/01/2026</strong>.</p>
+  <p>Bạn có thể gia hạn bất cứ lúc nào trong ứng dụng để tiếp tục học.</p>
+<th:block th:replace="~{_layout :: footer}"></th:block>
+</body>
+</html>

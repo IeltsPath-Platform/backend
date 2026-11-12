@@ -160,6 +160,11 @@ public interface LearningContentClient {
     /** Error codes currently accepted by Content. */
     List<ErrorType> activeErrorTypes();
 
+    /** Approved codes that apply to {@code skill}; the grader asks for WRITING. Without a skill-aware client it is the full list. */
+    default List<ErrorType> activeErrorTypes(String skill) {
+        return activeErrorTypes();
+    }
+
     record Rubric(String code, String task, int version, String sourceNote, String systemPrompt,
                   List<RubricCriterion> criteria, List<RubricExample> examples) {
         public Rubric(String code, String task, int version, String sourceNote, List<RubricCriterion> criteria,

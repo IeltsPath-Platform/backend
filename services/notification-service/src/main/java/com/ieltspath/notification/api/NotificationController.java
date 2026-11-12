@@ -33,6 +33,11 @@ public class NotificationController {
     public void markRead(@PathVariable("id") UUID id) { inbox.markRead(users.requireCurrentUser().id(), id); }
     @PutMapping("/read-all")
     public Count markAllRead() { return new Count(inbox.markAllRead(users.requireCurrentUser().id())); }
+    @DeleteMapping("/{id:[0-9a-fA-F-]*}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable("id") UUID id) { inbox.delete(users.requireCurrentUser().id(), id); }
+    @DeleteMapping("/read")
+    public Count deleteRead() { return new Count(inbox.deleteRead(users.requireCurrentUser().id())); }
     @GetMapping("/preferences")
     public List<NotificationPreference> preferences() { return preferences.list(users.requireCurrentUser().id()); }
     @PutMapping("/preferences/{eventType}")

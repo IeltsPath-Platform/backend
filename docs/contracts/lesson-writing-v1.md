@@ -85,9 +85,60 @@ Response 200:
   most 3 items of ≤ 300 characters.
 - `overallBand` is computed by Learning Service, not taken from the LLM: the mean of the four bands rounded to the
   nearest half band, with .25 rounding up to .5 and .75 up to the next whole band.
-- `corrections`: at most 10; `excerpt` is an exact substring of the essay; `category` remains the broad category
+- `corrections`: at most 10 with prompt template `v1`, at most `learning.writing.max-corrections` (default 30, range 1–50)
+  with template `v2`; `excerpt` is an exact substring of the essay; `category` remains the broad category
   (`GRAMMAR`, `VOCABULARY`, `COHERENCE`, `TASK` or `OTHER`) and the additive `errorCode` identifies a matching active,
   human-approved Content error type. A correction with an unknown, inactive or unapproved `errorCode` is omitted.
+  Each correction also carries `errorName`, `fixHint` and `severity` (1–3) copied from that error type when the grade
+  is stored, and `practiceKnowledgePointId` with `practiceKnowledgePointCode` only when the error type maps to a knowledge point that has a practice set.
+  These fields are absent (not null) on grades stored before they were added and are not backfilled.
+- `model` is stored with the grade for audit (value of `LEARNING_LLM_MODEL`); the learner API does not return it.
+- Quota: a grading that fails for a system reason (`LLM_UNAVAILABLE`, `AI_BUSY`, `RUBRIC_UNAVAILABLE`,
+  `PROMPT_VERSION_UNAVAILABLE`) gives its daily grading unit back. `INVALID_GRADE` keeps the unit, because a malformed
+  output may be caused by the essay itself.
+- `bandLimits` (optional, present only when a cap lowered a band): `[{reason, criterion, cap, message}]`, the same shape
+  as Speaking's `bandLimits` plus `criterion` (TA or TR). `reason` is `TOO_SHORT`, `OFF_TOPIC`, `T1_NO_OVERVIEW`,
+  `PARTIAL_ANSWER` or `NO_POSITION`. A criterion lowered by a cap carries `limited: true`. Caps are off until
+  `learning.writing.band-caps-enabled` is true and the thresholds are set; while off, responses carry neither field.
+  The length rule needs only the essay. `T1_NO_OVERVIEW` fires when the second prompt template reports
+  `hasOverview = false`; `PARTIAL_ANSWER` and `NO_POSITION` fire from the Task 2 checks below. `OFF_TOPIC` has no check
+  behind it yet and never fires.
+- `dataChecks` (Task 1, only for a grade made with the second prompt template; absent otherwise):
+  `{wrong: [{excerpt, expected}], correctCount, hasOverview?, overviewAccurate?, hasPersonalOpinion?}`. `wrong` lists the
+  sentences of the essay that contradict the chart; `expected` is a short Vietnamese statement of what the chart shows.
+  Sentences judged right come back only as `correctCount`. A flag the model did not give is omitted. The chart facts
+  themselves are never returned. A wrong figure also appears in `corrections` with the code `T1_DATA_MISREPORTED`.
+- `taskChecks` (Task 2, same condition): `{questionParts: [{part, addressed, excerpt?}], position?: {required, stated,
+  excerpt?, consistent?, conflictExcerpt?}, outline: [{role, mainIdea, developed, excerpt?}], partialAnswer, noPosition,
+  inconsistentPosition, noConclusion}`. `addressed` is `FULL`, `PARTIAL` or `NONE`; `role` is `INTRODUCTION`, `BODY` or
+  `CONCLUSION`. `questionParts` has at most 4 items and `outline` at most 8. The four flags are derived: `partialAnswer`
+  when some part is not `FULL`; `noPosition` when the question asks for an opinion and the essay gives none;
+  `noConclusion` only when an outline was returned and has no `CONCLUSION`. These checks add no evidence and no
+  correction; they are shown to the learner and feed the band caps.
+- `corrections[]` also carries `start` and `end` (the character range `[start, end)` of `excerpt` in `essayText`) and,
+  from the second prompt template, `reason` (one Vietnamese sentence naming the broken rule) and `certainty` (`ERROR` or
+  `SUGGESTION`; a missing value reads as `ERROR`). Each quotation takes the first occurrence that no earlier correction
+  with the same quotation took; a quotation with no free occurrence has no `start`/`end`. Overlapping quotations of
+  different corrections each keep their own range; the client decides which one to draw.
+- `errorGroups` (absent when there are no errors): `[{errorCode, errorName, category, count, severity, fixHint,
+  example?: {wrong, right}, practiceKnowledgePointId?}]`, worst first by `count x severity`, fallback codes (`*_OTHER`) last.
+  Only `ERROR` corrections count; a `SUGGESTION` never starts a group.
+- `priorities` (absent when there is nothing to prioritise): at most 3 items
+  `{title, explanation, excerpts, action, errorCodes, practiceKnowledgePointId?, source}`. `source = AI` when the model
+  chose them (second prompt template); otherwise `RULE`: the three worst `errorGroups`, with `title = errorName`,
+  `action = fixHint` and the first correction of the group as the excerpt. `errorGroups` and `priorities` are worked out
+  when the grade is read, from what is stored; no call to Content or the model is made.
+- `criteria[].evidence` and `criteria[].descriptor` (second prompt template only, omitted when empty): the quotations that
+  support the band and the rubric descriptor that matched.
+- `criteria[].nextBand` (`{band, descriptor}`, omitted at the top of the rubric and for grades stored before it was kept):
+  the lowest band the rubric describes above the band shown, which is the capped band when a cap applied. It is
+  taken from the rubric at grading time and stored with the grade.
+- `revision` (only for an essay sent again, see [essay-revision-v1](essay-revision-v1.md)):
+  `{previousSubmissionId, fixedCodes, repeatedCodes, newCodes}`. The error codes of the version before are compared with
+  those of this one: fixed (gone), repeated (in both), new (only here). Suggestions and fallback codes (`*_OTHER`) do not
+  count. Omitted when the earlier version cannot be read.
+- Every quotation in these fields is an exact part of `essayText`; one that was not is dropped. A reply with a missing or
+  malformed `taskChecks` gives empty lists and unknown flags, and never fails the grade.
 - `summary` ≤ 600 characters. `passed = overallBand ≥ passBand`. `sampleAnswer` only when `passed` or the block was
   passed before.
 
@@ -99,11 +150,21 @@ Each criterion also includes `knowledgePointJudgments`, an ordered array that is
 Each judgment has `knowledgePointId`, `code`, `name`, and `judgment` (`PASS`, `FAIL` or `NOT_ASSESSED`); `excerpt` and `reason` are omitted
 when no evidence is available. When the rubric lists sub-points, Learning appends `essay-kp-judgment-v2` instructions to
 the unchanged band template `v1`; one response supplies `criteria`, `corrections`, `summary`, `focus` and `judgments`.
-Rubrics without sub-points do not require `judgments`. `promptVersion` remains
-`<rubricCode>@<rubricVersion>+tplv1` for band activation; internal grade JSON stores `judgmentVersion=kpj2` whenever the rubric has
+Rubrics without sub-points do not require `judgments`. `promptVersion` is
+`<rubricCode>@<rubricVersion>+tplv1` for band activation, or `+tplv2` when an administrator has activated a run made with the
+second template (`docs/contracts/essay-prompt-template-v2.txt`); with nothing activated, `v1` is used and an unknown template
+version is `PROMPT_VERSION_UNAVAILABLE`. Template `v2` additionally returns, and the grade JSON stores (not yet exposed by the API),
+per correction a `reason` (at most 300 characters, optional) and `certainty` (`ERROR` or `SUGGESTION`; missing or unknown reads as
+`ERROR`; a `SUGGESTION` never creates a knowledge-point `FAIL` and is not counted in the essay event's `error_code`), per criterion
+`evidence` (exact quotations, at most 3; a quotation not in the essay is dropped and the band is kept) and `descriptor`, at most 3
+`priorities` and one `errorExamples` entry per error code in `corrections`. Missing optional parts never make the grade `INVALID_GRADE`.
+Band activation is unchanged; internal grade JSON stores `judgmentVersion=kpj2` whenever the rubric has
 sub-points (the prompt was extended), even if the response has no judgments array, otherwise null. This version is not
 exposed by the API. `EssayKnowledgeJudge` validates the received data without LLM or clock
 dependencies; the grader supplies a lazy Content catalog, loaded at most once when needed for practice targets.
+The essay template's single source is `docs/contracts/essay-prompt-template-v*.txt`; Maven copies it to the root
+classpath of Learning and Assessment. Each grader owns the `<rubricCode>@<rubricVersion>+tpl<templateVersion>`
+identifier; the shared LLM transport does not construct or interpret it.
 Missing or malformed judgments preserve a valid band and leave the affected model
 judgments `NOT_ASSESSED`; validated corrections whose active error type maps to a knowledge point can still produce
 `FAIL`. Corrections and judgments come from the same model response and are checked against application rules.

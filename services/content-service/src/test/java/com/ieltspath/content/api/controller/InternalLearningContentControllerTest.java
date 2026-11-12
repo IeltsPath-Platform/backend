@@ -185,6 +185,20 @@ class InternalLearningContentControllerTest {
     }
 
     @Test
+    void skillParameterLimitsApprovedCodesAndRejectsAnUnknownSkill() throws Exception {
+        var writingCode = com.ieltspath.content.domain.aggregate.ErrorType.create("TENSE", "Tense",
+                com.ieltspath.content.domain.vo.ErrorCategory.GRAMMAR, 1, null, "Use the right tense.");
+        when(errorTypes.executeApprovedActive("WRITING")).thenReturn(List.of(writingCode));
+
+        mockMvc.perform(get("/internal/learning-content/error-types").param("skill", "WRITING"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].code").value("TENSE"))
+                .andExpect(jsonPath("$[0].fallback").value(false));
+        mockMvc.perform(get("/internal/learning-content/error-types").param("skill", "MATH"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void topicSequenceCarriesEachTopicsSkillAndWhetherItHasAFinalTest() throws Exception {
         UUID writing = UUID.randomUUID();
         when(topicSequence.execute(false)).thenReturn(List.of(new TopicSequenceResult(writing, "DEMO_WRITING",

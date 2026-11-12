@@ -41,6 +41,8 @@ public class VocabularyNotebookJdbcAdapter implements VocabularyNotebookReader {
         }
         if (Boolean.TRUE.equals(query.due())) where.append(" and (f.next_review_at is null or f.next_review_at<=:now)");
         if (Boolean.FALSE.equals(query.due())) where.append(" and f.next_review_at>:now");
+        if (Boolean.TRUE.equals(query.learned())) where.append(" and (f.review_count>0 or f.leitner_box>=2)");
+        if (Boolean.FALSE.equals(query.learned())) where.append(" and f.review_count=0 and f.leitner_box=1");
         if (query.topicId() != null) { where.append(" and s.topic_id=:topicId"); params.addValue("topicId", query.topicId()); }
         if (query.setId() != null) {
             where.append(" and exists (select 1 from vocabulary_set_items si join vocabulary_sets vs on vs.id=si.set_id and vs.status='ACTIVE' where si.set_id=:setId and si.sense_id=s.id)");
@@ -77,14 +79,34 @@ public class VocabularyNotebookJdbcAdapter implements VocabularyNotebookReader {
 
     @Override
     public NotebookSummaryResult summarize(UUID userId, Instant now, Instant today, Instant tomorrow) {
-        String sql = "select count(*) total, count(*) filter(where leitner_box=1) unknown, count(*) filter(where leitner_box=2) familiar, count(*) filter(where leitner_box=3) learning, count(*) filter(where leitner_box in (4,5)) mastered, count(*) filter(where review_count>0 or leitner_box>=2) learned_count, (select count(*) from vocabulary_senses s join vocabulary_items i on i.id=s.vocabulary_item_id where s.status='ACTIVE' and i.status='ACTIVE') catalog_total, count(*) filter(where next_review_at is null or next_review_at<=:now) due_now, count(*) filter(where created_at>=:seven) added_last7, count(*) filter(where last_reviewed_at>=:today and last_reviewed_at<:tomorrow) reviewed_today, min(next_review_at) filter(where next_review_at>:now) next_due from flashcards where user_id=:user and status='ACTIVE' and source_type='VOCABULARY_SENSE'";
+        String sql = """
+                select count(*) total,
+                       count(*) filter(where leitner_box=1) unknown,
+                       count(*) filter(where leitner_box=2) familiar,
+                       count(*) filter(where leitner_box=3) learning,
+                       count(*) filter(where leitner_box in (4,5)) mastered,
+                       count(*) filter(where review_count>0 or leitner_box>=2) learned_count,
+                       (select count(*) from vocabulary_senses s join vocabulary_items i on i.id=s.vocabulary_item_id
+                        where s.status='ACTIVE' and i.status='ACTIVE') catalog_total,
+                       count(*) filter(where next_review_at is null or next_review_at<=:now) due_now,
+                       count(*) filter(where created_at>=:seven) added_last7,
+                       count(*) filter(where last_reviewed_at>=:today and last_reviewed_at<:tomorrow) reviewed_today,
+                       min(next_review_at) filter(where next_review_at>:now) next_due,
+                       count(*) filter(where leitner_box=1 and review_count=0) new_count,
+                       count(*) filter(where leitner_box<4 and (review_count>0 or leitner_box>=2)) in_progress_count,
+                       count(*) filter(where (review_count>0 or leitner_box>=2)
+                                       and (next_review_at is null or next_review_at<=:now)) due_review_count
+                from flashcards
+                where user_id=:user and status='ACTIVE' and source_type='VOCABULARY_SENSE'
+                """;
         MapSqlParameterSource p = new MapSqlParameterSource().addValue("user", userId).addValue("now", java.sql.Timestamp.from(now))
                 .addValue("seven", java.sql.Timestamp.from(now.minusSeconds(7 * 86400L)))
                 .addValue("today", java.sql.Timestamp.from(today)).addValue("tomorrow", java.sql.Timestamp.from(tomorrow));
         return jdbc.queryForObject(sql, p, (rs, row) -> new NotebookSummaryResult(rs.getLong("total"), rs.getLong("unknown"),
                 rs.getLong("familiar"), rs.getLong("learning"), rs.getLong("mastered"), rs.getLong("due_now"),
                 rs.getLong("added_last7"), rs.getLong("reviewed_today"), rs.getTimestamp("next_due") == null ? null : rs.getTimestamp("next_due").toInstant(),
-                rs.getLong("learned_count"), rs.getLong("catalog_total")));
+                rs.getLong("learned_count"), rs.getLong("catalog_total"), rs.getLong("new_count"),
+                rs.getLong("in_progress_count"), rs.getLong("due_review_count")));
     }
 
     @Override
