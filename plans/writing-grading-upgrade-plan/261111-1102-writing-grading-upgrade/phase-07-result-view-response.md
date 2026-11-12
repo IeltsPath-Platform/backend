@@ -1,7 +1,7 @@
 ---
 phase: 7
 title: "Result view response"
-status: backend-done-frontend-pending
+status: done-pending-visual-check
 priority: P2
 dependencies: [2, 4, 5, 8]
 ---
