@@ -68,9 +68,13 @@ resilience4j:
       assessment: { base-config: default }
       library: { base-config: default }
       learning: { base-config: default }
+      # Only a call that asks for IDEMPOTENT_WRITE is retried, and for llm that is the Speaking grade alone. The provider's
+      # "high demand" 503 lasts seconds, so wait longer than 200 ms between the three tries. 429 is never retried.
+      llm: { base-config: default, max-attempts: 3, wait-duration: 2s }
   bulkhead:
     instances:
-      llm: { max-concurrent-calls: 4, max-wait-duration: 0 }
+      # One Speaking grading asks the model four times at once, so this must leave room for other learners' gradings.
+      llm: { max-concurrent-calls: 12, max-wait-duration: 0 }
 
 logging:
   pattern:

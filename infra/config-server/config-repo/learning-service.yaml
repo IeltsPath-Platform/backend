@@ -58,7 +58,7 @@ learning:
   writing:
     point-cost: ${LEARNING_WRITING_POINT_COST:3}
     # LLM gradings per learner and calendar day in quota-timezone.
-    daily-grading-limit: ${LEARNING_WRITING_DAILY_GRADING_LIMIT:10}
+    daily-grading-limit: ${LEARNING_WRITING_DAILY_GRADING_LIMIT:20}
     quota-timezone: Asia/Ho_Chi_Minh
     grading-timeout-seconds: 20
   # Azure Speech: transcript and pronunciation scores of a Speaking recording. The key lives only in .env. Blank key or
@@ -83,10 +83,12 @@ learning:
     retention-days: ${LEARNING_SPEAKING_RETENTION_DAYS:90}
     timezone: Asia/Ho_Chi_Minh
     daily-grading-limit: ${LEARNING_SPEAKING_DAILY_LIMIT:5}
-    # A row being graded that has not changed for this long is taken over, and a grading that failed waits this long before
-    # it is tried again. The job signals progress after every recording, so this only has to cover one step (analysing
-    # one recording, or the LLM call), not the whole submission.
+    # A row being graded that has not changed for this long is taken over. The job signals progress after every recording,
+    # so this only has to cover one step (analysing one recording, or the LLM call), not the whole submission.
     stale-after-seconds: 300
+    # A grading that failed for a reason that may pass (model or speech service unreachable) waits this long before it is
+    # tried again. Kept short: the wait is what the learner sees, and the speech analysis is stored, so a retry is cheap.
+    retry-delay-seconds: 30
     max-attempts: 3
     pass-band: 6.0
     max-input-chars: 60000

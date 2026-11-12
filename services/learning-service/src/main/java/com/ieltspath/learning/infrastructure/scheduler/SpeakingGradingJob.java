@@ -77,7 +77,9 @@ public class SpeakingGradingJob {
     @Scheduled(fixedDelayString = "${learning.speaking.job-delay-ms:5000}")
     public void runOne() {
         if (!settings.enabled()) return;
-        submissions.claimNext(Instant.now(clock).minusSeconds(settings.staleAfterSeconds()), settings.maxAttempts())
+        Instant now = Instant.now(clock);
+        submissions.claimNext(now.minusSeconds(settings.staleAfterSeconds()), now.minusSeconds(settings.retryDelaySeconds()),
+                        settings.maxAttempts())
                 .ifPresent(this::process);
     }
 
@@ -139,7 +141,11 @@ public class SpeakingGradingJob {
             submissions.save(submission);
             log.warn("Speaking grading deferred: submissionId={}, code={}", submission.id(), "DAILY_LIMIT_REACHED");
         } catch (RuntimeException exception) {
-            log.warn("Speaking grading failed: submissionId={}, code={}", submission.id(), "INTERNAL_FAILURE");
+            // The type and the place of the failure are enough to find the cause; the message could carry the learner's words.
+            StackTraceElement origin = exception.getStackTrace().length == 0 ? null : exception.getStackTrace()[0];
+            log.warn("Speaking grading failed: submissionId={}, code={}, exception={}, at={}", submission.id(),
+                    "INTERNAL_FAILURE", exception.getClass().getName(),
+                    origin == null ? "-" : origin.getClassName() + "." + origin.getMethodName() + ":" + origin.getLineNumber());
             failRetryable(submission, "INTERNAL_FAILURE");
         } finally {
             // A call that produced no grade does not use up the learner's day.

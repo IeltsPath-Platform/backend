@@ -11,6 +11,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.test.web.client.ExpectedCount;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
@@ -53,6 +54,46 @@ class OpenAiCompatibleLlmClientTest {
 
         assertEquals("{\"criteria\":[]}", setup.client().completeJson("system text", "user text"));
         setup.server().verify();
+    }
+
+    @Test
+    void theDefaultOutputBudgetIsKeptAndAnExplicitBudgetReplacesIt() {
+        Setup setup = client("gpt-4o-mini", "");
+        setup.server().expect(requestTo(BASE_URL + "/chat/completions")).andExpect(jsonPath("$.max_tokens").value(4096))
+                .andRespond(withSuccess(reply("\"x\""), MediaType.APPLICATION_JSON));
+        setup.server().expect(requestTo(BASE_URL + "/chat/completions")).andExpect(jsonPath("$.max_tokens").value(12000))
+                .andRespond(withSuccess(reply("\"y\""), MediaType.APPLICATION_JSON));
+
+        assertEquals("x", setup.client().completeJson("s", "u"));
+        assertEquals("y", setup.client().completeJson("s", "u", new com.ieltspath.learning.application.port.LlmClient.Budget(12000, 0)));
+        setup.server().verify();
+    }
+
+    /** The longer wait is applied to a copy of the client, which must still reach the same endpoint with the same key. */
+    @Test
+    void aBudgetWithItsOwnTimeoutStillReachesTheEndpointWithTheKeyAndTheBudget() throws IOException {
+        var seen = new java.util.concurrent.atomic.AtomicReference<String>();
+        var http = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        http.createContext("/v1/chat/completions", exchange -> {
+            seen.set(exchange.getRequestHeaders().getFirst("Authorization") + " "
+                    + new String(exchange.getRequestBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+            byte[] body = reply("\"ok\"").getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
+        http.start();
+        try {
+            var client = new OpenAiCompatibleLlmClient(RestClient.builder().baseUrl("http://127.0.0.1:" + http.getAddress().getPort() + "/v1").build(),
+                    "test-key", "gpt-4o-mini", "");
+
+            assertEquals("ok", client.completeJson("s", "u", new com.ieltspath.learning.application.port.LlmClient.Budget(12000, 30)));
+            assertTrue(seen.get().startsWith("Bearer test-key "));
+            assertTrue(seen.get().contains("\"max_tokens\":12000"));
+        } finally {
+            http.stop(0);
+        }
     }
 
     @Test
@@ -110,6 +151,62 @@ class OpenAiCompatibleLlmClientTest {
         setup.server().verify();
     }
 
+    private static final com.ieltspath.learning.application.port.LlmClient.Budget RETRYING =
+            new com.ieltspath.learning.application.port.LlmClient.Budget(8000, 0, true);
+
+    private static Setup resilientClient() {
+        RestClient.Builder builder = RestClient.builder().baseUrl(BASE_URL);
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        return new Setup(new OpenAiCompatibleLlmClient(builder.build(), "test-key", "gpt-4o-mini", "",
+                com.ieltspath.commonresilience.ResilientCall.isolatedDefault()), server);
+    }
+
+    @Test
+    void aBudgetThatRetriesAsksAgainWhenTheProviderIsBusyWithA503() {
+        Setup setup = resilientClient();
+        setup.server().expect(once(), requestTo(BASE_URL + "/chat/completions"))
+                .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
+        setup.server().expect(once(), requestTo(BASE_URL + "/chat/completions"))
+                .andRespond(withSuccess(reply("\"ok\""), MediaType.APPLICATION_JSON));
+
+        assertEquals("ok", setup.client().completeJson("s", "u", RETRYING));
+        setup.server().verify();
+    }
+
+    @Test
+    void aBudgetThatRetriesGivesUpWhenTheRetryIsBusyToo() {
+        Setup setup = resilientClient();
+        setup.server().expect(ExpectedCount.times(2), requestTo(BASE_URL + "/chat/completions"))
+                .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
+
+        LlmUnavailableException failure = assertThrows(LlmUnavailableException.class,
+                () -> setup.client().completeJson("s", "u", RETRYING));
+        assertEquals("LLM provider request failed (status 503)", failure.getMessage());
+        setup.server().verify();
+    }
+
+    @Test
+    void aBudgetThatDoesNotAskForTheRetryKeepsTheSingleRequestOfEveryOtherCall() {
+        Setup setup = resilientClient();
+        setup.server().expect(once(), requestTo(BASE_URL + "/chat/completions"))
+                .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
+
+        assertThrows(LlmUnavailableException.class, () -> setup.client().completeJson("s", "u"));
+        setup.server().verify();
+    }
+
+    @Test
+    void aGoneQuotaIsNeverAskedAgainEvenByABudgetThatRetries() {
+        Setup setup = resilientClient();
+        setup.server().expect(once(), requestTo(BASE_URL + "/chat/completions"))
+                .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
+
+        LlmUnavailableException failure = assertThrows(LlmUnavailableException.class,
+                () -> setup.client().completeJson("s", "u", RETRYING));
+        assertEquals("LLM provider request failed (status 429)", failure.getMessage());
+        setup.server().verify();
+    }
+
     @Test
     void errorsOtherThanBusyAreNotAskedAgain() {
         Setup setup = client("gemini-3.8-flash", "");
@@ -120,6 +217,35 @@ class OpenAiCompatibleLlmClientTest {
                 () -> setup.client().completeJson("s", "u"));
         assertTrue(failure.getMessage().contains("400"));
         setup.server().verify();
+    }
+
+    @Test
+    void aRejectedRequestLogsTheProviderIdentifiersAndTheStartOfItsMessage(CapturedOutput output) {
+        Setup setup = client("gpt-4o-mini", "");
+        setup.server().expect(requestTo(BASE_URL + "/chat/completions"))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_JSON)
+                        .body("[{\"error\":{\"code\":400,\"status\":\"INVALID_ARGUMENT\",\"param\":\"max_tokens\","
+                                + "\"message\":\"max_tokens is too large\\nfor this model " + "x".repeat(400) + "\"}}]"));
+
+        assertThrows(LlmUnavailableException.class, () -> setup.client().completeJson("s", "u"));
+        assertTrue(output.getAll().contains("status=400"));
+        assertTrue(output.getAll().contains("providerCode=400"));
+        assertTrue(output.getAll().contains("providerStatus=INVALID_ARGUMENT"));
+        assertTrue(output.getAll().contains("providerParam=max_tokens"));
+        assertTrue(output.getAll().contains("providerMessage=max_tokens is too large for this model xxx"));
+        assertFalse(output.getAll().contains("x".repeat(320)));
+    }
+
+    @Test
+    void aBusyProviderMessageIsNotLogged(CapturedOutput output) {
+        Setup setup = client("gpt-4o-mini", "");
+        setup.server().expect(requestTo(BASE_URL + "/chat/completions"))
+                .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"error\":{\"code\":429,\"message\":\"private learner essay\"}}"));
+
+        assertThrows(LlmUnavailableException.class, () -> setup.client().completeJson("s", "u"));
+        assertTrue(output.getAll().contains("providerCode=429"));
+        assertFalse(output.getAll().contains("private learner essay"));
     }
 
     @Test

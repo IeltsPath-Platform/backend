@@ -82,7 +82,7 @@ class SpeakingGradingJobTest {
         submission.saveRubricSnapshot(json.convertValue(rubric, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() { }));
         submission.complete(NOW);
         submission.startAnalysis(NOW);
-        when(submissions.claimNext(any(), anyInt())).thenReturn(Optional.of(submission));
+        when(submissions.claimNext(any(), any(), anyInt())).thenReturn(Optional.of(submission));
         return submission;
     }
 
@@ -94,7 +94,7 @@ class SpeakingGradingJobTest {
     private void gradingFailsWith(RuntimeException failure) {
         LearningContentClient.Rubric rubric = new LearningContentClient.Rubric("IELTS_SPEAKING", "SPEAKING", 2, "note",
                 List.of(), List.of());
-        when(grader.prepare(any(), any())).thenReturn(new SpeakingPromptAssembler.Prepared(rubric, "a".repeat(64), "system", "user"));
+        when(grader.prepare(any(), any())).thenReturn(new SpeakingPromptAssembler.Prepared(rubric, "a".repeat(64), "user"));
         when(grader.grade(any(), any())).thenThrow(failure);
     }
 
@@ -134,7 +134,7 @@ class SpeakingGradingJobTest {
         when(quota.tryConsume(any(), any(), anyString(), anyInt())).thenReturn(false);
         when(grader.prepare(any(), any())).thenReturn(new SpeakingPromptAssembler.Prepared(
                 new LearningContentClient.Rubric("IELTS_SPEAKING", "SPEAKING", 2, "note", List.of(), List.of()),
-                "a".repeat(64), "system", "user"));
+                "a".repeat(64), "user"));
 
         job.runOne();
 

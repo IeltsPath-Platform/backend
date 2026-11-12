@@ -268,6 +268,32 @@ Added 2026-10-03. Request `{knowledgePointIds, excludePackageIds, minQuestions}`
 {"counts":{"10000000-0000-4000-8000-000000000002":3}}
 ```
 
+## `POST /practice-test-keys`
+
+Added 2026-11-12. Translates what a learner's records point at into the practice test the library catalog lists, so
+Learning can say which tests of Speaking and Writing a learner has done (see
+[Practice progress](./practice-progress-v1.md)). The catalog knows a test by its package and part; Learning keeps a
+Speaking submission by package version and a free Writing essay by question version.
+
+Request: `packageVersionIds` and `questionVersionIds`, each optional, at most 500 ids, no `null` (else `400`). Both
+empty is allowed and returns two empty lists.
+
+```json
+{"packageVersionIds":["adff6074-cfd2-4320-b8d6-684dece01862"],"questionVersionIds":["20000000-0000-4000-8000-000000000201"]}
+```
+
+Response:
+
+```json
+{"versions":[{"packageVersionId":"adff6074-cfd2-4320-b8d6-684dece01862","packageId":"6b2bf327-9455-4be7-942c-f24c5669f422"}],
+ "questions":[{"questionVersionId":"20000000-0000-4000-8000-000000000201","packageId":"6b2bf327-9455-4be7-942c-f24c5669f422","partNo":2}]}
+```
+
+Only `PRACTICE_TEST` packages are answered; an id that matches none is left out, not an error. `versions` holds any
+version of the package, published or not, because a record made on an older version still belongs to the same test.
+`questions` holds Writing questions only; a question that sits in more than one version of a package is answered with
+the current published version first, then the highest version number. `partNo` is the part (task) of the section.
+
 ## `POST /questions/difficulties`
 
 Returns the stored difficulty tag for question versions in one database query. This endpoint requires an authenticated internal JWT like the other `/internal/learning-content/**` routes.

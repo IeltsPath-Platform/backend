@@ -16,6 +16,6 @@ public final class SpeakingSettingsFixture {
 
     public static SpeakingPracticeSettings of(boolean enabled, long maxRecordingBytes) {
         return new SpeakingPracticeSettings(enabled, 5, "speaking-recordings", maxRecordingBytes, 1800, 90,
-                "Asia/Ho_Chi_Minh", 5, 120, 3, 6.0, 60000, 3, 5, "", 5, 90, 30, 5.0, 4.0, 3.0);
+                "Asia/Ho_Chi_Minh", 5, 120, 30, 3, 6.0, 60000, 3, 5, "", 5, 90, 30, 5.0, 4.0, 3.0);
     }
 }

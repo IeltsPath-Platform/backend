@@ -29,7 +29,10 @@ public record SpeakingPracticeSettings(
         @DefaultValue("90") @Min(1) int retentionDays,
         @DefaultValue("Asia/Ho_Chi_Minh") @NotBlank String timezone,
         @DefaultValue("5") @Min(1) int dailyGradingLimit,
+        /** A row being analysed or graded that has not changed for this long is taken over by another worker. */
         @DefaultValue("120") @Min(30) int staleAfterSeconds,
+        /** A grading that failed for a reason that may pass waits this long before it is tried again. */
+        @DefaultValue("30") @Min(5) int retryDelaySeconds,
         @DefaultValue("3") @Min(1) int maxAttempts,
         @DefaultValue("6.0") double passBand,
         @DefaultValue("60000") @Min(1000) int maxInputChars,

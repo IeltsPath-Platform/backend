@@ -22,6 +22,17 @@ public class SpeakingResultValidator {
     private static final BigDecimal NINE = BigDecimal.valueOf(9);
     private static final BigDecimal HALF = new BigDecimal("0.5");
     private static final int MAX_QUOTE = 160;
+    /**
+     * How much of each part of the answer is kept. The prompt tells the model these same numbers, so it can put the most
+     * serious findings first instead of having the tail cut off.
+     */
+    static final int MAX_ERRORS = 45;
+    static final int MAX_EVIDENCE = 8;
+    static final int MAX_POINTS = 6;
+    /** A weakness names one kind of mistake, how often it happens and quotes its places with their fixes, so it is long. */
+    static final int MAX_WEAKNESS_CHARS = 700;
+    private static final int MAX_STRENGTH_CHARS = 300;
+    static final int MAX_OBSERVATIONS = 12;
     private static final Set<String> RELIABILITY = Set.of("HIGH", "MEDIUM", "LOW");
     private static final Set<String> STANCES = Set.of("STRENGTH", "WEAKNESS");
 
@@ -71,14 +82,15 @@ public class SpeakingResultValidator {
         String transcript = SpeakingGradingInput.normalize(input.transcript());
         Set<Integer> parts = input.parts();
         return new ValidatedGrade(criteria(root, transcript), partNotes(root.path("partNotes"), parts), flags(root.path("flags")),
-                reliability(root.path("transcriptReliability")), clean(root.path("summary").asText(""), 500),
+                reliability(root.path("transcriptReliability")), clean(root.path("summary").asText(""), 800),
                 texts(root.path("focus"), 4, 200), errors(root.path("errors"), input, transcript, parts),
                 observations(root.path("kpObservations"), allowedKpCodes, transcript, parts),
                 personalFeedback(root.path("personalFeedback"), allowedKpCodes, transcript),
                 pronunciationNotes(root.path("pronunciationNotes"), input));
     }
 
-    private JsonNode parse(String raw) {
+    /** The answer of one model call as a JSON object. */
+    JsonNode parse(String raw) {
         try {
             JsonNode value = json.readTree(raw);
             if (value != null && value.isObject()) return value;
@@ -100,15 +112,16 @@ public class SpeakingResultValidator {
         for (String code : SpeakingPromptAssembler.GRADED_CRITERIA) {
             JsonNode item = byCode.get(code);
             if (item == null) throw new InvalidSpeakingGradeException();
-            criteria.add(new Criterion(code, band(item.path("band")), clean(item.path("comment").asText(""), 600),
-                    texts(item.path("strengths"), 4, 200), texts(item.path("weaknesses"), 4, 200),
+            criteria.add(new Criterion(code, band(item.path("band")), clean(item.path("comment").asText(""), 1000),
+                    texts(item.path("strengths"), MAX_POINTS, MAX_STRENGTH_CHARS),
+                    texts(item.path("weaknesses"), MAX_POINTS, MAX_WEAKNESS_CHARS),
                     evidence(item.path("evidence"), transcript)));
         }
         return criteria;
     }
 
     /** A JSON number from 0 to 9 in steps of 0.5; anything else, including a missing field, is not a band. */
-    private static BigDecimal band(JsonNode node) {
+    static BigDecimal band(JsonNode node) {
         if (!node.isNumber()) throw new InvalidSpeakingGradeException();
         BigDecimal band = node.decimalValue();
         if (band.compareTo(BigDecimal.ZERO) < 0 || band.compareTo(NINE) > 0 || band.remainder(HALF).signum() != 0) {
@@ -123,8 +136,8 @@ public class SpeakingResultValidator {
         for (JsonNode item : node) {
             String quote = item.path("quote").asText("").strip();
             if (!quoted(quote, transcript)) continue;
-            kept.add(new Evidence(quote, clean(item.path("note").asText(""), 200)));
-            if (kept.size() == 5) break;
+            kept.add(new Evidence(quote, clean(item.path("note").asText(""), 300)));
+            if (kept.size() == MAX_EVIDENCE) break;
         }
         return kept;
     }
@@ -134,7 +147,7 @@ public class SpeakingResultValidator {
         if (!node.isArray()) return kept;
         for (JsonNode item : node) {
             if (!item.path("partNo").isInt() || !parts.contains(item.path("partNo").asInt())) continue;
-            String note = clean(item.path("note").asText(""), 300);
+            String note = clean(item.path("note").asText(""), 500);
             if (!note.isBlank()) kept.add(new PartNote(item.path("partNo").asInt(), note));
         }
         return kept;
@@ -160,8 +173,8 @@ public class SpeakingResultValidator {
             if (!allowed.contains(code) || partNo == BAD_PART) continue;
             String excerpt = item.path("excerpt").asText("").strip();
             if (!quoted(excerpt, transcript)) continue;
-            kept.add(new ErrorItem(code, partNo == NO_PART ? null : partNo, excerpt, clean(item.path("suggestion").asText(""), 300)));
-            if (kept.size() == 10) break;
+            kept.add(new ErrorItem(code, partNo == NO_PART ? null : partNo, excerpt, clean(item.path("suggestion").asText(""), 400)));
+            if (kept.size() == MAX_ERRORS) break;
         }
         return kept;
     }
@@ -176,8 +189,8 @@ public class SpeakingResultValidator {
             if (!allowedKps.contains(code) || !STANCES.contains(stance) || partNo == BAD_PART) continue;
             String excerpt = item.path("excerpt").asText("").strip();
             if (!quoted(excerpt, transcript)) continue;
-            kept.add(new KpObservation(code, stance, partNo == NO_PART ? null : partNo, excerpt, clean(item.path("reason").asText(""), 200)));
-            if (kept.size() == 8) break;
+            kept.add(new KpObservation(code, stance, partNo == NO_PART ? null : partNo, excerpt, clean(item.path("reason").asText(""), 300)));
+            if (kept.size() == MAX_OBSERVATIONS) break;
         }
         return kept;
     }
@@ -185,7 +198,7 @@ public class SpeakingResultValidator {
     /** The advice written for this learner. A wrong shape drops this part alone; the code then writes a stock note. */
     private static PersonalFeedback personalFeedback(JsonNode node, Set<String> allowedKps, String transcript) {
         if (!node.isObject()) return null;
-        String note = clean(node.path("note").asText(""), 300);
+        String note = clean(node.path("note").asText(""), 600);
         List<PriorityKp> priority = new ArrayList<>();
         if (node.path("priorityKps").isArray()) {
             for (JsonNode item : node.path("priorityKps")) {
@@ -195,7 +208,7 @@ public class SpeakingResultValidator {
                 if (priority.size() == 3) break;
             }
         }
-        List<String> plan = texts(node.path("studyPlan"), 4, 200);
+        List<String> plan = texts(node.path("studyPlan"), 6, 300);
         return note.isBlank() && plan.isEmpty() && priority.isEmpty() ? null : new PersonalFeedback(note, priority, plan);
     }
 

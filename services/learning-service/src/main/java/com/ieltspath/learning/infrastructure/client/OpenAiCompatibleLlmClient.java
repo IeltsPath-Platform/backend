@@ -3,6 +3,7 @@ package com.ieltspath.learning.infrastructure.client;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.commonresilience.CallKind;
 import com.ieltspath.commonresilience.DownstreamUnavailableException;
 import com.ieltspath.commonresilience.ResilientCall;
@@ -27,12 +28,16 @@ import java.util.Locale;
  * Minimal OpenAI-compatible {@code /chat/completions} client. The reasoning-effort defaults and the temperature rule
  * follow DeepTutor v1.6.9 ({@code deeptutor/services/llm/reasoning_params.py} and
  * {@code provider_core/openai_compat_provider.py}, Apache-2.0), as the retired Python service did. No request or
- * response text is ever logged, and provider error bodies are dropped.
+ * response text is ever logged, and provider error bodies are dropped: only the identifier-shaped {@code type},
+ * {@code code}, {@code status} and {@code param} of an error are kept for the log, plus a short excerpt of the message
+ * of a 400 (see {@link #errorDetail}).
  */
 @Component
 public class OpenAiCompatibleLlmClient implements LlmClient {
     private static final Logger log = LoggerFactory.getLogger(OpenAiCompatibleLlmClient.class);
     private static final int MAX_TOKENS = 4096;
+    private static final ObjectMapper ERROR_READER = new ObjectMapper();
+    private static final int MESSAGE_EXCERPT = 300;
     /** Families that think by default and may spend the whole budget on it unless told not to. */
     private static final List<String> THINKING_DEFAULT_OFF = List.of("gemini-2.5", "gemini-3");
     /** The subset that rejects "none" and accepts "minimal" as the lowest level. */
@@ -98,11 +103,20 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
 
     @Override
     public String completeJson(String systemPrompt, String userPrompt) {
+        return completeJson(systemPrompt, userPrompt, new Budget(MAX_TOKENS, 0));
+    }
+
+    /** A {@code timeoutSeconds} of 0 keeps the client's own read timeout. */
+    @Override
+    public String completeJson(String systemPrompt, String userPrompt, Budget budget) {
         if (!configured()) throw new LlmUnavailableException(null);
         try {
-            Request request = request(systemPrompt, userPrompt);
-            return resilientCall == null ? requestContent(request)
-                    : resilientCall.call("llm", CallKind.WRITE, () -> requestContent(request));
+            Request request = request(systemPrompt, userPrompt, budget.maxTokens());
+            RestClient client = budget.timeoutSeconds() > 0
+                    ? restClient.mutate().requestFactory(requestFactory(budget.timeoutSeconds())).build() : restClient;
+            CallKind kind = budget.retryTransient() ? CallKind.IDEMPOTENT_WRITE : CallKind.WRITE;
+            return resilientCall == null ? requestContent(client, request)
+                    : resilientCall.call("llm", kind, () -> requestContent(client, request));
         } catch (DownstreamUnavailableException exception) {
             if ("bulkhead-full".equals(exception.reason())) {
                 throw new LearningRequestException(503, "AI_BUSY", "AI grading is busy; try again shortly");
@@ -110,7 +124,7 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
             throw new LlmUnavailableException(null);
         } catch (RestClientResponseException exception) {
             int status = exception.getStatusCode().value();
-            log.warn("LLM request failed: status={}", status);
+            log.warn("LLM request failed: status={}, {}", status, errorDetail(exception));
             throw new LlmUnavailableException(status);
         } catch (RestClientException exception) {
             log.warn("LLM request failed: {}", exception.getClass().getSimpleName());
@@ -118,14 +132,43 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
         }
     }
 
-    private Request request(String systemPrompt, String userPrompt) {
+    /**
+     * The {@code type}, {@code code}, {@code status} and {@code param} of a provider error, so a failure can be told apart
+     * (an unsupported parameter, a limit that is too high). Each value is kept only when it looks like an identifier.
+     * Only a 400 also keeps the start of the provider's message: it says which part of the request was refused, and the
+     * other statuses (busy, unavailable, refused key) are understood from the code alone.
+     */
+    static String errorDetail(RestClientResponseException exception) {
+        try {
+            JsonNode root = ERROR_READER.readTree(exception.getResponseBodyAsString());
+            JsonNode error = (root.isArray() ? root.path(0) : root).path("error");
+            String detail = "providerType=" + identifier(error.path("type")) + ", providerCode=" + identifier(error.path("code"))
+                    + ", providerStatus=" + identifier(error.path("status")) + ", providerParam=" + identifier(error.path("param"));
+            if (exception.getStatusCode().value() == 400) detail += ", providerMessage=" + excerpt(error.path("message"));
+            return detail;
+        } catch (Exception unreadable) {
+            return "providerType=-, providerCode=-, providerStatus=-, providerParam=-";
+        }
+    }
+
+    private static String excerpt(JsonNode value) {
+        String text = value.asText("").replaceAll("\\s+", " ").strip();
+        return text.length() <= MESSAGE_EXCERPT ? text : text.substring(0, MESSAGE_EXCERPT) + "...";
+    }
+
+    private static String identifier(JsonNode value) {
+        String text = value.asText("");
+        return text.matches("[A-Za-z0-9_.\\-]{1,64}") ? text : "-";
+    }
+
+    private Request request(String systemPrompt, String userPrompt, int maxTokens) {
         return new Request(model, List.of(new Message("system", systemPrompt), new Message("user", userPrompt)),
-                MAX_TOKENS, supportsTemperature(model, reasoningEffort) ? 0.0 : null, new ResponseFormat("json_object"),
+                maxTokens, supportsTemperature(model, reasoningEffort) ? 0.0 : null, new ResponseFormat("json_object"),
                 resolveReasoningEffort(model, reasoningEffort));
     }
 
-    private String requestContent(Request body) {
-        JsonNode response = restClient.post().uri("/chat/completions")
+    private String requestContent(RestClient client, Request body) {
+        JsonNode response = client.post().uri("/chat/completions")
                 .headers(headers -> headers.setBearerAuth(apiKey))
                 .body(body).retrieve().body(JsonNode.class);
         JsonNode content = response == null ? null : response.path("choices").path(0).path("message").path("content");
