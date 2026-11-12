@@ -44,7 +44,9 @@ public final class RubricPromptBuilder {
         String codes = errorTypes.stream().filter(java.util.Objects::nonNull).filter(error -> error.code() != null)
                 .sorted(java.util.Comparator.comparing(ErrorTypeCatalog.ErrorType::code))
                 .map(error -> error.code() + " — " + error.name() + ": " + error.fixHint()).collect(Collectors.joining("\n"));
-        return (TEMPLATE_VERSION_2.equals(templateVersion) ? TEMPLATE_2 : TEMPLATE).replace("{{task}}", task).replace("{{criteria}}", criteria)
+        String template = forTask(TEMPLATE_VERSION_2.equals(templateVersion) ? TEMPLATE_2 : TEMPLATE,
+                "TASK_1".equals(rubric.task()));
+        return template.replace("{{task}}", task).replace("{{criteria}}", criteria)
                 .replace("{{error_codes}}", codes.isBlank() ? "(none)" : codes);
     }
 
@@ -63,7 +65,20 @@ public final class RubricPromptBuilder {
     private static String loadTemplate(String version) {
         try (InputStream stream = RubricPromptBuilder.class.getResourceAsStream("/essay-prompt-template-" + version + ".txt")) {
             if (stream == null) throw new IllegalStateException("Essay prompt template is missing");
-            return new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+            return withoutNotes(new String(stream.readAllBytes(), StandardCharsets.UTF_8));
         } catch (IOException exception) { throw new IllegalStateException("Essay prompt template cannot be read", exception); }
+    }
+
+    /** Lines that start with "#" at the top of a template are notes for people; the model never sees them. */
+    private static String withoutNotes(String template) {
+        return template.replaceFirst("\\A(?:#[^\\r\\n]*\\R)+\\s*", "");
+    }
+
+    /** The template with only the section of the given task kept; a template without sections is unchanged. */
+    static String forTask(String template, boolean taskOne) {
+        String drop = taskOne ? "TASK_2" : "TASK_1";
+        String keep = taskOne ? "TASK_1" : "TASK_2";
+        return template.replaceAll("(?s)\\[\\[" + drop + "\\]\\].*?\\[\\[/" + drop + "\\]\\]\\R*", "")
+                .replaceAll("\\[\\[/?" + keep + "\\]\\]\\R?", "");
     }
 }

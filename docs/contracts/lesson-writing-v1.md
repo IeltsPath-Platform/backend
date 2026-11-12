@@ -100,7 +100,45 @@ Response 200:
   as Speaking's `bandLimits` plus `criterion` (TA or TR). `reason` is `TOO_SHORT`, `OFF_TOPIC`, `T1_NO_OVERVIEW`,
   `PARTIAL_ANSWER` or `NO_POSITION`. A criterion lowered by a cap carries `limited: true`. Caps are off until
   `learning.writing.band-caps-enabled` is true and the thresholds are set; while off, responses carry neither field.
-  Only the length rule can fire from the grade alone; the other rules need the flags of prompt v2.
+  The length rule needs only the essay. `T1_NO_OVERVIEW` fires when the second prompt template reports
+  `hasOverview = false`; `PARTIAL_ANSWER` and `NO_POSITION` fire from the Task 2 checks below. `OFF_TOPIC` has no check
+  behind it yet and never fires.
+- `dataChecks` (Task 1, only for a grade made with the second prompt template; absent otherwise):
+  `{wrong: [{excerpt, expected}], correctCount, hasOverview?, overviewAccurate?, hasPersonalOpinion?}`. `wrong` lists the
+  sentences of the essay that contradict the chart; `expected` is a short Vietnamese statement of what the chart shows.
+  Sentences judged right come back only as `correctCount`. A flag the model did not give is omitted. The chart facts
+  themselves are never returned. A wrong figure also appears in `corrections` with the code `T1_DATA_MISREPORTED`.
+- `taskChecks` (Task 2, same condition): `{questionParts: [{part, addressed, excerpt?}], position?: {required, stated,
+  excerpt?, consistent?, conflictExcerpt?}, outline: [{role, mainIdea, developed, excerpt?}], partialAnswer, noPosition,
+  inconsistentPosition, noConclusion}`. `addressed` is `FULL`, `PARTIAL` or `NONE`; `role` is `INTRODUCTION`, `BODY` or
+  `CONCLUSION`. `questionParts` has at most 4 items and `outline` at most 8. The four flags are derived: `partialAnswer`
+  when some part is not `FULL`; `noPosition` when the question asks for an opinion and the essay gives none;
+  `noConclusion` only when an outline was returned and has no `CONCLUSION`. These checks add no evidence and no
+  correction; they are shown to the learner and feed the band caps.
+- `corrections[]` also carries `start` and `end` (the character range `[start, end)` of `excerpt` in `essayText`) and,
+  from the second prompt template, `reason` (one Vietnamese sentence naming the broken rule) and `certainty` (`ERROR` or
+  `SUGGESTION`; a missing value reads as `ERROR`). Each quotation takes the first occurrence that no earlier correction
+  with the same quotation took; a quotation with no free occurrence has no `start`/`end`. Overlapping quotations of
+  different corrections each keep their own range; the client decides which one to draw.
+- `errorGroups` (absent when there are no errors): `[{errorCode, errorName, category, count, severity, fixHint,
+  example?: {wrong, right}, practiceKnowledgePointId?}]`, worst first by `count x severity`, fallback codes (`*_OTHER`) last.
+  Only `ERROR` corrections count; a `SUGGESTION` never starts a group.
+- `priorities` (absent when there is nothing to prioritise): at most 3 items
+  `{title, explanation, excerpts, action, errorCodes, practiceKnowledgePointId?, source}`. `source = AI` when the model
+  chose them (second prompt template); otherwise `RULE`: the three worst `errorGroups`, with `title = errorName`,
+  `action = fixHint` and the first correction of the group as the excerpt. `errorGroups` and `priorities` are worked out
+  when the grade is read, from what is stored; no call to Content or the model is made.
+- `criteria[].evidence` and `criteria[].descriptor` (second prompt template only, omitted when empty): the quotations that
+  support the band and the rubric descriptor that matched.
+- `criteria[].nextBand` (`{band, descriptor}`, omitted at the top of the rubric and for grades stored before it was kept):
+  the lowest band the rubric describes above the band shown, which is the capped band when a cap applied. It is
+  taken from the rubric at grading time and stored with the grade.
+- `revision` (only for an essay sent again, see [essay-revision-v1](essay-revision-v1.md)):
+  `{previousSubmissionId, fixedCodes, repeatedCodes, newCodes}`. The error codes of the version before are compared with
+  those of this one: fixed (gone), repeated (in both), new (only here). Suggestions and fallback codes (`*_OTHER`) do not
+  count. Omitted when the earlier version cannot be read.
+- Every quotation in these fields is an exact part of `essayText`; one that was not is dropped. A reply with a missing or
+  malformed `taskChecks` gives empty lists and unknown flags, and never fails the grade.
 - `summary` ≤ 600 characters. `passed = overallBand ≥ passBand`. `sampleAnswer` only when `passed` or the block was
   passed before.
 

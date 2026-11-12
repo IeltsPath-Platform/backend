@@ -3,6 +3,7 @@ package com.ieltspath.learning.application.service;
 import com.ieltspath.learning.application.result.WritingSubmissionResult;
 import com.ieltspath.learning.domain.aggregate.WritingSubmission;
 import com.ieltspath.learning.domain.repository.WritingSubmissionRepository;
+import com.ieltspath.learning.domain.service.WritingResultView;
 import com.ieltspath.learning.domain.vo.WritingSubmissionStatus;
 import org.springframework.stereotype.Service;
 
@@ -25,7 +26,8 @@ public class WritingSubmissionViewAssembler {
                     || essays.blockPassed(submission.userId(), submission.blockId(), submission.id());
             return new WritingSubmissionResult(submission.id(), status, task, submission.wordCount(),
                     submission.overallBand(), submission.passed(), submission.grade(), submission.pointCost(),
-                    showSample ? submission.prompt().sampleAnswer() : null, null, null, submission.essayText());
+                    showSample ? submission.prompt().sampleAnswer() : null, null, null, submission.essayText(),
+                    revision(submission));
         }
         if (submission.status() == WritingSubmissionStatus.AWAITING_EXAMINER) {
             // No grade lives here: the examiner's review is read from Assessment (GET .../human-review).
@@ -38,5 +40,17 @@ public class WritingSubmissionViewAssembler {
         }
         return new WritingSubmissionResult(submission.id(), status, task, null, null, null, null, null,
                 null, null, submission.failureCode());
+    }
+
+    /** One read of the version before, by id; an essay that is not a revision, or whose earlier version is gone, has none. */
+    private WritingSubmissionResult.Revision revision(WritingSubmission submission) {
+        if (submission.previousSubmissionId() == null || submission.grade() == null) return null;
+        return essays.findOwned(submission.previousSubmissionId(), submission.userId())
+                .map(WritingSubmission::grade)
+                .map(previous -> {
+                    var delta = WritingResultView.revisionDelta(previous, submission.grade());
+                    return new WritingSubmissionResult.Revision(submission.previousSubmissionId(), delta.fixedCodes(),
+                            delta.repeatedCodes(), delta.newCodes());
+                }).orElse(null);
     }
 }

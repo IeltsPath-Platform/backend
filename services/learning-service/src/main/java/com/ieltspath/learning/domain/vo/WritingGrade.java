@@ -8,12 +8,21 @@ import java.util.UUID;
 public record WritingGrade(List<Criterion> criteria, List<Correction> corrections, String summary,
                            BigDecimal overallBand, List<StudyPoint> studyPoints, String judgmentVersion, String model,
                            List<AppliedBandLimit> bandLimits, List<Priority> priorities,
-                           List<ErrorExample> errorExamples) {
+                           List<ErrorExample> errorExamples, Task1Checks task1Checks, Task2Checks task2Checks) {
     public WritingGrade {
         studyPoints = studyPoints == null ? List.of() : List.copyOf(studyPoints);
         bandLimits = bandLimits == null ? List.of() : List.copyOf(bandLimits);
         priorities = priorities == null ? List.of() : List.copyOf(priorities);
         errorExamples = errorExamples == null ? List.of() : List.copyOf(errorExamples);
+    }
+
+    /** Grades stored before the task checks existed read with none; only the second prompt template returns them. */
+    public WritingGrade(List<Criterion> criteria, List<Correction> corrections, String summary, BigDecimal overallBand,
+                        List<StudyPoint> studyPoints, String judgmentVersion, String model,
+                        List<AppliedBandLimit> bandLimits, List<Priority> priorities,
+                        List<ErrorExample> errorExamples) {
+        this(criteria, corrections, summary, overallBand, studyPoints, judgmentVersion, model, bandLimits, priorities,
+                errorExamples, null, null);
     }
 
     /** Grades stored before priorities and error examples existed read with both empty. */
@@ -45,13 +54,80 @@ public record WritingGrade(List<Criterion> criteria, List<Correction> correction
 
     public WritingGrade withModel(String model) {
         return new WritingGrade(criteria, corrections, summary, overallBand, studyPoints, judgmentVersion, model,
-                bandLimits, priorities, errorExamples);
+                bandLimits, priorities, errorExamples, task1Checks, task2Checks);
     }
 
     /** The same grade with the details only the second prompt template returns. */
     public WritingGrade withDetails(List<Priority> priorities, List<ErrorExample> errorExamples) {
         return new WritingGrade(criteria, corrections, summary, overallBand, studyPoints, judgmentVersion, model,
-                bandLimits, priorities, errorExamples);
+                bandLimits, priorities, errorExamples, task1Checks, task2Checks);
+    }
+
+    /** The same grade with other criteria, for example after their bands or next bands changed. */
+    public WritingGrade withCriteria(List<Criterion> criteria) {
+        return new WritingGrade(criteria, corrections, summary, overallBand, studyPoints, judgmentVersion, model,
+                bandLimits, priorities, errorExamples, task1Checks, task2Checks);
+    }
+
+    /** The same grade with the whole-essay checks of its task; the other task's checks stay null. */
+    public WritingGrade withChecks(Task1Checks task1Checks, Task2Checks task2Checks) {
+        return new WritingGrade(criteria, corrections, summary, overallBand, studyPoints, judgmentVersion, model,
+                bandLimits, priorities, errorExamples, task1Checks, task2Checks);
+    }
+
+    /** One sentence of a Task 1 essay checked against the chart; {@code expected} is set only for WRONG. */
+    public record DataCheck(String excerpt, String verdict, String expected) {
+        public static final String CORRECT = "CORRECT";
+        public static final String WRONG = "WRONG";
+        public static final String UNVERIFIABLE = "UNVERIFIABLE";
+    }
+
+    /**
+     * What the model found about the chart figures and the structure of a Task 1 essay. A null flag means the model
+     * did not say. {@code hasOverview = false} cannot carry a quotation: a missing paragraph is not in the essay.
+     */
+    public record Task1Checks(List<DataCheck> dataChecks, int correctCount, Boolean hasOverview,
+                              Boolean overviewAccurate, Boolean hasPersonalOpinion, String personalOpinionExcerpt) {
+        public Task1Checks {
+            dataChecks = dataChecks == null ? List.of() : List.copyOf(dataChecks);
+        }
+    }
+
+    /** One requirement of a Task 2 question and how far the essay answers it: FULL, PARTIAL or NONE. */
+    public record QuestionPart(String part, String addressed, String excerpt) {}
+
+    /** The position a Task 2 essay takes. {@code required} is true when the question asks for an opinion. */
+    public record Position(boolean required, boolean stated, String excerpt, Boolean consistent,
+                           String conflictExcerpt) {}
+
+    /** One paragraph of a Task 2 essay: INTRODUCTION, BODY or CONCLUSION, its main idea and whether it is supported. */
+    public record OutlineItem(String role, String mainIdea, boolean developed, String excerpt) {}
+
+    /** Whole-essay findings for Task 2: the question parts, the position and the outline of the paragraphs. */
+    public record Task2Checks(List<QuestionPart> questionParts, Position position, List<OutlineItem> outline) {
+        public Task2Checks {
+            questionParts = questionParts == null ? List.of() : List.copyOf(questionParts);
+            outline = outline == null ? List.of() : List.copyOf(outline);
+        }
+
+        /** Some part of the question is answered only in part, or not at all. */
+        public boolean partialAnswer() {
+            return questionParts.stream().anyMatch(part -> !"FULL".equals(part.addressed()));
+        }
+
+        /** The question asks for an opinion and the essay gives none. */
+        public boolean noPosition() {
+            return position != null && position.required() && !position.stated();
+        }
+
+        public boolean inconsistentPosition() {
+            return position != null && Boolean.FALSE.equals(position.consistent());
+        }
+
+        /** Only known when the model gave an outline: an essay with no outline says nothing about its ending. */
+        public boolean noConclusion() {
+            return !outline.isEmpty() && outline.stream().noneMatch(item -> "CONCLUSION".equals(item.role()));
+        }
     }
 
     /** A problem that costs the most band, chosen by the grader; the quotations are exact parts of the essay. */
@@ -73,13 +149,26 @@ public record WritingGrade(List<Criterion> criteria, List<Correction> correction
     public record AppliedBandLimit(String reason, String criterion, BigDecimal cap, BigDecimal bandBeforeLimit,
                                    String message) {}
 
-    /** {@code knowledgePointId} is the point this criterion is evidence for; null for grades stored before the mapping. */
+    /** The next band the rubric describes above the one shown, and what it asks for. */
+    public record NextBand(BigDecimal band, String descriptor) {}
+
+    /**
+     * {@code knowledgePointId} is the point this criterion is evidence for; null for grades stored before the mapping.
+     * {@code nextBand} is null at the top of the rubric and for grades stored before it was kept.
+     */
     public record Criterion(String code, BigDecimal band, List<String> strengths, List<String> improvements,
                             UUID knowledgePointId, List<KnowledgeJudgment> knowledgePointJudgments,
-                            List<String> evidence, String descriptor) {
+                            List<String> evidence, String descriptor, NextBand nextBand) {
         public Criterion {
             knowledgePointJudgments = knowledgePointJudgments == null ? List.of() : List.copyOf(knowledgePointJudgments);
             evidence = evidence == null ? List.of() : List.copyOf(evidence);
+        }
+
+        public Criterion(String code, BigDecimal band, List<String> strengths, List<String> improvements,
+                         UUID knowledgePointId, List<KnowledgeJudgment> knowledgePointJudgments,
+                         List<String> evidence, String descriptor) {
+            this(code, band, strengths, improvements, knowledgePointId, knowledgePointJudgments, evidence, descriptor,
+                    null);
         }
 
         /** {@code evidence} and {@code descriptor} are only returned by the second prompt template. */
@@ -98,12 +187,18 @@ public record WritingGrade(List<Criterion> criteria, List<Correction> correction
         }
 
         public Criterion withKnowledgePointJudgments(List<KnowledgeJudgment> judgments) {
-            return new Criterion(code, band, strengths, improvements, knowledgePointId, judgments, evidence, descriptor);
+            return new Criterion(code, band, strengths, improvements, knowledgePointId, judgments, evidence, descriptor,
+                    nextBand);
+        }
+
+        public Criterion withNextBand(NextBand next) {
+            return new Criterion(code, band, strengths, improvements, knowledgePointId, knowledgePointJudgments,
+                    evidence, descriptor, next);
         }
 
         public Criterion withBand(BigDecimal newBand) {
             return new Criterion(code, newBand, strengths, improvements, knowledgePointId, knowledgePointJudgments,
-                    evidence, descriptor);
+                    evidence, descriptor, nextBand);
         }
     }
 

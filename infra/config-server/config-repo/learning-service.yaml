@@ -65,15 +65,15 @@ learning:
     # Corrections kept per essay with the second prompt template; the first template keeps its own ceiling of 10.
     max-corrections: ${LEARNING_WRITING_MAX_CORRECTIONS:30}
     # Thresholds follow the public band descriptors: band 6 TA/TR needs an overview, a clear position and every part of
-    # the task, so those rules cap at 5.0; a tangential answer is band 4. Set by the product owner without an examiner
-    # review. Caps stay off until prompt v2 returns the flags and an evaluation run with caps has been recorded.
+    # the task, so those rules cap at 5.0; a tangential answer is band 4, and so is an essay that gives no position at
+    # all when the question asks for one. Set by the product owner without a human examiner review. Caps stay off until prompt v2 returns the flags and an evaluation run with caps has been recorded.
     # A cap left blank switches its rule off.
     band-caps-enabled: ${LEARNING_WRITING_BAND_CAPS_ENABLED:false}
     too-short-band-cap: ${LEARNING_WRITING_TOO_SHORT_BAND_CAP:5.0}
     off-topic-band-cap: ${LEARNING_WRITING_OFF_TOPIC_BAND_CAP:4.0}
     no-overview-band-cap: ${LEARNING_WRITING_NO_OVERVIEW_BAND_CAP:5.0}
     partial-answer-band-cap: ${LEARNING_WRITING_PARTIAL_ANSWER_BAND_CAP:5.0}
-    no-position-band-cap: ${LEARNING_WRITING_NO_POSITION_BAND_CAP:5.0}
+    no-position-band-cap: ${LEARNING_WRITING_NO_POSITION_BAND_CAP:4.0}
   # Azure Speech: transcript and pronunciation scores of a Speaking recording. The key lives only in .env. Blank key or
   # region turns the analysis off; storing recordings still works. locale en-US also gives an intonation score.
   speech:

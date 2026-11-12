@@ -54,7 +54,7 @@ hay evidence. Endpoint chỉ đọc.
 | Phase | Việc | Service | Phụ thuộc | Đổi contract | Status |
 | --- | --- | --- | --- | --- | --- |
 | 1 | [Endpoint tổng hợp](./phase-01-progress-endpoint.md) | learning | plan nâng cấp phase 2, phase 4 (`certainty`, chưa có: coi là ERROR) | Có (endpoint mới) | Xong |
-| 2 | [Màn tiến bộ Writing](./phase-02-progress-view.md) | frontend | 1 | Không | Xong (chưa chạy được vitest, xem báo cáo) |
+| 2 | [Màn tiến bộ Writing](./phase-02-progress-view.md) | frontend | 1 | Không | Xong ở frontend PR #81 (nhánh của Dev A không có trên remote nên viết lại theo contract; test chạy được, chưa xem trên trình duyệt) |
 
 Phase 1 làm được trước khi plan nâng cấp xong: thiếu `certainty` thì coi là `ERROR`, thiếu tên thì tra theo lô.
 

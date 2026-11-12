@@ -78,10 +78,10 @@ examiner là một bài trong bộ (quyết định 9).
 | 2 | [Sửa nhỏ không đổi prompt](./phase-02-quick-fixes-without-prompt-change.md) | learning | 0b | Không (khớp lại contract) | Xong, chờ 0b cho metric LLM |
 | 3 | [Danh mục lỗi Writing](./phase-03-writing-error-catalog.md) | content, learning, assessment | duyệt chuyên gia | Có | Code xong (V125). Mã do chủ sản phẩm duyệt tạm, chờ examiner xác nhận |
 | 4 | [Prompt v2](./phase-04-prompt-v2.md) | learning, assessment, docs | 1, 2, 3 | Có | Template v2 đã duyệt nội dung, chưa kích hoạt; chờ chạy lại đo sau V125 (hạn mức LLM) |
-| 5 | [Kiểm số liệu Task 1](./phase-05-task-1-data-checks.md) | learning, assessment (template) | 4 | Có | Pending |
+| 5 | [Kiểm số liệu Task 1](./phase-05-task-1-data-checks.md) | learning, assessment (template) | 4 | Có | Code xong, chạy với template v2 (chưa kích hoạt). Chờ: examiner duyệt câu chữ, đo `data_error_recall`, kiểm tay 10 bài |
 | 6 | [Luật cứng cho band](./phase-06-band-caps.md) | learning (domain) | 4, examiner duyệt ngưỡng | Có | Code xong, luật tắt mặc định; ngưỡng do chủ sản phẩm đặt tạm, chưa bật |
-| 7 | [Response cho giao diện kết quả](./phase-07-result-view-response.md) | learning, frontend | 2, 4, 5, 8 | Có | Pending |
-| 8 | [Kiểm yêu cầu đề Task 2](./phase-08-task-2-requirement-checks.md) | learning, assessment (template) | 4 | Có | Pending |
+| 7 | [Response cho giao diện kết quả](./phase-07-result-view-response.md) | learning, frontend | 2, 4, 5, 8 | Có | Backend xong (vị trí đoạn trích, nhóm lỗi, top 3 vấn đề, dẫn chứng, nextBand, revision, dataChecks, taskChecks). Frontend xong ở frontend PR #81 (chưa xem trên trình duyệt, chưa có dữ liệu thật của template v2) |
+| 8 | [Kiểm yêu cầu đề Task 2](./phase-08-task-2-requirement-checks.md) | learning, assessment (template) | 4 | Có | Code xong, chạy với template v2 (chưa kích hoạt). Chờ: examiner duyệt câu chữ, kiểm tay 10 bài Task 2 |
 
 Thứ tự: 0 → 0b → 1 và 2 song song → 3 → 4 → 5 và 8 song song → 7; 6 độc lập sau 4 (hai luật Task 2 cần cờ của phase 8). Phase 0 có thể đổi quyết định 2, nên phase 1 trở đi
 chỉ bắt đầu khi đã ghi kết luận của phase 0. Phase 1, 3 và 6 có phần chờ người làm nội dung (đánh dấu bộ bài, duyệt mã

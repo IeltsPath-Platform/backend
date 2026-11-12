@@ -14,7 +14,7 @@ V124 giữ cho Dev B (work-split 261111-1628), nên dùng V125. Kiểm lại s�
 | `PREPOSITION` | Sai giới từ | GRAMMAR | 1 | `V55_ACADEMIC_COLLOCATIONS` | CORE-01 E21, AN-02 E07 |
 | `COMPARISON` | Sai cấu trúc so sánh | GRAMMAR | 1 | `G55_COMPARISON` | AN-02 E06 |
 | `T2_PARTIAL_ANSWER` | Trả lời thiếu phần của đề Task 2 | TASK | 3 | `W65_DISCUSS_BOTH_VIEWS` | (phase 8) |
-| `T2_NO_CONCLUSION` | Thiếu kết bài Task 2 | TASK | 2 | `TR_W_OPINION` | (phase 8) |
+| `T2_NO_CONCLUSION` | Thiếu kết bài Task 2 | TASK | 2 | `TR_W_OPINION` | (phase 8). **Bỏ ngày 2026-11-12 (V127, `INACTIVE`):** chỉ còn cờ cấu trúc `noConclusion` |
 | `T2_IRRELEVANT_EXAMPLE` | Ví dụ không liên quan hoặc quá chung chung | TASK | 2 | `W70_IDEA_DEVELOPMENT` | (phase 8) |
 
 - `NO_CLEAR_POSITION` gắn kiến thức `TR_W_OPINION` (trước đây không có).
