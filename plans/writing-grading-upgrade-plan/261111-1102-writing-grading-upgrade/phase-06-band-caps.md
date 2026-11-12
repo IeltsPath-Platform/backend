@@ -37,7 +37,7 @@ dạng response **theo mẫu Speaking** (quyết định 13), để frontend dù
   `TOO_SHORT` và `OFF_TOPIC` dùng cùng tên `reason` với Speaking.
 - Trần chỉ **hạ** band, không bao giờ nâng. `overallBand` tính lại bằng `WritingScore.overallBand` sau trần.
 - Cấu hình trong `WritingSettings` theo kiểu `SpeakingPracticeSettings`: `tooShortBandCap`, `offTopicBandCap`,
-  `noOverviewBandCap`, `partialAnswerBandCap`, `noPositionBandCap` (`@DefaultValue`, `@Min`, `@Max`), cộng
+  `noOverviewBandCap`, `partialAnswerBandCap`, `noPositionBandCap` (mặc định cấu hình: 5.0, 5.0 và 4.0 từ 2026-11-12) (`@DefaultValue`, `@Min`, `@Max`), cộng
   `bandCapsEnabled` (mặc định `false`). Giá trị đặt trong config-repo, đổi không cần deploy.
 - JSON bài chấm lưu `bandBeforeLimit` trên từng tiêu chí bị hạ (như signals của Speaking) và `bandLimits`.
 - Response: `bandLimits[] {reason, criterion, cap, message}`; tiêu chí bị hạ có `limited: true`. `message` tiếng Việt,

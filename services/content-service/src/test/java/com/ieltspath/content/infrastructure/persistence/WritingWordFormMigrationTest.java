@@ -72,11 +72,13 @@ class WritingWordFormMigrationTest {
     }
 
     @Test
-    void codesStillUndecidedAreLeftAlone() throws Exception {
-        // Dropping T2_NO_CONCLUSION and splitting the NO_CLEAR_POSITION cap wait for the product owner.
+    void aMissingConclusionIsNoLongerACodeButTheCodeIsKeptForStoredGrades() throws Exception {
         try (Connection connection = connection()) {
-            assertEquals("ACTIVE", scalar(connection, "SELECT status FROM error_types WHERE code = 'T2_NO_CONCLUSION'"));
-            assertNotNull(scalar(connection, "SELECT code FROM error_types WHERE code = 'NO_CLEAR_POSITION'"));
+            assertEquals("INACTIVE", scalar(connection, "SELECT status FROM error_types WHERE code = 'T2_NO_CONCLUSION'"));
+            // Its neighbours stay usable: only this code was retired.
+            assertEquals("ACTIVE", scalar(connection, "SELECT status FROM error_types WHERE code = 'T2_PARTIAL_ANSWER'"));
+            assertEquals("ACTIVE", scalar(connection, "SELECT status FROM error_types WHERE code = 'NO_CLEAR_POSITION'"));
+            assertNotNull(scalar(connection, "SELECT code FROM error_types WHERE code = 'T2_NO_CONCLUSION'"));
         }
     }
 

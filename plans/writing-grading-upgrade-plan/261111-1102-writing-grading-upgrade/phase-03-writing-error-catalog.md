@@ -71,7 +71,7 @@ Chủ sản phẩm đồng ý các thay đổi ít rủi ro; chưa qua giám kh�
   (gồm dạng quá khứ sai của động từ bất quy tắc), `T2_IRRELEVANT_EXAMPLE` (chỉ còn ví dụ không liên quan), `UNDERDEVELOPED_IDEA`
   (nhận ví dụ quá chung).
 - Không thêm mã song song cấu trúc (mới gặp 1 lần).
-- **Chưa quyết, không đụng:** bỏ `T2_NO_CONCLUSION`; trần 4.0 cho bài hoàn toàn không có quan điểm (hiện 5.0).
+- **Chủ sản phẩm quyết 2026-11-12:** bỏ `T2_NO_CONCLUSION` khỏi mã lỗi (V127 chuyển sang `INACTIVE`, không xóa); thiếu kết bài chỉ còn là cờ `noConclusion` trong `taskChecks`, không trừ điểm. Trần cho bài hoàn toàn không có quan điểm là 4.0 (xem phase 6).
 - Danh mục đổi mà `promptVersion` không đổi: phải chạy lại eval trước khi coi số đo cũ còn đúng.
 
 ## Success Criteria
