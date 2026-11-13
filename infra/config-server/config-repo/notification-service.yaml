@@ -26,10 +26,11 @@ spring:
 
 notification:
   fcm:
-    # Off until a Firebase project exists. The service account file is given by GOOGLE_APPLICATION_CREDENTIALS
-    # (Application Default Credentials), never stored here or in the repo.
+    # Off until a Firebase project exists. The service account file path comes from GOOGLE_APPLICATION_CREDENTIALS
+    # (OS env or root .env); empty means Application Default Credentials. The file is never stored here or in the repo.
     enabled: ${NOTIFICATION_FCM_ENABLED:false}
     project-id: ${FIREBASE_PROJECT_ID:}
+    credentials-file: ${GOOGLE_APPLICATION_CREDENTIALS:}
     dispatch-delay-ms: ${NOTIFICATION_FCM_DISPATCH_DELAY_MS:5000}
 
 app:

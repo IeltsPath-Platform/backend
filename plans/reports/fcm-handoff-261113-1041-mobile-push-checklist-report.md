@@ -19,8 +19,10 @@ Việc còn lại cần quyền Firebase console hoặc repo mobile, nên chưa 
    - `NOTIFICATION_FCM_ENABLED=true`
    - `FIREBASE_PROJECT_ID=<project id>`
    - `GOOGLE_APPLICATION_CREDENTIALS=<đường dẫn tuyệt đối tới file JSON>`
-2. Chạy trong Compose: mount file JSON vào container notification-service (read-only) và trỏ
-   `GOOGLE_APPLICATION_CREDENTIALS` tới đường dẫn trong container. Chưa sửa `docker-compose.yml` lần này.
+   Chạy trên host (IDE/`java -jar`): chỉ cần `.env` như trên.
+2. Chạy trong Compose: `docker-compose.yml` hiện chưa truyền ba biến trên vào container notification-service (chưa sửa
+   lần này). Cần thêm chúng vào `environment` của service, mount file JSON read-only và trỏ
+   `GOOGLE_APPLICATION_CREDENTIALS` tới đường dẫn trong container.
 3. Restart notification-service. Flyway chạy migration V5 (`push_devices`, `notification_deliveries`).
 4. Kiểm tra: đăng ký một máy thật, tạo một thông báo (ví dụ follow), xem `notification_deliveries.status = 'SENT'`.
 5. Xoay khóa: tạo khóa mới → thay file → restart → xóa khóa cũ trong console.

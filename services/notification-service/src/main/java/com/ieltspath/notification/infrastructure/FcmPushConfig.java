@@ -15,12 +15,15 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.Scheduled;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Clock;
 
 /**
- * Push sending exists only when {@code notification.fcm.enabled=true}. Credentials come from Application Default
- * Credentials ({@code GOOGLE_APPLICATION_CREDENTIALS} pointing at a service-account file outside the repo, or the
- * runtime's workload identity); nothing is read from config-repo. Without it, devices still register and deliveries
+ * Push sending exists only when {@code notification.fcm.enabled=true}. Credentials come from the service-account file
+ * named by {@code GOOGLE_APPLICATION_CREDENTIALS} (outside the repo), or Application Default Credentials when unset;
+ * the key itself is never in config-repo. Without it, devices still register and deliveries
  * stay PENDING.
  */
 @Configuration
@@ -28,10 +31,21 @@ import java.time.Clock;
 public class FcmPushConfig {
 
     @Bean
-    FirebaseMessaging firebaseMessaging(@Value("${notification.fcm.project-id}") String projectId) throws IOException {
+    FirebaseMessaging firebaseMessaging(@Value("${notification.fcm.project-id:}") String projectId,
+                                        @Value("${notification.fcm.credentials-file:}") String credentialsFile)
+            throws IOException {
+        // Read the path through Spring: a value from the root .env is a property, not an OS env var, so ADC alone misses it.
+        GoogleCredentials credentials;
+        if (credentialsFile.isBlank()) {
+            credentials = GoogleCredentials.getApplicationDefault();
+        } else {
+            try (InputStream in = Files.newInputStream(Path.of(credentialsFile))) {
+                credentials = GoogleCredentials.fromStream(in);
+            }
+        }
         FirebaseOptions options = FirebaseOptions.builder()
-                .setCredentials(GoogleCredentials.getApplicationDefault())
-                .setProjectId(projectId)
+                .setCredentials(credentials)
+                .setProjectId(projectId.isBlank() ? null : projectId) // null: SDK takes project_id from the credentials
                 .build();
         return FirebaseMessaging.getInstance(FirebaseApp.initializeApp(options, "notification-service"));
     }

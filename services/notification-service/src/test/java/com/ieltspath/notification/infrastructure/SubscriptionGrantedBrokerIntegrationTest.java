@@ -168,6 +168,9 @@ class SubscriptionGrantedBrokerIntegrationTest {
         // Parked on the dead-letter queue, as a failed delivery leaves it.
         rabbit.send("", SubscriptionGrantedTopology.DLQ, MessageBuilder.withBody(json.writeValueAsBytes(event))
                 .setContentType(MessageProperties.CONTENT_TYPE_JSON).setMessageId(event.eventId().toString()).build());
+        // replay() moves only what the queue counts at call time; under load the publish is not counted yet.
+        assertTrue(eventually(() -> rabbit.execute(channel -> channel.messageCount(SubscriptionGrantedTopology.DLQ)) == 1),
+                "the parked message is on the dead-letter queue");
 
         var result = replayer.replay(SubscriptionGrantedTopology.DLQ, 10);
 
