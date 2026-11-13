@@ -26,6 +26,8 @@ env_text = (BACKEND / ".env").read_text(encoding="utf-8")
 
 
 def env(key):
+    if key in os.environ:  # a value set for this run wins over .env, so a key never has to be written to the file
+        return os.environ[key]
     m = re.search(rf"^{key}=(.*)$", env_text, re.M)
     return m.group(1).strip().strip('"') if m else ""
 
@@ -51,7 +53,7 @@ else:
     snap = snapshot if isinstance(snapshot, dict) else json.loads(snapshot)
 task_one = snap.get("task") == "TASK_1"
 
-content = db("content_db", "CONTENT_DB_PASSWORD")
+content = db(os.environ.get("REPLAY_CONTENT_DB", "content_db"), "CONTENT_DB_PASSWORD")
 rubric_id, rubric_system = content.run(
     "SELECT id, system_prompt FROM rubrics WHERE task = :t AND status = 'ACTIVE' AND code LIKE 'IELTS_WRITING%'",
     t=snap.get("task"))[0]
