@@ -51,7 +51,7 @@ public final class WritingResultView {
     }
 
     private static List<String> errorCodes(WritingGrade grade) {
-        return grade.corrections().stream().filter(item -> !item.isSuggestion()).map(Correction::errorCode)
+        return grade.corrections().stream().filter(item -> !item.suggestionOnly()).map(Correction::errorCode)
                 .filter(code -> code != null && !code.endsWith(FALLBACK_SUFFIX)).distinct().toList();
     }
 
@@ -87,7 +87,7 @@ public final class WritingResultView {
     public static List<ErrorGroup> errorGroups(List<Correction> corrections, List<ErrorExample> examples) {
         Map<String, List<Correction>> byCode = new LinkedHashMap<>();
         for (Correction correction : corrections) {
-            if (correction.errorCode() == null || correction.isSuggestion()) continue;
+            if (correction.errorCode() == null || correction.suggestionOnly()) continue;
             byCode.computeIfAbsent(correction.errorCode(), code -> new ArrayList<>()).add(correction);
         }
         List<ErrorGroup> groups = new ArrayList<>();
@@ -124,7 +124,7 @@ public final class WritingResultView {
         }
         return errorGroups(grade.corrections(), grade.errorExamples()).stream().limit(MAX_PRIORITIES).map(group -> {
             Correction first = grade.corrections().stream().filter(item -> group.errorCode().equals(item.errorCode())
-                    && !item.isSuggestion()).findFirst().orElseThrow();
+                    && !item.suggestionOnly()).findFirst().orElseThrow();
             String explanation = first.reason() != null && !first.reason().isBlank() ? first.reason() : group.fixHint();
             return new PriorityItem(group.errorName(), explanation, List.of(first.excerpt()), group.fixHint(),
                     List.of(group.errorCode()), group.practiceKnowledgePointId(), "RULE");

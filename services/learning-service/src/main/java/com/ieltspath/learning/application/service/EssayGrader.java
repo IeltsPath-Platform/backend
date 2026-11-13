@@ -109,8 +109,8 @@ public class EssayGrader {
                 || errorTypes == null) {
             throw new WritingGradingException("RUBRIC_UNAVAILABLE");
         }
-        // The activated version names the template; with nothing activated the first template stays in use.
-        String templateVersion = expectedVersion == null ? TEMPLATE_VERSION : templateVersionOf(expectedVersion);
+        // The activated version names the template; with nothing activated the configured default template is used.
+        String templateVersion = expectedVersion == null ? settings.defaultTemplate() : templateVersionOf(expectedVersion);
         String promptVersion = rubric.code() + "@" + rubric.version() + "+tpl" + templateVersion;
         if (expectedVersion != null && !expectedVersion.equals(promptVersion)) {
             throw new WritingGradingException("PROMPT_VERSION_UNAVAILABLE");

@@ -9,6 +9,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Stored grades are JSON; ones written before criteria carried a knowledge point must still read. */
 class WritingGradeJsonTest {
@@ -74,6 +75,29 @@ class WritingGradeJsonTest {
                 new BigDecimal("5.5"), UUID.randomUUID(), "LINKING", "Linking", "Linking", "reason", "excerpt",
                 UUID.randomUUID());
         assertEquals(point, json.readValue(json.writeValueAsString(point), WritingGrade.StudyPoint.class));
+    }
+
+    @Test
+    void aCorrectionKeepsItsSuggestedTextThroughStorage() throws Exception {
+        var correction = new WritingGrade.Correction("It have", "It has", "GRAMMAR", "SUBJECT_VERB_AGREEMENT",
+                "Sai hòa hợp chủ ngữ và động từ", "hint", 2, null, null, "It is singular.",
+                WritingGrade.Correction.ERROR);
+
+        var stored = json.writeValueAsString(correction);
+
+        assertTrue(json.readTree(stored).path("suggestion").isTextual(), stored);
+        assertEquals(correction, json.readValue(stored, WritingGrade.Correction.class));
+    }
+
+    @Test
+    void aSuggestionKeepsItsTextAndItsCertaintyThroughStorage() throws Exception {
+        var correction = new WritingGrade.Correction("big", "considerable", "VOCABULARY", "WORD_CHOICE", "Word choice",
+                "hint", 1, null, null, "More precise.", WritingGrade.Correction.SUGGESTION);
+
+        var restored = json.readValue(json.writeValueAsString(correction), WritingGrade.Correction.class);
+
+        assertEquals("considerable", restored.suggestion());
+        assertTrue(restored.suggestionOnly());
     }
 
     @Test

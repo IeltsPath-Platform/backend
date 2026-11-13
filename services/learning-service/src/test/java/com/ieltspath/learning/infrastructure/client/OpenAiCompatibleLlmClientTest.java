@@ -59,7 +59,8 @@ class OpenAiCompatibleLlmClientTest {
     @Test
     void theDefaultOutputBudgetIsKeptAndAnExplicitBudgetReplacesIt() {
         Setup setup = client("gpt-4o-mini", "");
-        setup.server().expect(requestTo(BASE_URL + "/chat/completions")).andExpect(jsonPath("$.max_tokens").value(4096))
+        setup.server().expect(requestTo(BASE_URL + "/chat/completions"))
+                .andExpect(jsonPath("$.max_tokens").value(OpenAiCompatibleLlmClient.DEFAULT_MAX_TOKENS))
                 .andRespond(withSuccess(reply("\"x\""), MediaType.APPLICATION_JSON));
         setup.server().expect(requestTo(BASE_URL + "/chat/completions")).andExpect(jsonPath("$.max_tokens").value(12000))
                 .andRespond(withSuccess(reply("\"y\""), MediaType.APPLICATION_JSON));
@@ -91,6 +92,31 @@ class OpenAiCompatibleLlmClientTest {
             assertEquals("ok", client.completeJson("s", "u", new com.ieltspath.learning.application.port.LlmClient.Budget(12000, 30)));
             assertTrue(seen.get().startsWith("Bearer test-key "));
             assertTrue(seen.get().contains("\"max_tokens\":12000"));
+        } finally {
+            http.stop(0);
+        }
+    }
+
+    @Test
+    void theConfiguredOutputBudgetIsSentWhenTheCallerNamesNone() throws IOException {
+        var seen = new java.util.concurrent.atomic.AtomicReference<String>();
+        var http = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        http.createContext("/v1/chat/completions", exchange -> {
+            seen.set(new String(exchange.getRequestBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+            byte[] body = reply("\"ok\"").getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
+        http.start();
+        try {
+            var client = new OpenAiCompatibleLlmClient(RestClient.builder(),
+                    "http://127.0.0.1:" + http.getAddress().getPort() + "/v1", "test-key", "gpt-4o-mini", "", 20, 6000,
+                    null);
+
+            assertEquals("ok", client.completeJson("s", "u"));
+            assertTrue(seen.get().contains("\"max_tokens\":6000"), seen.get());
         } finally {
             http.stop(0);
         }

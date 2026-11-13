@@ -61,9 +61,14 @@ learning:
     # LLM gradings per learner and calendar day in quota-timezone.
     daily-grading-limit: ${LEARNING_WRITING_DAILY_GRADING_LIMIT:20}
     quota-timezone: Asia/Ho_Chi_Minh
-    grading-timeout-seconds: 20
+    # Template v2 with deepseek-flash took 17 to 20 s for a 200-word Task 1; 25 is the most WritingSettings allows and
+    # stays under the Gateway's 60 s timeout for essay submissions.
+    grading-timeout-seconds: 25
     # Corrections kept per essay with the second prompt template; the first template keeps its own ceiling of 10.
     max-corrections: ${LEARNING_WRITING_MAX_CORRECTIONS:30}
+    # Prompt template when assessment has no activation for the task (an activation always wins). The product owner
+    # switched the default to v2 on 2026-11-12 without an examiner gold set or an evaluation run; set v1 to roll back.
+    default-template: ${LEARNING_WRITING_DEFAULT_TEMPLATE:v2}
     # Thresholds follow the public band descriptors: band 6 TA/TR needs an overview, a clear position and every part of
     # the task, so those rules cap at 5.0; a tangential answer is band 4, and so is an essay that gives no position at
     # all when the question asks for one. Set by the product owner without a human examiner review. Caps stay off until prompt v2 returns the flags and an evaluation run with caps has been recorded.

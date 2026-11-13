@@ -236,7 +236,7 @@ class PracticeEssayIntegrationTest {
         when(access.debit(any(), anyInt(), any(), anyString(), any())).thenAnswer(invocation -> UUID.randomUUID());
         var essay = submitEssay.execute(USER, attempt, ESSAY, request, TEXT);
         assertTrue(essay.passed());
-        assertEquals("IELTS_WRITING@1+tplv1", jdbc.queryForObject(
+        assertEquals("IELTS_WRITING@1+tplv2", jdbc.queryForObject(
                 "SELECT prompt_version FROM lesson_writing_submissions", String.class));
         verify(llm, times(1)).completeJson(any(), any());
         var result = submitPractice.execute(USER, attempt, new SubmitExerciseCommand(UUID.randomUUID(), List.of()));

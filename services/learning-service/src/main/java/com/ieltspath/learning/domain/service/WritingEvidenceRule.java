@@ -83,7 +83,7 @@ public final class WritingEvidenceRule {
         if (grade == null || grade.corrections() == null) return null;
         Map<String, Integer> counts = new TreeMap<>();
         for (WritingGrade.Correction correction : grade.corrections()) {
-            if (correction == null || correction.isSuggestion() || correction.errorCode() == null
+            if (correction == null || correction.suggestionOnly() || correction.errorCode() == null
                     || correction.errorCode().isBlank()) continue;
             counts.merge(correction.errorCode(), 1, Integer::sum);
         }

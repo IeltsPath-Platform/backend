@@ -157,7 +157,7 @@ class EssayGraderTest {
     void aTooShortEssayIsCappedOnTaskTwoOnlyWhenTheBandCapsAreOn() {
         llm.reply(reply(criterion("TR", "7"), criterion("CC", "6"), criterion("LR", "6"), criterion("GRA", "6")));
         WritingSettings capped = new WritingSettings(3, 50, 1000, 10000, 20, 120, 10, "Asia/Ho_Chi_Minh", 2, true,
-                new BigDecimal("5.0"), null, null, null, null, 30);
+                new BigDecimal("5.0"), null, null, null, null, 30, "v1");
         EssayGrader grader = new EssayGrader(llm, new ObjectMapper(), content, activations,
                 new EssayKnowledgeJudge(), "configured-model", capped);
 

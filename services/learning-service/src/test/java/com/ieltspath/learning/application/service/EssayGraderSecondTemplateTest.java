@@ -81,6 +81,33 @@ class EssayGraderSecondTemplateTest {
     }
 
     @Test
+    void withNothingActivatedTheConfiguredDefaultTemplateIsUsed() {
+        llm.reply(reply("", "\"corrections\":[]"));
+
+        var graded = graderDefaultingTo("v2").grade(task2(), ESSAY);
+
+        assertEquals("IELTS_ESSAY@2+tplv2", graded.promptVersion());
+        assertTrue(llm.prompts.getFirst()[0].contains("\"priorities\""), "the second template asks for priorities");
+    }
+
+    @Test
+    void anActivationStillWinsOverTheConfiguredDefaultTemplate() {
+        when(activations.activatedVersion("TASK_2")).thenReturn("IELTS_ESSAY@2+tplv1");
+        llm.reply(reply("", "\"corrections\":[]"));
+
+        var graded = graderDefaultingTo("v2").grade(task2(), ESSAY);
+
+        assertEquals("IELTS_ESSAY@2+tplv1", graded.promptVersion());
+        assertFalse(llm.prompts.getFirst()[0].contains("\"priorities\""));
+    }
+
+    private EssayGrader graderDefaultingTo(String template) {
+        WritingSettings settings = new WritingSettings(3, 50, 1000, 10000, 20, 120, 10, "Asia/Ho_Chi_Minh", 2, false,
+                null, null, null, null, null, 30, template);
+        return new EssayGrader(llm, new ObjectMapper(), content, activations, new EssayKnowledgeJudge(), "m", settings);
+    }
+
+    @Test
     void anUnknownTemplateVersionIsUnavailable() {
         when(activations.activatedVersion("TASK_2")).thenReturn("IELTS_ESSAY@2+tplv3");
 
@@ -102,7 +129,7 @@ class EssayGraderSecondTemplateTest {
         assertTrue(grade.errorExamples().isEmpty());
         assertTrue(grade.criteria().getFirst().evidence().isEmpty());
         assertNull(grade.corrections().getFirst().reason());
-        assertFalse(grade.corrections().getFirst().isSuggestion());
+        assertFalse(grade.corrections().getFirst().suggestionOnly());
     }
 
     @Test
@@ -121,7 +148,7 @@ class EssayGraderSecondTemplateTest {
         assertEquals(new BigDecimal("6.0"), first.band(), "the band stays whatever the evidence");
         WritingGrade.Correction suggestion = grade.corrections().get(0);
         assertEquals("Dung so nhieu", suggestion.reason());
-        assertTrue(suggestion.isSuggestion());
+        assertTrue(suggestion.suggestionOnly());
         WritingGrade.Correction missing = grade.corrections().get(1);
         assertNull(missing.reason(), "a missing reason does not spoil the correction");
         assertEquals("ERROR", missing.certainty(), "a missing certainty reads as an error");
@@ -133,7 +160,7 @@ class EssayGraderSecondTemplateTest {
         llm.reply(reply("", "\"corrections\":[{\"excerpt\":\"Peoples can save\",\"suggestion\":\"People can save\","
                 + "\"errorCode\":\"PLURAL\",\"certainty\":\"MAYBE\"}]"));
 
-        assertFalse(grader.grade(task2(), ESSAY).grade().corrections().getFirst().isSuggestion());
+        assertFalse(grader.grade(task2(), ESSAY).grade().corrections().getFirst().suggestionOnly());
     }
 
     @Test

@@ -35,7 +35,8 @@ import java.util.Locale;
 @Component
 public class OpenAiCompatibleLlmClient implements LlmClient {
     private static final Logger log = LoggerFactory.getLogger(OpenAiCompatibleLlmClient.class);
-    private static final int MAX_TOKENS = 4096;
+    /** Output budget of a call that names none, as {@code learning.llm.max-tokens} defaults to. */
+    static final int DEFAULT_MAX_TOKENS = 8192;
     private static final ObjectMapper ERROR_READER = new ObjectMapper();
     private static final int MESSAGE_EXCERPT = 300;
     /** Families that think by default and may spend the whole budget on it unless told not to. */
@@ -48,6 +49,7 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
     private final String model;
     private final String reasoningEffort;
     private final ResilientCall resilientCall;
+    private final int maxTokens;
 
     @Autowired
     public OpenAiCompatibleLlmClient(RestClient.Builder builder,
@@ -56,6 +58,7 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
                                      @Value("${learning.llm.model:}") String model,
                                      @Value("${learning.llm.reasoning-effort:}") String reasoningEffort,
                                      @Value("${learning.writing.grading-timeout-seconds:20}") int timeoutSeconds,
+                                     @Value("${learning.llm.max-tokens:8192}") int maxTokens,
                                      ResilientCall resilientCall) {
         String normalizedBaseUrl = baseUrl.isBlank() ? null : baseUrl.replaceAll("/+$", "");
         this.restClient = normalizedBaseUrl == null ? null : builder.clone()
@@ -64,11 +67,12 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
         this.model = model;
         this.reasoningEffort = reasoningEffort;
         this.resilientCall = resilientCall;
+        this.maxTokens = maxTokens;
     }
 
     OpenAiCompatibleLlmClient(RestClient.Builder builder, String baseUrl, String apiKey, String model,
                               String reasoningEffort, int timeoutSeconds) {
-        this(builder, baseUrl, apiKey, model, reasoningEffort, timeoutSeconds, null);
+        this(builder, baseUrl, apiKey, model, reasoningEffort, timeoutSeconds, DEFAULT_MAX_TOKENS, null);
     }
 
     /** {@code restClient} is null when no endpoint is configured. */
@@ -78,6 +82,7 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
         this.model = model;
         this.reasoningEffort = reasoningEffort;
         this.resilientCall = null;
+        this.maxTokens = DEFAULT_MAX_TOKENS;
     }
 
     OpenAiCompatibleLlmClient(RestClient restClient, String apiKey, String model, String reasoningEffort,
@@ -87,6 +92,7 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
         this.model = model;
         this.reasoningEffort = reasoningEffort;
         this.resilientCall = resilientCall;
+        this.maxTokens = DEFAULT_MAX_TOKENS;
     }
 
     private static SimpleClientHttpRequestFactory requestFactory(int timeoutSeconds) {
@@ -101,9 +107,13 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
         return restClient != null && !apiKey.isBlank() && !model.isBlank();
     }
 
+    /**
+     * Essay grading uses this. A template-v2 grade of a 200-word Task 1 already takes 4,200 to 4,700 output tokens, so a
+     * smaller fixed budget cut the JSON off and the grade failed as INVALID_GRADE.
+     */
     @Override
     public String completeJson(String systemPrompt, String userPrompt) {
-        return completeJson(systemPrompt, userPrompt, new Budget(MAX_TOKENS, 0));
+        return completeJson(systemPrompt, userPrompt, new Budget(maxTokens, 0));
     }
 
     /** A {@code timeoutSeconds} of 0 keeps the client's own read timeout. */

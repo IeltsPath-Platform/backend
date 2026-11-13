@@ -124,7 +124,7 @@ class EssayGraderTaskChecksTest {
         assertEquals("Sales fell to 10 in 2021.", added.excerpt());
         assertEquals("Năm 2021 là 15.", added.suggestion());
         assertEquals(3, added.severity());
-        assertFalse(added.isSuggestion());
+        assertFalse(added.suggestionOnly());
     }
 
     @Test
@@ -184,7 +184,7 @@ class EssayGraderTaskChecksTest {
 
     private EssayGrader capped(BigDecimal noOverview, BigDecimal partial, BigDecimal noPosition) {
         WritingSettings settings = new WritingSettings(3, 50, 1000, 10000, 20, 120, 10, "Asia/Ho_Chi_Minh", 2, true,
-                null, null, noOverview, partial, noPosition, 30);
+                null, null, noOverview, partial, noPosition, 30, "v1");
         return new EssayGrader(llm, new ObjectMapper(), content, activations, new EssayKnowledgeJudge(), "m", settings);
     }
 

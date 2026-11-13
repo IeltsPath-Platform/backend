@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
@@ -32,12 +33,14 @@ public record WritingSettings(
         BigDecimal noOverviewBandCap,
         BigDecimal partialAnswerBandCap,
         BigDecimal noPositionBandCap,
-        @DefaultValue("30") @Min(1) @Max(50) int maxCorrections) {
+        @DefaultValue("30") @Min(1) @Max(50) int maxCorrections,
+        // Prompt template used when no evaluation run has activated a version for the task; an activation wins.
+        @DefaultValue("v2") @Pattern(regexp = "v1|v2") String defaultTemplate) {
 
-    /** The settings the grader uses when the configuration is not given: caps off. */
+    /** Settings for a grader built without Spring, as unit tests do: caps off and the first prompt template. */
     public static WritingSettings defaults() {
         return new WritingSettings(3, 50, 1000, 10000, 20, 120, 10, "Asia/Ho_Chi_Minh", 2, false,
-                null, null, null, null, null, 30);
+                null, null, null, null, null, 30, "v1");
     }
 
     @AssertTrue(message = "minWords must be below maxWords")

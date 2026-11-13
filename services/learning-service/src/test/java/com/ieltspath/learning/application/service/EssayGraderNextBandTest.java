@@ -96,7 +96,7 @@ class EssayGraderNextBandTest {
         EssayPrompt tooShort = new EssayPrompt(UUID.randomUUID(), "Q", "TASK_2", 250, new BigDecimal("6.0"), null,
                 "Sample", List.of(), List.of(UUID.randomUUID()));
         WritingSettings withCap = new WritingSettings(3, 50, 1000, 10000, 20, 120, 10, "Asia/Ho_Chi_Minh", 2, true,
-                new BigDecimal("5.0"), null, null, null, null, 30);
+                new BigDecimal("5.0"), null, null, null, null, 30, "v1");
 
         WritingGrade grade = new EssayGrader(llm, new ObjectMapper(), content, activations, new EssayKnowledgeJudge(), "m",
                 withCap).grade(tooShort, ESSAY).grade();

@@ -242,8 +242,11 @@ public record WritingGrade(List<Criterion> criteria, List<Correction> correction
             this(excerpt, suggestion, category, errorCode, null, null, null, null, null);
         }
 
-        /** A suggestion is acceptable text with a better wording; it is not counted as an error. */
-        public boolean isSuggestion() { return SUGGESTION.equals(certainty); }
+        /**
+         * A suggestion is acceptable text with a better wording; it is not counted as an error. Not named
+         * {@code isSuggestion}: Jackson would store that as a boolean {@code suggestion} over the suggested text.
+         */
+        public boolean suggestionOnly() { return SUGGESTION.equals(certainty); }
     }
 
     /** A weak rubric criterion and its knowledge point, or a focus suggested by the grader's model. */

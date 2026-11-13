@@ -56,7 +56,7 @@ public class EssayKnowledgeJudge {
         if (grade.corrections() != null) {
             for (WritingGrade.Correction correction : grade.corrections()) {
                 // A suggestion is acceptable text, so it never turns a knowledge point into a FAIL.
-                if (correction == null || correction.errorCode() == null || correction.isSuggestion()) continue;
+                if (correction == null || correction.errorCode() == null || correction.suggestionOnly()) continue;
                 ErrorType error = errorTypes.get(correction.errorCode());
                 if (error != null && error.knowledgePointId() != null) {
                     corrections.add(new KnowledgeJudgmentRule.CorrectionEvidence(error.knowledgePointId(),
