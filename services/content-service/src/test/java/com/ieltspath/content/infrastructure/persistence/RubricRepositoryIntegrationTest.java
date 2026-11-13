@@ -51,14 +51,14 @@ class RubricRepositoryIntegrationTest {
                 + "AND status='ACTIVE'", java.util.Map.of(), Integer.class))
                 .isEqualTo(2);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM rubric_criteria c JOIN rubrics r ON r.id=c.rubric_id "
-                + "WHERE r.code IN ('IELTS_WRITING_TASK_1','IELTS_WRITING_TASK_2') AND r.status='ACTIVE'", java.util.Map.of(), Integer.class))
+                + "WHERE r.code IN ('IELTS_WRITING_TASK_1','IELTS_WRITING_TASK_2')", java.util.Map.of(), Integer.class))
                 .isEqualTo(8);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM rubric_band_descriptors d JOIN rubric_criteria c ON c.id=d.criterion_id "
-                + "JOIN rubrics r ON r.id=c.rubric_id WHERE r.code IN ('IELTS_WRITING_TASK_1','IELTS_WRITING_TASK_2') "
-                + "AND r.status='ACTIVE'", java.util.Map.of(), Integer.class))
-                .isEqualTo(144);
+                + "JOIN rubrics r ON r.id=c.rubric_id WHERE r.code IN ('IELTS_WRITING_TASK_1','IELTS_WRITING_TASK_2')",
+                java.util.Map.of(), Integer.class))
+                .isEqualTo(88);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM rubric_examples e JOIN rubrics r ON r.id=e.rubric_id "
-                + "WHERE r.code IN ('IELTS_WRITING_TASK_1','IELTS_WRITING_TASK_2') AND r.status='ACTIVE'", java.util.Map.of(), Integer.class))
+                + "WHERE r.code IN ('IELTS_WRITING_TASK_1','IELTS_WRITING_TASK_2')", java.util.Map.of(), Integer.class))
                 .isEqualTo(2);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM rubrics WHERE code IN ('IELTS_WRITING_TASK_1','IELTS_WRITING_TASK_2') "
                 + "AND source_note LIKE '%ielts.org%'", java.util.Map.of(), Integer.class))

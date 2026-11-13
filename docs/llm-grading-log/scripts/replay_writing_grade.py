@@ -1,10 +1,13 @@
-﻿"""Rebuild the template-v2 grading prompt for one stored submission and send it to the learning LLM from .env.
+﻿"""Rebuild the grading prompt for one stored submission and send it to the learning LLM from .env.
 
-Approximates EssayGrader.systemPrompt/userPrompt without the appended knowledge-point section. Saves the raw reply
+The template is chosen with REPLAY_TEMPLATE (v2 by default, or v3). The prompt follows EssayGrader: the rubric's system
+prompt comes before its criteria, error codes are listed only for the submission's task and show their model definition
+when they have one, and the knowledge-point extension is appended when the rubric has sub-points. Saves the raw reply
 and checks it the way EssayGrader.parse decides INVALID_GRADE. Never prints the API key.
-Usage: replay_writing_grade.py <submission-id-prefix> [model-override]
+Usage: [REPLAY_TEMPLATE=v3] replay_writing_grade.py <submission-id-prefix> [model-override]
 """
 import json
+import os
 import re
 import sys
 import time
@@ -16,6 +19,9 @@ import pg8000.native
 
 BACKEND = Path(__file__).resolve().parents[3]
 OUT = Path(__file__).resolve().parent
+TEMPLATE = os.environ.get("REPLAY_TEMPLATE", "v2")
+if TEMPLATE not in ("v2", "v3"):
+    sys.exit("REPLAY_TEMPLATE must be v2 or v3")
 env_text = (BACKEND / ".env").read_text(encoding="utf-8")
 
 
@@ -25,21 +31,30 @@ def env(key):
 
 
 def db(name, password_key):
-    return pg8000.native.Connection("postgres", host="localhost", port=5432, database=name, password=env(password_key))
+    return pg8000.native.Connection("postgres", host="localhost", port=int(os.environ.get("REPLAY_DB_PORT", "5432")), database=name, password=env(password_key))
 
 
 prefix = sys.argv[1]
-learning = db("learning_db", "LEARNING_DB_PASSWORD")
-sid, essay, snapshot = learning.run(
-    "SELECT id, essay_text, prompt_snapshot FROM lesson_writing_submissions WHERE CAST(id AS TEXT) LIKE :p",
-    p=prefix + "%")[0]
-learning.close()
-snap = snapshot if isinstance(snapshot, dict) else json.loads(snapshot)
+if prefix.startswith("sheet:"):
+    # A test essay from the Bai_test sheet of the grading log workbook (for example sheet:E01), no submission needed.
+    import openpyxl
+    workbook = openpyxl.load_workbook(next(OUT.parent.glob("llm-writing-grading-prompt-iteration-log-*.xlsx")), data_only=True)
+    row = next(r for r in workbook["Bai_test"].iter_rows(min_row=4, values_only=True) if r[0] == prefix[6:])
+    sid, essay = prefix, row[5]
+    snap = {"task": row[1], "stem": row[3], "minWords": 150 if row[1] == "TASK_1" else 250, "chartFacts": row[4]}
+else:
+    learning = db("learning_db", "LEARNING_DB_PASSWORD")
+    sid, essay, snapshot = learning.run(
+        "SELECT id, essay_text, prompt_snapshot FROM lesson_writing_submissions WHERE CAST(id AS TEXT) LIKE :p",
+        p=prefix + "%")[0]
+    learning.close()
+    snap = snapshot if isinstance(snapshot, dict) else json.loads(snapshot)
 task_one = snap.get("task") == "TASK_1"
 
 content = db("content_db", "CONTENT_DB_PASSWORD")
-rubric_id = content.run("SELECT id FROM rubrics WHERE task = :t AND status = 'ACTIVE' AND code LIKE 'IELTS_WRITING%'",
-                        t=snap.get("task"))[0][0]
+rubric_id, rubric_system = content.run(
+    "SELECT id, system_prompt FROM rubrics WHERE task = :t AND status = 'ACTIVE' AND code LIKE 'IELTS_WRITING%'",
+    t=snap.get("task"))[0]
 criteria = content.run("SELECT id, code, name, description FROM rubric_criteria WHERE rubric_id = :r ORDER BY sort_order",
                        r=rubric_id)
 criterion_text = []
@@ -57,20 +72,27 @@ for _, code, name, _description in criteria:
     entries = [f"- {k} \u2014 {n or k}" + (f": {d}" if d and d.strip() else "") for cc, k, n, d in subs if cc == code]
     if entries:
         kp_blocks.append(f"{code} ({name}):\n" + "\n".join(entries))
-errors = content.run("SELECT code, name, fix_hint FROM error_types WHERE status = 'ACTIVE' AND 'WRITING' = ANY(skills) "
-                     "ORDER BY code")
+errors = content.run("SELECT code, name, fix_hint, model_definition, writing_tasks FROM error_types "
+                     "WHERE status = 'ACTIVE' AND 'WRITING' = ANY(skills) ORDER BY code")
 content.close()
-error_codes = "\n".join(f"{c} \u2014 {n}: {h}" for c, n, h in errors)
+# Same rule as ErrorType.appliesToWritingTask: no task list means both tasks.
+error_codes = "\n".join(f"{c} \u2014 {n}: {d or h}" for c, n, h, d, tasks in errors
+                        if not tasks or snap.get("task") in tasks)
 
-template = (BACKEND / "docs/contracts/essay-prompt-template-v2.txt").read_text(encoding="utf-8")
+template = (BACKEND / f"docs/contracts/essay-prompt-template-{TEMPLATE}.txt").read_text(encoding="utf-8")
 template = re.sub(r"\A(?:#[^\r\n]*\r?\n)+\s*", "", template)
 drop, keep = ("TASK_2", "TASK_1") if task_one else ("TASK_1", "TASK_2")
 template = re.sub(rf"(?s)\[\[{drop}\]\].*?\[\[/{drop}\]\]\r?\n*", "", template)
 template = re.sub(rf"\[\[/?{keep}\]\]\r?\n?", "", template)
+# The rubric's own band instructions come before its criteria, as in EssayGrader.systemPrompt.
+criteria_block = "\n\n".join(criterion_text)
+if rubric_system and rubric_system.strip():
+    criteria_block = rubric_system.strip() + "\n\n" + criteria_block
 system = (template.replace("{{task}}", "Academic Writing Task 1" if task_one else "Writing Task 2")
-          .replace("{{criteria}}", "\n\n".join(criterion_text)).replace("{{error_codes}}", error_codes or "(none)"))
+          .replace("{{criteria}}", criteria_block).replace("{{error_codes}}", error_codes or "(none)"))
 if kp_blocks:
-    kp_template = (BACKEND / "services/learning-service/src/main/resources/essay-kp-judgment-v2.txt").read_text(encoding="utf-8")
+    kp_file = "essay-kp-judgment-v3.txt" if TEMPLATE == "v3" else "essay-kp-judgment-v2.txt"
+    kp_template = (BACKEND / "services/learning-service/src/main/resources" / kp_file).read_text(encoding="utf-8")
     kp_template = re.sub(r"\A(?:#[^\r\n]*\r?\n)+\s*", "", kp_template)
     system += "\n\n" + kp_template.replace("{{knowledge_points}}", "\n".join(kp_blocks))
 user = (f"Question:\n{snap.get('stem') or ''}\n\nMinimum words: {snap.get('minWords') or ''}\n"
@@ -88,7 +110,7 @@ request = urllib.request.Request(env("LEARNING_LLM_BASE_URL").rstrip("/") + "/ch
                                  data=json.dumps(body).encode(),
                                  headers={"Authorization": "Bearer " + env("LEARNING_LLM_API_KEY"),
                                           "Content-Type": "application/json"})
-print(f"submission {sid} task1={task_one} model={model} system_chars={len(system)} user_chars={len(user)} kp_criteria={len(kp_blocks)}")
+print(f"submission {sid} template={TEMPLATE} task1={task_one} model={model} system_chars={len(system)} user_chars={len(user)} kp_criteria={len(kp_blocks)}")
 started = time.time()
 try:
     with urllib.request.urlopen(request, timeout=120) as response:
@@ -99,7 +121,7 @@ except urllib.error.HTTPError as error:
 elapsed = time.time() - started
 choice = data["choices"][0]
 reply = choice["message"].get("content") or ""
-(OUT / f"replay-{prefix}-{model}.json").write_text(reply, encoding="utf-8")
+(OUT / f"replay-{prefix.replace(':', '-')}-{TEMPLATE}-{model}.json").write_text(reply, encoding="utf-8")
 print(f"seconds={elapsed:.1f} finish_reason={choice.get('finish_reason')} usage={json.dumps(data.get('usage'))}")
 
 # The checks EssayGrader.parse applies before it accepts a grade.

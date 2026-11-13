@@ -65,10 +65,12 @@ class GrammarErrorCodeMappingMigrationTest {
     @Test
     void codesWithoutAnApprovedPointStayUnmappedAndExistingMappingsAreUnchanged() throws Exception {
         try (Connection connection = connection()) {
-            // OFF_TOPIC has no approved point. NO_CLEAR_POSITION got one later (V125) but still has no trap point,
-            // because no practice sets with trap questions exist for it yet.
-            assertNull(scalar(connection, "SELECT knowledge_point_id::text FROM error_types WHERE code = 'OFF_TOPIC'"),
-                    "OFF_TOPIC");
+            // OFF_TOPIC got the task-response point later (V132) and NO_CLEAR_POSITION did earlier (V125), but neither
+            // has a trap point, because no practice sets with trap questions exist for them yet.
+            assertEquals("TR_W_OPINION", scalar(connection, """
+                    SELECT kp.code FROM error_types et JOIN knowledge_points kp ON kp.id = et.knowledge_point_id
+                    WHERE et.code = 'OFF_TOPIC'
+                    """), "OFF_TOPIC point");
             assertNull(scalar(connection, "SELECT trap_knowledge_point_id::text FROM error_types WHERE code = 'OFF_TOPIC'"),
                     "OFF_TOPIC");
             assertEquals("TR_W_OPINION", scalar(connection, """
