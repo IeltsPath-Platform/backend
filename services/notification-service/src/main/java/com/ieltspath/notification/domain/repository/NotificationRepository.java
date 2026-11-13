@@ -7,7 +7,10 @@ import java.util.List;
 import java.util.UUID;
 
 public interface NotificationRepository {
-    /** Stores the notification unless one with the same source event already exists; true when a row was added. */
+    /**
+     * Stores the notification unless one with the same source event already exists; true when a row was added. A stored
+     * notification is also queued for push to each device the recipient has registered, in the same transaction.
+     */
     boolean insertIfAbsent(UUID sourceEventId, Notification notification);
 
     List<Notification> findByRecipient(UUID recipientId, int size, long offset);

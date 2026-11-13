@@ -18,11 +18,16 @@ public class NotificationRepositoryAdapter implements NotificationRepository {
 
     @Override
     public boolean insertIfAbsent(UUID sourceEventId, Notification n) {
-        return jdbc.update("""
+        boolean inserted = jdbc.update("""
                 INSERT INTO notifications(id,source_event_id,recipient_id,actor_id,event_type,post_id,comment_id,grading_job_id,created_at)
                 VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING
                 """, n.id(), sourceEventId, n.recipientId(), n.actorId(), n.eventType(), n.postId(), n.commentId(),
                 n.gradingJobId(), Timestamp.from(n.createdAt())) > 0;
+        if (inserted) jdbc.update("""
+                INSERT INTO notification_deliveries(id,notification_id,installation_id,status,next_attempt_at,created_at)
+                SELECT gen_random_uuid(),?,installation_id,'PENDING',now(),now() FROM push_devices WHERE user_id=?
+                """, n.id(), n.recipientId());
+        return inserted;
     }
 
     @Override

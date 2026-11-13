@@ -24,6 +24,14 @@ spring:
     template:
       mandatory: true
 
+notification:
+  fcm:
+    # Off until a Firebase project exists. The service account file is given by GOOGLE_APPLICATION_CREDENTIALS
+    # (Application Default Credentials), never stored here or in the repo.
+    enabled: ${NOTIFICATION_FCM_ENABLED:false}
+    project-id: ${FIREBASE_PROJECT_ID:}
+    dispatch-delay-ms: ${NOTIFICATION_FCM_DISPATCH_DELAY_MS:5000}
+
 app:
   auth:
     internal-jwt-issuer: ${INTERNAL_JWT_ISSUER:urn:code-base:api-gateway}

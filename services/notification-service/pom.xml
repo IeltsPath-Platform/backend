@@ -14,6 +14,7 @@
 
     <properties>
         <mapstruct.version>1.6.3</mapstruct.version>
+        <firebase-admin.version>9.11.0</firebase-admin.version>
     </properties>
 
     <dependencies>
@@ -31,6 +32,27 @@
             <groupId>com.ieltspath</groupId>
             <artifactId>common-observability</artifactId>
             <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.ieltspath</groupId>
+            <artifactId>common-resilience</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- Only Cloud Messaging is used; Firestore and Cloud Storage clients are dropped to keep the jar small. -->
+        <dependency>
+            <groupId>com.google.firebase</groupId>
+            <artifactId>firebase-admin</artifactId>
+            <version>${firebase-admin.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.google.cloud</groupId>
+                    <artifactId>google-cloud-firestore</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.google.cloud</groupId>
+                    <artifactId>google-cloud-storage</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

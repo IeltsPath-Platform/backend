@@ -30,7 +30,7 @@ suy diễn khả năng nghiệp vụ ngoài các module dưới đây.
 | `services/access-service` | Gói, subscription, activation key, điểm. |
 | `services/game-service` | Phòng game, trận, phiên chơi, WebSocket. |
 | `services/community-service` | Bài viết, bình luận, reaction, kiểm duyệt. |
-| `services/notification-service` | Cổng 8088, `notification_db` (Compose PostgreSQL host 5440, migration V1-V4: `notifications`, `notification_preferences`): nhận event RabbitMQ (bốn queue chấm bài `notification.grading-{requested,completed,due-soon,overdue}.v1` và `community.notifications.v1`), lưu hộp thư thông báo, tùy chọn thông báo theo loại sự kiện. Route `/api/notifications/**`. |
+| `services/notification-service` | Cổng 8088, `notification_db` (Compose PostgreSQL host 5440, migration V1-V5: `notifications`, `notification_preferences`, `push_devices`, `notification_deliveries`): nhận event RabbitMQ (bốn queue chấm bài `notification.grading-{requested,completed,due-soon,overdue}.v1` và `community.notifications.v1`), lưu hộp thư thông báo, tùy chọn thông báo theo loại sự kiện, push FCM tới app mobile (`docs/contracts/notification-push-v1.md`, tắt khi `NOTIFICATION_FCM_ENABLED` không bật). Route `/api/notifications/**`. |
 | `services/learning-service` | Cổng 8086, `learning_db` (Compose PostgreSQL host 5440): thứ tự topic, bài học, nộp bài, cổng mở bài, mastery theo KP, bài ôn, giao mã đề cuối, consumer `AssessmentCompleted.v2`, mục tiêu học, activity, thời gian học và streak. Route `/api/learning/**`; Gateway còn chuyển các path công khai cũ của goal, activity và study-time tới đây. |
 
 Mỗi business service sở hữu một database PostgreSQL riêng. Gateway chuyển nhóm activity tới user-service;
@@ -53,6 +53,7 @@ phần hạ tầng hoặc architectural pattern mới nếu chưa được phê 
 | Resilience | Resilience4j 2.4.0, chỉ dùng qua `common-resilience` (`ResilientCall`). |
 | Quan sát | Micrometer, Micrometer Tracing + OpenTelemetry qua `common-observability`; Prometheus, Loki, Tempo, Alloy, Grafana là stack tùy chọn (`docker-compose.observability.yml`, profile `observability`). |
 | Lưu file | Supabase Storage qua `common-storage`. |
+| Push mobile | Firebase Admin SDK Java 9.11.0 (chỉ Cloud Messaging; duyệt 2026-11-13), chỉ ở notification-service. |
 | Shared code | `common-security` auto-configuration; `common-events` (tên/hình dạng event, helper retry AMQP); MapStruct 1.6.3; Lombok 1.18.46. |
 | API docs | springdoc-openapi 2.8.17 (duyệt 2026-10-02): `webmvc-api` ở user/access/assessment/learning, `webflux-ui` ở Gateway gom Swagger UI; chỉ route luồng chính, không `/internal/**`. |
 | Kiểm thử | JUnit Jupiter, Spring Boot Test, Mockito, Spring Security Test, Testcontainers PostgreSQL. |

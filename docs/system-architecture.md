@@ -46,7 +46,7 @@ content --HTTP--> library                 learning --HTTP--> content (/internal/
 | `access-service` | Gói, subscription, activation key, ví điểm và sổ điểm | `access_db` (Compose PostgreSQL host 5440) | `/api/access/**` |
 | `game-service` | Phòng game, trận, phiên chơi, WebSocket realtime | `game_db` (Compose PostgreSQL host 5440) | `/api/games/**`, `/ws/games/**` |
 | `community-service` | Bài viết, bình luận, reaction, kiểm duyệt | `community_db` (Compose PostgreSQL host 5440) | `/api/community/**` |
-| `notification-service` | Thông báo bền vững từ Community events, REST unread/read và STOMP push | `notification_db` (Compose PostgreSQL host 5440) | `/api/notifications/**`, `/ws/notifications` |
+| `notification-service` | Thông báo bền vững từ Community events, REST unread/read, STOMP push và push FCM tới app mobile ([`notification-push-v1.md`](contracts/notification-push-v1.md)) | `notification_db` (Compose PostgreSQL host 5440) | `/api/notifications/**`, `/ws/notifications` |
 | `learning-service` | Placement recommendation; topic path theo course (một chuỗi cho mọi skill), bài học, Practice theo bài, mastery theo KP và KP con mã lỗi, phản hồi fix hint, thang ôn tập, course/topic progress và giao mã đề cuối; mục tiêu học, activity, thời gian học và streak; nhận kết quả thi chính thức | `learning_db` (Compose PostgreSQL host 5440; `learner_placements`, `course_progress`, `course_test_assignments`, `learning_goals`, `learning_activities`, `study_*`; V40 tạo các bảng goal/activity/study) | `/api/learning/**`; Gateway viết lại `/api/users/me/learning-goals/**`, `/api/users/{id}/learning-goals/**`, `/api/users/me/study-sessions/**`, `/api/users/me/statistics/study-time`, `/api/learning-support/activities/**` sang đây |
 
 Library owns the standalone vocabulary dictionary taxonomy in `vocabulary_topics` and vocabulary sets. These are separate from Content's curriculum `topics`; catalog reads do not call Content or synchronize curriculum topic IDs. Each sense's CEFR level lives in Library, and its IELTS band range is derived by Library domain rules rather than stored as a second level.
@@ -293,7 +293,7 @@ cùng course mở theo trạng thái suy ra khi đọc. Course test không chặ
 
 ## Scheduler và nhiều instance
 
-Backend hiện có 22 phương thức `@Scheduled` trong 21 job. Cơ chế chống xử lý trùng theo mã đang chạy:
+Backend hiện có 23 phương thức `@Scheduled` trong 22 job. Cơ chế chống xử lý trùng theo mã đang chạy:
 
 | Service | Job / lịch | Cơ chế cạnh tranh | HTTP/LLM khi giữ khóa hoặc transaction |
 |---|---|---|---|
@@ -303,6 +303,7 @@ Backend hiện có 22 phương thức `@Scheduled` trong 21 job. Cơ chế chố
 | game | `OutboxRetentionJob` | Xóa theo ngưỡng thời gian; chạy lặp an toàn | Không |
 | game | `RoomEventChannelSupervisor` | Mỗi instance tự đăng ký lại Redis pub/sub của nó | Không |
 | notification | `NoticePushChannelConfig` | Mỗi instance tự đăng ký lại Redis pub/sub của nó | Không |
+| notification | `FcmPushConfig.PushDeliveryJob` (chỉ khi `NOTIFICATION_FCM_ENABLED=true`) | Claim `notification_deliveries` bằng `FOR UPDATE SKIP LOCKED` trong một câu lệnh tự commit, kèm lease 2 phút | FCM ngoài transaction và khóa |
 | assessment | `OutboxRelayScheduler` | `FOR UPDATE SKIP LOCKED`; publish broker trong transaction ngắn để giữ claim tới khi gửi xong | Broker trong transaction ngắn |
 | access | `AccessOutboxRelayScheduler` | `FOR UPDATE SKIP LOCKED`; publish broker trong transaction ngắn | Broker trong transaction ngắn |
 | community | `CommunityOutboxRelayScheduler` | `FOR UPDATE SKIP LOCKED`; publish broker trong transaction ngắn | Broker trong transaction ngắn |
