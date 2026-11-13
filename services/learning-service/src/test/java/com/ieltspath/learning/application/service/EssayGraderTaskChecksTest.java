@@ -101,6 +101,44 @@ class EssayGraderTaskChecksTest {
     }
 
     @Test
+    void aWrongSentenceWithoutACorrectionGetsAnEntryWithAnEmptyReplacementAndTheExplanation() {
+        llm.reply(reply("TA", "\"corrections\":[],\"taskChecks\":{\"dataChecks\":["
+                + "{\"excerpt\":\"Sales fell to 10 in 2021.\",\"verdict\":\"WRONG\",\"expected\":\"Doanh số giảm còn 15.\"}]}"));
+
+        WritingGrade grade = grader.grade(task1(), ESSAY_1).grade();
+
+        var entry = grade.corrections().getFirst();
+        assertEquals("T1_DATA_MISREPORTED", entry.errorCode());
+        assertEquals("", entry.suggestion());
+        assertEquals("Doanh số giảm còn 15.", entry.reason());
+    }
+
+    @Test
+    void aReplacementWrittenInVietnameseIsDroppedAndTheCorrectionKeepsItsExcerptAndReason() {
+        llm.reply(reply("TA", "\"corrections\":[{\"excerpt\":\"Sales fell to 10 in 2021.\",\"suggestion\":\"Bỏ đoạn này.\","
+                + "\"errorCode\":\"GRAMMAR\",\"reason\":\"Bỏ câu nêu ý kiến.\",\"certainty\":\"ERROR\"}],"
+                + "\"taskChecks\":{\"hasOverview\":false}"));
+
+        WritingGrade grade = grader.grade(task1(), ESSAY_1).grade();
+
+        var entry = grade.corrections().getFirst();
+        assertEquals("Sales fell to 10 in 2021.", entry.excerpt());
+        assertEquals("", entry.suggestion());
+        assertEquals("Bỏ câu nêu ý kiến.", entry.reason());
+    }
+
+    @Test
+    void theThirdTemplateIsGradedWithItsOwnPromptVersion() {
+        when(activations.activatedVersion("TASK_1")).thenReturn("IELTS_ESSAY@1+tplv3");
+        llm.reply(reply("TA", "\"corrections\":[],\"taskChecks\":{\"hasOverview\":false}"));
+
+        var graded = grader.grade(task1(), ESSAY_1);
+
+        assertEquals("IELTS_ESSAY@1+tplv3", graded.promptVersion());
+        assertEquals(Boolean.FALSE, graded.grade().task1Checks().hasOverview());
+    }
+
+    @Test
     void theFirstTemplateIgnoresTheChecks() {
         when(activations.activatedVersion("TASK_1")).thenReturn(null);
         llm.reply(reply("TA", "\"corrections\":[],\"taskChecks\":{\"hasOverview\":false}"));
@@ -122,7 +160,8 @@ class EssayGraderTaskChecksTest {
         var added = grade.corrections().getFirst();
         assertEquals("T1_DATA_MISREPORTED", added.errorCode());
         assertEquals("Sales fell to 10 in 2021.", added.excerpt());
-        assertEquals("Năm 2021 là 15.", added.suggestion());
+        assertEquals("", added.suggestion());
+        assertEquals("Năm 2021 là 15.", added.reason());
         assertEquals(3, added.severity());
         assertFalse(added.suggestionOnly());
     }

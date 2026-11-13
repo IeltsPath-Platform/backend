@@ -34,6 +34,11 @@ import java.util.stream.Collectors;
 @Component
 public class EssayGrader {
     static final int MAX_ITEM_CHARS = 300;
+    /** A replacement sentence can be a whole passage that was rewritten, so it has more room than a comment. */
+    static final int MAX_SUGGESTION_CHARS = 600;
+    /** Vietnamese letters with diacritics; a replacement sentence in a corrected essay must be English. */
+    private static final java.util.regex.Pattern VIETNAMESE =
+            java.util.regex.Pattern.compile("[ĂăĐđĨĩŨũƠơƯưẠ-ỹ]");
     static final int MAX_FOCUS_POINTS = 4;
     static final int MAX_FOCUS_TITLE_CHARS = 80;
     static final int MAX_CORRECTIONS = 10;
@@ -46,8 +51,10 @@ public class EssayGrader {
     static final int MAX_EXAMPLE_CHARS = 200;
     static final String TEMPLATE_VERSION = "v1";
     static final String TEMPLATE_VERSION_2 = "v2";
+    static final String TEMPLATE_VERSION_3 = "v3";
     static final String PROMPT_TEMPLATE = loadTemplate(TEMPLATE_VERSION);
     static final String PROMPT_TEMPLATE_2 = loadTemplate(TEMPLATE_VERSION_2);
+    static final String PROMPT_TEMPLATE_3 = loadTemplate(TEMPLATE_VERSION_3);
 
     private final LlmClient llm;
     private final ObjectMapper json;
@@ -136,13 +143,13 @@ public class EssayGrader {
             throw new WritingGradingException("LLM_UNAVAILABLE");
         }
         WritingGrade parsed = parse(task, essay, allowedCodes, criterionPoints, root, catalog,
-                TEMPLATE_VERSION_2.equals(templateVersion))
+                hasTaskChecks(templateVersion))
                 .orElseThrow(() -> new WritingGradingException("INVALID_GRADE"));
         WritingGrade grade = applyBandCaps(parsed, task, essay, prompt.minWords(), settings);
         WritingGrade withCriteria = withNextBands(withCriterionStudyPoints(grade, rubric, prompt.passBand(), catalog),
                 rubric);
         WritingGrade judged = knowledgeJudge.judge(task, essay, withCriteria, rubric.criteria(), allowedCodes,
-                root.path("judgments"), catalog);
+                root.path("judgments"), catalog, TEMPLATE_VERSION_3.equals(templateVersion));
         return new GradedEssay(judged.withModel(model), promptVersion);
     }
 
@@ -162,7 +169,12 @@ public class EssayGrader {
     }
 
     private static boolean isKnownTemplate(String version) {
-        return TEMPLATE_VERSION.equals(version) || TEMPLATE_VERSION_2.equals(version);
+        return TEMPLATE_VERSION.equals(version) || TEMPLATE_VERSION_2.equals(version) || TEMPLATE_VERSION_3.equals(version);
+    }
+
+    /** Templates from the second on ask for taskChecks and the corrections with reasons and certainty. */
+    private static boolean hasTaskChecks(String version) {
+        return TEMPLATE_VERSION_2.equals(version) || TEMPLATE_VERSION_3.equals(version);
     }
 
     private static String templateVersionOf(String activatedVersion) {
@@ -187,12 +199,16 @@ public class EssayGrader {
                 .map(error -> error.code() + " — " + error.name() + ": " + modelText(error))
                 .collect(Collectors.joining("\n"));
         String taskName = task == WritingTask.TASK_1 ? "Academic Writing Task 1" : "Writing Task 2";
-        String template = forTask(TEMPLATE_VERSION_2.equals(templateVersion) ? PROMPT_TEMPLATE_2 : PROMPT_TEMPLATE,
-                task == WritingTask.TASK_1);
+        String template = forTask(templateOf(templateVersion), task == WritingTask.TASK_1);
         return template.replace("{{task}}", taskName)
                 .replace("{{criteria}}", criterionText)
                 .replace("{{error_codes}}", errorCodes.isBlank() ? "(none)" : errorCodes)
-                + EssayKnowledgeJudge.prompt(task, rubric.criteria());
+                + EssayKnowledgeJudge.prompt(task, rubric.criteria(), TEMPLATE_VERSION_3.equals(templateVersion));
+    }
+
+    private static String templateOf(String version) {
+        if (TEMPLATE_VERSION_3.equals(version)) return PROMPT_TEMPLATE_3;
+        return TEMPLATE_VERSION_2.equals(version) ? PROMPT_TEMPLATE_2 : PROMPT_TEMPLATE;
     }
 
     /** The codes that apply to this Writing task; a code without a task list applies to both. */
@@ -244,7 +260,7 @@ public class EssayGrader {
             }
             BigDecimal value = band.decimalValue();
             if (!WritingScore.isBand(value)) return Optional.empty();
-            String comment = truncate(node.path("comment").asText(""), MAX_ITEM_CHARS);
+            String comment = truncateAtSentence(node.path("comment").asText(""), MAX_ITEM_CHARS);
             List<String> evidence = secondTemplate ? quotations(node.path("evidence"), essay) : List.of();
             if (secondTemplate && evidence.isEmpty() && metrics != null) {
                 metrics.counter("learning.writing.evidence_missing").increment();
@@ -295,7 +311,10 @@ public class EssayGrader {
                     || covered(merged, check.excerpt(), essay)) continue;
             ObjectNode item = json.createObjectNode();
             item.put("excerpt", check.excerpt());
-            item.put("suggestion", check.expected());
+            // The fallback entry keeps the sentence and its explanation in "reason"; the replacement stays empty, so no
+            // Vietnamese text can reach the corrected essay.
+            item.put("suggestion", "");
+            item.put("reason", check.expected());
             item.put("errorCode", DATA_MISREPORTED_CODE);
             item.put("certainty", WritingGrade.Correction.ERROR);
             merged.add(item);
@@ -532,6 +551,9 @@ public class EssayGrader {
             if (values.size() == ceiling) break;
             String excerpt = item.path("excerpt").isTextual() ? item.get("excerpt").asText() : null;
             String suggestion = item.path("suggestion").isTextual() ? item.get("suggestion").asText() : null;
+            // A replacement written in Vietnamese is an instruction, not text for the essay: it is dropped, and the
+            // correction keeps its excerpt and reason.
+            if (suggestion != null && VIETNAMESE.matcher(suggestion).find()) suggestion = "";
             String code = item.path("errorCode").asText(null);
             if (excerpt == null || excerpt.isBlank() || !essay.contains(excerpt) || suggestion == null
                     || code == null || !allowedCodes.containsKey(code)) continue;
@@ -557,7 +579,7 @@ public class EssayGrader {
                         ? WritingGrade.Correction.SUGGESTION : WritingGrade.Correction.ERROR;
             }
             values.add(new WritingGrade.Correction(truncate(excerpt, MAX_ITEM_CHARS),
-                    truncate(suggestion, MAX_ITEM_CHARS), errorType.category(), code, errorType.name(),
+                    truncateAtSentence(suggestion, MAX_SUGGESTION_CHARS), errorType.category(), code, errorType.name(),
                     errorType.fixHint(), errorType.severity(), practiceKnowledgePointId, practiceKnowledgePointCode,
                     reason, certainty));
         }
@@ -565,6 +587,19 @@ public class EssayGrader {
     }
 
     private static String truncate(String value, int max) { return value.length() <= max ? value : value.substring(0, max); }
+
+    /**
+     * Cuts a text at its last sentence end before {@code max} characters; without one, at its last space. Cuts that would
+     * keep less than half the limit are not used, so a long text is never reduced to a fragment.
+     */
+    static String truncateAtSentence(String value, int max) {
+        if (value.length() <= max) return value;
+        String head = value.substring(0, max);
+        int sentence = Math.max(head.lastIndexOf(". "), Math.max(head.lastIndexOf("! "), head.lastIndexOf("? ")));
+        if (sentence >= max / 2) return head.substring(0, sentence + 1);
+        int space = head.lastIndexOf(' ');
+        return space >= max / 2 ? head.substring(0, space) : head;
+    }
 
     private static String loadTemplate(String version) {
         try (InputStream input = EssayGrader.class.getResourceAsStream("/essay-prompt-template-" + version + ".txt")) {

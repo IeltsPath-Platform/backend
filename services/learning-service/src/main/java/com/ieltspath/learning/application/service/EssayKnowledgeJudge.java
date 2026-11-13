@@ -23,13 +23,22 @@ import java.util.stream.Collectors;
 @Component
 public class EssayKnowledgeJudge {
     public static final String VERSION = "kpj2";
-    private static final String TEMPLATE = loadTemplate();
+    /** The judgment version of a grade made with the third essay template, which asks for judgments in a new order. */
+    public static final String VERSION_THIRD_TEMPLATE = "kpj3";
+    private static final String TEMPLATE = loadTemplate("essay-kp-judgment-v2.txt");
+    private static final String TEMPLATE_THIRD_TEMPLATE = loadTemplate("essay-kp-judgment-v3.txt");
 
     private final KnowledgeJudgmentRule rule = new KnowledgeJudgmentRule();
 
     public WritingGrade judge(WritingTask task, String essay, WritingGrade grade,
                               List<RubricCriterion> rubricCriteria, Map<String, ErrorType> errorTypes,
                               JsonNode entries, Supplier<Map<UUID, KnowledgePoint>> catalog) {
+        return judge(task, essay, grade, rubricCriteria, errorTypes, entries, catalog, false);
+    }
+
+    public WritingGrade judge(WritingTask task, String essay, WritingGrade grade,
+                              List<RubricCriterion> rubricCriteria, Map<String, ErrorType> errorTypes,
+                              JsonNode entries, Supplier<Map<UUID, KnowledgePoint>> catalog, boolean thirdTemplate) {
         List<RubricCriterion> orderedCriteria = orderedCriteria(task, rubricCriteria);
         List<KnowledgeJudgmentRule.Candidate> candidates = orderedCriteria.stream()
                 .flatMap(criterion -> criterion.subKnowledgePoints().stream()
@@ -88,11 +97,16 @@ public class EssayKnowledgeJudge {
             return parentPoints.get(judgmentCriterion(candidates, judgment));
         });
         return new WritingGrade(gradeCriteria, grade.corrections(), grade.summary(), grade.overallBand(), studyPoints,
-                VERSION, grade.model(), grade.bandLimits(), grade.priorities(), grade.errorExamples(),
+                thirdTemplate ? VERSION_THIRD_TEMPLATE : VERSION, grade.model(), grade.bandLimits(), grade.priorities(),
+                grade.errorExamples(),
                 grade.task1Checks(), grade.task2Checks());
     }
 
     static String prompt(WritingTask task, List<RubricCriterion> criteria) {
+        return prompt(task, criteria, false);
+    }
+
+    static String prompt(WritingTask task, List<RubricCriterion> criteria, boolean thirdTemplate) {
         String points = orderedCriteria(task, criteria).stream().map(criterion -> {
             String heading = criterion.code() + " (" + criterion.name() + "):\n";
             String entries = criterion.subKnowledgePoints().stream()
@@ -103,7 +117,8 @@ public class EssayKnowledgeJudge {
                     .collect(Collectors.joining("\n"));
             return entries.isBlank() ? "" : heading + entries;
         }).filter(text -> !text.isBlank()).collect(Collectors.joining("\n"));
-        return points.isBlank() ? "" : "\n\n" + TEMPLATE.replace("{{knowledge_points}}", points);
+        String template = thirdTemplate ? TEMPLATE_THIRD_TEMPLATE : TEMPLATE;
+        return points.isBlank() ? "" : "\n\n" + template.replace("{{knowledge_points}}", points);
     }
 
     private static List<RubricCriterion> orderedCriteria(WritingTask task, List<RubricCriterion> criteria) {
@@ -124,8 +139,8 @@ public class EssayKnowledgeJudge {
         return value != null && value.isTextual() ? value.asText() : null;
     }
 
-    private static String loadTemplate() {
-        try (var input = EssayKnowledgeJudge.class.getResourceAsStream("/essay-kp-judgment-v2.txt")) {
+    private static String loadTemplate(String resource) {
+        try (var input = EssayKnowledgeJudge.class.getResourceAsStream("/" + resource)) {
             if (input == null) throw new IllegalStateException("Knowledge judgment prompt template missing");
             return new String(input.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
         } catch (java.io.IOException exception) {

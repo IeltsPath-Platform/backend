@@ -109,7 +109,7 @@ class EssayGraderSecondTemplateTest {
 
     @Test
     void anUnknownTemplateVersionIsUnavailable() {
-        when(activations.activatedVersion("TASK_2")).thenReturn("IELTS_ESSAY@2+tplv3");
+        when(activations.activatedVersion("TASK_2")).thenReturn("IELTS_ESSAY@2+tplv4");
 
         assertEquals("PROMPT_VERSION_UNAVAILABLE", assertThrows(WritingGradingException.class,
                 () -> grader.grade(task2(), ESSAY)).getCode());

@@ -80,6 +80,36 @@ class EssayGraderWritingDefinitionsTest {
         assertEquals(Set.of("MISSING_VERB", "T1_IRRELEVANT_CONTENT"), taskOneCodes);
     }
 
+    @Test
+    void theThirdTemplateAsksForTheNewOrderAndTheCodeOfTaskOneOpinions() {
+        String third = EssayGrader.systemPrompt(WritingTask.TASK_1, rubric("TASK_1"), List.of(BOTH_TASKS, TASK_ONE_ONLY),
+                "v3");
+        String second = EssayGrader.systemPrompt(WritingTask.TASK_1, rubric("TASK_1"), List.of(BOTH_TASKS, TASK_ONE_ONLY),
+                "v2");
+
+        assertTrue(third.contains("Write the fields in exactly this order"));
+        assertTrue(third.contains("T1_IRRELEVANT_CONTENT"));
+        assertTrue(third.contains("Every sentence marked \"WRONG\""));
+        assertFalse(third.contains("[["), "task markers are removed");
+        assertFalse(second.contains("Write the fields in exactly this order"));
+    }
+
+    @Test
+    void aLongTextIsCutAtASentenceEndWhenOneFallsInTheSecondHalfOfTheLimit() {
+        assertEquals("A sentence that comes first and is long enough.", EssayGrader.truncateAtSentence(
+                "A sentence that comes first and is long enough. Then another sentence that runs well past the limit.", 60));
+    }
+
+    @Test
+    void aLongTextWithoutASentenceEndIsCutAtASpace() {
+        assertEquals("alpha beta", EssayGrader.truncateAtSentence("alpha beta gamma delta epsilon", 12));
+    }
+
+    @Test
+    void aTextWithinTheLimitIsUnchanged() {
+        assertEquals("short text", EssayGrader.truncateAtSentence("short text", 60));
+    }
+
     private static LearningContentClient.Rubric rubric(String task) {
         return new LearningContentClient.Rubric("IELTS_ESSAY", task, 1, "source", RUBRIC_INSTRUCTION,
                 criteria(task), List.of());

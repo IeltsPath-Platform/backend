@@ -12,12 +12,19 @@ import java.util.stream.Collectors;
 public final class RubricPromptBuilder {
     public static final String TEMPLATE_VERSION = "v1";
     public static final String TEMPLATE_VERSION_2 = "v2";
+    public static final String TEMPLATE_VERSION_3 = "v3";
     private static final String TEMPLATE = loadTemplate(TEMPLATE_VERSION);
     private static final String TEMPLATE_2 = loadTemplate(TEMPLATE_VERSION_2);
+    private static final String TEMPLATE_3 = loadTemplate(TEMPLATE_VERSION_3);
     private RubricPromptBuilder() {}
 
     public static boolean isKnownTemplate(String version) {
-        return TEMPLATE_VERSION.equals(version) || TEMPLATE_VERSION_2.equals(version);
+        return TEMPLATE_VERSION.equals(version) || TEMPLATE_VERSION_2.equals(version) || TEMPLATE_VERSION_3.equals(version);
+    }
+
+    private static String templateOf(String version) {
+        if (TEMPLATE_VERSION_3.equals(version)) return TEMPLATE_3;
+        return TEMPLATE_VERSION_2.equals(version) ? TEMPLATE_2 : TEMPLATE;
     }
 
     public static String promptVersion(ActiveRubricProvider.Rubric rubric) {
@@ -57,7 +64,7 @@ public final class RubricPromptBuilder {
                 .map(error -> error.code() + " — " + error.name() + ": "
                         + (error.modelDefinition() != null ? error.modelDefinition() : error.fixHint()))
                 .collect(Collectors.joining("\n"));
-        String template = forTask(TEMPLATE_VERSION_2.equals(templateVersion) ? TEMPLATE_2 : TEMPLATE,
+        String template = forTask(templateOf(templateVersion),
                 "TASK_1".equals(rubric.task()));
         return template.replace("{{task}}", task).replace("{{criteria}}", criteria)
                 .replace("{{error_codes}}", codes.isBlank() ? "(none)" : codes);

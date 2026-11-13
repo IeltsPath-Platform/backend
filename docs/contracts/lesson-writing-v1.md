@@ -107,7 +107,10 @@ Response 200:
   `{wrong: [{excerpt, expected}], correctCount, hasOverview?, overviewAccurate?, hasPersonalOpinion?}`. `wrong` lists the
   sentences of the essay that contradict the chart; `expected` is a short Vietnamese statement of what the chart shows.
   Sentences judged right come back only as `correctCount`. A flag the model did not give is omitted. The chart facts
-  themselves are never returned. A wrong figure also appears in `corrections` with the code `T1_DATA_MISREPORTED`.
+  themselves are never returned. A wrong figure also appears in `corrections` with the code `T1_DATA_MISREPORTED`. When the model gave no such entry, Learning adds one
+whose `suggestion` is empty and whose `reason` is the `expected` statement. A `suggestion` that contains Vietnamese is emptied
+(the correction keeps its excerpt and reason), so no Vietnamese text reaches a corrected essay. A `suggestion` is at most 600
+characters and a criterion `comment` at most 300, both cut at a sentence end when one is near the limit.
 - `taskChecks` (Task 2, same condition): `{questionParts: [{part, addressed, excerpt?}], position?: {required, stated,
   excerpt?, consistent?, conflictExcerpt?}, outline: [{role, mainIdea, developed, excerpt?}], partialAnswer, noPosition,
   inconsistentPosition, noConclusion}`. `addressed` is `FULL`, `PARTIAL` or `NONE`; `role` is `INTRODUCTION`, `BODY` or
@@ -152,14 +155,16 @@ when no evidence is available. When the rubric lists sub-points, Learning append
 the unchanged band template `v1`; one response supplies `criteria`, `corrections`, `summary`, `focus` and `judgments`.
 Rubrics without sub-points do not require `judgments`. `promptVersion` is
 `<rubricCode>@<rubricVersion>+tplv1` for band activation, or `+tplv2` when an administrator has activated a run made with the
-second template (`docs/contracts/essay-prompt-template-v2.txt`); with nothing activated, `v1` is used and an unknown template
-version is `PROMPT_VERSION_UNAVAILABLE`. Template `v2` additionally returns, and the grade JSON stores (not yet exposed by the API),
+second template (`docs/contracts/essay-prompt-template-v2.txt`), or `+tplv3` for the third (`docs/contracts/essay-prompt-template-v3.txt`,
+which asks for `taskChecks` first and for the sentence rules of the corrections); with nothing activated, `v1` is used and an unknown template
+version is `PROMPT_VERSION_UNAVAILABLE`. The default template is set by `learning.writing.default-template` and stays `v2`. Template `v2` additionally returns, and the grade JSON stores (not yet exposed by the API),
 per correction a `reason` (at most 300 characters, optional) and `certainty` (`ERROR` or `SUGGESTION`; missing or unknown reads as
 `ERROR`; a `SUGGESTION` never creates a knowledge-point `FAIL` and is not counted in the essay event's `error_code`), per criterion
 `evidence` (exact quotations, at most 3; a quotation not in the essay is dropped and the band is kept) and `descriptor`, at most 3
 `priorities` and one `errorExamples` entry per error code in `corrections`. Missing optional parts never make the grade `INVALID_GRADE`.
 Band activation is unchanged; internal grade JSON stores `judgmentVersion=kpj2` whenever the rubric has
-sub-points (the prompt was extended), even if the response has no judgments array, otherwise null. This version is not
+sub-points (the prompt was extended), even if the response has no judgments array, otherwise null. With the third template the
+extension is `essay-kp-judgment-v3` and the stored version is `kpj3`. This version is not
 exposed by the API. `EssayKnowledgeJudge` validates the received data without LLM or clock
 dependencies; the grader supplies a lazy Content catalog, loaded at most once when needed for practice targets.
 The essay template's single source is `docs/contracts/essay-prompt-template-v*.txt`; Maven copies it to the root

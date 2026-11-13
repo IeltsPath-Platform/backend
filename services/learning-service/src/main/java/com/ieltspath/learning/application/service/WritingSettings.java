@@ -35,7 +35,7 @@ public record WritingSettings(
         BigDecimal noPositionBandCap,
         @DefaultValue("30") @Min(1) @Max(50) int maxCorrections,
         // Prompt template used when no evaluation run has activated a version for the task; an activation wins.
-        @DefaultValue("v2") @Pattern(regexp = "v1|v2") String defaultTemplate) {
+        @DefaultValue("v2") @Pattern(regexp = "v1|v2|v3") String defaultTemplate) {
 
     /** Settings for a grader built without Spring, as unit tests do: caps off and the first prompt template. */
     public static WritingSettings defaults() {

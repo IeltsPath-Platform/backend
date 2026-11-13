@@ -172,4 +172,15 @@ class EssayKnowledgeJudgeTest {
         assertFalse(extension.contains(TOPIC.toString()));
         assertEquals("", EssayKnowledgeJudge.prompt(WritingTask.TASK_2, List.of(criterion(List.of()))));
     }
+
+    @Test
+    void thirdTemplateAsksForTheJudgmentsRightAfterCriteriaAndUsesItsOwnVersion() {
+        var points = List.of(new LearningContentClient.SubKnowledgePoint(LINKING, "LINKING", "Linking", "Use linking words"));
+        String extension = EssayKnowledgeJudge.prompt(WritingTask.TASK_2, List.of(criterion(points)), true);
+
+        assertTrue(extension.contains("placed right after \"criteria\""));
+        assertTrue(extension.contains("Return every field requested above"));
+        assertTrue(extension.contains("LINKING — Linking: Use linking words"));
+        assertEquals("kpj3", EssayKnowledgeJudge.VERSION_THIRD_TEMPLATE);
+    }
 }

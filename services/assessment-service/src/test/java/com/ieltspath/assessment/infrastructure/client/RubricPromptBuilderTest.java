@@ -43,6 +43,17 @@ class RubricPromptBuilderTest {
         }
     }
 
+    @Test void thirdTemplateIsKnownAndAsksForTheNewOrderOfFields() {
+        var rubric = new com.ieltspath.assessment.application.port.ActiveRubricProvider.Rubric(
+                "IELTS_ESSAY", "TASK_2", 2, "source", java.util.List.of(), java.util.List.of());
+        org.junit.jupiter.api.Assertions.assertTrue(RubricPromptBuilder.isKnownTemplate("v3"));
+        String prompt = RubricPromptBuilder.build(rubric, java.util.List.of(), "v3");
+        org.junit.jupiter.api.Assertions.assertTrue(prompt.contains("Write the fields in exactly this order"));
+        org.junit.jupiter.api.Assertions.assertFalse(prompt.contains("[["));
+        org.junit.jupiter.api.Assertions.assertFalse(RubricPromptBuilder.build(rubric, java.util.List.of(), "v2")
+                .contains("Write the fields in exactly this order"));
+    }
+
     @Test void codesShowTheirDefinitionsAndTheRubricInstructionOnlyForTheirTask() {
         var rubric = new com.ieltspath.assessment.application.port.ActiveRubricProvider.Rubric(
                 "IELTS_ESSAY", "TASK_1", 2, "source", "How to choose a band.", java.util.List.of(), java.util.List.of());
