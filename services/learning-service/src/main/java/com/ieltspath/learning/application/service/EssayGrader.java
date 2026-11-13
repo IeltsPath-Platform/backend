@@ -14,6 +14,7 @@ import com.ieltspath.learning.application.port.LearningContentClient.Rubric;
 import com.ieltspath.learning.application.port.LearningContentClient.RubricCriterion;
 import com.ieltspath.learning.application.port.LlmClient;
 import com.ieltspath.learning.domain.service.WritingBandCaps;
+import com.ieltspath.learning.domain.service.WritingErrorDensity;
 import com.ieltspath.learning.domain.service.WritingScore;
 import com.ieltspath.learning.domain.vo.EssayPrompt;
 import com.ieltspath.learning.domain.vo.WritingGrade;
@@ -420,8 +421,11 @@ public class EssayGrader {
                 grade.task1Checks() != null && Boolean.FALSE.equals(grade.task1Checks().hasOverview()),
                 grade.task2Checks() != null && grade.task2Checks().partialAnswer(),
                 grade.task2Checks() != null && grade.task2Checks().noPosition());
-        List<WritingBandCaps.Limit> limits = WritingBandCaps.evaluate(task, WritingScore.countWords(essay), minWords,
-                flags, caps);
+        List<WritingBandCaps.Limit> limits = new ArrayList<>(WritingBandCaps.evaluate(task,
+                WritingScore.countWords(essay), minWords, flags, caps));
+        // Errors in most sentences are counted from the corrections, so the same grade always gets the same caps.
+        limits.addAll(WritingBandCaps.evaluateDensity(task,
+                WritingErrorDensity.measure(essay, grade.corrections(), grade.task1Checks()), settings.density().rules()));
         if (limits.isEmpty()) return grade;
         Map<String, BigDecimal> before = new LinkedHashMap<>();
         for (WritingGrade.Criterion criterion : grade.criteria()) before.putIfAbsent(criterion.code(), criterion.band());

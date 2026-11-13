@@ -18,7 +18,10 @@ public final class WritingBandCaps {
     private WritingBandCaps() {}
 
     /** Stable reason codes; {@code TOO_SHORT} and {@code OFF_TOPIC} share their names with Speaking. */
-    public enum Reason { TOO_SHORT, OFF_TOPIC, T1_NO_OVERVIEW, PARTIAL_ANSWER, NO_POSITION }
+    public enum Reason {
+        TOO_SHORT, OFF_TOPIC, T1_NO_OVERVIEW, PARTIAL_ANSWER, NO_POSITION,
+        DENSE_GRAMMAR, DENSE_VOCABULARY, WRONG_DATA, WRONG_DATA_OVERVIEW
+    }
 
     /**
      * One applied cap. {@code criterion} is the criterion it lowers (TA or TR, and the same code for every Writing
@@ -35,6 +38,63 @@ public final class WritingBandCaps {
     public record Caps(BigDecimal tooShort, BigDecimal offTopic, BigDecimal noOverview,
                        BigDecimal partialAnswer, BigDecimal noPosition) {
         public static final Caps NONE = new Caps(null, null, null, null, null);
+    }
+
+    /**
+     * What counting an essay and its corrections gives: sentences in all and the sentences that carry a grammar or a
+     * vocabulary error, and for Task 1 the statements about the chart that were judged and the ones judged wrong.
+     */
+    public record Density(int sentences, int grammarSentences, int vocabularySentences, int dataStatements,
+                          int wrongDataStatements, boolean overviewWrong) {
+        public static final Density NONE = new Density(0, 0, 0, 0, 0, false);
+    }
+
+    /**
+     * Shares of the essay at which a density rule fires, and the cap each rule sets; a null cap switches its rule off.
+     * {@code wrongDataOverviewCap} applies when the overview is wrong as well as most statements.
+     */
+    public record DensityRules(BigDecimal grammarShare, BigDecimal vocabularyShare, BigDecimal wrongDataShare,
+                               BigDecimal grammarCap, BigDecimal vocabularyCap, BigDecimal wrongDataCap,
+                               BigDecimal wrongDataOverviewCap) {
+        public static final DensityRules NONE = new DensityRules(null, null, null, null, null, null, null);
+    }
+
+    /**
+     * The caps for an essay whose errors are in most of its sentences: GRA and LR from the shares of sentences with a
+     * grammar or a vocabulary error, and for Task 1 TA from the share of chart statements that are wrong. A rule needs
+     * both its cap and its share set, and something to count; otherwise it adds nothing.
+     */
+    public static List<Limit> evaluateDensity(WritingTask task, Density density, DensityRules rules) {
+        List<Limit> limits = new ArrayList<>();
+        if (density.sentences() > 0 && rules.grammarCap() != null && reaches(density.grammarSentences(), density.sentences(), rules.grammarShare())) {
+            limits.add(new Limit(Reason.DENSE_GRAMMAR, "GRA", rules.grammarCap(),
+                    "Lỗi ngữ pháp có ở " + density.grammarSentences() + "/" + density.sentences() + " câu nên GRA bị giới hạn ở "
+                            + rules.grammarCap().stripTrailingZeros().toPlainString()));
+        }
+        if (density.sentences() > 0 && rules.vocabularyCap() != null && reaches(density.vocabularySentences(), density.sentences(), rules.vocabularyShare())) {
+            limits.add(new Limit(Reason.DENSE_VOCABULARY, "LR", rules.vocabularyCap(),
+                    "Lỗi từ vựng có ở " + density.vocabularySentences() + "/" + density.sentences() + " câu nên LR bị giới hạn ở "
+                            + rules.vocabularyCap().stripTrailingZeros().toPlainString()));
+        }
+        if (task == WritingTask.TASK_1 && density.dataStatements() > 0
+                && reaches(density.wrongDataStatements(), density.dataStatements(), rules.wrongDataShare())) {
+            if (rules.wrongDataCap() != null) {
+                limits.add(new Limit(Reason.WRONG_DATA, "TA", rules.wrongDataCap(),
+                        density.wrongDataStatements() + "/" + density.dataStatements() + " câu nói về biểu đồ sai nên TA bị giới hạn ở "
+                                + rules.wrongDataCap().stripTrailingZeros().toPlainString()));
+            }
+            if (rules.wrongDataOverviewCap() != null && density.overviewWrong()) {
+                limits.add(new Limit(Reason.WRONG_DATA_OVERVIEW, "TA", rules.wrongDataOverviewCap(),
+                        "Tổng quan sai và phần lớn câu nói về biểu đồ sai nên TA bị giới hạn ở "
+                                + rules.wrongDataOverviewCap().stripTrailingZeros().toPlainString()));
+            }
+        }
+        return List.copyOf(limits);
+    }
+
+    /** True when {@code part} is at least {@code share} of {@code whole}; a null share never reaches. */
+    private static boolean reaches(int part, int whole, BigDecimal share) {
+        return share != null && whole > 0 && BigDecimal.valueOf(part).compareTo(share.multiply(BigDecimal.valueOf(whole))) >= 0;
     }
 
     /**

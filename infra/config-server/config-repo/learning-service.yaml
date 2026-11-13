@@ -79,6 +79,16 @@ learning:
     no-overview-band-cap: ${LEARNING_WRITING_NO_OVERVIEW_BAND_CAP:5.0}
     partial-answer-band-cap: ${LEARNING_WRITING_PARTIAL_ANSWER_BAND_CAP:5.0}
     no-position-band-cap: ${LEARNING_WRITING_NO_POSITION_BAND_CAP:4.0}
+    # Errors in most sentences, counted from the corrections: a share of 0.8 means errors in four sentences in five. A cap
+    # left blank switches its rule off. The values are proposals for an examiner to check against gold essays.
+    density:
+      grammar-share: ${LEARNING_WRITING_DENSE_GRAMMAR_SHARE:0.8}
+      grammar-band-cap: ${LEARNING_WRITING_DENSE_GRAMMAR_BAND_CAP:4.0}
+      vocabulary-share: ${LEARNING_WRITING_DENSE_VOCABULARY_SHARE:0.5}
+      vocabulary-band-cap: ${LEARNING_WRITING_DENSE_VOCABULARY_BAND_CAP:4.0}
+      wrong-data-share: ${LEARNING_WRITING_WRONG_DATA_SHARE:0.5}
+      wrong-data-band-cap: ${LEARNING_WRITING_WRONG_DATA_BAND_CAP:4.0}
+      wrong-data-overview-band-cap: ${LEARNING_WRITING_WRONG_DATA_OVERVIEW_BAND_CAP:3.0}
   # Azure Speech: transcript and pronunciation scores of a Speaking recording. The key lives only in .env. Blank key or
   # region turns the analysis off; storing recordings still works. locale en-US also gives an intonation score.
   speech:

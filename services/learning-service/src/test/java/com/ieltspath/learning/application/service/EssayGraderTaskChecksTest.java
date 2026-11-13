@@ -243,6 +243,26 @@ class EssayGraderTaskChecksTest {
     }
 
     @Test
+    void grammarErrorsInMostSentencesCapGrammaticalRangeWhenTheCapIsOn() {
+        var density = new WritingSettings.Density(new BigDecimal("0.75"), new BigDecimal("0.5"), new BigDecimal("0.5"),
+                new BigDecimal("4.0"), null, null, null);
+        var settings = new WritingSettings(3, 50, 1000, 10000, 20, 120, 10, "Asia/Ho_Chi_Minh", 2, true,
+                null, null, null, null, null, 30, "v1", density);
+        var densityGrader = new EssayGrader(llm, new ObjectMapper(), content, activations, new EssayKnowledgeJudge(), "m", settings);
+        llm.reply(reply("TA", "\"corrections\":["
+                + "{\"excerpt\":\"chart shows\",\"suggestion\":\"x\",\"errorCode\":\"GRAMMAR\",\"reason\":\"r\",\"certainty\":\"ERROR\"},"
+                + "{\"excerpt\":\"rose to 40\",\"suggestion\":\"x\",\"errorCode\":\"GRAMMAR\",\"reason\":\"r\",\"certainty\":\"ERROR\"},"
+                + "{\"excerpt\":\"fell to 10\",\"suggestion\":\"x\",\"errorCode\":\"GRAMMAR\",\"reason\":\"r\",\"certainty\":\"ERROR\"}],"
+                + "\"taskChecks\":{\"hasOverview\":true}"));
+
+        WritingGrade grade = densityGrader.grade(task1(), ESSAY_1).grade();
+
+        assertEquals(0, new BigDecimal("4.0").compareTo(band(grade, "GRA")));
+        assertEquals(0, new BigDecimal("7").compareTo(band(grade, "TA")), "only the criterion the rule names is capped");
+        assertEquals("DENSE_GRAMMAR", grade.bandLimits().getFirst().reason());
+    }
+
+    @Test
     void anOverviewThatIsThereLeavesTheBandAlone() {
         llm.reply(reply("TA", "\"corrections\":[],\"taskChecks\":{\"hasOverview\":true}"));
 
