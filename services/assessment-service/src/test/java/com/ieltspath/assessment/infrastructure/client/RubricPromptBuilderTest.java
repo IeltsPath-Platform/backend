@@ -43,6 +43,20 @@ class RubricPromptBuilderTest {
         }
     }
 
+    @Test void codesShowTheirDefinitionsAndTheRubricInstructionOnlyForTheirTask() {
+        var rubric = new com.ieltspath.assessment.application.port.ActiveRubricProvider.Rubric(
+                "IELTS_ESSAY", "TASK_1", 2, "source", "How to choose a band.", java.util.List.of(), java.util.List.of());
+        var both = new com.ieltspath.assessment.application.port.ErrorTypeCatalog.ErrorType(
+                "MISSING_VERB", "Thiếu động từ", "Learner hint", "Use when a clause has no finite verb.", java.util.List.of());
+        var taskTwo = new com.ieltspath.assessment.application.port.ErrorTypeCatalog.ErrorType(
+                "OFF_TOPIC", "Lạc đề", "Đọc lại đề", null, java.util.List.of("TASK_2"));
+        String prompt = RubricPromptBuilder.build(rubric, java.util.List.of(both, taskTwo), "v2");
+        org.junit.jupiter.api.Assertions.assertTrue(prompt.contains("MISSING_VERB — Thiếu động từ: Use when a clause has no finite verb."));
+        org.junit.jupiter.api.Assertions.assertFalse(prompt.contains("Learner hint"));
+        org.junit.jupiter.api.Assertions.assertFalse(prompt.contains("OFF_TOPIC —"));
+        org.junit.jupiter.api.Assertions.assertTrue(prompt.contains("How to choose a band."));
+    }
+
     @Test void classpathPromptTemplateMatchesTheSingleSourceContract() throws Exception {
         String shared = Files.readString(Path.of("..", "..", "docs", "contracts", "essay-prompt-template-v1.txt"));
         assertEquals(shared, RubricPromptBuilder.template());

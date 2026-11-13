@@ -116,7 +116,8 @@ public class EssayGrader {
             throw new WritingGradingException("PROMPT_VERSION_UNAVAILABLE");
         }
 
-        Map<String, ErrorType> allowedCodes = errorTypes.stream().filter(Objects::nonNull)
+        List<ErrorType> taskErrorTypes = appliesTo(errorTypes, task);
+        Map<String, ErrorType> allowedCodes = taskErrorTypes.stream().filter(Objects::nonNull)
                 .filter(error -> error.code() != null).collect(Collectors.toMap(ErrorType::code, error -> error,
                         (first, ignored) -> first));
         Map<String, UUID> criterionPoints = new HashMap<>();
@@ -125,7 +126,7 @@ public class EssayGrader {
                 criterionPoints.putIfAbsent(criterion.code(), criterion.knowledgePointId());
             }
         }
-        String system = systemPrompt(task, rubric, errorTypes, templateVersion);
+        String system = systemPrompt(task, rubric, taskErrorTypes, templateVersion);
         String user = userPrompt(task, prompt, essay);
         Supplier<Map<UUID, LearningContentClient.KnowledgePoint>> catalog = memoized(this::knowledgePointCatalog);
         JsonNode root;
@@ -177,9 +178,13 @@ public class EssayGrader {
     static String systemPrompt(WritingTask task, Rubric rubric, List<ErrorType> errorTypes, String templateVersion) {
         String criterionText = rubric.criteria().stream().sorted(Comparator.comparingInt(RubricCriterion::sortOrder))
                 .map(EssayGrader::renderCriterion).collect(Collectors.joining("\n\n"));
-        String errorCodes = errorTypes.stream().filter(Objects::nonNull).filter(error -> error.code() != null)
+        // The rubric's own instructions (how to choose a band) come before its criteria when Content has them.
+        if (rubric.systemPrompt() != null && !rubric.systemPrompt().isBlank()) {
+            criterionText = rubric.systemPrompt().trim() + "\n\n" + criterionText;
+        }
+        String errorCodes = appliesTo(errorTypes, task).stream().filter(error -> error.code() != null)
                 .sorted(Comparator.comparing(ErrorType::code))
-                .map(error -> error.code() + " — " + error.name() + ": " + error.fixHint())
+                .map(error -> error.code() + " — " + error.name() + ": " + modelText(error))
                 .collect(Collectors.joining("\n"));
         String taskName = task == WritingTask.TASK_1 ? "Academic Writing Task 1" : "Writing Task 2";
         String template = forTask(TEMPLATE_VERSION_2.equals(templateVersion) ? PROMPT_TEMPLATE_2 : PROMPT_TEMPLATE,
@@ -188,6 +193,16 @@ public class EssayGrader {
                 .replace("{{criteria}}", criterionText)
                 .replace("{{error_codes}}", errorCodes.isBlank() ? "(none)" : errorCodes)
                 + EssayKnowledgeJudge.prompt(task, rubric.criteria());
+    }
+
+    /** The codes that apply to this Writing task; a code without a task list applies to both. */
+    static List<ErrorType> appliesTo(List<ErrorType> errorTypes, WritingTask task) {
+        return errorTypes.stream().filter(Objects::nonNull).filter(error -> error.appliesToWritingTask(task.name())).toList();
+    }
+
+    /** What the model reads about a code: its definition when Content has one, otherwise the learner hint. */
+    private static String modelText(ErrorType error) {
+        return error.modelDefinition() != null ? error.modelDefinition() : error.fixHint();
     }
 
     private static String renderCriterion(RubricCriterion criterion) {

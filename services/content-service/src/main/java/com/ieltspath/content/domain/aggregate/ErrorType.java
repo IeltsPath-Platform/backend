@@ -20,8 +20,11 @@ public class ErrorType {
     private static final Pattern CODE = Pattern.compile("^[A-Z][A-Z0-9_]*$");
     private static final int MAX_CODE_LENGTH = 60;
     private static final Set<String> ALLOWED_SKILLS = Set.of("READING", "LISTENING", "WRITING", "SPEAKING");
+    private static final Set<String> ALLOWED_WRITING_TASKS = Set.of("TASK_1", "TASK_2");
 
     private final UUID id;
+    private final String modelDefinition;
+    private final List<String> writingTasks;
     private final String code;
     private String name;
     private ErrorCategory category;
@@ -54,6 +57,20 @@ public class ErrorType {
     public ErrorType(UUID id, String code, String name, ErrorCategory category, int severity, UUID knowledgePointId,
                      UUID trapKnowledgePointId, String fixHint, ContentStatus status, ErrorReviewStatus reviewStatus,
                      Instant createdAt, Instant updatedAt, List<String> skills, boolean fallback) {
+        this(id, code, name, category, severity, knowledgePointId, trapKnowledgePointId, fixHint, status, reviewStatus,
+                createdAt, updatedAt, skills, fallback, null, List.of());
+    }
+
+    /**
+     * {@code modelDefinition} is what the grader shows the model in place of the learner hint; {@code writingTasks}
+     * limits a Writing code to TASK_1 or TASK_2, and an empty list means both tasks.
+     */
+    public ErrorType(UUID id, String code, String name, ErrorCategory category, int severity, UUID knowledgePointId,
+                     UUID trapKnowledgePointId, String fixHint, ContentStatus status, ErrorReviewStatus reviewStatus,
+                     Instant createdAt, Instant updatedAt, List<String> skills, boolean fallback,
+                     String modelDefinition, List<String> writingTasks) {
+        this.modelDefinition = modelDefinition == null || modelDefinition.isBlank() ? null : modelDefinition.trim();
+        this.writingTasks = requireWritingTasks(writingTasks);
         this.skills = requireSkills(skills);
         this.fallback = fallback;
         this.id = Objects.requireNonNull(id, "id must not be null");
@@ -112,6 +129,17 @@ public class ErrorType {
         return distinct;
     }
 
+    private static List<String> requireWritingTasks(List<String> values) {
+        if (values == null) return List.of();
+        List<String> distinct = values.stream().distinct().sorted().toList();
+        for (String task : distinct) {
+            if (!ALLOWED_WRITING_TASKS.contains(task)) {
+                throw new InvalidErrorTypeException("writing task must be TASK_1 or TASK_2");
+            }
+        }
+        return distinct;
+    }
+
     private static String requireCode(String value) {
         if (value == null || value.length() > MAX_CODE_LENGTH || !CODE.matcher(value).matches()) {
             throw new InvalidErrorTypeException("error code must be upper snake case, at most 60 characters");
@@ -151,6 +179,8 @@ public class ErrorType {
     public ContentStatus getStatus() { return status; }
     public ErrorReviewStatus getReviewStatus() { return reviewStatus; }
     public List<String> getSkills() { return skills; }
+    public String getModelDefinition() { return modelDefinition; }
+    public List<String> getWritingTasks() { return writingTasks; }
     public boolean isFallback() { return fallback; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }

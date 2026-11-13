@@ -97,12 +97,15 @@ public class InternalLearningContentController {
         return errorTypes.stream().map(ActiveErrorTypeResponse::from).toList();
     }
 
+    /** {@code modelDefinition} is null when the code has none; an empty {@code writingTasks} means both Writing tasks. */
     public record ActiveErrorTypeResponse(String code, String name, String category, int severity, String fixHint,
-                                          UUID knowledgePointId, List<String> skills, boolean fallback) {
+                                          UUID knowledgePointId, List<String> skills, boolean fallback,
+                                          String modelDefinition, List<String> writingTasks) {
         static ActiveErrorTypeResponse from(com.ieltspath.content.domain.aggregate.ErrorType errorType) {
             return new ActiveErrorTypeResponse(errorType.getCode(), errorType.getName(),
                     errorType.getCategory().name(), errorType.getSeverity(), errorType.getFixHint(),
-                    errorType.getKnowledgePointId(), errorType.getSkills(), errorType.isFallback());
+                    errorType.getKnowledgePointId(), errorType.getSkills(), errorType.isFallback(),
+                    errorType.getModelDefinition(), errorType.getWritingTasks());
         }
     }
 

@@ -36,14 +36,27 @@ public final class RubricPromptBuilder {
         return build(rubric, errorTypes, TEMPLATE_VERSION);
     }
 
+    /** The codes a grader for this rubric's task may use; a code without a task list applies to both tasks. */
+    public static List<ErrorTypeCatalog.ErrorType> applicableTo(ActiveRubricProvider.Rubric rubric,
+                                                                List<ErrorTypeCatalog.ErrorType> errorTypes) {
+        return errorTypes.stream().filter(java.util.Objects::nonNull).filter(error -> error.code() != null)
+                .filter(error -> error.appliesToWritingTask(rubric.task())).toList();
+    }
+
     public static String build(ActiveRubricProvider.Rubric rubric, List<ErrorTypeCatalog.ErrorType> errorTypes,
                                String templateVersion) {
         String criteria = rubric.criteria().stream().sorted(java.util.Comparator.comparingInt(ActiveRubricProvider.Criterion::sortOrder))
                 .map(RubricPromptBuilder::formatCriterion).collect(Collectors.joining("\n\n"));
+        // The rubric's own instructions (how to choose a band) come before its criteria when Content has them.
+        if (rubric.systemPrompt() != null && !rubric.systemPrompt().isBlank()) {
+            criteria = rubric.systemPrompt().trim() + "\n\n" + criteria;
+        }
         String task = "TASK_1".equals(rubric.task()) ? "Academic Writing Task 1" : "Writing Task 2";
-        String codes = errorTypes.stream().filter(java.util.Objects::nonNull).filter(error -> error.code() != null)
+        String codes = applicableTo(rubric, errorTypes).stream()
                 .sorted(java.util.Comparator.comparing(ErrorTypeCatalog.ErrorType::code))
-                .map(error -> error.code() + " — " + error.name() + ": " + error.fixHint()).collect(Collectors.joining("\n"));
+                .map(error -> error.code() + " — " + error.name() + ": "
+                        + (error.modelDefinition() != null ? error.modelDefinition() : error.fixHint()))
+                .collect(Collectors.joining("\n"));
         String template = forTask(TEMPLATE_VERSION_2.equals(templateVersion) ? TEMPLATE_2 : TEMPLATE,
                 "TASK_1".equals(rubric.task()));
         return template.replace("{{task}}", task).replace("{{criteria}}", criteria)

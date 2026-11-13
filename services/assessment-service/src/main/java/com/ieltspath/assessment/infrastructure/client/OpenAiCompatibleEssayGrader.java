@@ -89,10 +89,11 @@ public class OpenAiCompatibleEssayGrader implements EssayGradingPort {
             String templateVersion = templateVersionOf(prompt);
             ActiveRubricProvider.Rubric rubric = resolveRubric(prompt, templateVersion);
             var activeErrorTypes = errorTypes.activeErrorTypes("WRITING");
-            Set<String> allowedErrorCodes = activeErrorTypes.stream().map(ErrorTypeCatalog.ErrorType::code)
+            var taskErrorTypes = RubricPromptBuilder.applicableTo(rubric, activeErrorTypes);
+            Set<String> allowedErrorCodes = taskErrorTypes.stream().map(ErrorTypeCatalog.ErrorType::code)
                     .filter(java.util.Objects::nonNull).collect(java.util.stream.Collectors.toSet());
             String response = client.chat(new ChatRequest("writing-grading",
-                    RubricPromptBuilder.build(rubric, activeErrorTypes, templateVersion), userPrompt(prompt, essay), true, null)).content();
+                    RubricPromptBuilder.build(rubric, taskErrorTypes, templateVersion), userPrompt(prompt, essay), true, null)).content();
             return parseGrade(response, rubric, allowedErrorCodes, essay, templateVersion);
         } catch (EssayGradingException exception) {
             throw exception;

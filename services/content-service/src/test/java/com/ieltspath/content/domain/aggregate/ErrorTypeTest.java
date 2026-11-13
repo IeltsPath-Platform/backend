@@ -24,6 +24,21 @@ class ErrorTypeTest {
     }
 
     @Test
+    void writingTasksAreStoredDistinctAndOnlyTaskOneOrTaskTwo() {
+        ErrorType errorType = new ErrorType(UUID.randomUUID(), "OFF_TOPIC", "Lạc đề", ErrorCategory.TASK, 3, null, null,
+                "Đọc lại đề.", ContentStatus.ACTIVE, ErrorReviewStatus.APPROVED, java.time.Instant.now(),
+                java.time.Instant.now(), java.util.List.of("WRITING"), false, "  ",
+                java.util.List.of("TASK_2", "TASK_1", "TASK_2"));
+
+        assertThat(errorType.getWritingTasks()).containsExactly("TASK_1", "TASK_2");
+        assertThat(errorType.getModelDefinition()).isNull();
+        assertThatThrownBy(() -> new ErrorType(UUID.randomUUID(), "OFF_TOPIC", "Lạc đề", ErrorCategory.TASK, 3, null,
+                null, "Đọc lại đề.", ContentStatus.ACTIVE, ErrorReviewStatus.APPROVED, java.time.Instant.now(),
+                java.time.Instant.now(), java.util.List.of("WRITING"), false, null, java.util.List.of("TASK_3")))
+                .isInstanceOf(InvalidErrorTypeException.class);
+    }
+
+    @Test
     void skillsAreStoredDistinctAndInAStableOrder() {
         ErrorType errorType = new ErrorType(UUID.randomUUID(), "GRAMMAR_SPEAKING_AND_WRITING", "Grammar", ErrorCategory.GRAMMAR,
                 1, null, null, "Fix it.", ContentStatus.ACTIVE, ErrorReviewStatus.APPROVED,

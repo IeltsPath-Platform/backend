@@ -31,5 +31,22 @@ public interface ErrorTypeCatalog {
         return activeErrorTypes();
     }
 
-    record ErrorType(String code, String name, String fixHint) {}
+    /**
+     * {@code modelDefinition} is the English definition the model reads, null when Content has none.
+     * {@code writingTasks} lists TASK_1 or TASK_2; an empty list means both tasks.
+     */
+    record ErrorType(String code, String name, String fixHint, String modelDefinition, List<String> writingTasks) {
+        public ErrorType {
+            writingTasks = writingTasks == null ? List.of() : List.copyOf(writingTasks);
+        }
+
+        public ErrorType(String code, String name, String fixHint) {
+            this(code, name, fixHint, null, List.of());
+        }
+
+        /** Whether a Writing task (TASK_1 or TASK_2) may use this code. */
+        public boolean appliesToWritingTask(String task) {
+            return writingTasks.isEmpty() || writingTasks.contains(task);
+        }
+    }
 }
