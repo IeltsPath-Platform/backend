@@ -55,8 +55,8 @@ task_one = snap.get("task") == "TASK_1"
 
 content = db(os.environ.get("REPLAY_CONTENT_DB", "content_db"), "CONTENT_DB_PASSWORD")
 rubric_id, rubric_system = content.run(
-    "SELECT id, system_prompt FROM rubrics WHERE task = :t AND status = 'ACTIVE' AND code LIKE 'IELTS_WRITING%'",
-    t=snap.get("task"))[0]
+    "SELECT id, system_prompt FROM rubrics WHERE task = :t AND status = :s AND code LIKE 'IELTS_WRITING%'",
+    t=snap.get("task"), s=os.environ.get("REPLAY_RUBRIC_STATUS", "ACTIVE"))[0]
 criteria = content.run("SELECT id, code, name, description FROM rubric_criteria WHERE rubric_id = :r ORDER BY sort_order",
                        r=rubric_id)
 criterion_text = []

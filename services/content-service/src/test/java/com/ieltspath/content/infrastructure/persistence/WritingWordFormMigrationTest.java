@@ -65,7 +65,7 @@ class WritingWordFormMigrationTest {
         try (Connection connection = connection()) {
             assertTrue(scalar(connection, "SELECT fix_hint FROM error_types WHERE code = 'T1_DATA_MISREPORTED'").contains("bản đồ"));
             assertTrue(scalar(connection, "SELECT fix_hint FROM error_types WHERE code = 'T1_DATA_MISREPORTED'").contains("quy trình"));
-            assertTrue(scalar(connection, "SELECT fix_hint FROM error_types WHERE code = 'VERB_FORM'").contains("growed"));
+            assertTrue(scalar(connection, "SELECT fix_hint FROM error_types WHERE code = 'VERB_FORM'").contains("grew, rose"));
             assertEquals("Ví dụ không liên quan", scalar(connection, "SELECT name FROM error_types WHERE code = 'T2_IRRELEVANT_EXAMPLE'"));
             assertTrue(scalar(connection, "SELECT fix_hint FROM error_types WHERE code = 'UNDERDEVELOPED_IDEA'").contains("quá chung"));
         }

@@ -1,15 +1,19 @@
--- Version 3 of both Writing rubrics. Each criterion now says what it judges, its ceilings and what it does not judge, in its
--- description, which the grader prints once before the bands. Every whole band from 0 and from 1 to 9 has its own
--- descriptor for each criterion. A half band (1.5 to 8.5) says only that the response meets every point of the band
--- below and some points of the band above, so the half bands are generated here, not written by hand.
+-- Version 3 of both Writing rubrics, as a DRAFT (product owner decisions of 2026-11-13). The version 2 rubric stays ACTIVE,
+-- so grading does not change until version 3 is activated by a later migration, after a measured run passes.
 --
--- Version 2 is retired, not edited or deleted, so a prompt activation that pins it keeps working. The rows of the
--- rubric are never rewritten: the active version is retired and a new one is inserted, as in the version 2 migration.
--- Examples are copied from version 2. The system prompt is the shared instruction for choosing a band; the grader reads
--- it once the rubric system prompt is wired into the Writing prompt.
+-- The criterion descriptions carry the scoring question, the ceilings and what the criterion does not judge. The
+-- grader prints the name of the criterion before its description, so a description does not repeat it. Every whole band
+-- 0 and 1 to 9 has its own descriptor for each criterion; band 0 is one sentence shared by the criteria. A half band
+-- (1.5 to 8.5) says only that the response meets every point of the band below and some points of the band above, so
+-- the half bands are generated here.
 --
--- The admin editor and JdbcRubricRepository.validateForActivation still require exactly bands 4.0 to 9.0 for a Writing
--- rubric, so version 3 cannot be edited and re-activated from the admin UI until that rule is widened.
+-- Two ceiling changes are not in the product owner's text. The "no position" ceiling for Task 2 is 4, the value
+-- configured for the same rule in the band-cap settings. Four density ceilings (GRA, LR and TA) were added so that a
+-- response with errors in almost every sentence cannot keep a band of 5; they are marked below and need examiner review.
+--
+-- Rubric rows are never rewritten: a new version is inserted. Examples and the system prompt are copied from the active
+-- version. The admin editor and JdbcRubricRepository.validateForActivation still require exactly bands 4.0 to 9.0 for a
+-- Writing rubric, so version 3 cannot be activated from the admin UI until that rule is widened.
 
 CREATE TEMP TABLE writing_v3_headers (task VARCHAR(10) NOT NULL, criterion_code VARCHAR(8) NOT NULL,
     description TEXT NOT NULL);
@@ -18,36 +22,41 @@ CREATE TEMP TABLE writing_v3_bands (task VARCHAR(10) NOT NULL, criterion_code VA
 
 -- 'ANY' rows apply to both tasks: CC, LR and GRA are the same criteria for Task 1 and Task 2.
 INSERT INTO writing_v3_headers (task, criterion_code, description) VALUES
-    ('TASK_1', 'TA', 'TA (Task Achievement): how well the response selects, reports and compares the key features of the visual.
-Key features are the main trends, the highest and lowest values and the main differences for data; the main stages for a process; the main changes for a map.
+    ('TASK_1', 'TA', 'How well the response selects, reports and compares the key features of the visual. Key features are the main trends, the highest and lowest values and the main differences for data; the main stages for a process; the main changes for a map.
 Judges: overview, choice of key features, accuracy against <chart_facts>, comparisons, irrelevant content.
 Does not judge: grammar, vocabulary or organisation, unless they make the data impossible to understand.
-Ceilings:
+Apply these ceilings before choosing a band:
 - Fewer than 150 words: at most 5.
 - No overview, or the overview states a wrong main trend: at most 5.
 - Most reported figures are wrong: at most 4.
-- A personal opinion, a reason or a prediction that the visual does not show: at most 6.'),
-    ('TASK_2', 'TR', 'TR (Task Response): how fully the response answers every part of the question and develops relevant ideas.
+- A personal opinion, a reason or a prediction that the visual does not show: at most 6.
+- Most statements about trends or comparisons contradict <chart_facts>, even when the copied figures are right: at most 4.
+- The overview states a wrong main trend and most trend or comparison statements are wrong: at most 3.'),
+    ('TASK_2', 'TR', 'How fully the response answers every part of the question and develops relevant ideas.
 Judges: coverage of each part of the question, position (only when the question asks for one), development and support of ideas, relevance.
 Does not judge: grammar, vocabulary or organisation, unless they make the ideas impossible to understand.
-Ceilings:
+Apply these ceilings before choosing a band:
 - Fewer than 250 words: at most 5.
-- The question asks for an opinion and no position is given: at most 5.
+- The question asks for an opinion and no position is given: at most 4.
 - One part of the question is not answered: at most 5.
 - Most of the response is off topic: at most 4.'),
-    ('ANY', 'CC', 'CC (Coherence and Cohesion): how clearly the ideas are ordered and connected.
-Judges: logical order and progression, paragraphing, linking words, reference and substitution (it, this, they, the former...).
+    ('ANY', 'CC', 'How clearly the ideas are ordered and connected.
+Judges: logical order and progression, paragraphing, linking words, reference and substitution (it, this, they, the former).
 Does not judge: grammar accuracy or word choice, except for linking words and reference.
-Ceilings:
+Apply this ceiling before choosing a band:
 - No paragraphing at all: at most 5.'),
-    ('ANY', 'LR', 'LR (Lexical Resource): range and accuracy of vocabulary.
+    ('ANY', 'LR', 'Range and accuracy of vocabulary.
 Judges: range, word choice, collocation, word formation, spelling, register, repetition; in Task 1 also the words used to describe trends and quantities.
-Does not judge: sentence structure, verb tense or agreement (these are GRA).'),
-    ('ANY', 'GRA', 'GRA (Grammatical Range and Accuracy): range of sentence structures and grammatical accuracy.
+Does not judge: sentence structure, verb tense or agreement (these are GRA).
+Apply this ceiling before choosing a band:
+- Basic words repeated throughout, and word form or plural errors in most sentences: at most 4.'),
+    ('ANY', 'GRA', 'Range of sentence structures and grammatical accuracy.
 Judges: simple and complex sentences, verb forms, tense, agreement, articles, plurals, sentence boundaries, punctuation.
 Does not judge: whether a figure is right (that is TA) or word choice (that is LR).
-Ceilings:
-- Almost only simple sentences: at most 5.');
+Apply these ceilings before choosing a band:
+- Almost only simple sentences: at most 5.
+- Errors in almost every sentence (at most one sentence in five is error-free): at most 4.
+- Errors in almost every sentence and several errors make the meaning unclear: at most 3.');
 
 INSERT INTO writing_v3_bands (task, criterion_code, band, descriptor) VALUES
     -- TA (Task 1)
@@ -126,20 +135,13 @@ BEGIN
         END IF;
         SELECT MAX(rubric_version) + 1 INTO next_version FROM rubrics WHERE code = spec.code;
 
-        UPDATE rubrics SET status = 'RETIRED', updated_at = CURRENT_TIMESTAMP WHERE id = source_id;
-
         INSERT INTO rubrics (id, code, task, rubric_version, status, source_note, system_prompt)
-        SELECT spec.new_id, code, task, next_version, 'ACTIVE',
-               'Version ' || rubric_version || ' with a description per criterion (purpose, ceilings, what it does not judge), '
-               || 'a descriptor for every whole band, and generated half bands. Original paraphrase for calibration, based on the '
-               || 'public IELTS Writing band descriptors (ielts.org): https://ielts.org/cdn/ielts-guides/ielts-writing-band-descriptors.pdf. '
-               || 'Not official IELTS descriptors; not yet reviewed by an IELTS examiner.',
-               'How to choose a band for each criterion:
-1. Apply the ceilings of the criterion first. A ceiling is the highest band the criterion can get.
-2. Then choose the highest whole band whose every point the response meets.
-3. Give X.5 only when the response meets every point of band X and some points of band X+1.
-4. Judge each criterion only on what it covers. Do not lower one criterion for a problem that belongs to another.
-Use the word count given with the essay; do not count the words yourself.'
+        SELECT spec.new_id, code, task, next_version, 'DRAFT',
+               'Version ' || rubric_version || ' with criterion descriptions (scope, ceilings, what is not judged), a descriptor for every whole band, '
+               || 'and half bands defined from the whole bands. Original paraphrase for calibration, based on the public IELTS Writing band '
+               || 'descriptors (ielts.org): https://ielts.org/cdn/ielts-guides/ielts-writing-band-descriptors.pdf. Not official IELTS '
+               || 'descriptors. Requires review by an IELTS examiner before activation.',
+               system_prompt
         FROM rubrics WHERE id = source_id;
 
         INSERT INTO rubric_criteria (id, rubric_id, code, name, description, sort_order)
@@ -172,6 +174,17 @@ Use the word count given with the essay; do not count the words yourself.'
                 spec.code, next_version, new_criteria, new_descriptors;
         END IF;
     END LOOP;
+
+    -- The active versions are unchanged: this migration only adds drafts.
+    IF (SELECT count(*) FROM rubrics WHERE code IN ('IELTS_WRITING_TASK_1', 'IELTS_WRITING_TASK_2') AND status = 'ACTIVE') <> 2 THEN
+        RAISE EXCEPTION 'the two Writing rubrics must stay active';
+    END IF;
+    IF EXISTS (SELECT 1 FROM rubric_criteria c JOIN rubrics r ON r.id = c.rubric_id
+               WHERE r.status = 'DRAFT'
+                 AND (c.description LIKE 'TA (%' OR c.description LIKE 'TR (%' OR c.description LIKE 'CC (%'
+                      OR c.description LIKE 'LR (%' OR c.description LIKE 'GRA (%')) THEN
+        RAISE EXCEPTION 'draft criterion descriptions must not repeat the criterion name';
+    END IF;
 END $$;
 
 DROP TABLE writing_v3_headers;

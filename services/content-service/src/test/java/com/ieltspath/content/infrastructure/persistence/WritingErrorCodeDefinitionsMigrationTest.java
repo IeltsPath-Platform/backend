@@ -14,9 +14,10 @@ import java.sql.Statement;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** After every migration, each Writing error code has a model definition and the task it applies to. */
+/** After every migration, each Writing error code has a model definition, its tasks and whether the model may choose it. */
 @Testcontainers(disabledWithoutDocker = true)
 class WritingErrorCodeDefinitionsMigrationTest {
     @Container
@@ -29,12 +30,15 @@ class WritingErrorCodeDefinitionsMigrationTest {
     }
 
     @Test
-    void everyActiveWritingCodeHasAModelDefinition() throws Exception {
+    void everyActiveWritingCodeHasAModelDefinitionAndATask() throws Exception {
         try (Connection connection = connection()) {
             assertEquals("0", scalar(connection, """
                     SELECT count(*)::text FROM error_types
                     WHERE status = 'ACTIVE' AND 'WRITING' = ANY(skills)
-                      AND (model_definition IS NULL OR btrim(model_definition) = '')
+                      AND (model_definition IS NULL OR btrim(model_definition) = '' OR cardinality(writing_tasks) = 0)
+                    """));
+            assertEquals("33", scalar(connection, """
+                    SELECT count(*)::text FROM error_types WHERE status = 'ACTIVE' AND 'WRITING' = ANY(skills)
                     """));
         }
     }
@@ -56,9 +60,8 @@ class WritingErrorCodeDefinitionsMigrationTest {
     @Test
     void theNewWritingCodesExistAsApprovedWritingCodesWithTheirTasks() throws Exception {
         try (Connection connection = connection()) {
-            for (String code : new String[] {"T1_IRRELEVANT_CONTENT", "DATA_LANGUAGE", "MISSING_VERB", "PERFECT_TENSE",
-                    "RUN_ON_SENTENCE", "REFERENCE", "REPETITION", "INFORMAL_REGISTER", "WRITING_SPELLING",
-                    "WRITING_PLURAL_FORM"}) {
+            for (String code : new String[] {"T1_IRRELEVANT_CONTENT", "DATA_LANGUAGE", "MISSING_VERB", "PAST_SIMPLE_TENSE",
+                    "RUN_ON_SENTENCE", "NOUN_PLURAL", "REFERENCE", "REPETITION", "INFORMAL_REGISTER", "WRITING_SPELLING"}) {
                 assertEquals("APPROVED", scalar(connection,
                         "SELECT review_status FROM error_types WHERE code = '" + code + "'"), code);
                 assertEquals("true", scalar(connection,
@@ -66,7 +69,7 @@ class WritingErrorCodeDefinitionsMigrationTest {
             }
             assertEquals("{TASK_1}", scalar(connection,
                     "SELECT writing_tasks::text FROM error_types WHERE code = 'DATA_LANGUAGE'"));
-            assertEquals("{}", scalar(connection,
+            assertEquals("{TASK_1,TASK_2}", scalar(connection,
                     "SELECT writing_tasks::text FROM error_types WHERE code = 'MISSING_VERB'"));
         }
     }
@@ -86,12 +89,23 @@ class WritingErrorCodeDefinitionsMigrationTest {
     }
 
     @Test
-    void offTopicPointsAtTheOpinionPoint() throws Exception {
+    void offTopicHasNoPointAsBefore() throws Exception {
         try (Connection connection = connection()) {
-            assertEquals("TR_W_OPINION", scalar(connection, """
-                    SELECT kp.code FROM error_types et JOIN knowledge_points kp ON kp.id = et.knowledge_point_id
-                    WHERE et.code = 'OFF_TOPIC'
-                    """));
+            assertNull(scalar(connection, "SELECT knowledge_point_id::text FROM error_types WHERE code = 'OFF_TOPIC'"));
+        }
+    }
+
+    @Test
+    void theThreeCodesTheBackendWillBuildFromTaskChecksAreNotChosenByTheModel() throws Exception {
+        try (Connection connection = connection()) {
+            assertEquals("false", scalar(connection,
+                    "SELECT model_selectable::text FROM error_types WHERE code = 'NO_CLEAR_POSITION'"));
+            assertEquals("false", scalar(connection,
+                    "SELECT model_selectable::text FROM error_types WHERE code = 'T1_NO_OVERVIEW'"));
+            assertEquals("false", scalar(connection,
+                    "SELECT model_selectable::text FROM error_types WHERE code = 'T2_PARTIAL_ANSWER'"));
+            assertEquals("true", scalar(connection,
+                    "SELECT model_selectable::text FROM error_types WHERE code = 'MISSING_VERB'"));
         }
     }
 

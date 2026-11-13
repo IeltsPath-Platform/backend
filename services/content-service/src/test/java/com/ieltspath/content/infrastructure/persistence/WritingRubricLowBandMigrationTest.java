@@ -41,14 +41,14 @@ class WritingRubricLowBandMigrationTest {
     }
 
     @Test
-    void versionThreeIsTheOnlyActiveRubricOfEachTaskAndTheOlderVersionsAreRetired() {
+    void versionTwoStaysActiveAndVersionThreeIsAVisibleDraft() {
         assertEquals(List.of(new RubricVersionRef("IELTS_WRITING_TASK_1", "TASK_1", 1, "RETIRED"),
-                new RubricVersionRef("IELTS_WRITING_TASK_1", "TASK_1", 2, "RETIRED"),
-                new RubricVersionRef("IELTS_WRITING_TASK_1", "TASK_1", 3, "ACTIVE")),
+                new RubricVersionRef("IELTS_WRITING_TASK_1", "TASK_1", 2, "ACTIVE"),
+                new RubricVersionRef("IELTS_WRITING_TASK_1", "TASK_1", 3, "DRAFT")),
                 rubrics.findVersions("IELTS_WRITING_TASK_1"));
         assertEquals(List.of(new RubricVersionRef("IELTS_WRITING_TASK_2", "TASK_2", 1, "RETIRED"),
-                new RubricVersionRef("IELTS_WRITING_TASK_2", "TASK_2", 2, "RETIRED"),
-                new RubricVersionRef("IELTS_WRITING_TASK_2", "TASK_2", 3, "ACTIVE")),
+                new RubricVersionRef("IELTS_WRITING_TASK_2", "TASK_2", 2, "ACTIVE"),
+                new RubricVersionRef("IELTS_WRITING_TASK_2", "TASK_2", 3, "DRAFT")),
                 rubrics.findVersions("IELTS_WRITING_TASK_2"));
     }
 
