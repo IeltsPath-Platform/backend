@@ -82,10 +82,14 @@ examiner là một bài trong bộ (quyết định 9).
 | 6 | [Luật cứng cho band](./phase-06-band-caps.md) | learning (domain) | 4, examiner duyệt ngưỡng | Có | Code xong, luật tắt mặc định; ngưỡng do chủ sản phẩm đặt tạm, chưa bật |
 | 7 | [Response cho giao diện kết quả](./phase-07-result-view-response.md) | learning, frontend | 2, 4, 5, 8 | Có | Backend xong (vị trí đoạn trích, nhóm lỗi, top 3 vấn đề, dẫn chứng, nextBand, revision, dataChecks, taskChecks). Frontend xong ở frontend PR #81 (chưa xem trên trình duyệt, chưa có dữ liệu thật của template v2) |
 | 8 | [Kiểm yêu cầu đề Task 2](./phase-08-task-2-requirement-checks.md) | learning, assessment (template) | 4 | Có | Code xong, chạy với template v2 (chưa kích hoạt). Chờ: examiner duyệt câu chữ, kiểm tay 10 bài Task 2 |
+| 9 | [Mã lỗi Writing v2 và rubric v3](./phase-09-error-codes-and-rubric-v3.md) | content | 3, 4, examiner duyệt câu chữ rubric | Có (cột mới của `error_types`, rubric v3 DRAFT) | Spec xong, chưa code |
+| 10 | [Judgments theo KP của đề](./phase-10-judgments-question-knowledge-points.md) | learning, content, frontend | 9 | Có (hợp đồng bằng chứng essay, response) | Spec xong, chưa code; chờ chủ sản phẩm xác nhận bảng KP 24 đề |
 
 Thứ tự: 0 → 0b → 1 và 2 song song → 3 → 4 → 5 và 8 song song → 7; 6 độc lập sau 4 (hai luật Task 2 cần cờ của phase 8). Phase 0 có thể đổi quyết định 2, nên phase 1 trở đi
 chỉ bắt đầu khi đã ghi kết luận của phase 0. Phase 1, 3 và 6 có phần chờ người làm nội dung (đánh dấu bộ bài, duyệt mã
 lỗi, duyệt ngưỡng); code của chúng làm trước được, dữ liệu vào sau.
+
+Phase 9 và 10 (thêm ngày 2026-11-13): 9 sau 4; 10 sau 9. Mỗi phase chấm lại bộ test của file log `docs/llm-grading-log/llm-writing-grading-prompt-iteration-log-261112.xlsx` và chỉ đổi một thứ mỗi lần: rubric v3 đo với prompt v2 trước, rồi mới đổi judgments.
 
 Ngoài phạm vi đợt này (plan riêng nếu cần): chấm lại bài sát ngưỡng `passBand` và chuyển Mentor khi hai lần chấm lệch
 trên 1 band; chấm bất đồng bộ theo mẫu hàng job của Assessment; hiển thị `reason`/`dataChecks` cho bài thi gate; theo dõi
@@ -147,6 +151,29 @@ Chốt thêm về tầng LLM (cùng ngày):
 25. **Làm phase 0b sau phase 0 và trước phase 1**, để phase 1 không phải chép luật dựng request sang Assessment.
 26. **Content bỏ vòng retry riêng** khi chuyển sang `common-llm`; lỗi thì bản nháp `FAILED`, author chạy lại.
 
+Chốt thêm ngày 2026-11-13, sau khi xem file log chấm và sheet `Ma_loi`, `Rubric`:
+
+27. **Rubric v3:** mỗi tiêu chí có câu mô tả riêng cho 10 band nguyên (0–9). Band .5 dùng câu mẫu "đạt hết band X và một
+    phần band X+1" (giữ 18 dòng mà `validateForActivation` yêu cầu). Phạm vi chấm, phần không chấm và mức trần nằm ở
+    `description` của tiêu chí, chỉ ghi một lần. Rubric v3 tạo ở trạng thái `DRAFT`; bật bằng migration riêng sau khi đo.
+    Câu chữ cần examiner duyệt, ưu tiên band 4–7 (phase 9).
+28. **Mã lỗi Writing:** thêm cột `model_definition` (định nghĩa tiếng Anh gửi model), `writing_tasks` (lọc theo task),
+    `model_selectable` (mã do backend tạo từ `taskChecks`). Mỗi nhóm ứng một tiêu chí. Thêm 10 mã. Không đổi mã có trap
+    point hay dùng chung với kỹ năng khác (`SPELLING`, `PLURAL_FORM` của `ErrorTagger`; `TENSE`, `SENTENCE_FRAGMENT` của
+    Speaking); Writing dùng mã mới thay thế (phase 9).
+29. **Gửi mọi mã lỗi Writing, chỉ lọc theo task.** Không lọc theo KP của đề: lỗi phụ có thể ở bất cứ đâu, lọc sẽ dồn lỗi
+    vào mã fallback.
+30. **Khối `judgments` chỉ chứa KP gắn với đề** (`question_knowledge_points`), tối đa 4; đề không có KP thì không có khối.
+    Bỏ danh sách KP con cố định theo tiêu chí (`writing_criterion_sub_knowledge_points`, 3 KP demo) khỏi prompt; giữ bảng
+    và dữ liệu cũ. File prompt mới `essay-kp-judgment-v3.txt` (`kpj3`), không sửa `kpj2` (phase 10).
+31. **Bài Writing trong course:** KP của đề ghi bằng chứng theo judgment (PASS đúng, FAIL sai); `NOT_ASSESSED` thì lấy
+    đạt/trượt của cả bài như trước. KP tiêu chí vẫn ghi theo band. Đổi `AGENTS.md` §3.8 và contract cùng PR.
+32. **Luyện tập tự do:** gắn KP cho 24 đề `PT-WRITING-01` đến `12`. Judgments chỉ để hiển thị và tạo gợi ý học; không ghi
+    mastery (giữ hành vi của `SubmitFreeWritingUseCase`).
+33. **Mastery chỉ tính theo KP; mã lỗi không phải đơn vị mastery.** Correction Writing không ghi bằng chứng cho KP của mã
+    lỗi (`WritingEvidenceRule` hiện tại). KP của mã lỗi chỉ dùng cho nút luyện tập, đối chiếu judgment khi trùng KP của đề,
+    và `dominantErrorCode` trên event câu hỏi. Cột "Ghi vào mastery?" của sheet `Ma_loi` mô tả sai, cần sửa trong file log.
+
 ## Rủi ro
 
 | Rủi ro | Giảm thiểu |
@@ -160,6 +187,10 @@ Chốt thêm về tầng LLM (cùng ngày):
 | Ba bản template lệch nhau | Phase 0b: một file ở `docs/contracts/`, chép vào hai service lúc build |
 | Đổi request của chấm gate (Assessment) khi gom client | Phase 0b: run eval v1 trước và sau; `max_tokens` đặt theo số đo phase 0 |
 | Model rẻ (DeepSeek) không theo nổi prompt v2 | Eval ghi `model`; mỗi lần đổi model phải chạy eval và kích hoạt lại |
+| Rubric v3 làm band dịch so với v2 | Tạo `DRAFT`; chấm lại bộ test với prompt v2 trước khi bật; examiner duyệt band 4–7 |
+| Đổi mã lỗi dùng chung làm hỏng Listening, Speaking hay bộ luyện bẫy lỗi | Phase 9 không đổi KP, nhóm, fix_hint của mã dùng chung; migration tự kiểm tra và dừng nếu thay đổi |
+| Model trả `NOT_ASSESSED` nhiều cho KP của đề | Quyết định 31: lùi về đạt/trượt cả bài; đo tỷ lệ trên bộ test; kiểm tra mô tả KP trước khi bật |
+| Judgments của KP đề không thuộc tiêu chí, frontend không hiển thị | Phase 10 thêm trường mới ở cấp bài chấm, giữ trường cũ; frontend đổi cùng đợt |
 
 ## Pattern áp dụng (`AGENTS.md` §3.9)
 
