@@ -41,12 +41,14 @@ class WritingRubricLowBandMigrationTest {
     }
 
     @Test
-    void versionOneIsRetiredAndVersionTwoIsTheOnlyActiveRubricOfEachTask() {
+    void versionThreeIsTheOnlyActiveRubricOfEachTaskAndTheOlderVersionsAreRetired() {
         assertEquals(List.of(new RubricVersionRef("IELTS_WRITING_TASK_1", "TASK_1", 1, "RETIRED"),
-                new RubricVersionRef("IELTS_WRITING_TASK_1", "TASK_1", 2, "ACTIVE")),
+                new RubricVersionRef("IELTS_WRITING_TASK_1", "TASK_1", 2, "RETIRED"),
+                new RubricVersionRef("IELTS_WRITING_TASK_1", "TASK_1", 3, "ACTIVE")),
                 rubrics.findVersions("IELTS_WRITING_TASK_1"));
         assertEquals(List.of(new RubricVersionRef("IELTS_WRITING_TASK_2", "TASK_2", 1, "RETIRED"),
-                new RubricVersionRef("IELTS_WRITING_TASK_2", "TASK_2", 2, "ACTIVE")),
+                new RubricVersionRef("IELTS_WRITING_TASK_2", "TASK_2", 2, "RETIRED"),
+                new RubricVersionRef("IELTS_WRITING_TASK_2", "TASK_2", 3, "ACTIVE")),
                 rubrics.findVersions("IELTS_WRITING_TASK_2"));
     }
 
@@ -82,27 +84,24 @@ class WritingRubricLowBandMigrationTest {
     }
 
     @Test
-    void lowBandDescriptorsEndWithTheSameClosingSentenceAsTheBandFourDescriptor() {
-        List<Map<String, Object>> mismatched = jdbc.queryForList("""
-                SELECT r.code AS rubric, c.code AS criterion, low.band, right(low.descriptor, 40) AS low_end,
-                       right(four.descriptor, 40) AS four_end
-                FROM rubric_band_descriptors low
-                JOIN rubric_criteria c ON c.id = low.criterion_id
-                JOIN rubrics r ON r.id = c.rubric_id AND r.rubric_version = 2
-                JOIN rubric_band_descriptors four ON four.criterion_id = c.id AND four.band = 4.0
-                WHERE low.band < 4.0
-                  AND r.code IN ('IELTS_WRITING_TASK_1', 'IELTS_WRITING_TASK_2')
-                  AND right(low.descriptor, 60) <> right(four.descriptor, 60)
-                ORDER BY r.code, c.code, low.band
-                """, Map.of());
-        assertTrue(mismatched.isEmpty(), mismatched.toString());
+    void everyHalfBandNamesTheWholeBandsOnEachSide() {
+        Integer wrong = jdbc.queryForObject("""
+                SELECT count(*) FROM rubric_band_descriptors d
+                JOIN rubric_criteria c ON c.id = d.criterion_id
+                JOIN rubrics r ON r.id = c.rubric_id AND r.rubric_version = 3
+                WHERE r.code IN ('IELTS_WRITING_TASK_1', 'IELTS_WRITING_TASK_2')
+                  AND d.band % 1 = 0.5
+                  AND d.descriptor <> 'Meets every point of band ' || floor(d.band) || ' and some, but not all, points of band '
+                                      || (floor(d.band) + 1) || '.'
+                """, Map.of(), Integer.class);
+        assertEquals(0, wrong);
     }
 
     @Test
-    void examplesOfVersionOneAreCopiedToVersionTwo() {
+    void examplesOfVersionTwoAreCopiedToVersionThree() {
         Integer examples = jdbc.queryForObject("""
                 SELECT count(*) FROM rubric_examples e JOIN rubrics r ON r.id = e.rubric_id
-                WHERE r.code IN ('IELTS_WRITING_TASK_1', 'IELTS_WRITING_TASK_2') AND r.rubric_version = 2
+                WHERE r.code IN ('IELTS_WRITING_TASK_1', 'IELTS_WRITING_TASK_2') AND r.rubric_version = 3
                 """, Map.of(), Integer.class);
         assertEquals(2, examples);
     }
