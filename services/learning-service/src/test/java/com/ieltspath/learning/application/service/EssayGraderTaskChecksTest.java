@@ -109,7 +109,7 @@ class EssayGraderTaskChecksTest {
 
         var entry = grade.corrections().getFirst();
         assertEquals("T1_DATA_MISREPORTED", entry.errorCode());
-        assertEquals("", entry.suggestion());
+        assertEquals("Sales fell to 10 in 2021.", entry.suggestion());
         assertEquals("Doanh số giảm còn 15.", entry.reason());
     }
 
@@ -160,7 +160,7 @@ class EssayGraderTaskChecksTest {
         var added = grade.corrections().getFirst();
         assertEquals("T1_DATA_MISREPORTED", added.errorCode());
         assertEquals("Sales fell to 10 in 2021.", added.excerpt());
-        assertEquals("", added.suggestion());
+        assertEquals("Sales fell to 10 in 2021.", added.suggestion());
         assertEquals("Năm 2021 là 15.", added.reason());
         assertEquals(3, added.severity());
         assertFalse(added.suggestionOnly());

@@ -311,9 +311,9 @@ public class EssayGrader {
                     || covered(merged, check.excerpt(), essay)) continue;
             ObjectNode item = json.createObjectNode();
             item.put("excerpt", check.excerpt());
-            // The fallback entry keeps the sentence and its explanation in "reason"; the replacement stays empty, so no
-            // Vietnamese text can reach the corrected essay.
-            item.put("suggestion", "");
+            // The fallback entry keeps the sentence as its own replacement, so a corrected essay still reads the same
+            // here and no Vietnamese text can reach it; the explanation is in "reason".
+            item.put("suggestion", check.excerpt());
             item.put("reason", check.expected());
             item.put("errorCode", DATA_MISREPORTED_CODE);
             item.put("certainty", WritingGrade.Correction.ERROR);

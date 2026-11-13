@@ -108,7 +108,7 @@ Response 200:
   sentences of the essay that contradict the chart; `expected` is a short Vietnamese statement of what the chart shows.
   Sentences judged right come back only as `correctCount`. A flag the model did not give is omitted. The chart facts
   themselves are never returned. A wrong figure also appears in `corrections` with the code `T1_DATA_MISREPORTED`. When the model gave no such entry, Learning adds one
-whose `suggestion` is empty and whose `reason` is the `expected` statement. A `suggestion` that contains Vietnamese is emptied
+whose `suggestion` is the sentence itself and whose `reason` is the `expected` statement. A `suggestion` that contains Vietnamese is emptied
 (the correction keeps its excerpt and reason), so no Vietnamese text reaches a corrected essay. A `suggestion` is at most 600
 characters and a criterion `comment` at most 300, both cut at a sentence end when one is near the limit.
 - `taskChecks` (Task 2, same condition): `{questionParts: [{part, addressed, excerpt?}], position?: {required, stated,
