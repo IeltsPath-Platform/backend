@@ -256,14 +256,27 @@ failed rubric criterion KPs may receive optional reviews in the same transaction
 only when its band is strictly below the prompt's pass band (5.5 against 5.5 passes). Judged question knowledge points do
 not create these reviews. Existing evidence, including `kpj2` sub-point judgments, is unchanged.
 
+The criterion decides whether there is a review; the errors of the essay decide what it practises. For each weak
+criterion the review practises the knowledge point of the error code met most often among that criterion's errors:
+corrections that are not `SUGGESTION` and whose code belongs to the criterion (`VOCABULARY` for LR, `GRAMMAR` for GRA,
+`COHERENCE` for CC, `TASK` for TA and TR; the word-level codes `WORD_FORM`, `NOUN_PLURAL` and `WRITING_SPELLING` count for
+LR). Codes are ranked by how often they occur, then by the higher `severity`, then by code. The first knowledge point in
+that order that has no `PENDING` review and still has an eligible unrevealed set is practised; when none has, the review
+practises the criterion's own point (`DEMO_WRITING_CRITERION_*`) on the same terms. A knowledge point is the one of an
+error code only when the correction carries a `practiceKnowledgePointId`, which the grade keeps only for a point with a
+practice set. This applies to AI grading of lesson and course Practice essays; Mentor results, Speaking and free writing
+are unchanged. Mastery is unchanged: the criterion's band is still evidence for its own point.
+
 The service selects the lowest criterion bands first, breaking ties by KP code, and creates at most
 `learning.writing.criterion-review-limit` reviews per submission (default `2`, pending user/mentor confirmation).
-A KP with any existing `PENDING` review is skipped. Content must have an eligible unrevealed set with at least three
+A criterion whose own point, or a review made for it, is `PENDING` is skipped, so a criterion has one waiting review. Content must have an eligible unrevealed set with at least three
 questions; packages already revealed in Practice/review or assigned in any review are excluded. Availability is
-checked once for all candidate KPs. This uses the published `PS-WCR-*` criterion practice sets.
+checked once for all candidate KPs. A criterion with no error point to practise uses the published `PS-WCR-*` criterion practice sets.
 
 Each new review stores the essay's lesson ID, `skill = WRITING`, `blocking = false`, and
-`trigger_kind = WRITING_CRITERION`. These reviews never block lessons, Practice or topic tests and do not change
+`trigger_kind = WRITING_CRITERION`. Its `knowledge_point_id` is the point it practises; `criterion_knowledge_point_id`
+keeps the criterion's own point so that an examiner's result finds the review: a criterion graded below the pass band
+makes its waiting review blocking, one graded at or above it closes the review. These reviews never block lessons, Practice or topic tests and do not change
 Practice clearance. They are accessible through `GET /reviews`, `GET /review-basket` (in `weak` when absent from
 `required`, `consolidate` and `due`), and the existing review start/submission routes. A successful review set writes `review_set` evidence and updates mastery.
 Replaying an existing submission or resubmitting a revealed Practice package creates no additional reviews.

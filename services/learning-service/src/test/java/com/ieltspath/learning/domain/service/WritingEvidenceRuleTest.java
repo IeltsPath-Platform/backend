@@ -299,4 +299,18 @@ class WritingEvidenceRuleTest {
         assertFalse(outcome.correctByKnowledgePoint().get(subPoint));
         assertTrue(outcome.criterionKnowledgePoints().contains(subPoint));
     }
+
+    @Test
+    void aFailedCriterionCarriesThePointsOfItsOwnErrorsOnly() {
+        UUID words = UUID.randomUUID(), articles = UUID.randomUUID();
+        var corrections = List.of(
+                new WritingGrade.Correction("x", "y", "VOCABULARY", "WORD_CHOICE", "n", "", 2, words, null, null, "ERROR"),
+                new WritingGrade.Correction("x", "y", "GRAMMAR", "ARTICLE", "n", "", 2, articles, null, null, "ERROR"));
+
+        var outcome = rule.derive(List.of(), new BigDecimal("5.5"), false,
+                grade(List.of(criterion("LR", "5.0", LR), criterion("GRA", "6.0", GRA)), corrections));
+
+        assertEquals(1, outcome.failedCriteria().size());
+        assertEquals(List.of(words), outcome.failedCriteria().getFirst().reviewPoints());
+    }
 }

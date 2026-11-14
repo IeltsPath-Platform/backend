@@ -217,7 +217,8 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
         return jdbc.query("""
                 UPDATE review_items SET blocking = TRUE
                 WHERE user_id = :userId AND status = 'PENDING' AND blocking = FALSE
-                  AND trigger_kind = 'WRITING_CRITERION' AND knowledge_point_id IN (:kpIds)
+                  AND trigger_kind = 'WRITING_CRITERION'
+                  AND (knowledge_point_id IN (:kpIds) OR criterion_knowledge_point_id IN (:kpIds))
                   AND source_submission_id IS DISTINCT FROM :submissionId
                 RETURNING id, knowledge_point_id, stage
                 """, params, (row, index) -> new PromotedReview(
@@ -231,7 +232,8 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
         jdbc.update("""
                 UPDATE review_items SET status = 'DONE', done_at = now()
                 WHERE user_id = :userId AND status = 'PENDING' AND blocking = FALSE
-                  AND trigger_kind = 'WRITING_CRITERION' AND knowledge_point_id IN (:kpIds)
+                  AND trigger_kind = 'WRITING_CRITERION'
+                  AND (knowledge_point_id IN (:kpIds) OR criterion_knowledge_point_id IN (:kpIds))
                 """, Map.of("userId", userId, "kpIds", knowledgePointIds));
     }
 
@@ -241,17 +243,27 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
         if (criteria.isEmpty()) return;
         jdbc.getJdbcOperations().batchUpdate("""
                 INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status, skill, trigger_kind,
-                                          blocking, source_submission_id)
-                VALUES (?, ?, ?, ?, 'PENDING', ?, ?, FALSE, ?)
+                                          blocking, source_submission_id, criterion_knowledge_point_id)
+                SELECT CAST(? AS uuid), CAST(? AS uuid), CAST(? AS uuid), CAST(? AS uuid), 'PENDING', CAST(? AS varchar),
+                       CAST(? AS varchar), FALSE, CAST(? AS uuid), CAST(? AS uuid)
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM review_items waiting
+                    WHERE waiting.user_id = ? AND waiting.status = 'PENDING' AND waiting.trigger_kind = ?
+                      AND (waiting.knowledge_point_id = ? OR waiting.criterion_knowledge_point_id = ?))
                 ON CONFLICT (user_id, knowledge_point_id) WHERE status = 'PENDING' DO NOTHING
                 """, criteria, criteria.size(), (statement, criterion) -> {
             statement.setObject(1, UUID.randomUUID());
             statement.setObject(2, userId);
-            statement.setObject(3, criterion.knowledgePointId());
+            statement.setObject(3, criterion.practisedPoint());
             statement.setObject(4, lessonId);
             statement.setString(5, skill.name());
             statement.setString(6, triggerKind);
             statement.setObject(7, criterion.sourceSubmissionId());
+            statement.setObject(8, criterion.knowledgePointId());
+            statement.setObject(9, userId);
+            statement.setString(10, triggerKind);
+            statement.setObject(11, criterion.knowledgePointId());
+            statement.setObject(12, criterion.knowledgePointId());
         });
     }
 

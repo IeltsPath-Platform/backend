@@ -98,6 +98,7 @@ class LessonWritingIntegrationTest {
     @Autowired GetLessonUseCase getLessonUseCase;
     @Autowired SubmitLessonExerciseUseCase submitLessonExerciseUseCase;
     @Autowired RefreshLearningTopicsUseCase topics;
+    @Autowired com.ieltspath.learning.domain.repository.ReviewItemRepository reviewItems;
     @MockitoBean LearningContentClient content;
     @MockitoBean AccessClient access;
     @MockitoBean LlmClient llm;
@@ -605,6 +606,69 @@ class LessonWritingIntegrationTest {
         assertEquals("GRADED", revision.status());
         assertEquals(0, count("review_items"));
         verify(content, never()).practiceSetAvailability(anyList(), anyList(), anyInt());
+    }
+
+    @Test
+    void aWeakCriterionReviewsThePointOfItsMostFrequentErrorAndStillFindsItsReview() {
+        UUID wordsKp = UUID.randomUUID();
+        when(content.activeErrorTypes("WRITING")).thenReturn(List.of(new LearningContentClient.ErrorType("WORD_CHOICE",
+                "Word choice", "VOCABULARY", 2, "Choose the precise word", wordsKp)));
+        when(content.getActiveRubric(anyString())).thenReturn(rubricWithCriterionPoints("TASK_2"));
+        when(content.getTopicSequence()).thenReturn(List.of(new LearningContentClient.Topic(TOPIC, "WRITING",
+                "Writing", 900, null, List.of(kp(KP), kp(ESSAY_KP), kp(TR_KP), kp(CC_KP), kp(LR_KP), kp(GRA_KP),
+                new LearningContentClient.KnowledgePoint(wordsKp, "W70_LEXICAL_PRECISION", "Lexical precision",
+                        "PROCEDURE", "WRITING", "Choose precise words", true)), LearningSkill.WRITING, true)));
+        when(content.practiceSetAvailability(anyList(), anyList(), eq(3))).thenReturn(Map.of(LR_KP, 3, wordsKp, 3));
+        topics.execute(USER);
+        llmReplies(gradeWithBands("6.0", "6.0", "5.0", "6.0").replace("\"corrections\":[{\"excerpt\":\"Cities should plant more trees\","
+                + "\"suggestion\":\"fix\",\"errorCode\":\"GRAMMAR\"}]", "\"corrections\":[{\"excerpt\":\"Cities should plant more trees\","
+                + "\"suggestion\":\"fix\",\"errorCode\":\"WORD_CHOICE\"},{\"excerpt\":\"because trees cool streets\","
+                + "\"suggestion\":\"fix\",\"errorCode\":\"WORD_CHOICE\"}]"));
+
+        var essay = submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), ESSAY);
+
+        var review = jdbc.queryForMap("SELECT knowledge_point_id, criterion_knowledge_point_id, blocking FROM review_items "
+                + "WHERE user_id = ?", USER);
+        assertEquals(wordsKp, review.get("knowledge_point_id"), "the review practises the error's point");
+        assertEquals(LR_KP, review.get("criterion_knowledge_point_id"), "and still knows the criterion it came from");
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE user_id = ? AND kp_id = ?",
+                Integer.class, USER, LR_KP), "the criterion's band is still its own evidence");
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE user_id = ? AND kp_id = ?",
+                Integer.class, USER, wordsKp));
+
+        // An examiner finding the same criterion weak makes the waiting review blocking; one finding it fine closes it.
+        reviewItems.promoteCriterionReviewsToBlocking(USER, java.util.Set.of(LR_KP), UUID.randomUUID());
+        assertEquals(Boolean.TRUE, jdbc.queryForObject("SELECT blocking FROM review_items WHERE user_id = ?", Boolean.class, USER));
+        jdbc.update("UPDATE review_items SET blocking = FALSE WHERE user_id = ?", USER);
+        reviewItems.closeOptionalCriterionReviews(USER, java.util.Set.of(LR_KP));
+        assertEquals("DONE", jdbc.queryForObject("SELECT status FROM review_items WHERE user_id = ?", String.class, USER));
+        assertNotNull(essay.submissionId());
+    }
+
+    @Test
+    void aSecondEssayWithTheSameWeakCriterionAddsNoSecondReviewForIt() {
+        UUID wordsKp = UUID.randomUUID(), otherKp = UUID.randomUUID();
+        when(content.activeErrorTypes("WRITING")).thenReturn(List.of(
+                new LearningContentClient.ErrorType("WORD_CHOICE", "Word choice", "VOCABULARY", 2, "Choose", wordsKp),
+                new LearningContentClient.ErrorType("REPETITION", "Repetition", "VOCABULARY", 2, "Vary", otherKp)));
+        when(content.getActiveRubric(anyString())).thenReturn(rubricWithCriterionPoints("TASK_2"));
+        when(content.getTopicSequence()).thenReturn(List.of(new LearningContentClient.Topic(TOPIC, "WRITING",
+                "Writing", 900, null, List.of(kp(KP), kp(ESSAY_KP), kp(TR_KP), kp(CC_KP), kp(LR_KP), kp(GRA_KP),
+                new LearningContentClient.KnowledgePoint(wordsKp, "W70_LEXICAL_PRECISION", "Lexical precision",
+                        "PROCEDURE", "WRITING", "d", true),
+                new LearningContentClient.KnowledgePoint(otherKp, "V55_PARAPHRASE_WORDS", "Paraphrase",
+                        "PROCEDURE", "WRITING", "d", true)), LearningSkill.WRITING, true)));
+        when(content.practiceSetAvailability(anyList(), anyList(), eq(3))).thenReturn(Map.of(LR_KP, 3, wordsKp, 3, otherKp, 3));
+        topics.execute(USER);
+        String first = gradeWithBands("6.0", "6.0", "5.0", "6.0").replace("\"errorCode\":\"GRAMMAR\"", "\"errorCode\":\"WORD_CHOICE\"");
+        String second = gradeWithBands("6.0", "6.0", "5.0", "6.0").replace("\"errorCode\":\"GRAMMAR\"", "\"errorCode\":\"REPETITION\"");
+        llmReplies(first, second);
+
+        submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), ESSAY);
+        submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), ESSAY);
+
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM review_items WHERE user_id = ? AND status = 'PENDING'",
+                Integer.class, USER), "one waiting review per criterion");
     }
 
     private static String gradeWithFocus(String tr, String cc, String lr, String gra) {

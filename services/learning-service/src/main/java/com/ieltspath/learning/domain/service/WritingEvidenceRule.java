@@ -52,8 +52,10 @@ public final class WritingEvidenceRule {
                 boolean reached = criterion.band().compareTo(passBand) >= 0;
                 UUID kp = criterion.knowledgePointId();
                 if (!reached && criterion.code() != null) {
+                    // The review practises the point of the error this criterion's essay made most, when it has one.
                     failedCriteria.add(new FailedWritingCriterion(kp,
-                            "DEMO_WRITING_CRITERION_" + criterion.code(), criterion.band()));
+                            "DEMO_WRITING_CRITERION_" + criterion.code(), criterion.band())
+                            .withReviewPoints(WritingErrorCriteria.reviewPoints(grade.corrections(), criterion.code())));
                 }
                 if (decidedByCriteria.add(kp)) correct.put(kp, reached);
                 else correct.put(kp, correct.get(kp) && reached);

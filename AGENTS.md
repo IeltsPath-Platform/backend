@@ -1,7 +1,7 @@
 # AGENTS.md - Quy tắc bắt buộc cho AI Agent
 
 - Phiên bản: 2.3
-- Cập nhật lần cuối: 2026-11-13 (khối `judgments` khi chấm Writing chỉ dùng KP của đề, `kpj3`); 2026-11-12 (ngoại lệ `chartFacts`: học viên nhận phát biểu đúng cho câu số liệu viết sai); 2026-11-11 (ghi chú gamification học từ vựng mobile ở §3.8; thêm common-llm); 2026-11-02 (thêm §3.9 và nhóm điều cấm "Pattern hệ thống" ở §5: resilience, outbox, idempotency, scheduler, storage; bổ sung Redis, Resilience4j, Micrometer/OpenTelemetry, Supabase vào stack và hai module shared mới); 2026-10-30 (Content gọi Library một chiều, Library không gọi Content; Notification đã có DB, listener và API; mặc định DB của config-repo là `localhost:5440`); 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); dữ kiện khác giữ mốc kiểm 2026-10-07 sau course path, placement recommendation và course gate
+- Cập nhật lần cuối: 2026-11-14 (bài ôn tiêu chí Writing ôn KP của mã lỗi gặp nhiều nhất); 2026-11-13 (khối `judgments` khi chấm Writing chỉ dùng KP của đề, `kpj3`); 2026-11-12 (ngoại lệ `chartFacts`: học viên nhận phát biểu đúng cho câu số liệu viết sai); 2026-11-11 (ghi chú gamification học từ vựng mobile ở §3.8; thêm common-llm); 2026-11-02 (thêm §3.9 và nhóm điều cấm "Pattern hệ thống" ở §5: resilience, outbox, idempotency, scheduler, storage; bổ sung Redis, Resilience4j, Micrometer/OpenTelemetry, Supabase vào stack và hai module shared mới); 2026-10-30 (Content gọi Library một chiều, Library không gọi Content; Notification đã có DB, listener và API; mặc định DB của config-repo là `localhost:5440`); 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); dữ kiện khác giữ mốc kiểm 2026-10-07 sau course path, placement recommendation và course gate
 - Dự án: `IELTSPath` (Maven coordinates: `com.ieltspath:code-base:1.0-SNAPSHOT`)
 - Kiến trúc chi tiết (sơ đồ, flow, data ownership, quyết định): [`docs/system-architecture.md`](docs/system-architecture.md)
 
@@ -274,8 +274,10 @@ src/main/java/com/ieltspath/<service>
   khối `judgments`, kể cả khi mô hình không trả mảng. API không phát `judgmentVersion`. Luyện tập tự do (`PT-WRITING-*`, kho đề
   `SubmitFreeWritingUseCase`) cũng nhận judgments và gợi ý học nhưng **không ghi mastery**.
   Event essay vẫn một dòng cho KP của đề, `error_code` là mã lỗi gặp nhiều nhất. Bằng chứng tiêu chí và KP con của essay
-  Practice không được XP mốc. Essay lesson/Practice tính evidence có thể tạo bài ôn tùy chọn `WRITING_CRITERION` cho KP
-  tiêu chí rớt (mặc định tối đa 2, `learning.writing.criterion-review-limit`); không tạo cho bài viết tự do, revision hay KP của đề.
+  Practice không được XP mốc. Essay lesson/Practice tính evidence có thể tạo bài ôn tùy chọn `WRITING_CRITERION` cho tiêu chí
+  rớt (mặc định tối đa 2, `learning.writing.criterion-review-limit`): tiêu chí rớt quyết định có bài ôn, còn nội dung ôn là KP của mã lỗi
+  gặp nhiều nhất thuộc tiêu chí đó (đếm từ corrections không phải `SUGGESTION`, hòa thì `severity` cao hơn rồi mã A→Z), dự phòng là KP tiêu
+  chí; `review_items.criterion_knowledge_point_id` giữ KP tiêu chí để Mentor nâng/đóng đúng bài ôn. Không tạo cho bài viết tự do, revision hay KP của đề.
   Mỗi KP tiêu chí có 3 bộ luyện tự do demo (`PS-WCR-*`, V70;
   nội dung AI soạn, cần giám khảo IELTS duyệt). Kết quả chấm trả thêm `studyPoints` (KP tiêu chí yếu, KP của đề có judgment
   `FAIL`, đặt sau các gợi ý tiêu chí và trước `focus` của LLM, không có `criterionCode`/`band`; rồi `focus` của LLM), tính một
