@@ -29,6 +29,18 @@ class WritingSettingsBindingTest {
     }
 
     @Test
+    void aBlankCapBindsAsOff() {
+        var source = new MapConfigurationPropertySource(Map.of(
+                "learning.writing.density.grammar-band-cap", "",
+                "learning.writing.density.vocabulary-band-cap", "4.0"));
+
+        var rules = new Binder(source).bind("learning.writing", WritingSettings.class).get().density().rules();
+
+        assertNull(rules.grammarCap());
+        assertEquals(0, new BigDecimal("4.0").compareTo(rules.vocabularyCap()));
+    }
+
+    @Test
     void withoutDensityKeysEveryDensityRuleIsOff() {
         WritingSettings settings = new Binder(new MapConfigurationPropertySource(Map.of("learning.writing.point-cost", "3")))
                 .bind("learning.writing", WritingSettings.class).get();

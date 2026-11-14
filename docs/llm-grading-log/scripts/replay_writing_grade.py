@@ -44,6 +44,13 @@ if prefix.startswith("sheet:"):
     row = next(r for r in workbook["Bai_test"].iter_rows(min_row=4, values_only=True) if r[0] == prefix[6:])
     sid, essay = prefix, row[5]
     snap = {"task": row[1], "stem": row[3], "minWords": 150 if row[1] == "TASK_1" else 250, "chartFacts": row[4]}
+elif prefix.startswith("file:"):
+    # A calibration essay kept as JSON (task, stem, chartFacts, essay), for essays that are not in the workbook.
+    item = json.loads(Path(prefix[5:]).read_text(encoding="utf-8"))
+    sid, essay = Path(prefix[5:]).stem, item["essay"]
+    snap = {"task": item["task"], "stem": item["stem"], "minWords": 150 if item["task"] == "TASK_1" else 250,
+            "chartFacts": item.get("chartFacts")}
+    prefix = "file-" + sid
 else:
     learning = db("learning_db", "LEARNING_DB_PASSWORD")
     sid, essay, snapshot = learning.run(

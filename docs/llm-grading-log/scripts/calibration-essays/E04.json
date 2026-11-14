@@ -1,0 +1,8 @@
+{
+  "intendedBands": {"TA": 6, "CC": 5, "LR": 5, "GRA": 5},
+  "note": "Accurate data and an overview, but grammar errors in almost every sentence that do not hide the meaning. Checks that the density caps do not push a band-5 essay below 5. Written by the assistant for calibration; needs examiner review.",
+  "task": "TASK_1",
+  "stem": "The table below shows the average number of visits each person made to public libraries in one year, by age group, in 2000 and in 2020. Under 16: 9 visits in 2000 and 6 in 2020; 16 to 24: 4 and 3; 25 to 44: 5 and 4; 45 to 64: 7 and 5; 65 and over: 11 and 12. Summarise the information by selecting and reporting the main features, and make comparisons where relevant.",
+  "chartFacts": "Average library visits per person per year. Under 16: 2000 9, 2020 6. 16 to 24: 2000 4, 2020 3. 25 to 44: 2000 5, 2020 4. 45 to 64: 2000 7, 2020 5. 65 and over: 2000 11, 2020 12.",
+  "essay": "The table give information about how many time people go to public library in 2000 and 2020, and it divide in five age group.\n\nOverall, most group visit library less in 2020. Only the people 65 and over is increase, and they are visit the most in both year.\n\nIn 2000, people over 65 go to library 11 times and children under 16 go 9 times. The group 45 to 64 have 7 visits, and the 25 to 44 group have 5. The lowest is 16 to 24 with 4 visits.\n\nIn 2020, children visit decrease to 6 and the 45 to 64 group decrease to 5. The 16 to 24 and 25 to 44 group also go down a little, it become 3 and 4. But the old people visit more, it rise to 12 times. So the old people is like library more than other people."
+}

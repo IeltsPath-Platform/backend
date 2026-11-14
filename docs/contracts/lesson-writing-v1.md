@@ -107,7 +107,8 @@ Response 200:
   reaches `learning.writing.density.grammar-share` or `vocabulary-share`; for Task 1, `WRONG_DATA` caps TA when the
   share of chart statements judged wrong reaches `wrong-data-share`, and `WRONG_DATA_OVERVIEW` caps it lower when the
   overview is also wrong. A correction that is only a suggestion is not counted. Each cap is set by a
-  `learning.writing.density.*-band-cap` key and a blank cap switches its rule off.
+  `learning.writing.density.*-band-cap` key and a blank cap switches its rule off. The shared configuration leaves
+  `DENSE_GRAMMAR` off: grammar errors in most sentences also appear in band 5 essays whose meaning stays clear.
 - `dataChecks` (Task 1, only for a grade made with the second prompt template; absent otherwise):
   `{wrong: [{excerpt, expected}], correctCount, hasOverview?, overviewAccurate?, hasPersonalOpinion?}`. `wrong` lists the
   sentences of the essay that contradict the chart; `expected` is a short Vietnamese statement of what the chart shows.
