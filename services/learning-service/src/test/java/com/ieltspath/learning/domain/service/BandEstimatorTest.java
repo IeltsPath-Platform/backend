@@ -187,6 +187,13 @@ class BandEstimatorTest {
     }
 
     @Test
+    void anAverageBetweenQuartersRoundsToTheNearestHalf() {
+        List<Point> all = join(points("LISTENING", B65, MAINTAIN), points("READING", B65, MAINTAIN),
+                points("WRITING", new BigDecimal("7.0"), MAINTAIN));
+        assertThat(estimate(all, null).overall()).as("6.667 rounds to 6.5").isEqualByComparingTo(B65);
+    }
+
+    @Test
     void noHintWhenTheNextBandIsStillFarOff() {
         List<Point> reading = join(
                 points("READING", B60, MAINTAIN, MAINTAIN),
