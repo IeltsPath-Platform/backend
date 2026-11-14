@@ -97,4 +97,13 @@ class RecordVideoDictationAttemptUseCaseTest {
     private RecordVideoDictationAttemptCommand command(String typed, boolean correct, String accuracy) {
         return new RecordVideoDictationAttemptCommand(userId, segmentId, typed, correct, new BigDecimal(accuracy));
     }
+
+    @Test
+    void aMissingAccuracyIsRefused() {
+        when(videoRepository.findPublishedVideoIdBySegmentId(segmentId)).thenReturn(Optional.of(videoId));
+        InvalidDataException error = assertThrows(InvalidDataException.class, () -> useCase.execute(
+                new RecordVideoDictationAttemptCommand(userId, segmentId, "text", true, null)));
+        assertEquals("accuracyPercent không hợp lệ", error.getMessage());
+        verify(attemptRepository, never()).save(any());
+    }
 }

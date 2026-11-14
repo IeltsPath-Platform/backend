@@ -85,4 +85,16 @@ class StudySessionTest {
         assertTrue(accepted.segments().stream().allMatch(segment -> segment.milliseconds() > 0));
         assertEquals(LocalDate.parse("2026-10-15"),accepted.segments().getFirst().date());
     }
+
+    @Test void aHeartbeatCarriesAtMostSixteenIntervals() {
+        List<StudySession.Interval> sixteen=new ArrayList<>();
+        for(int i=0;i<16;i++) sixteen.add(interval(i*1000L,i*1000L+1000));
+        assertEquals(16000,session().accept(1,1,sixteen,start.plusSeconds(30),false).acceptedMs());
+
+        List<StudySession.Interval> seventeen=new ArrayList<>(sixteen);
+        seventeen.add(interval(16000,17000));
+        var error=assertThrows(IllegalArgumentException.class,
+                ()->session().accept(1,1,seventeen,start.plusSeconds(30),false));
+        assertEquals("At most 16 intervals are allowed",error.getMessage());
+    }
 }

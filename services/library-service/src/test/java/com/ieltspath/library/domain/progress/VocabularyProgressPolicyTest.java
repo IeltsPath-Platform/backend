@@ -65,4 +65,26 @@ class VocabularyProgressPolicyTest {
         assertEquals("COMPLETED", VocabularyProgressPolicy.topicStatus(5, 5));
         assertEquals("COMPLETED", VocabularyProgressPolicy.topicStatus(5, 6));
     }
+
+    @Test void noReviewDaysMeanNoStreak() {
+        assertEquals(0, VocabularyProgressPolicy.reviewStreak(Set.of(), LocalDate.of(2026, 10, 26)));
+    }
+    @Test void aSingleReviewTodayIsAStreakOfOne() {
+        LocalDate today = LocalDate.of(2026, 10, 26);
+        assertEquals(1, VocabularyProgressPolicy.reviewStreak(Set.of(today), today));
+    }
+    @Test void valuesJustUnderEachTargetAchieveNothing() {
+        var result = VocabularyProgressPolicy.achievements(6, 0, 299);
+        assertTrue(result.stream().noneMatch(VocabularyProgressPolicy.Achievement::achieved));
+        assertEquals(6, result.get(0).progress());
+        assertEquals(0, result.get(1).progress());
+        assertEquals(299, result.get(2).progress());
+    }
+    @Test void weeklyTargetsOfTenAndOneThousandAreAccepted() {
+        assertDoesNotThrow(() -> VocabularyProgressPolicy.validateWeeklyTarget(10));
+        assertDoesNotThrow(() -> VocabularyProgressPolicy.validateWeeklyTarget(1000));
+    }
+    @Test void fourOfFiveWordsIsStillInProgress() {
+        assertEquals("IN_PROGRESS", VocabularyProgressPolicy.topicStatus(5, 4));
+    }
 }

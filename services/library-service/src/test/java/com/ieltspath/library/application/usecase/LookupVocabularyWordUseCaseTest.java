@@ -103,4 +103,19 @@ class LookupVocabularyWordUseCaseTest {
         return new VocabularySense(UUID.randomUUID(), item.getId(), PartOfSpeech.NOUN, "def", "nghĩa", "Example.",
                 null, sortOrder, status, Instant.now(), Instant.now());
     }
+
+    @Test
+    void sensesComeBackInTheirSortOrder() {
+        VocabularyItem item = VocabularyItem.create("trend", "/trend/", null);
+        item.addSense(new VocabularySense(UUID.randomUUID(), item.getId(), PartOfSpeech.NOUN, "second", "thứ hai", "Example.",
+                null, 2, ContentStatus.ACTIVE, Instant.now(), Instant.now()));
+        item.addSense(new VocabularySense(UUID.randomUUID(), item.getId(), PartOfSpeech.NOUN, "first", "thứ nhất", "Example.",
+                null, 1, ContentStatus.ACTIVE, Instant.now(), Instant.now()));
+        when(vocabulary.findByNormalizedLemmas(List.of("trend"))).thenReturn(List.of(item));
+
+        List<WordLookupResult> result = useCase().execute(List.of("trend"));
+
+        assertThat(result.getFirst().senses()).extracting(WordLookupResult.Sense::englishDefinition)
+                .containsExactly("first", "second");
+    }
 }

@@ -138,6 +138,32 @@ class MasteryPolicyTest {
     }
 
     @Test
+    void aMaintainedPointKeepsItsTierExactlyAtTheLowerEdgeOfTheMargin() {
+        assertThat(policy.tier(0.770, true, MasteryTier.MAINTAIN, 0.03)).isEqualTo(MasteryTier.MAINTAIN);
+        assertThat(policy.tier(0.769, true, MasteryTier.MAINTAIN, 0.03)).isEqualTo(MasteryTier.CONSOLIDATE);
+    }
+
+    @Test
+    void narrowThresholdsStillGiveAnOrderedTierForEveryScore() {
+        MasteryPolicy narrow = new MasteryPolicy(new MasteryRules(0.60, 0.62, List.of(7), 3));
+        for (MasteryTier previous : new MasteryTier[]{MasteryTier.PRIORITY, MasteryTier.CONSOLIDATE, MasteryTier.MAINTAIN}) {
+            int lastRank = -1;
+            for (int thousandths = 560; thousandths <= 660; thousandths++) {
+                MasteryTier tier = narrow.tier(thousandths / 1000.0, true, previous, 0.03);
+                assertThat(tier).isNotEqualTo(MasteryTier.INSUFFICIENT);
+                assertThat(tier.rank()).as("from %s at %d", previous, thousandths).isGreaterThanOrEqualTo(lastRank);
+                lastRank = tier.rank();
+            }
+        }
+    }
+
+    @Test
+    void theExtremeValidRulesAreAccepted() {
+        assertThat(new MasteryRules(0.01, 0.02, List.of(1), 1).maintainFrom()).isEqualTo(0.02);
+        assertThat(new MasteryRules(0.6, 1.0, List.of(7), 3).maintainFrom()).isEqualTo(1.0);
+    }
+
+    @Test
     void rulesRejectNonsense() {
         assertThatThrownBy(() -> new MasteryRules(0.8, 0.6, List.of(7), 3)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new MasteryRules(0.0, 0.8, List.of(7), 3)).isInstanceOf(IllegalArgumentException.class);

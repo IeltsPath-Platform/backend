@@ -1,5 +1,6 @@
 package com.ieltspath.content.domain.aggregate;
 
+import com.ieltspath.content.domain.exception.InvalidPackageLessonException;
 import com.ieltspath.content.domain.entity.ContentPackageVersion;
 import com.ieltspath.content.domain.vo.PackageType;
 import com.ieltspath.content.domain.vo.PublicationStatus;
@@ -50,5 +51,16 @@ class ContentPackageTest {
         assertThatThrownBy(() -> pkg.publishVersion(randomVersionId))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Version does not belong to package");
+    }
+
+    @Test
+    @DisplayName("Only a practice set can belong to a lesson")
+    void onlyAPracticeSetCanBelongToALesson() {
+        UUID lessonId = UUID.randomUUID();
+        assertThatThrownBy(() -> ContentPackage.create("MOCK", "Mock", PackageType.MOCK_TEST, null, lessonId))
+                .isInstanceOf(InvalidPackageLessonException.class)
+                .hasMessage("Only a PRACTICE_SET package can belong to a lesson");
+        assertThat(ContentPackage.create("PS", "Practice", PackageType.PRACTICE_SET, null, lessonId).getLessonId())
+                .isEqualTo(lessonId);
     }
 }

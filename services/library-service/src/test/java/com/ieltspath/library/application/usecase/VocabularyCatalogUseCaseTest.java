@@ -1,5 +1,6 @@
 package com.ieltspath.library.application.usecase;
 
+import com.ieltspath.library.domain.catalog.VocabularyItemDetails;
 import com.ieltspath.library.application.port.VocabularyCatalogStore;
 import com.ieltspath.library.application.result.VocabularyMindmapResult;
 import com.ieltspath.library.domain.catalog.Collocation;
@@ -133,5 +134,24 @@ class VocabularyCatalogUseCaseTest {
 
         verify(store, never()).lockSet(any());
         verify(store, never()).replaceSetItems(any(), any());
+    }
+
+    @Test
+    void replacingTheItemsOfAnUnknownSetWritesNothing() {
+        UUID set = UUID.randomUUID();
+        when(store.lockSet(set)).thenReturn(false);
+        assertThrows(ResourceNotFoundException.class, () -> useCase.replaceSetItems(set, List.of(UUID.randomUUID())));
+        verify(store, never()).replaceSetItems(any(), any());
+    }
+
+    @Test
+    void updatingAnUnknownWordOrSenseIsNotFound() {
+        UUID id = UUID.randomUUID();
+        when(store.updateItem(any(), any())).thenReturn(java.util.Optional.empty());
+        when(store.updateSense(any(), any())).thenReturn(java.util.Optional.empty());
+        assertThrows(ResourceNotFoundException.class, () -> useCase.updateItem(id,
+                new VocabularyItemDetails(null, null, null, null, null, false, null)));
+        assertThrows(ResourceNotFoundException.class, () -> useCase.updateSense(id,
+                new VocabularySenseDetails(null, null, null, null, null, null)));
     }
 }

@@ -77,4 +77,36 @@ class ActivationKeyTest {
         assertThatThrownBy(key::revoke)
                 .isInstanceOf(InvalidKeyOperationException.class);
     }
+
+    @Test
+    @DisplayName("Redeeming an expired key marks it EXPIRED")
+    void shouldMarkExpiredKeyOnRedeem() {
+        ActivationKey key = ActivationKey.create(UUID.randomUUID(), "hash123", "9999", Instant.now().minus(1, ChronoUnit.DAYS), null);
+
+        assertThatThrownBy(key::redeem)
+                .isInstanceOf(KeyExpiredException.class)
+                .hasMessage("Activation key has expired");
+        assertThat(key.getStatus()).isEqualTo(KeyStatus.EXPIRED);
+    }
+
+    @Test
+    @DisplayName("Revoking a revoked key again changes nothing")
+    void shouldAllowRevokingTwice() {
+        ActivationKey key = ActivationKey.create(UUID.randomUUID(), "hash123", "9999", null, null);
+        key.revoke();
+
+        key.revoke();
+
+        assertThat(key.getStatus()).isEqualTo(KeyStatus.REVOKED);
+    }
+
+    @Test
+    @DisplayName("An expired key that was never redeemed can still be revoked")
+    void shouldRevokeExpiredKey() {
+        ActivationKey key = ActivationKey.create(UUID.randomUUID(), "hash123", "9999", Instant.now().minus(1, ChronoUnit.DAYS), null);
+
+        key.revoke();
+
+        assertThat(key.getStatus()).isEqualTo(KeyStatus.REVOKED);
+    }
 }

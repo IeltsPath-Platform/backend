@@ -1,5 +1,14 @@
 package com.ieltspath.access.application.usecase;
 
+import static org.mockito.ArgumentMatchers.anyString;
+import java.time.temporal.ChronoUnit;
+import java.time.Instant;
+import org.mockito.ArgumentCaptor;
+import com.ieltspath.access.domain.vo.SubscriptionStatus;
+import com.ieltspath.access.domain.vo.SubscriptionSourceType;
+import com.ieltspath.access.domain.exception.KeyRevokedException;
+import com.ieltspath.access.domain.exception.KeyProductNotFoundException;
+import com.ieltspath.access.domain.exception.KeyExpiredException;
 import com.ieltspath.access.application.command.ActivateKeyCommand;
 import com.ieltspath.access.application.result.ActivationResult;
 import com.ieltspath.access.domain.aggregate.ActivationKey;
@@ -188,5 +197,81 @@ class ActivateKeyUseCaseTest {
 
         assertThatThrownBy(() -> activateKeyUseCase.execute(new ActivateKeyCommand(userId, rawKey, "idem-4")))
                 .isInstanceOf(KeyAlreadyRedeemedException.class);
+    }
+
+    @Test
+    @DisplayName("Expired and revoked keys grant nothing")
+    void shouldRefuseExpiredAndRevokedKeys() {
+        ActivationKey expired = ActivationKey.create(UUID.randomUUID(), keyCode.codeHash(), keyCode.codeHint(),
+                Instant.now().minus(1, ChronoUnit.DAYS), null);
+        when(keyActivationRepository.findByIdempotencyKey(anyString())).thenReturn(Optional.empty());
+        when(activationKeyRepository.findByCodeHash(keyCode.codeHash())).thenReturn(Optional.of(expired));
+        assertThatThrownBy(() -> activateKeyUseCase.execute(new ActivateKeyCommand(userId, rawKey, "idem-exp")))
+                .isInstanceOf(KeyExpiredException.class);
+
+        ActivationKey revoked = ActivationKey.create(UUID.randomUUID(), keyCode.codeHash(), keyCode.codeHint(), null, null);
+        revoked.revoke();
+        when(activationKeyRepository.findByCodeHash(keyCode.codeHash())).thenReturn(Optional.of(revoked));
+        assertThatThrownBy(() -> activateKeyUseCase.execute(new ActivateKeyCommand(userId, rawKey, "idem-rev")))
+                .isInstanceOf(KeyRevokedException.class);
+
+        verifyNoInteractions(keyProductRepository, pointWalletRepository, subscriptionRepository, outboxEventRepository);
+        verify(activationKeyRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("A key whose product does not exist grants nothing")
+    void shouldThrowWhenProductMissing() {
+        UUID productId = UUID.randomUUID();
+        ActivationKey key = ActivationKey.create(productId, keyCode.codeHash(), keyCode.codeHint(), null, null);
+        when(keyActivationRepository.findByIdempotencyKey("idem-5")).thenReturn(Optional.empty());
+        when(activationKeyRepository.findByCodeHash(keyCode.codeHash())).thenReturn(Optional.of(key));
+        when(keyProductRepository.findById(productId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> activateKeyUseCase.execute(new ActivateKeyCommand(userId, rawKey, "idem-5")))
+                .isInstanceOf(KeyProductNotFoundException.class);
+        verifyNoInteractions(pointWalletRepository, subscriptionRepository, outboxEventRepository);
+        verify(activationKeyRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("A premium key extends the active subscription")
+    void shouldExtendActiveSubscriptionWithPremiumKey() {
+        UUID productId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+        Instant now = Instant.now();
+        ActivationKey key = ActivationKey.create(productId, keyCode.codeHash(), keyCode.codeHint(), null, null);
+        Subscription active = new Subscription(UUID.randomUUID(), userId, planId, SubscriptionStatus.ACTIVE, now.minus(20, ChronoUnit.DAYS),
+                now.plus(10, ChronoUnit.DAYS), SubscriptionSourceType.ACTIVATION_KEY, UUID.randomUUID(), 2, 0, null, 0, null, null);
+        when(keyActivationRepository.findByIdempotencyKey("idem-6")).thenReturn(Optional.empty());
+        when(activationKeyRepository.findByCodeHash(keyCode.codeHash())).thenReturn(Optional.of(key));
+        when(keyProductRepository.findById(productId)).thenReturn(Optional.of(KeyProduct.createPremiumProduct("PREMIUM_30D", "30 Days Premium", planId, 30, 4)));
+        when(subscriptionRepository.findActiveByUserId(userId)).thenReturn(Optional.of(active));
+
+        ActivationResult result = activateKeyUseCase.execute(new ActivateKeyCommand(userId, rawKey, "idem-6"));
+
+        assertThat(active.getEndsAt()).isAfter(now.plus(39, ChronoUnit.DAYS)).isBefore(now.plus(41, ChronoUnit.DAYS));
+        assertThat(active.getRemainingCredits()).isEqualTo(6);
+        assertThat(result.subscriptionEndsAt()).isEqualTo(active.getEndsAt());
+        verify(subscriptionRepository).save(active);
+    }
+
+    @Test
+    @DisplayName("The first points key of a learner creates the wallet")
+    void shouldCreateWalletForFirstPointsKey() {
+        UUID productId = UUID.randomUUID();
+        ActivationKey key = ActivationKey.create(productId, keyCode.codeHash(), keyCode.codeHint(), null, null);
+        when(keyActivationRepository.findByIdempotencyKey("idem-7")).thenReturn(Optional.empty());
+        when(activationKeyRepository.findByCodeHash(keyCode.codeHash())).thenReturn(Optional.of(key));
+        when(keyProductRepository.findById(productId)).thenReturn(Optional.of(KeyProduct.createPointsProduct("POINT_50", "50 Points", 50)));
+        when(pointWalletRepository.findByUserId(userId)).thenReturn(Optional.empty());
+
+        ActivationResult result = activateKeyUseCase.execute(new ActivateKeyCommand(userId, rawKey, "idem-7"));
+
+        ArgumentCaptor<PointWallet> saved = ArgumentCaptor.forClass(PointWallet.class);
+        verify(pointWalletRepository).save(saved.capture());
+        assertThat(saved.getValue().getUserId()).isEqualTo(userId);
+        assertThat(saved.getValue().getBalance()).isEqualTo(50);
+        assertThat(result.newBalance()).isEqualTo(50L);
     }
 }

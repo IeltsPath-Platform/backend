@@ -174,4 +174,37 @@ class PersonalLibraryUseCaseTest {
         verify(cards, never()).save(any());
         verifyNoInteractions(storage, items, imageUsage, txTemplate);
     }
+
+    @Test
+    void aCardIsAddedToTheUsersDeck() {
+        FlashcardDeckRepository decks = mock(FlashcardDeckRepository.class);
+        FlashcardRepository cards = mock(FlashcardRepository.class);
+        FlashcardDeckItemRepository items = mock(FlashcardDeckItemRepository.class);
+        UUID userId = UUID.randomUUID();
+        FlashcardDeck deck = FlashcardDeck.create(userId, "Deck", null);
+        Flashcard card = Flashcard.create(userId, FlashcardSourceType.MANUAL, null, null, null, "front", "back");
+        when(decks.findByIdAndUserId(deck.getId(), userId)).thenReturn(Optional.of(deck));
+        when(cards.findByIdAndUserId(card.getId(), userId)).thenReturn(Optional.of(card));
+
+        new AddFlashcardToDeckUseCase(decks, cards, items).execute(userId, deck.getId(), card.getId(), 1);
+
+        verify(items).add(deck.getId(), card.getId(), 1);
+    }
+
+    @Test
+    void deletingADeckThatIsNotTheUsersIsNotFound() {
+        FlashcardDeckRepository decks = mock(FlashcardDeckRepository.class);
+        FlashcardDeckItemRepository items = mock(FlashcardDeckItemRepository.class);
+        FlashcardImageStorage storage = mock(FlashcardImageStorage.class);
+        var imageUsage = mock(com.ieltspath.library.application.service.FlashcardImageUsageService.class);
+        var tx = mock(org.springframework.transaction.support.TransactionTemplate.class);
+        UUID userId = UUID.randomUUID();
+        UUID deckId = UUID.randomUUID();
+        when(decks.findByIdAndUserId(deckId, userId)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> new DeleteFlashcardDeckUseCase(decks, items, storage, imageUsage, tx).execute(userId, deckId));
+        verify(decks, never()).save(any());
+        verifyNoInteractions(items, storage, tx);
+    }
 }

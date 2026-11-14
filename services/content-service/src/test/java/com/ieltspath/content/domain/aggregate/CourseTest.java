@@ -106,4 +106,40 @@ class CourseTest {
         }
         assertThat(Course.create("BLANK", "Blank", new BigDecimal("5.5"), " ", null).getCoverImageUrl()).isNull();
     }
+
+    @Test
+    void codeAndNameAreLimitedTo100And255Characters() {
+        Course longest = Course.create("C".repeat(100), "N".repeat(255), new BigDecimal("5.0"));
+        assertThat(longest.getCode()).hasSize(100);
+        assertThat(longest.getName()).hasSize(255);
+        assertThatThrownBy(() -> Course.create("C".repeat(101), "Name", new BigDecimal("5.0")))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("code exceeds 100 characters");
+        assertThatThrownBy(() -> Course.create("CODE", "N".repeat(256), new BigDecimal("5.0")))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("name exceeds 255 characters");
+    }
+
+    @Test
+    void theLowestAndHighestBandLevelsAreAccepted() {
+        assertThat(Course.create("IELTS_0", "Zero", new BigDecimal("0.0")).getBandLevel()).isEqualByComparingTo("0.0");
+        assertThat(Course.create("IELTS_9", "Nine", new BigDecimal("9.0")).getBandLevel()).isEqualByComparingTo("9.0");
+    }
+
+    @Test
+    void aComboPriceLiesBetweenTheHighestSkillPriceAndTheirSum() {
+        Map<Skill, Integer> prices = Map.of(Skill.READING, 40, Skill.LISTENING, 60);
+        assertThatThrownBy(() -> Course.create("P1", "Priced", new BigDecimal("6.0"), null, null, prices, 50, false))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("combo unlock price must be at least the highest skill price");
+        assertThatThrownBy(() -> Course.create("P2", "Priced", new BigDecimal("6.0"), null, null, prices, 120, false))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("combo unlock price must not exceed the sum of skill prices");
+        assertThatThrownBy(() -> Course.create("P3", "Priced", new BigDecimal("6.0"), null, null,
+                Map.of(Skill.READING, 0), null, false))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("skill unlock prices must be positive integers");
+        assertThat(Course.create("P4", "Priced", new BigDecimal("6.0"), null, null, prices, 60, false)
+                .getComboUnlockPoints()).isEqualTo(60);
+        assertThat(Course.create("P5", "Priced", new BigDecimal("6.0"), null, null, prices, 100, false)
+                .getComboUnlockPoints()).isEqualTo(100);
+    }
 }
