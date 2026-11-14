@@ -73,4 +73,41 @@ class SubscriptionTest {
         assertThat(sub.isActive()).isFalse();
         assertThat(sub.getCancelledAt()).isNotNull();
     }
+
+    @Test
+    @DisplayName("A cancelled subscription cannot use a credit")
+    void shouldRefuseCreditOnCancelledSubscription() {
+        Subscription sub = Subscription.create(UUID.randomUUID(), UUID.randomUUID(), SubscriptionSourceType.ACTIVATION_KEY, UUID.randomUUID(), 30, 4);
+        sub.cancel();
+
+        assertThatThrownBy(sub::consumeHumanGradingCredit)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Cannot consume credit on inactive subscription");
+        assertThat(sub.getRemainingCredits()).isEqualTo(4);
+    }
+
+    @Test
+    @DisplayName("Extending an ended subscription counts from now")
+    void shouldExtendEndedSubscriptionFromNow() {
+        Instant now = Instant.now();
+        Subscription sub = new Subscription(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), SubscriptionStatus.ACTIVE,
+                now.minus(35, ChronoUnit.DAYS), now.minus(5, ChronoUnit.DAYS), SubscriptionSourceType.ACTIVATION_KEY,
+                UUID.randomUUID(), 0, 0, null, 0, null, null);
+
+        sub.extend(30, 0);
+
+        assertThat(sub.getEndsAt()).isAfter(now.plus(29, ChronoUnit.DAYS)).isBefore(now.plus(31, ChronoUnit.DAYS));
+        assertThat(sub.isActive()).isTrue();
+    }
+
+    @Test
+    @DisplayName("A credit cannot be refunded when none was used")
+    void shouldRefuseRefundWithoutUsedCredit() {
+        Subscription sub = Subscription.create(UUID.randomUUID(), UUID.randomUUID(), SubscriptionSourceType.ACTIVATION_KEY, UUID.randomUUID(), 30, 2);
+
+        assertThatThrownBy(sub::refundHumanGradingCredit)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("No consumed human grading credit to refund");
+        assertThat(sub.getHumanGradingCreditsUsed()).isZero();
+    }
 }

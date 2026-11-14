@@ -83,4 +83,12 @@ class PointWalletTest {
         assertThatThrownBy(() -> wallet.debit(0)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> wallet.debit(-5)).isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    @DisplayName("Should refuse a wallet read back with a negative balance")
+    void shouldRejectNegativeStoredBalance() {
+        assertThatThrownBy(() -> new PointWallet(UUID.randomUUID(), -1, 0, 1, 0, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Wallet balance cannot be negative");
+    }
 }

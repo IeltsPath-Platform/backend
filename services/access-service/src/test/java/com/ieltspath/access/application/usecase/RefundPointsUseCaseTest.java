@@ -56,4 +56,22 @@ class RefundPointsUseCaseTest {
         verify(pointWalletRepository).save(wallet);
         verify(pointLedgerRepository).save(any(PointLedgerEntry.class));
     }
+
+    @Test
+    @DisplayName("A repeated refund with the same key returns the stored entry without crediting again")
+    void shouldReplayRefundWithSameKey() {
+        UUID userId = UUID.randomUUID();
+        UUID refId = UUID.randomUUID();
+        PointLedgerEntry existing = new PointLedgerEntry(UUID.randomUUID(), userId, 10, 40,
+                PointTransactionType.AI_GRADING_REFUND, "GRADING_JOB", refId, "idem-ref", "Refund failed grading job", Instant.now());
+        when(pointLedgerRepository.findByIdempotencyKey("idem-ref")).thenReturn(Optional.of(existing));
+
+        PointLedgerResult result = refundPointsUseCase.execute(new RefundPointsCommand(
+                userId, 10, "GRADING_JOB", refId, "idem-ref", "Refund failed grading job"));
+
+        assertThat(result.id()).isEqualTo(existing.getId());
+        assertThat(result.balanceAfter()).isEqualTo(40);
+        verifyNoInteractions(pointWalletRepository);
+        verify(pointLedgerRepository, never()).save(any());
+    }
 }

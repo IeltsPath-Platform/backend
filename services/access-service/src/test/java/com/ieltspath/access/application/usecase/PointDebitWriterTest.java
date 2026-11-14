@@ -83,4 +83,37 @@ class PointDebitWriterTest {
                 .isInstanceOf(InsufficientPointsException.class);
         verifyNoInteractions(pointLedgerRepository);
     }
+
+    @Test
+    @DisplayName("Heart refills and streak freezes keep their own ledger types")
+    void shouldRecordHeartRefillAndStreakFreezeTypes() {
+        UUID userId = UUID.randomUUID();
+        PointWallet wallet = new PointWallet(userId, 50, 50, 0, 0, Instant.now());
+        when(pointWalletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
+        when(pointLedgerRepository.save(any(PointLedgerEntry.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        PointLedgerResult heart = pointDebitWriter.debit(new DebitPointsCommand(
+                userId, userId, 5, "HEART_REFILL", UUID.randomUUID(), "idem-heart", "Heart refill"));
+        PointLedgerResult freeze = pointDebitWriter.debit(new DebitPointsCommand(
+                userId, userId, 10, "STREAK_FREEZE", UUID.randomUUID(), "idem-freeze", "Streak freeze"));
+
+        assertThat(heart.transactionType()).isEqualTo(PointTransactionType.HEART_REFILL_DEBIT);
+        assertThat(freeze.transactionType()).isEqualTo(PointTransactionType.STREAK_FREEZE_DEBIT);
+        assertThat(freeze.balanceAfter()).isEqualTo(35);
+    }
+
+    @Test
+    @DisplayName("A debit equal to the balance leaves the wallet at zero")
+    void shouldDebitWholeBalance() {
+        UUID userId = UUID.randomUUID();
+        PointWallet wallet = new PointWallet(userId, 10, 10, 0, 0, Instant.now());
+        when(pointWalletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
+        when(pointLedgerRepository.save(any(PointLedgerEntry.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        PointLedgerResult result = pointDebitWriter.debit(new DebitPointsCommand(
+                userId, userId, 10, "GRADING_JOB", UUID.randomUUID(), "idem-all", "AI grading"));
+
+        assertThat(result.delta()).isEqualTo(-10);
+        assertThat(result.balanceAfter()).isZero();
+    }
 }
