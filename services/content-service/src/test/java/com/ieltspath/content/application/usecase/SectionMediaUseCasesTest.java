@@ -142,4 +142,36 @@ class SectionMediaUseCasesTest {
                 () -> useCase.clearPassage(unknownPackage, draft.getId(), section.getId()));
         verifyNoInteractions(writer);
     }
+
+    @Test
+    void theLongestPassageAndTheShortestAndLongestAudioAreAccepted() {
+        when(writer.setAudio(any(), anyString(), anyInt(), any())).thenReturn(UUID.randomUUID());
+        useCase.setPassage(pkg.getId(), draft.getId(), section.getId(), "x".repeat(50_000));
+        verify(writer).setPassage(section.getId(), "x".repeat(50_000));
+        useCase.setAudio(pkg.getId(), draft.getId(), section.getId(), "listening/demo/ls1.mp3", 1, null);
+        useCase.setAudio(pkg.getId(), draft.getId(), section.getId(), "listening/demo/ls1.mp3", 7200, null);
+        verify(writer).setAudio(section.getId(), "listening/demo/ls1.mp3", 1, null);
+        verify(writer).setAudio(section.getId(), "listening/demo/ls1.mp3", 7200, null);
+    }
+
+    @Test
+    void aTranscriptHasAtMostFiftyThousandCharacters() {
+        when(writer.setAudio(any(), anyString(), anyInt(), any())).thenReturn(UUID.randomUUID());
+        AuthorPackageExtras.Audio longest = useCase.setAudio(pkg.getId(), draft.getId(), section.getId(),
+                "listening/demo/ls1.mp3", 45, "t".repeat(50_000));
+        assertEquals(50_000, longest.transcript().length());
+        IllegalArgumentException tooLong = assertThrows(IllegalArgumentException.class, () -> useCase.setAudio(pkg.getId(),
+                draft.getId(), section.getId(), "listening/demo/ls1.mp3", 45, "t".repeat(50_001)));
+        assertEquals("transcript must not exceed 50000 characters", tooLong.getMessage());
+    }
+
+    @Test
+    void anAudioKeyIsStoredEvenBeforeAMediaBaseUrlIsConfigured() {
+        when(writer.setAudio(any(), anyString(), anyInt(), any())).thenReturn(UUID.randomUUID());
+        AuthorPackageExtras.Audio audio = new SectionMediaUseCases(packages, writer, new MediaReferencePolicy(""))
+                .setAudio(pkg.getId(), draft.getId(), section.getId(), "listening/demo/ls1.mp3", 45, "words");
+        assertNull(audio.mediaUrl());
+        assertEquals("listening/demo/ls1.mp3", audio.mediaReference());
+        verify(writer).setAudio(section.getId(), "listening/demo/ls1.mp3", 45, "words");
+    }
 }

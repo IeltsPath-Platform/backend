@@ -1,5 +1,6 @@
 package com.ieltspath.content.application.usecase;
 
+import com.ieltspath.content.domain.exception.QuestionVersionStateException;
 import com.ieltspath.content.application.port.QuestionVersionUsageLookup;
 import com.ieltspath.content.domain.aggregate.Question;
 import com.ieltspath.content.domain.entity.QuestionVersion;
@@ -56,5 +57,21 @@ class ArchiveQuestionVersionUseCaseTest {
         question.addVersion(version);
         question.publishVersion(version.getId());
         return question;
+    }
+
+    @Test
+    void aDraftVersionCannotBeArchived() {
+        Question question = Question.create(QuestionType.MULTIPLE_CHOICE, Skill.READING, null);
+        QuestionVersion draft = QuestionVersion.create(question.getId(), 1, "Stem",
+                List.of(new QuestionOptionPayload("A", "One", 1)), "{\"type\":\"CHOICE\",\"correct\":\"A\"}", null,
+                QuestionDifficulty.MEDIUM);
+        question.addVersion(draft);
+        when(questions.findByIdForUpdate(question.getId())).thenReturn(Optional.of(question));
+
+        assertThatThrownBy(() -> useCase.execute(question.getId(), draft.getId()))
+                .isInstanceOf(QuestionVersionStateException.class)
+                .hasMessage("Only published question versions can be archived");
+        assertThat(draft.getStatus()).isEqualTo(PublicationStatus.DRAFT);
+        org.mockito.Mockito.verifyNoInteractions(usage);
     }
 }
