@@ -176,6 +176,37 @@ class FreeWritingIntegrationTest {
         verify(llm, times(1)).completeJson(any(), any());
     }
 
+    /** The question's knowledge points are judged and shown, but a free essay never counts toward mastery. */
+    @Test
+    void theQuestionPointsAreJudgedAndShownButWriteNoMasteryEvidence() {
+        UUID point = UUID.randomUUID();
+        UUID version = UUID.randomUUID();
+        when(content.getPackageVersion(version)).thenReturn(new PackageVersion(version, UUID.randomUUID(),
+                "PRACTICE_TEST", null, Map.of(), List.of(new Section(UUID.randomUUID(), "Task 1", "WRITING", null, 1,
+                null, List.of(new Item(ESSAY, 1, "The line graph below shows device ownership.", null,
+                Map.of("type", "ESSAY", "task", "TASK_1", "minWords", 150, "passBand", 5.5,
+                        "chartFacts", "Mobile phone: 1995 5%, 2015 95%."), "Model essay", BigDecimal.ONE,
+                List.of(new LearningContentClient.KnowledgePointMapping(point, BigDecimal.ONE))))))));
+        when(content.getTopicSequence()).thenReturn(List.of(new LearningContentClient.Topic(UUID.randomUUID(), "W",
+                "Writing", 1, null, List.of(new LearningContentClient.KnowledgePoint(point, "DEMO_READING_W1_CHART",
+                "Describe a chart", "PROCEDURE", "WRITING", "Overview and figures", true)), null, false, null, null)));
+        when(llm.completeJson(any(), any())).thenReturn(grade("6.0").replace("\"summary\":\"ok\"",
+                "\"summary\":\"ok\",\"judgments\":[{\"code\":\"DEMO_READING_W1_CHART\",\"judgment\":\"PASS\","
+                        + "\"excerpt\":\"mobile phones became the most common device\",\"reason\":\"Có số liệu.\"}]"));
+        long before = jdbc.queryForObject("SELECT count(*) FROM kp_evidence", Long.class);
+
+        var essay = submitFree.execute(USER, version, ESSAY, UUID.randomUUID(), TEXT);
+
+        assertEquals("GRADED", essay.status());
+        assertEquals("kpj3", essay.grade().judgmentVersion());
+        var judgment = essay.grade().taskKnowledgePointJudgments().getFirst();
+        assertEquals(point, judgment.knowledgePointId());
+        assertEquals("PASS", judgment.judgment().name());
+        var stored = getSubmission.execute(USER, essay.submissionId());
+        assertEquals(1, stored.grade().taskKnowledgePointJudgments().size());
+        assertEquals(before, jdbc.queryForObject("SELECT count(*) FROM kp_evidence", Long.class));
+    }
+
     private static LearningContentClient.Rubric rubric(String task) {
         var descriptor = new LearningContentClient.RubricBandDescriptor(new BigDecimal("6.0"), "Band six.");
         var criteria = (task.equals("TASK_1") ? List.of("TA", "CC", "LR", "GRA") : List.of("TR", "CC", "LR", "GRA"))

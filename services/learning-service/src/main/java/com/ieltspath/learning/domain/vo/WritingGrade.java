@@ -8,12 +8,24 @@ import java.util.UUID;
 public record WritingGrade(List<Criterion> criteria, List<Correction> corrections, String summary,
                            BigDecimal overallBand, List<StudyPoint> studyPoints, String judgmentVersion, String model,
                            List<AppliedBandLimit> bandLimits, List<Priority> priorities,
-                           List<ErrorExample> errorExamples, Task1Checks task1Checks, Task2Checks task2Checks) {
+                           List<ErrorExample> errorExamples, Task1Checks task1Checks, Task2Checks task2Checks,
+                           List<KnowledgeJudgment> taskKnowledgePointJudgments) {
     public WritingGrade {
+        taskKnowledgePointJudgments = taskKnowledgePointJudgments == null
+                ? List.of() : List.copyOf(taskKnowledgePointJudgments);
         studyPoints = studyPoints == null ? List.of() : List.copyOf(studyPoints);
         bandLimits = bandLimits == null ? List.of() : List.copyOf(bandLimits);
         priorities = priorities == null ? List.of() : List.copyOf(priorities);
         errorExamples = errorExamples == null ? List.of() : List.copyOf(errorExamples);
+    }
+
+    /** Grades stored before the question's knowledge points were judged read with no such judgments. */
+    public WritingGrade(List<Criterion> criteria, List<Correction> corrections, String summary, BigDecimal overallBand,
+                        List<StudyPoint> studyPoints, String judgmentVersion, String model,
+                        List<AppliedBandLimit> bandLimits, List<Priority> priorities,
+                        List<ErrorExample> errorExamples, Task1Checks task1Checks, Task2Checks task2Checks) {
+        this(criteria, corrections, summary, overallBand, studyPoints, judgmentVersion, model, bandLimits, priorities,
+                errorExamples, task1Checks, task2Checks, List.of());
     }
 
     /** Grades stored before the task checks existed read with none; only the second prompt template returns them. */
@@ -54,25 +66,32 @@ public record WritingGrade(List<Criterion> criteria, List<Correction> correction
 
     public WritingGrade withModel(String model) {
         return new WritingGrade(criteria, corrections, summary, overallBand, studyPoints, judgmentVersion, model,
-                bandLimits, priorities, errorExamples, task1Checks, task2Checks);
+                bandLimits, priorities, errorExamples, task1Checks, task2Checks, taskKnowledgePointJudgments);
     }
 
     /** The same grade with the details only the second prompt template returns. */
     public WritingGrade withDetails(List<Priority> priorities, List<ErrorExample> errorExamples) {
         return new WritingGrade(criteria, corrections, summary, overallBand, studyPoints, judgmentVersion, model,
-                bandLimits, priorities, errorExamples, task1Checks, task2Checks);
+                bandLimits, priorities, errorExamples, task1Checks, task2Checks, taskKnowledgePointJudgments);
     }
 
     /** The same grade with other criteria, for example after their bands or next bands changed. */
     public WritingGrade withCriteria(List<Criterion> criteria) {
         return new WritingGrade(criteria, corrections, summary, overallBand, studyPoints, judgmentVersion, model,
-                bandLimits, priorities, errorExamples, task1Checks, task2Checks);
+                bandLimits, priorities, errorExamples, task1Checks, task2Checks, taskKnowledgePointJudgments);
     }
 
     /** The same grade with the whole-essay checks of its task; the other task's checks stay null. */
     public WritingGrade withChecks(Task1Checks task1Checks, Task2Checks task2Checks) {
         return new WritingGrade(criteria, corrections, summary, overallBand, studyPoints, judgmentVersion, model,
-                bandLimits, priorities, errorExamples, task1Checks, task2Checks);
+                bandLimits, priorities, errorExamples, task1Checks, task2Checks, taskKnowledgePointJudgments);
+    }
+
+    /** The same grade with the judgments of the question's own knowledge points. */
+    public WritingGrade withTaskKnowledgePointJudgments(List<KnowledgeJudgment> judgments, List<StudyPoint> studyPoints,
+                                                         String judgmentVersion) {
+        return new WritingGrade(criteria, corrections, summary, overallBand, studyPoints, judgmentVersion, model,
+                bandLimits, priorities, errorExamples, task1Checks, task2Checks, judgments);
     }
 
     /** One sentence of a Task 1 essay checked against the chart; {@code expected} is set only for WRONG. */

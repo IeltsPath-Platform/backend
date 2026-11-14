@@ -2,7 +2,7 @@
 
 The template is chosen with REPLAY_TEMPLATE (v2 by default, or v3). The prompt follows EssayGrader: the rubric's system
 prompt comes before its criteria, error codes are listed only for the submission's task and show their model definition
-when they have one, and the knowledge-point extension is appended when the rubric has sub-points. Saves the raw reply
+when they have one, and the knowledge-point extension is appended when the question has knowledge points (at most four, by code or id). Saves the raw reply
 and checks it the way EssayGrader.parse decides INVALID_GRADE. Never prints the API key.
 Usage: [REPLAY_TEMPLATE=v3] replay_writing_grade.py <submission-id-prefix> [model-override]
 """
@@ -37,19 +37,22 @@ def db(name, password_key):
 
 
 prefix = sys.argv[1]
+# The question knowledge points of the workbook essays (E01 is the prompt of PT-WRITING-07, part 1).
+SHEET_POINTS = {"E01": ["DEMO_READING_W1_CHART", "DEMO_WRITING_TREND_LANGUAGE"]}
 if prefix.startswith("sheet:"):
     # A test essay from the Bai_test sheet of the grading log workbook (for example sheet:E01), no submission needed.
     import openpyxl
     workbook = openpyxl.load_workbook(next(OUT.parent.glob("llm-writing-grading-prompt-iteration-log-*.xlsx")), data_only=True)
     row = next(r for r in workbook["Bai_test"].iter_rows(min_row=4, values_only=True) if r[0] == prefix[6:])
     sid, essay = prefix, row[5]
-    snap = {"task": row[1], "stem": row[3], "minWords": 150 if row[1] == "TASK_1" else 250, "chartFacts": row[4]}
+    snap = {"task": row[1], "stem": row[3], "minWords": 150 if row[1] == "TASK_1" else 250, "chartFacts": row[4],
+            "kpCodes": SHEET_POINTS.get(prefix[6:], [])}
 elif prefix.startswith("file:"):
     # A calibration essay kept as JSON (task, stem, chartFacts, essay), for essays that are not in the workbook.
     item = json.loads(Path(prefix[5:]).read_text(encoding="utf-8"))
     sid, essay = Path(prefix[5:]).stem, item["essay"]
     snap = {"task": item["task"], "stem": item["stem"], "minWords": 150 if item["task"] == "TASK_1" else 250,
-            "chartFacts": item.get("chartFacts")}
+            "chartFacts": item.get("chartFacts"), "kpCodes": item.get("knowledgePointCodes", [])}
     prefix = "file-" + sid
 else:
     learning = db("learning_db", "LEARNING_DB_PASSWORD")
@@ -71,16 +74,14 @@ for cid, code, name, description in criteria:
     bands = content.run("SELECT band, descriptor FROM rubric_band_descriptors WHERE criterion_id = :c ORDER BY band", c=cid)
     lines = [f"  Band {format(b.normalize(), 'f')}: {d}" for b, d in bands]
     criterion_text.append(f"{code} ({name}): {description}" + ("\n" + "\n".join(lines) if lines else ""))
-subs = content.run("""SELECT s.criterion_code, kp.code, kp.name, kp.description
-    FROM writing_criterion_sub_knowledge_points s JOIN knowledge_points kp ON kp.id = s.knowledge_point_id
-    JOIN topics t ON t.id = kp.topic_id JOIN courses c ON c.id = t.course_id
-    WHERE s.task = :task AND kp.status = 'ACTIVE' AND kp.skill = 'WRITING' AND t.status = 'ACTIVE' AND c.status = 'ACTIVE'
-    ORDER BY s.criterion_code, s.sort_order""", task=snap.get("task"))
-kp_blocks = []
-for _, code, name, _description in criteria:
-    entries = [f"- {k} \u2014 {n or k}" + (f": {d}" if d and d.strip() else "") for cc, k, n, d in subs if cc == code]
-    if entries:
-        kp_blocks.append(f"{code} ({name}):\n" + "\n".join(entries))
+# The judgments block holds only the knowledge points of the question, at most four, as EssayKnowledgeJudge does.
+if snap.get("kpCodes"):
+    points = content.run("SELECT code, name, description FROM knowledge_points WHERE code = ANY(:codes) AND status = 'ACTIVE'",
+                         codes=snap["kpCodes"])
+else:
+    points = content.run("SELECT code, name, description FROM knowledge_points WHERE id = ANY(:ids) AND status = 'ACTIVE'",
+                         ids=[__import__("uuid").UUID(i) for i in snap.get("knowledgePointIds") or []])
+kp_lines = [f"- {k} \u2014 {n or k}" + (f": {d}" if d and d.strip() else "") for k, n, d in points][:4]
 errors = content.run("SELECT code, name, fix_hint, model_definition, writing_tasks FROM error_types "
                      "WHERE status = 'ACTIVE' AND 'WRITING' = ANY(skills) ORDER BY code")
 content.close()
@@ -99,11 +100,10 @@ if rubric_system and rubric_system.strip():
     criteria_block = rubric_system.strip() + "\n\n" + criteria_block
 system = (template.replace("{{task}}", "Academic Writing Task 1" if task_one else "Writing Task 2")
           .replace("{{criteria}}", criteria_block).replace("{{error_codes}}", error_codes or "(none)"))
-if kp_blocks:
-    kp_file = "essay-kp-judgment-v3.txt" if TEMPLATE == "v3" else "essay-kp-judgment-v2.txt"
-    kp_template = (BACKEND / "services/learning-service/src/main/resources" / kp_file).read_text(encoding="utf-8")
+if kp_lines:
+    kp_template = (BACKEND / "services/learning-service/src/main/resources/essay-kp-judgment-v3.txt").read_text(encoding="utf-8")
     kp_template = re.sub(r"\A(?:#[^\r\n]*\r?\n)+\s*", "", kp_template)
-    system += "\n\n" + kp_template.replace("{{knowledge_points}}", "\n".join(kp_blocks))
+    system += "\n\n" + kp_template.replace("{{knowledge_points}}", "\n".join(kp_lines))
 user = (f"Question:\n{snap.get('stem') or ''}\n\nMinimum words: {snap.get('minWords') or ''}\n"
         f"Word count of the essay: {len(essay.split())}\n\n")
 if task_one:
@@ -119,7 +119,7 @@ request = urllib.request.Request(env("LEARNING_LLM_BASE_URL").rstrip("/") + "/ch
                                  data=json.dumps(body).encode(),
                                  headers={"Authorization": "Bearer " + env("LEARNING_LLM_API_KEY"),
                                           "Content-Type": "application/json"})
-print(f"submission {sid} template={TEMPLATE} task1={task_one} model={model} system_chars={len(system)} user_chars={len(user)} kp_criteria={len(kp_blocks)}")
+print(f"submission {sid} template={TEMPLATE} task1={task_one} model={model} system_chars={len(system)} user_chars={len(user)} question_points={len(kp_lines)}")
 started = time.time()
 try:
     with urllib.request.urlopen(request, timeout=120) as response:

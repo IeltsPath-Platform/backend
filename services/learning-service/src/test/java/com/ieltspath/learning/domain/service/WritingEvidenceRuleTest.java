@@ -228,4 +228,75 @@ class WritingEvidenceRuleTest {
         assertNull(WritingEvidenceRule.dominantErrorCode(grade(List.of(), List.of())));
         assertNull(WritingEvidenceRule.dominantErrorCode(grade(List.of(), List.of(correction(null)))));
     }
+
+    private static WritingGrade withTaskJudgments(WritingGrade grade, WritingGrade.KnowledgeJudgment... judgments) {
+        return grade.withTaskKnowledgePointJudgments(List.of(judgments), grade.studyPoints(), "kpj3");
+    }
+
+    private static WritingGrade.KnowledgeJudgment taskJudgment(UUID point, WritingGrade.Judgment value) {
+        return new WritingGrade.KnowledgeJudgment(point, "TASK", "Task point", value, "excerpt", "reason");
+    }
+
+    @Test
+    void aPassedQuestionPointIsCorrectEvenWhenTheEssayFailed() {
+        var grade = withTaskJudgments(grade(List.of(), List.of()), taskJudgment(QUESTION_KP, WritingGrade.Judgment.PASS));
+
+        assertTrue(rule.derive(List.of(QUESTION_KP), PASS, false, grade).correctByKnowledgePoint().get(QUESTION_KP));
+    }
+
+    @Test
+    void aFailedQuestionPointIsWrongEvenWhenTheEssayPassed() {
+        var grade = withTaskJudgments(grade(List.of(), List.of()), taskJudgment(QUESTION_KP, WritingGrade.Judgment.FAIL));
+
+        assertFalse(rule.derive(List.of(QUESTION_KP), PASS, true, grade).correctByKnowledgePoint().get(QUESTION_KP));
+    }
+
+    @Test
+    void aQuestionPointTheModelDidNotAssessTakesTheEssayResult() {
+        var grade = withTaskJudgments(grade(List.of(), List.of()),
+                taskJudgment(QUESTION_KP, WritingGrade.Judgment.NOT_ASSESSED));
+
+        assertTrue(rule.derive(List.of(QUESTION_KP), PASS, true, grade).correctByKnowledgePoint().get(QUESTION_KP));
+        assertFalse(rule.derive(List.of(QUESTION_KP), PASS, false, grade).correctByKnowledgePoint().get(QUESTION_KP));
+    }
+
+    @Test
+    void aQuestionPointThatWasNotPutToTheModelTakesTheEssayResult() {
+        UUID notAsked = UUID.randomUUID();
+        var grade = withTaskJudgments(grade(List.of(), List.of()), taskJudgment(QUESTION_KP, WritingGrade.Judgment.PASS));
+
+        var outcome = rule.derive(List.of(QUESTION_KP, notAsked), PASS, false, grade);
+
+        assertTrue(outcome.correctByKnowledgePoint().get(QUESTION_KP));
+        assertFalse(outcome.correctByKnowledgePoint().get(notAsked));
+    }
+
+    @Test
+    void aCriterionPointWinsOverAJudgmentOfTheSamePoint() {
+        var grade = withTaskJudgments(grade(List.of(criterion("CC", "5.0", CC)), List.of()),
+                taskJudgment(CC, WritingGrade.Judgment.PASS));
+
+        var outcome = rule.derive(List.of(CC), PASS, true, grade);
+
+        assertFalse(outcome.correctByKnowledgePoint().get(CC), "band 5.0 is below the pass band");
+    }
+
+    @Test
+    void aQuestionPointJudgmentIsNotACriterionResult() {
+        var grade = withTaskJudgments(grade(List.of(), List.of()), taskJudgment(QUESTION_KP, WritingGrade.Judgment.FAIL));
+
+        assertTrue(rule.derive(List.of(QUESTION_KP), PASS, true, grade).criterionKnowledgePoints().isEmpty());
+    }
+
+    @Test
+    void aGradeOfTheOlderKindStillDecidesItsSubPointsByCriterion() {
+        UUID subPoint = UUID.randomUUID();
+        var cc = criterion("CC", "6.0", CC).withKnowledgePointJudgments(
+                List.of(judgment(subPoint, WritingGrade.Judgment.FAIL)));
+
+        var outcome = rule.derive(List.of(QUESTION_KP), PASS, true, grade(List.of(cc), List.of()));
+
+        assertFalse(outcome.correctByKnowledgePoint().get(subPoint));
+        assertTrue(outcome.criterionKnowledgePoints().contains(subPoint));
+    }
 }

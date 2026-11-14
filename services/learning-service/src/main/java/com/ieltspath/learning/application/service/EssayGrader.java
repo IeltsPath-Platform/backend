@@ -134,9 +134,11 @@ public class EssayGrader {
                 criterionPoints.putIfAbsent(criterion.code(), criterion.knowledgePointId());
             }
         }
-        String system = systemPrompt(task, rubric, taskErrorTypes, templateVersion);
-        String user = userPrompt(task, prompt, essay);
         Supplier<Map<UUID, LearningContentClient.KnowledgePoint>> catalog = memoized(this::knowledgePointCatalog);
+        // Only the question's own knowledge points are put to the model; with none, the prompt has no judgments block.
+        List<EssayKnowledgeJudge.TaskPoint> taskPoints = EssayKnowledgeJudge.taskPoints(prompt, catalog);
+        String system = systemPrompt(task, rubric, taskErrorTypes, templateVersion, taskPoints);
+        String user = userPrompt(task, prompt, essay);
         JsonNode root;
         try {
             root = readObject(llm.completeJson(system, user));
@@ -149,8 +151,7 @@ public class EssayGrader {
         WritingGrade grade = applyBandCaps(parsed, task, essay, prompt.minWords(), settings);
         WritingGrade withCriteria = withNextBands(withCriterionStudyPoints(grade, rubric, prompt.passBand(), catalog),
                 rubric);
-        WritingGrade judged = knowledgeJudge.judge(task, essay, withCriteria, rubric.criteria(), allowedCodes,
-                root.path("judgments"), catalog, TEMPLATE_VERSION_3.equals(templateVersion));
+        WritingGrade judged = knowledgeJudge.judge(essay, withCriteria, taskPoints, allowedCodes, root.path("judgments"));
         return new GradedEssay(judged.withModel(model), promptVersion);
     }
 
@@ -189,6 +190,11 @@ public class EssayGrader {
     }
 
     static String systemPrompt(WritingTask task, Rubric rubric, List<ErrorType> errorTypes, String templateVersion) {
+        return systemPrompt(task, rubric, errorTypes, templateVersion, List.of());
+    }
+
+    static String systemPrompt(WritingTask task, Rubric rubric, List<ErrorType> errorTypes, String templateVersion,
+                               List<EssayKnowledgeJudge.TaskPoint> taskPoints) {
         String criterionText = rubric.criteria().stream().sorted(Comparator.comparingInt(RubricCriterion::sortOrder))
                 .map(EssayGrader::renderCriterion).collect(Collectors.joining("\n\n"));
         // The rubric's own instructions (how to choose a band) come before its criteria when Content has them.
@@ -204,7 +210,7 @@ public class EssayGrader {
         return template.replace("{{task}}", taskName)
                 .replace("{{criteria}}", criterionText)
                 .replace("{{error_codes}}", errorCodes.isBlank() ? "(none)" : errorCodes)
-                + EssayKnowledgeJudge.prompt(task, rubric.criteria(), TEMPLATE_VERSION_3.equals(templateVersion));
+                + EssayKnowledgeJudge.prompt(taskPoints);
     }
 
     private static String templateOf(String version) {

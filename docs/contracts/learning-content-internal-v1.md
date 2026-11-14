@@ -433,7 +433,7 @@ The internal prompt projection is available to service callers using their forwa
 Each internal criterion also carries `knowledgePointId` (UUID, nullable, added 2026-10-21): the knowledge point that the
 criterion is evidence for, from `writing_criterion_knowledge_points` keyed by task and criterion code
 (`V69__writing_criterion_knowledge_points.sql`). It does not depend on the rubric version. The additive
-`subKnowledgePoints` field is an ordered array of `{id,code,name,description}` entries from
+`subKnowledgePoints` field (no longer read by the essay grader since 2026-11-13, which judges the question's own knowledge points; kept for grades stored as `kpj2`) is an ordered array of `{id,code,name,description}` entries from
 `writing_criterion_sub_knowledge_points` (`V71__writing_criterion_sub_knowledge_points.sql`), filtered to active
 knowledge points; it is `[]` when the criterion has none. For example, Task 2's CC criterion returns
 `[{"id":"…","code":"DEMO_WRITING_TOPIC_SENTENCE","name":"…","description":"…"},{"id":"…","code":"DEMO_WRITING_LINKING","name":"…","description":"…"}]`.

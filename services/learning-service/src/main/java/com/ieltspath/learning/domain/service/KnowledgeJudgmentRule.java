@@ -20,12 +20,25 @@ public final class KnowledgeJudgmentRule {
     /** A validated correction whose error type is tied to a knowledge point. */
     public record CorrectionEvidence(UUID knowledgePointId, String excerpt, String reason) {}
 
+    /** Judges points grouped by rubric criterion: an entry counts only under the criterion it names. */
     public List<WritingGrade.KnowledgeJudgment> judge(List<Candidate> candidates, List<Raw> raws, String essay,
                                                        List<CorrectionEvidence> corrections) {
+        return judge(candidates, raws, essay, corrections, true);
+    }
+
+    /** Judges the question's own points, which belong to no criterion: an entry matches by knowledge point code only. */
+    public List<WritingGrade.KnowledgeJudgment> judgeByCode(List<Candidate> candidates, List<Raw> raws, String essay,
+                                                             List<CorrectionEvidence> corrections) {
+        return judge(candidates, raws, essay, corrections, false);
+    }
+
+    private List<WritingGrade.KnowledgeJudgment> judge(List<Candidate> candidates, List<Raw> raws, String essay,
+                                                        List<CorrectionEvidence> corrections,
+                                                        boolean matchCriterion) {
         List<WritingGrade.KnowledgeJudgment> judgments = new ArrayList<>(candidates.size());
         for (Candidate candidate : candidates) {
             Raw raw = raws.stream().filter(Objects::nonNull)
-                    .filter(item -> Objects.equals(item.criterionCode(), candidate.criterionCode())
+                    .filter(item -> (!matchCriterion || Objects.equals(item.criterionCode(), candidate.criterionCode()))
                             && Objects.equals(item.code(), candidate.code()))
                     .findFirst().orElse(null);
             WritingGrade.Judgment judgment = parseJudgment(raw == null ? null : raw.judgment());
@@ -94,6 +107,32 @@ public final class KnowledgeJudgmentRule {
         }
         existing.stream().filter(point -> !WritingGrade.StudyPoint.CRITERION.equals(point.kind()))
                 .forEach(ordered::add);
+        return List.copyOf(ordered);
+    }
+
+    /**
+     * The failed judgments of the question's own points, as study points. They follow every criterion point and come
+     * before the model's own focus entries; they belong to no criterion, so they carry neither a criterion code nor a band.
+     */
+    public List<WritingGrade.StudyPoint> withTaskStudyPoints(List<WritingGrade.StudyPoint> existing,
+                                                             List<WritingGrade.KnowledgeJudgment> judgments,
+                                                             Function<WritingGrade.KnowledgeJudgment, UUID> practiceTarget) {
+        List<WritingGrade.StudyPoint> failed = judgments.stream()
+                .filter(judgment -> judgment != null && judgment.judgment() == WritingGrade.Judgment.FAIL)
+                .map(judgment -> new WritingGrade.StudyPoint(WritingGrade.StudyPoint.KNOWLEDGE_POINT, null, null,
+                        judgment.knowledgePointId(), judgment.code(), judgment.name(), judgment.name(),
+                        judgment.reason(), judgment.excerpt(), practiceTarget.apply(judgment)))
+                .toList();
+        if (failed.isEmpty()) return existing;
+        int at = existing.size();
+        for (int i = 0; i < existing.size(); i++) {
+            if (WritingGrade.StudyPoint.AI.equals(existing.get(i).kind())) {
+                at = i;
+                break;
+            }
+        }
+        List<WritingGrade.StudyPoint> ordered = new ArrayList<>(existing);
+        ordered.addAll(at, failed);
         return List.copyOf(ordered);
     }
 

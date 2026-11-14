@@ -106,4 +106,32 @@ class WritingGradeJsonTest {
                 WritingGrade.class);
         assertNull(grade.judgmentVersion());
     }
+
+    @Test
+    void theJudgmentsOfTheQuestionPointsSurviveStorage() throws Exception {
+        var judgment = new WritingGrade.KnowledgeJudgment(UUID.randomUUID(), "TOPIC", "Topic sentence",
+                WritingGrade.Judgment.FAIL, "a quote", "reason");
+        var grade = new WritingGrade(List.of(), List.of(), "Summary", new BigDecimal("6.0"), List.of(), "kpj3", null,
+                List.of(), List.of(), List.of(), null, null, List.of(judgment));
+
+        var restored = json.readValue(json.writeValueAsString(grade), WritingGrade.class);
+
+        assertEquals(List.of(judgment), restored.taskKnowledgePointJudgments());
+        assertEquals("kpj3", restored.judgmentVersion());
+    }
+
+    @Test
+    void aGradeOfTheOlderKindKeepsItsCriterionJudgmentsAndHasNoQuestionPointJudgments() throws Exception {
+        var point = UUID.randomUUID();
+        var stored = "{\"criteria\":[{\"code\":\"CC\",\"band\":6.0,\"strengths\":[],\"improvements\":[],"
+                + "\"knowledgePointJudgments\":[{\"knowledgePointId\":\"" + point + "\",\"code\":\"LINKING\","
+                + "\"name\":\"Linking\",\"judgment\":\"FAIL\",\"excerpt\":\"however\",\"reason\":\"r\"}]}],"
+                + "\"corrections\":[],\"summary\":\"x\",\"overallBand\":6.0,\"judgmentVersion\":\"kpj2\"}";
+
+        var grade = json.readValue(stored, WritingGrade.class);
+
+        assertEquals("kpj2", grade.judgmentVersion());
+        assertEquals(point, grade.criteria().getFirst().knowledgePointJudgments().getFirst().knowledgePointId());
+        assertEquals(List.of(), grade.taskKnowledgePointJudgments());
+    }
 }

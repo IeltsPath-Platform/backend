@@ -86,8 +86,6 @@ class LessonWritingIntegrationTest {
     private static final UUID CC_KP = UUID.randomUUID();
     private static final UUID LR_KP = UUID.randomUUID();
     private static final UUID GRA_KP = UUID.randomUUID();
-    private static final UUID SUB_LINK_KP = UUID.randomUUID();
-    private static final UUID SUB_TOPIC_KP = UUID.randomUUID();
     private static final String ESSAY = ("Cities should plant more trees because trees cool streets, clean the air "
             + "and make people calmer. ").repeat(4);
 
@@ -488,35 +486,64 @@ class LessonWritingIntegrationTest {
                 + "WHERE source_reference_id = ?", String.class, result.submissionId()));
     }
 
-    @Test
-    void aFailedSubKnowledgePointIsRecordedOnItsOwnAndAnUnassessedOneIsNot() {
-        when(content.getActiveRubric(anyString())).thenReturn(rubricWithSubKnowledgePoints("TASK_2"));
+    private void catalogWithTheQuestionPoint() {
+        when(content.getActiveRubric(anyString())).thenReturn(rubricWithCriterionPoints("TASK_2"));
         when(content.getTopicSequence()).thenReturn(List.of(new LearningContentClient.Topic(TOPIC, "WRITING",
-                "Writing", 900, null, List.of(kp(KP), kp(ESSAY_KP), kp(TR_KP), kp(CC_KP), kp(LR_KP),
-                new LearningContentClient.KnowledgePoint(SUB_LINK_KP, "DEMO_WRITING_LINKING", "Linking",
-                        "PROCEDURE", "WRITING", "Connect ideas", true),
-                new LearningContentClient.KnowledgePoint(SUB_TOPIC_KP, "DEMO_WRITING_TOPIC_SENTENCE", "Topic sentence",
-                        "PROCEDURE", "WRITING", "State the main idea", true)), LearningSkill.WRITING, true)));
+                "Writing", 900, null, List.of(kp(KP), kp(TR_KP), kp(CC_KP), kp(LR_KP),
+                new LearningContentClient.KnowledgePoint(ESSAY_KP, "TR_W_OPINION", "Opinion", "PROCEDURE", "WRITING",
+                        "State a clear opinion", true)), LearningSkill.WRITING, true)));
         topics.execute(USER);
-        llmReplies(gradeWithBands("7.0", "5.5", "6.5", "6.0")
-                .replace("\"focus\":[]", "\"focus\":[],\"judgments\":[{\"criterion\":\"CC\","
-                + "\"code\":\"DEMO_WRITING_LINKING\",\"judgment\":\"FAIL\","
-                + "\"excerpt\":\"because trees cool streets\",\"reason\":\"Use a linker clearly.\"}]"));
+    }
+
+    @Test
+    void aQuestionPointJudgedFailIsRecordedWrongWhateverTheEssayPassMark() {
+        catalogWithTheQuestionPoint();
+        llmReplies(gradeWithBands("7.0", "7.0", "7.0", "7.0")
+                .replace("\"focus\":[]", "\"focus\":[],\"judgments\":[{\"code\":\"TR_W_OPINION\","
+                + "\"judgment\":\"FAIL\",\"excerpt\":\"because trees cool streets\",\"reason\":\"Nêu rõ quan điểm.\"}]"));
 
         WritingSubmissionResult result = submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), ESSAY);
 
+        assertTrue(result.passed(), "the essay passes, yet the point it was judged on is wrong");
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE source = 'lesson_writing' "
-                + "AND kp_id = ? AND correct = false", Integer.class, SUB_LINK_KP));
-        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE source = 'lesson_writing' "
-                + "AND kp_id = ?", Integer.class, SUB_TOPIC_KP));
-        var subPoint = result.grade().studyPoints().stream()
+                + "AND kp_id = ? AND correct = false", Integer.class, ESSAY_KP));
+        var studyPoint = result.grade().studyPoints().stream()
                 .filter(point -> WritingGrade.StudyPoint.KNOWLEDGE_POINT.equals(point.kind())).findFirst().orElseThrow();
-        assertEquals("because trees cool streets", subPoint.excerpt());
-        assertEquals(SUB_LINK_KP, subPoint.practiceKnowledgePointId());
+        assertEquals("because trees cool streets", studyPoint.excerpt());
+        assertEquals(ESSAY_KP, studyPoint.practiceKnowledgePointId());
+        assertNull(studyPoint.criterionCode());
         var restored = getWritingSubmissionUseCase.execute(USER, result.submissionId());
-        assertEquals(result.grade().criteria().get(1).knowledgePointJudgments(),
-                restored.grade().criteria().get(1).knowledgePointJudgments());
+        assertEquals(result.grade().taskKnowledgePointJudgments(), restored.grade().taskKnowledgePointJudgments());
+        assertEquals(1, restored.grade().taskKnowledgePointJudgments().size());
         verify(llm, times(1)).completeJson(any(), any());
+    }
+
+    @Test
+    void aQuestionPointJudgedPassIsRecordedRightEvenWhenTheEssayFailed() {
+        catalogWithTheQuestionPoint();
+        llmReplies(gradeWithBands("4.0", "4.0", "4.0", "4.0")
+                .replace("\"focus\":[]", "\"focus\":[],\"judgments\":[{\"code\":\"TR_W_OPINION\","
+                + "\"judgment\":\"PASS\",\"excerpt\":\"because trees cool streets\",\"reason\":\"Có quan điểm.\"}]"));
+
+        WritingSubmissionResult result = submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), ESSAY);
+
+        assertFalse(result.passed());
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE source = 'lesson_writing' "
+                + "AND kp_id = ? AND correct = true", Integer.class, ESSAY_KP));
+    }
+
+    @Test
+    void aQuestionPointTheModelCouldNotAssessTakesTheResultOfTheWholeEssay() {
+        catalogWithTheQuestionPoint();
+        llmReplies(gradeWithBands("7.0", "7.0", "7.0", "7.0")
+                .replace("\"focus\":[]", "\"focus\":[],\"judgments\":[{\"code\":\"TR_W_OPINION\","
+                + "\"judgment\":\"NOT_ASSESSED\",\"excerpt\":\"\",\"reason\":\"Chưa đủ dữ liệu.\"}]"));
+
+        WritingSubmissionResult result = submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), ESSAY);
+
+        assertTrue(result.passed());
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE source = 'lesson_writing' "
+                + "AND kp_id = ? AND correct = true", Integer.class, ESSAY_KP));
     }
 
     @Test
@@ -601,19 +628,6 @@ class LessonWritingIntegrationTest {
         var criteria = (task.equals("TASK_1") ? List.of("TA", "CC", "LR", "GRA") : List.of("TR", "CC", "LR", "GRA"))
                 .stream().map(code -> new LearningContentClient.RubricCriterion(code, code, "Description", 1,
                         List.of(descriptor), points.get(code))).toList();
-        return new LearningContentClient.Rubric("IELTS_WRITING", task, 1, "source", criteria, List.of());
-    }
-
-    private static LearningContentClient.Rubric rubricWithSubKnowledgePoints(String task) {
-        var descriptor = new LearningContentClient.RubricBandDescriptor(new BigDecimal("6.0"), "Band six.");
-        Map<String, UUID> points = Map.of("TR", TR_KP, "CC", CC_KP, "LR", LR_KP, "GRA", GRA_KP);
-        var criteria = (task.equals("TASK_1") ? List.of("TA", "CC", "LR", "GRA") : List.of("TR", "CC", "LR", "GRA"))
-                .stream().map(code -> new LearningContentClient.RubricCriterion(code, code, "Description", 1,
-                        List.of(descriptor), points.get(code), code.equals("CC") ? List.of(
-                        new LearningContentClient.SubKnowledgePoint(SUB_TOPIC_KP, "DEMO_WRITING_TOPIC_SENTENCE",
-                                "Topic sentence", "State the main idea"),
-                        new LearningContentClient.SubKnowledgePoint(SUB_LINK_KP, "DEMO_WRITING_LINKING", "Linking",
-                                "Connect ideas")) : List.of())).toList();
         return new LearningContentClient.Rubric("IELTS_WRITING", task, 1, "source", criteria, List.of());
     }
 

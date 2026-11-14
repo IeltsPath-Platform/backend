@@ -1,64 +1,86 @@
 package com.ieltspath.learning.application.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.port.LearningContentClient.ErrorType;
 import com.ieltspath.learning.application.port.LearningContentClient.KnowledgePoint;
-import com.ieltspath.learning.application.port.LearningContentClient.RubricCriterion;
 import com.ieltspath.learning.domain.service.KnowledgeJudgmentRule;
+import com.ieltspath.learning.domain.vo.EssayPrompt;
 import com.ieltspath.learning.domain.vo.WritingGrade;
-import com.ieltspath.learning.domain.vo.WritingTask;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
-/** Validates knowledge-point judgments from the same response as the essay's band scores. */
+/**
+ * Judges the knowledge points of the question itself, in the same response as the essay's band scores. The model is
+ * asked about no other points. A question without knowledge points gets no judgments block and no judgment version.
+ */
 @Component
 public class EssayKnowledgeJudge {
-    public static final String VERSION = "kpj2";
-    /** The judgment version of a grade made with the third essay template, which asks for judgments in a new order. */
-    public static final String VERSION_THIRD_TEMPLATE = "kpj3";
-    private static final String TEMPLATE = loadTemplate("essay-kp-judgment-v2.txt");
-    private static final String TEMPLATE_THIRD_TEMPLATE = loadTemplate("essay-kp-judgment-v3.txt");
+    private static final Logger log = LoggerFactory.getLogger(EssayKnowledgeJudge.class);
+
+    /** Stored with a grade whose prompt asked about the question's own knowledge points. */
+    public static final String VERSION = "kpj3";
+    /** At most this many of the question's points go into the prompt; the rest take the essay's pass mark. */
+    public static final int MAX_POINTS = 4;
+    private static final String TEMPLATE = loadTemplate("essay-kp-judgment-v3.txt");
 
     private final KnowledgeJudgmentRule rule = new KnowledgeJudgmentRule();
 
-    public WritingGrade judge(WritingTask task, String essay, WritingGrade grade,
-                              List<RubricCriterion> rubricCriteria, Map<String, ErrorType> errorTypes,
-                              JsonNode entries, Supplier<Map<UUID, KnowledgePoint>> catalog) {
-        return judge(task, essay, grade, rubricCriteria, errorTypes, entries, catalog, false);
+    /** A knowledge point of the question as the prompt shows it. */
+    public record TaskPoint(UUID id, String code, String name, String description, boolean hasPracticeSet) {}
+
+    /**
+     * The question's knowledge points that the prompt will ask about, in the question's order and without repeats. A
+     * point the catalog does not know cannot be described to the model, so it is left out. The catalog is read only
+     * when the question has points.
+     */
+    public static List<TaskPoint> taskPoints(EssayPrompt prompt, Supplier<Map<UUID, KnowledgePoint>> catalog) {
+        if (prompt == null || prompt.knowledgePointIds() == null) return List.of();
+        List<UUID> ids = prompt.knowledgePointIds().stream().filter(id -> id != null)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new)).stream().toList();
+        if (ids.isEmpty()) return List.of();
+        Map<UUID, KnowledgePoint> known = catalog.get();
+        List<TaskPoint> points = new ArrayList<>();
+        for (UUID id : ids) {
+            KnowledgePoint point = known.get(id);
+            if (point == null || point.code() == null) {
+                log.info("Question knowledge point left out of the essay prompt: questionVersionId={}, knowledgePointId={}",
+                        prompt.questionVersionId(), id);
+                continue;
+            }
+            points.add(new TaskPoint(id, point.code(), point.name() == null ? point.code() : point.name(),
+                    point.description(), point.hasPracticeSet()));
+        }
+        if (points.size() > MAX_POINTS) {
+            log.info("Question has {} knowledge points, only the first {} are judged: questionVersionId={}",
+                    points.size(), MAX_POINTS, prompt.questionVersionId());
+            return List.copyOf(points.subList(0, MAX_POINTS));
+        }
+        return List.copyOf(points);
     }
 
-    public WritingGrade judge(WritingTask task, String essay, WritingGrade grade,
-                              List<RubricCriterion> rubricCriteria, Map<String, ErrorType> errorTypes,
-                              JsonNode entries, Supplier<Map<UUID, KnowledgePoint>> catalog, boolean thirdTemplate) {
-        List<RubricCriterion> orderedCriteria = orderedCriteria(task, rubricCriteria);
-        List<KnowledgeJudgmentRule.Candidate> candidates = orderedCriteria.stream()
-                .flatMap(criterion -> criterion.subKnowledgePoints().stream()
-                        .filter(point -> point != null && point.id() != null && point.code() != null)
-                        .map(point -> new KnowledgeJudgmentRule.Candidate(criterion.code(), point.id(), point.code(),
-                                point.name() == null ? point.code() : point.name(), point.description())))
-                .toList();
-        if (candidates.isEmpty()) return grade;
+    /** Adds the judgments of the question's points to a grade; a grade for a question without points stays as it is. */
+    public WritingGrade judge(String essay, WritingGrade grade, List<TaskPoint> points,
+                              Map<String, ErrorType> errorTypes, JsonNode entries) {
+        if (points.isEmpty()) return grade;
+        List<KnowledgeJudgmentRule.Candidate> candidates = points.stream()
+                .map(point -> new KnowledgeJudgmentRule.Candidate(null, point.id(), point.code(), point.name(),
+                        point.description())).toList();
 
-        // The prompt carried the extension for these points, so the version is recorded even when the model
-        // returned no judgments.
-        List<KnowledgeJudgmentRule.Raw> raws = List.of();
+        List<KnowledgeJudgmentRule.Raw> raws = new ArrayList<>();
         if (entries != null && entries.isArray()) {
-            List<KnowledgeJudgmentRule.Raw> parsed = new ArrayList<>();
             for (JsonNode entry : entries) {
                 if (!entry.isObject()) continue;
-                parsed.add(new KnowledgeJudgmentRule.Raw(text(entry, "criterion"), text(entry, "code"),
-                        text(entry, "judgment"), text(entry, "excerpt"), text(entry, "reason")));
+                raws.add(new KnowledgeJudgmentRule.Raw(null, text(entry, "code"), text(entry, "judgment"),
+                        text(entry, "excerpt"), text(entry, "reason")));
             }
-            raws = List.copyOf(parsed);
         }
 
         List<KnowledgeJudgmentRule.CorrectionEvidence> corrections = new ArrayList<>();
@@ -74,64 +96,22 @@ public class EssayKnowledgeJudge {
             }
         }
 
-        List<WritingGrade.KnowledgeJudgment> judgments = rule.judge(candidates, raws, essay, corrections);
-        Map<String, List<WritingGrade.KnowledgeJudgment>> byCriterion = judgments.stream()
-                .collect(Collectors.groupingBy(judgment -> candidates.stream()
-                        .filter(candidate -> candidate.knowledgePointId().equals(judgment.knowledgePointId())
-                                && candidate.code().equals(judgment.code()))
-                        .findFirst().map(KnowledgeJudgmentRule.Candidate::criterionCode).orElse("")));
-        List<WritingGrade.Criterion> gradeCriteria = grade.criteria().stream().map(criterion ->
-                criterion.withKnowledgePointJudgments(byCriterion.getOrDefault(criterion.code(), List.of()))).toList();
-
-        boolean hasFailedJudgment = judgments.stream()
-                .anyMatch(judgment -> judgment.judgment() == WritingGrade.Judgment.FAIL);
-        Map<String, UUID> parentPoints = grade.criteria().stream().filter(Objects::nonNull)
-                .filter(criterion -> criterion.code() != null && criterion.knowledgePointId() != null)
-                .collect(Collectors.toMap(WritingGrade.Criterion::code, WritingGrade.Criterion::knowledgePointId,
-                        (first, ignored) -> first));
-        Supplier<Map<UUID, KnowledgePoint>> catalogIfNeeded = hasFailedJudgment ? catalog : Map::of;
-        List<WritingGrade.StudyPoint> studyPoints = rule.studyPoints(gradeCriteria, grade.studyPoints(), judgment -> {
-            Map<UUID, KnowledgePoint> points = catalogIfNeeded.get();
-            KnowledgePoint point = points.get(judgment.knowledgePointId());
-            if (point != null && point.hasPracticeSet()) return judgment.knowledgePointId();
-            return parentPoints.get(judgmentCriterion(candidates, judgment));
-        });
-        return new WritingGrade(gradeCriteria, grade.corrections(), grade.summary(), grade.overallBand(), studyPoints,
-                thirdTemplate ? VERSION_THIRD_TEMPLATE : VERSION, grade.model(), grade.bandLimits(), grade.priorities(),
-                grade.errorExamples(),
-                grade.task1Checks(), grade.task2Checks());
+        List<WritingGrade.KnowledgeJudgment> judgments = rule.judgeByCode(candidates, raws, essay, corrections);
+        Map<UUID, Boolean> practice = new java.util.HashMap<>();
+        points.forEach(point -> practice.put(point.id(), point.hasPracticeSet()));
+        // A point with a practice set sends the learner to it; one without sends nowhere, never to a criterion's point.
+        List<WritingGrade.StudyPoint> studyPoints = rule.withTaskStudyPoints(grade.studyPoints(), judgments,
+                judgment -> Boolean.TRUE.equals(practice.get(judgment.knowledgePointId())) ? judgment.knowledgePointId() : null);
+        return grade.withTaskKnowledgePointJudgments(judgments, studyPoints, VERSION);
     }
 
-    static String prompt(WritingTask task, List<RubricCriterion> criteria) {
-        return prompt(task, criteria, false);
-    }
-
-    static String prompt(WritingTask task, List<RubricCriterion> criteria, boolean thirdTemplate) {
-        String points = orderedCriteria(task, criteria).stream().map(criterion -> {
-            String heading = criterion.code() + " (" + criterion.name() + "):\n";
-            String entries = criterion.subKnowledgePoints().stream()
-                    .filter(point -> point != null && point.id() != null && point.code() != null)
-                    .map(point -> "- " + point.code() + " — " + (point.name() == null ? point.code() : point.name())
-                            + (point.description() == null || point.description().isBlank()
-                            ? "" : ": " + point.description()))
-                    .collect(Collectors.joining("\n"));
-            return entries.isBlank() ? "" : heading + entries;
-        }).filter(text -> !text.isBlank()).collect(Collectors.joining("\n"));
-        String template = thirdTemplate ? TEMPLATE_THIRD_TEMPLATE : TEMPLATE;
-        return points.isBlank() ? "" : "\n\n" + template.replace("{{knowledge_points}}", points);
-    }
-
-    private static List<RubricCriterion> orderedCriteria(WritingTask task, List<RubricCriterion> criteria) {
-        return criteria.stream().filter(Objects::nonNull)
-                .filter(criterion -> task.criteria().contains(criterion.code()))
-                .sorted(Comparator.comparingInt(RubricCriterion::sortOrder)).toList();
-    }
-
-    private static String judgmentCriterion(List<KnowledgeJudgmentRule.Candidate> candidates,
-                                            WritingGrade.KnowledgeJudgment judgment) {
-        return candidates.stream().filter(candidate -> candidate.knowledgePointId().equals(judgment.knowledgePointId())
-                        && candidate.code().equals(judgment.code()))
-                .findFirst().map(KnowledgeJudgmentRule.Candidate::criterionCode).orElse("");
+    /** The prompt extension that asks for the judgments; empty when there are no points to ask about. */
+    static String prompt(List<TaskPoint> points) {
+        if (points == null || points.isEmpty()) return "";
+        String lines = points.stream().map(point -> "- " + point.code() + " — " + point.name()
+                        + (point.description() == null || point.description().isBlank() ? "" : ": " + point.description()))
+                .collect(java.util.stream.Collectors.joining("\n"));
+        return "\n\n" + TEMPLATE.replace("{{knowledge_points}}", lines);
     }
 
     private static String text(JsonNode node, String key) {
