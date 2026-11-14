@@ -95,4 +95,54 @@ class FlashcardLeitnerReviewTest {
     private static Flashcard newCard() {
         return Flashcard.create(UUID.randomUUID(), FlashcardSourceType.MANUAL, null, null, null, "Front", "Back");
     }
+
+    @Test
+    void oneCorrectReviewMovesToBoxTwoForTwoDays() {
+        Flashcard card = newCard();
+        Instant now = Instant.parse("2026-10-17T00:00:00Z");
+        card.review(true, UUID.randomUUID(), now, INTERVALS);
+        assertEquals(2, card.getLeitnerBox());
+        assertEquals(now.plusSeconds(2L * 24 * 60 * 60), card.getNextReviewAt());
+        assertEquals(1, card.getReviewCount());
+    }
+
+    @Test
+    void aCorrectReviewInBoxFiveStaysInBoxFive() {
+        Flashcard card = newCard();
+        Instant now = Instant.parse("2026-10-17T00:00:00Z");
+        for (int review = 0; review < 4; review++) {
+            card.review(true, UUID.randomUUID(), now.plusSeconds(review), INTERVALS);
+        }
+        Instant fifth = now.plusSeconds(100);
+        card.review(true, UUID.randomUUID(), fifth, INTERVALS);
+        assertEquals(5, card.getLeitnerBox());
+        assertEquals(fifth.plusSeconds(16L * 24 * 60 * 60), card.getNextReviewAt());
+        assertEquals(5, card.getReviewCount());
+    }
+
+    @Test
+    void aSenseCardNeedsASenseId() {
+        assertEquals("vocabularySenseId không hợp lệ", assertThrows(InvalidDataException.class, () -> Flashcard.create(
+                UUID.randomUUID(), FlashcardSourceType.VOCABULARY_SENSE, null, null, null, "word", "meaning")).getMessage());
+    }
+
+    @Test
+    void aHighlightCardNeedsHighlightedText() {
+        assertEquals("highlightedText không hợp lệ", assertThrows(InvalidDataException.class, () -> Flashcard.create(
+                UUID.randomUUID(), FlashcardSourceType.HIGHLIGHT, null, null, null, "word", "meaning")).getMessage());
+    }
+
+    @Test
+    void aBlankFrontIsRefused() {
+        assertEquals("front không hợp lệ", assertThrows(InvalidDataException.class, () -> Flashcard.create(
+                UUID.randomUUID(), FlashcardSourceType.MANUAL, null, null, null, " ", "Back")).getMessage());
+    }
+
+    @Test
+    void aFrontHasAtMostFourThousandCharacters() {
+        assertEquals(4000, Flashcard.create(UUID.randomUUID(), FlashcardSourceType.MANUAL, null, null, null,
+                "f".repeat(4000), "Back").getFront().length());
+        assertEquals("front không hợp lệ", assertThrows(InvalidDataException.class, () -> Flashcard.create(
+                UUID.randomUUID(), FlashcardSourceType.MANUAL, null, null, null, "f".repeat(4001), "Back")).getMessage());
+    }
 }

@@ -124,4 +124,65 @@ class CatalogDomainRulesTest {
         assertThrows(InvalidDataException.class, () -> CatalogLimits.requireSetSenses(Collections.singletonList(null)));
         assertEquals(List.of(a), CatalogLimits.requireSetSenses(List.of(a)));
     }
+
+    @Test
+    void negativeFrequencyRankIsRefused() {
+        InvalidDataException error = assertThrows(InvalidDataException.class,
+                () -> new VocabularyItemDetails(null, null, null, null, -1, false, null));
+        assertEquals("frequencyRank must be at least 1", error.getMessage());
+    }
+
+    @Test
+    void ipaUkHasAtMost255Characters() {
+        assertEquals(255, new VocabularyItemDetails("i".repeat(255), null, null, null, null, false, null).ipaUk().length());
+        assertEquals("ipaUk must not exceed 255 characters", assertThrows(InvalidDataException.class,
+                () -> new VocabularyItemDetails("i".repeat(256), null, null, null, null, false, null)).getMessage());
+    }
+
+    @Test
+    void wordFamilyHasAtMost2000Characters() {
+        assertEquals(2000, new VocabularyItemDetails(null, null, null, null, null, false, "w".repeat(2000)).wordFamily().length());
+        assertEquals("wordFamily must not exceed 2000 characters", assertThrows(InvalidDataException.class,
+                () -> new VocabularyItemDetails(null, null, null, null, null, false, "w".repeat(2001))).getMessage());
+    }
+
+    @Test
+    void aRegisterOfExactlyThirtyCharactersIsAccepted() {
+        assertEquals("x".repeat(30), new VocabularySenseDetails(null, null, "x".repeat(30), null, null, null).register());
+    }
+
+    @Test
+    void grammarNoteHasAtMost2000Characters() {
+        assertEquals("grammarNote must not exceed 2000 characters", assertThrows(InvalidDataException.class,
+                () -> new VocabularySenseDetails(null, null, null, "g".repeat(2001), null, null)).getMessage());
+    }
+
+    @Test
+    void aCollocationPhraseHasAtMost255Characters() {
+        assertEquals(255, new Collocation("p".repeat(255), null, null).phrase().length());
+        assertEquals("phrase must not exceed 255 characters", assertThrows(InvalidDataException.class,
+                () -> new Collocation("p".repeat(256), null, null)).getMessage());
+    }
+
+    @Test
+    void aTopicNameHasAtMost120Characters() {
+        assertEquals(120, new VocabularyTopicDraft("env", "n".repeat(120), "Environment", null, 0, null).name().length());
+        assertEquals("name must not exceed 120 characters", assertThrows(InvalidDataException.class,
+                () -> new VocabularyTopicDraft("env", "n".repeat(121), "Environment", null, 0, null)).getMessage());
+    }
+
+    @Test
+    void aSetTitleHasAtMost180Characters() {
+        assertEquals(180, new VocabularySetDraft("t".repeat(180), null, VocabularySetKind.BAND, CefrLevel.B1, null, null, 0, null)
+                .title().length());
+        assertEquals("title must not exceed 180 characters", assertThrows(InvalidDataException.class,
+                () -> new VocabularySetDraft("t".repeat(181), null, VocabularySetKind.BAND, CefrLevel.B1, null, null, 0, null))
+                .getMessage());
+    }
+
+    @Test
+    void exactlyFiveHundredSetSensesAreAccepted() {
+        List<UUID> fiveHundred = IntStream.range(0, 500).mapToObj(i -> UUID.randomUUID()).toList();
+        assertEquals(fiveHundred, CatalogLimits.requireSetSenses(fiveHundred));
+    }
 }

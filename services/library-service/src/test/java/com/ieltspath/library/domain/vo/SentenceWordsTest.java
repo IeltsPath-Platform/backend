@@ -36,4 +36,9 @@ class SentenceWordsTest {
     void nullInputReturnsAnEmptyList() {
         assertTrue(SentenceWords.normalized(null).isEmpty());
     }
+
+    @Test
+    void anEmptyStringGivesNoWords() {
+        assertTrue(SentenceWords.normalized("").isEmpty());
+    }
 }
