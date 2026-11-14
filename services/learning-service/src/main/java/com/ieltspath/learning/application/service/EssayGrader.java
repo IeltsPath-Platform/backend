@@ -218,9 +218,13 @@ public class EssayGrader {
         return TEMPLATE_VERSION_2.equals(version) ? PROMPT_TEMPLATE_2 : PROMPT_TEMPLATE;
     }
 
-    /** The codes that apply to this Writing task; a code without a task list applies to both. */
+    /**
+     * The codes the model may pick for this Writing task: a code without a task list applies to both, and a code that
+     * describes the whole essay is left out. A correction that names a left-out code is dropped like any unknown code.
+     */
     static List<ErrorType> appliesTo(List<ErrorType> errorTypes, WritingTask task) {
-        return errorTypes.stream().filter(Objects::nonNull).filter(error -> error.appliesToWritingTask(task.name())).toList();
+        return errorTypes.stream().filter(Objects::nonNull).filter(ErrorType::selectableByModel)
+                .filter(error -> error.appliesToWritingTask(task.name())).toList();
     }
 
     /** What the model reads about a code: its definition when Content has one, otherwise the learner hint. */

@@ -25,6 +25,7 @@ public class ErrorType {
     private final UUID id;
     private final String modelDefinition;
     private final List<String> writingTasks;
+    private final boolean modelSelectable;
     private final String code;
     private String name;
     private ErrorCategory category;
@@ -69,6 +70,20 @@ public class ErrorType {
                      UUID trapKnowledgePointId, String fixHint, ContentStatus status, ErrorReviewStatus reviewStatus,
                      Instant createdAt, Instant updatedAt, List<String> skills, boolean fallback,
                      String modelDefinition, List<String> writingTasks) {
+        this(id, code, name, category, severity, knowledgePointId, trapKnowledgePointId, fixHint, status, reviewStatus,
+                createdAt, updatedAt, skills, fallback, modelDefinition, writingTasks, true);
+    }
+
+    /**
+     * {@code modelSelectable} is false for a code that describes the whole essay (a missing overview, no position, a
+     * question part left out): it has no passage to quote, so a grader must not offer it for the model to pick; the
+     * essay-level checks report it instead.
+     */
+    public ErrorType(UUID id, String code, String name, ErrorCategory category, int severity, UUID knowledgePointId,
+                     UUID trapKnowledgePointId, String fixHint, ContentStatus status, ErrorReviewStatus reviewStatus,
+                     Instant createdAt, Instant updatedAt, List<String> skills, boolean fallback,
+                     String modelDefinition, List<String> writingTasks, boolean modelSelectable) {
+        this.modelSelectable = modelSelectable;
         this.modelDefinition = modelDefinition == null || modelDefinition.isBlank() ? null : modelDefinition.trim();
         this.writingTasks = requireWritingTasks(writingTasks);
         this.skills = requireSkills(skills);
@@ -181,6 +196,7 @@ public class ErrorType {
     public List<String> getSkills() { return skills; }
     public String getModelDefinition() { return modelDefinition; }
     public List<String> getWritingTasks() { return writingTasks; }
+    public boolean isModelSelectable() { return modelSelectable; }
     public boolean isFallback() { return fallback; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }

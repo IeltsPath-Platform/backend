@@ -143,7 +143,7 @@ class LessonWritingIntegrationTest {
         UUID request = UUID.randomUUID();
 
         WritingSubmissionResult result = submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, request, ESSAY);
-        assertEquals("IELTS_WRITING@1+tplv2", jdbc.queryForObject(
+        assertEquals("IELTS_WRITING@1+tplv3", jdbc.queryForObject(
                 "SELECT prompt_version FROM lesson_writing_submissions", String.class));
 
         assertEquals("GRADED", result.status());

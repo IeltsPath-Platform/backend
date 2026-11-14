@@ -97,15 +97,18 @@ public class InternalLearningContentController {
         return errorTypes.stream().map(ActiveErrorTypeResponse::from).toList();
     }
 
-    /** {@code modelDefinition} is null when the code has none; an empty {@code writingTasks} means both Writing tasks. */
+    /**
+     * {@code modelDefinition} is null when the code has none; an empty {@code writingTasks} means both Writing tasks.
+     * {@code modelSelectable} is false for a code a grader must not offer the model (it describes the whole essay).
+     */
     public record ActiveErrorTypeResponse(String code, String name, String category, int severity, String fixHint,
                                           UUID knowledgePointId, List<String> skills, boolean fallback,
-                                          String modelDefinition, List<String> writingTasks) {
+                                          String modelDefinition, List<String> writingTasks, boolean modelSelectable) {
         static ActiveErrorTypeResponse from(com.ieltspath.content.domain.aggregate.ErrorType errorType) {
             return new ActiveErrorTypeResponse(errorType.getCode(), errorType.getName(),
                     errorType.getCategory().name(), errorType.getSeverity(), errorType.getFixHint(),
                     errorType.getKnowledgePointId(), errorType.getSkills(), errorType.isFallback(),
-                    errorType.getModelDefinition(), errorType.getWritingTasks());
+                    errorType.getModelDefinition(), errorType.getWritingTasks(), errorType.isModelSelectable());
         }
     }
 

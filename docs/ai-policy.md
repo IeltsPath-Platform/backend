@@ -42,10 +42,13 @@ chuyển job cho EXAMINER khi rubric hoặc prompt đã được kích hoạt kh
 
 LLM chỉ được gắn `errorCode` trong danh mục `ACTIVE` của Content; mã không tồn tại
 hoặc đã bị loại khỏi danh mục sẽ bị bỏ khỏi kết quả của LLM. Không dùng các mã
-do mô hình tự tạo làm bằng chứng lỗi.
+do mô hình tự tạo làm bằng chứng lỗi. Learning còn không đưa cho mô hình ba mã mô tả lỗi cả bài
+(`T1_NO_OVERVIEW`, `NO_CLEAR_POSITION`, `T2_PARTIAL_ANSWER`, cờ `modelSelectable = false` ở Content) và bỏ
+correction nào dùng chúng, vì các lỗi đó không có đoạn văn để trích và đã có `taskChecks` báo cáo (từ 2026-11-14;
+Assessment chưa đọc cờ này).
 
 Learning gửi đúng một request LLM cho mỗi lần thực thi chấm: template band theo activation của Assessment, không có
-activation thì theo `learning.writing.default-template` (mặc định `v2` từ 2026-11-12, chưa qua evaluation), nối hướng dẫn
+activation thì theo `learning.writing.default-template` (mặc định `v3` từ 2026-11-14, `v2` từ 2026-11-12; chưa qua gold set của giám khảo), nối hướng dẫn
 `essay-kp-judgment-v3` (`kpj3`) để cùng JSON trả `criteria`, `corrections`, `summary`, `focus` và `judgments`, đặt `judgments`
 ngay sau `criteria`. Khối `judgments` chỉ chứa KP gắn với đề (tối đa 4); đề không có KP thì không có khối này. `prompt_version`
 (`+tplv1`, `+tplv2` hoặc `+tplv3`) và activation vẫn nhận diện template band; `judgmentVersion=kpj3` lưu trong JSON grade bất cứ khi nào

@@ -445,4 +445,23 @@ class InternalLearningContentControllerTest {
         verify(search).execute(command.capture());
         org.assertj.core.api.Assertions.assertThat(command.getValue().trapErrorCode()).isEqualTo("TFNG_NG_AS_FALSE");
     }
+
+    @Test
+    void errorTypesTellWhetherTheModelMayPickThem() throws Exception {
+        var wholeEssay = new com.ieltspath.content.domain.aggregate.ErrorType(UUID.randomUUID(), "T1_NO_OVERVIEW",
+                "Thiếu overview", com.ieltspath.content.domain.vo.ErrorCategory.TASK, 3, null, null, "Viết overview.",
+                com.ieltspath.content.domain.vo.ContentStatus.ACTIVE,
+                com.ieltspath.content.domain.vo.ErrorReviewStatus.APPROVED, null, null, List.of("WRITING"), false,
+                "The essay has no overview.", List.of("TASK_1"), false);
+        var quotable = com.ieltspath.content.domain.aggregate.ErrorType.create("TENSE", "Tense",
+                com.ieltspath.content.domain.vo.ErrorCategory.GRAMMAR, 1, null, "Use the right tense.");
+        when(errorTypes.executeApprovedActive("WRITING")).thenReturn(List.of(wholeEssay, quotable));
+
+        mockMvc.perform(get("/internal/learning-content/error-types").param("skill", "WRITING"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].code").value("T1_NO_OVERVIEW"))
+                .andExpect(jsonPath("$[0].modelSelectable").value(false))
+                .andExpect(jsonPath("$[1].code").value("TENSE"))
+                .andExpect(jsonPath("$[1].modelSelectable").value(true));
+    }
 }

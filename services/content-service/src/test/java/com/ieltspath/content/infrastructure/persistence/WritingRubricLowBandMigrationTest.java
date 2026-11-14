@@ -41,15 +41,27 @@ class WritingRubricLowBandMigrationTest {
     }
 
     @Test
-    void versionTwoStaysActiveAndVersionThreeIsAVisibleDraft() {
+    void versionThreeIsActiveAndVersionTwoIsRetiredNotDeleted() {
         assertEquals(List.of(new RubricVersionRef("IELTS_WRITING_TASK_1", "TASK_1", 1, "RETIRED"),
-                new RubricVersionRef("IELTS_WRITING_TASK_1", "TASK_1", 2, "ACTIVE"),
-                new RubricVersionRef("IELTS_WRITING_TASK_1", "TASK_1", 3, "DRAFT")),
+                new RubricVersionRef("IELTS_WRITING_TASK_1", "TASK_1", 2, "RETIRED"),
+                new RubricVersionRef("IELTS_WRITING_TASK_1", "TASK_1", 3, "ACTIVE")),
                 rubrics.findVersions("IELTS_WRITING_TASK_1"));
         assertEquals(List.of(new RubricVersionRef("IELTS_WRITING_TASK_2", "TASK_2", 1, "RETIRED"),
-                new RubricVersionRef("IELTS_WRITING_TASK_2", "TASK_2", 2, "ACTIVE"),
-                new RubricVersionRef("IELTS_WRITING_TASK_2", "TASK_2", 3, "DRAFT")),
+                new RubricVersionRef("IELTS_WRITING_TASK_2", "TASK_2", 2, "RETIRED"),
+                new RubricVersionRef("IELTS_WRITING_TASK_2", "TASK_2", 3, "ACTIVE")),
                 rubrics.findVersions("IELTS_WRITING_TASK_2"));
+        assertEquals(3, rubrics.findActive("TASK_1").get(0).version());
+        assertEquals(3, rubrics.findActive("TASK_2").get(0).version());
+    }
+
+    @Test
+    void theActivationKeepsTheNoteThatAnExaminerHasNotReviewedTheWording() {
+        Integer withoutNote = jdbc.queryForObject("""
+                SELECT count(*) FROM rubrics
+                WHERE code IN ('IELTS_WRITING_TASK_1', 'IELTS_WRITING_TASK_2') AND rubric_version = 3
+                  AND (source_note NOT LIKE '%Requires review by an IELTS examiner%' OR source_note NOT LIKE '%still pending%')
+                """, Map.of(), Integer.class);
+        assertEquals(0, withoutNote);
     }
 
     @Test

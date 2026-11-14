@@ -51,6 +51,7 @@ class ErrorTypeSeedMigrationTest {
         jdbc.getJdbcTemplate().execute("ALTER TABLE error_types ADD COLUMN IF NOT EXISTS fallback BOOLEAN NOT NULL DEFAULT false");
         jdbc.getJdbcTemplate().execute("ALTER TABLE error_types ADD COLUMN IF NOT EXISTS model_definition TEXT");
         jdbc.getJdbcTemplate().execute("ALTER TABLE error_types ADD COLUMN IF NOT EXISTS writing_tasks VARCHAR(10)[] NOT NULL DEFAULT '{}'");
+        jdbc.getJdbcTemplate().execute("ALTER TABLE error_types ADD COLUMN IF NOT EXISTS model_selectable BOOLEAN NOT NULL DEFAULT true");
         jdbc.getJdbcTemplate().update("UPDATE error_types SET review_status = 'APPROVED' WHERE code = 'PARAPHRASE_TRAP'");
         var repository = new JdbcErrorTypeRepository(jdbc);
 

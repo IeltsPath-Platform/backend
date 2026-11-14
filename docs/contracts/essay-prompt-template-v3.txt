@@ -1,4 +1,4 @@
-# Version 3 of the Writing grading prompt. Used only when an activation or the default template names v3; the default stays v2 until the measurement for v3 passes. Differences from v2 are limited to the corrections, the data checks, the output order and the length limits.
+# Version 3 of the Writing grading prompt. Used when an activation or the default template names v3; it has been the default since 2026-11-14, chosen by the product owner without an examiner gold set. Differences from v2 are limited to the corrections, the data checks, the output order and the length limits.
 
 You are an experienced IELTS examiner grading an IELTS {{task}} response. Judge each criterion separately using the band descriptors below.
 

@@ -121,4 +121,31 @@ class EssayGraderWritingDefinitionsTest {
                 List.of(new LearningContentClient.RubricBandDescriptor(new BigDecimal("6.0"), "Descriptor")), null,
                 List.of())).toList();
     }
+
+    private static final ErrorType WHOLE_ESSAY = new ErrorType("T1_NO_OVERVIEW", "Thiếu overview", "TASK", 3,
+            "Viết overview", null, "The essay has no overview.", List.of("TASK_1"), false);
+
+    @Test
+    void aCodeThatDescribesTheWholeEssayIsNotOfferedToTheModel() {
+        List<ErrorType> errors = List.of(BOTH_TASKS, TASK_ONE_ONLY, WHOLE_ESSAY);
+
+        var offered = EssayGrader.appliesTo(errors, WritingTask.TASK_1);
+        String prompt = EssayGrader.systemPrompt(WritingTask.TASK_1, rubric("TASK_1"), offered, "v3");
+
+        assertEquals(List.of("MISSING_VERB", "T1_IRRELEVANT_CONTENT"), offered.stream().map(ErrorType::code).toList());
+        assertFalse(prompt.contains("T1_NO_OVERVIEW"));
+        assertTrue(prompt.contains("T1_IRRELEVANT_CONTENT —"));
+    }
+
+    @Test
+    void aContentThatDoesNotSendTheFlagLeavesEveryCodeOffered() {
+        var withoutFlag = new ErrorType("T1_NO_OVERVIEW", "Thiếu overview", "TASK", 3, "Viết overview", null,
+                "The essay has no overview.", List.of("TASK_1"));
+        var explicitlyTrue = new ErrorType("TENSE", "Thì", "GRAMMAR", 1, "Hint", null, null, List.of(), true);
+
+        assertTrue(withoutFlag.selectableByModel());
+        assertTrue(explicitlyTrue.selectableByModel());
+        assertFalse(WHOLE_ESSAY.selectableByModel());
+        assertEquals(2, EssayGrader.appliesTo(List.of(withoutFlag, explicitlyTrue), WritingTask.TASK_1).size());
+    }
 }

@@ -173,7 +173,7 @@ This applies to course essays, Practice essays and free writing alike. `promptVe
 `<rubricCode>@<rubricVersion>+tplv1` for band activation, or `+tplv2` when an administrator has activated a run made with the
 second template (`docs/contracts/essay-prompt-template-v2.txt`), or `+tplv3` for the third (`docs/contracts/essay-prompt-template-v3.txt`,
 which asks for `taskChecks` first and for the sentence rules of the corrections); with nothing activated, `v1` is used and an unknown template
-version is `PROMPT_VERSION_UNAVAILABLE`. The default template is set by `learning.writing.default-template` and stays `v2`. Template `v2` additionally returns, and the grade JSON stores (not yet exposed by the API),
+version is `PROMPT_VERSION_UNAVAILABLE`. The default template is set by `learning.writing.default-template` and has been `v3` since 2026-11-14 (`v2` from 2026-11-12), chosen by the product owner without an examiner gold set. Template `v2` additionally returns, and the grade JSON stores (not yet exposed by the API),
 per correction a `reason` (at most 300 characters, optional) and `certainty` (`ERROR` or `SUGGESTION`; missing or unknown reads as
 `ERROR`; a `SUGGESTION` never creates a knowledge-point `FAIL` and is not counted in the essay event's `error_code`), per criterion
 `evidence` (exact quotations, at most 3; a quotation not in the essay is dropped and the band is kept) and `descriptor`, at most 3

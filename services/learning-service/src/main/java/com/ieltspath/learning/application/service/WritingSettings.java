@@ -37,7 +37,7 @@ public record WritingSettings(
         BigDecimal noPositionBandCap,
         @DefaultValue("30") @Min(1) @Max(50) int maxCorrections,
         // Prompt template used when no evaluation run has activated a version for the task; an activation wins.
-        @DefaultValue("v2") @Pattern(regexp = "v1|v2|v3") String defaultTemplate,
+        @DefaultValue("v3") @Pattern(regexp = "v1|v2|v3") String defaultTemplate,
         // Caps for essays whose errors are in most sentences; they apply only while bandCapsEnabled is true.
         @DefaultValue Density density) {
 
