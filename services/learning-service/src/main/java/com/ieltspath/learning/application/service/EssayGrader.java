@@ -585,17 +585,20 @@ public class EssayGrader {
             }
             String reason = null;
             String certainty = null;
+            Boolean impedesMeaning = null;
             if (secondTemplate) {
                 // A missing reason does not spoil the correction; a missing or unknown certainty reads as an error.
                 String text = item.path("reason").isTextual() ? item.get("reason").asText().trim() : "";
                 reason = text.isBlank() ? null : truncate(text, MAX_REASON_CHARS);
                 certainty = WritingGrade.Correction.SUGGESTION.equals(item.path("certainty").asText(""))
                         ? WritingGrade.Correction.SUGGESTION : WritingGrade.Correction.ERROR;
+                // Only a real true or false counts; anything else leaves the flag unset.
+                if (item.path("impedesMeaning").isBoolean()) impedesMeaning = item.get("impedesMeaning").asBoolean();
             }
             values.add(new WritingGrade.Correction(truncate(excerpt, MAX_ITEM_CHARS),
                     truncateAtSentence(suggestion, MAX_SUGGESTION_CHARS), errorType.category(), code, errorType.name(),
                     errorType.fixHint(), errorType.severity(), practiceKnowledgePointId, practiceKnowledgePointCode,
-                    reason, certainty));
+                    reason, certainty, impedesMeaning));
         }
         return List.copyOf(values);
     }

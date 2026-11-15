@@ -139,4 +139,53 @@ class JdbcReviewItemRepositoryIntegrationTest {
         assertEquals(ReviewStatus.PENDING, states.getFirst().status());
         assertFalse(states.getFirst().blocking());
     }
+
+    private void answeredSet(UUID user, UUID reviewId, int correct, int total) {
+        jdbc.update("INSERT INTO review_sets (id, review_item_id, user_id, package_id, package_version_id, submitted_at, "
+                + "passed, correct_count, total_count) VALUES (?, ?, ?, ?, ?, now(), ?, ?, ?)",
+                UUID.randomUUID(), reviewId, user, UUID.randomUUID(), UUID.randomUUID(), correct * 10 >= total * 7,
+                correct, total);
+    }
+
+    @Test
+    void blockingReviewsStayOnTheMapAfterTheyAreFinishedAndAPendingOneWins() {
+        UUID user = UUID.randomUUID();
+        UUID finishedPoint = UUID.randomUUID();
+        UUID optionalPoint = UUID.randomUUID();
+        UUID none = UUID.randomUUID();
+        UUID done = review(user, finishedPoint, "PRACTICE", true);
+        answeredSet(user, done, 8, 10);
+        jdbc.update("UPDATE review_items SET status = 'DONE', done_at = now() WHERE id = ?", done);
+        review(user, optionalPoint, "CONSOLIDATE", false);
+
+        var finished = reviews.findBlockingByPoint(user, List.of(finishedPoint, optionalPoint, none));
+
+        // A finished review is still returned, with how it went; an optional one and a point without any are not.
+        assertEquals(Set.of(finishedPoint), finished.keySet());
+        var summary = finished.get(finishedPoint);
+        assertEquals(done, summary.reviewId());
+        assertEquals(ReviewStatus.DONE, summary.status());
+        assertNotNull(summary.doneAt());
+        assertEquals(1, summary.setsAnswered());
+        assertEquals(8, summary.lastCorrect());
+        assertEquals(10, summary.lastTotal());
+
+        // The point fails again: its new pending review is the one the map shows.
+        UUID again = review(user, finishedPoint, "PRACTICE", true);
+        var current = reviews.findBlockingByPoint(user, List.of(finishedPoint)).get(finishedPoint);
+        assertEquals(again, current.reviewId());
+        assertEquals(ReviewStatus.PENDING, current.status());
+        assertNull(current.doneAt());
+        assertEquals(0, current.setsAnswered());
+        assertNull(current.lastCorrect());
+    }
+
+    @Test
+    void blockingReviewsOfAnotherLearnerAreNotShown() {
+        UUID kp = UUID.randomUUID();
+        review(UUID.randomUUID(), kp, "PRACTICE", true);
+
+        assertTrue(reviews.findBlockingByPoint(UUID.randomUUID(), List.of(kp)).isEmpty());
+        assertTrue(reviews.findBlockingByPoint(UUID.randomUUID(), List.of()).isEmpty());
+    }
 }

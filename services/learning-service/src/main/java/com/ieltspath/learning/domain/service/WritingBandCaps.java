@@ -20,7 +20,7 @@ public final class WritingBandCaps {
     /** Stable reason codes; {@code TOO_SHORT} and {@code OFF_TOPIC} share their names with Speaking. */
     public enum Reason {
         TOO_SHORT, OFF_TOPIC, T1_NO_OVERVIEW, PARTIAL_ANSWER, NO_POSITION,
-        DENSE_GRAMMAR, DENSE_VOCABULARY, WRONG_DATA, WRONG_DATA_OVERVIEW
+        DENSE_GRAMMAR, DENSE_IMPEDING_GRAMMAR, DENSE_VOCABULARY, DENSE_COHERENCE, WRONG_DATA, WRONG_DATA_OVERVIEW
     }
 
     /**
@@ -41,28 +41,33 @@ public final class WritingBandCaps {
     }
 
     /**
-     * What counting an essay and its corrections gives: sentences in all and the sentences that carry a grammar or a
-     * vocabulary error, and for Task 1 the statements about the chart that were judged and the ones judged wrong.
+     * What counting an essay and its corrections gives: sentences in all and the sentences that carry a grammar, a
+     * vocabulary or a coherence error (a wrong linking word, an unclear reference), the sentences whose grammar error
+     * leaves the reader guessing the meaning, and for Task 1 the statements about the chart that were judged and the
+     * ones judged wrong.
      */
-    public record Density(int sentences, int grammarSentences, int vocabularySentences, int dataStatements,
-                          int wrongDataStatements, boolean overviewWrong) {
-        public static final Density NONE = new Density(0, 0, 0, 0, 0, false);
+    public record Density(int sentences, int grammarSentences, int vocabularySentences, int coherenceSentences,
+                          int impedingGrammarSentences, int dataStatements, int wrongDataStatements,
+                          boolean overviewWrong) {
+        public static final Density NONE = new Density(0, 0, 0, 0, 0, 0, 0, false);
     }
 
     /**
      * Shares of the essay at which a density rule fires, and the cap each rule sets; a null cap switches its rule off.
      * {@code wrongDataOverviewCap} applies when the overview is wrong as well as most statements.
      */
-    public record DensityRules(BigDecimal grammarShare, BigDecimal vocabularyShare, BigDecimal wrongDataShare,
-                               BigDecimal grammarCap, BigDecimal vocabularyCap, BigDecimal wrongDataCap,
-                               BigDecimal wrongDataOverviewCap) {
-        public static final DensityRules NONE = new DensityRules(null, null, null, null, null, null, null);
+    public record DensityRules(BigDecimal grammarShare, BigDecimal vocabularyShare, BigDecimal coherenceShare,
+                               BigDecimal impedingGrammarShare, BigDecimal wrongDataShare, BigDecimal grammarCap,
+                               BigDecimal vocabularyCap, BigDecimal coherenceCap, BigDecimal impedingGrammarCap,
+                               BigDecimal wrongDataCap, BigDecimal wrongDataOverviewCap) {
+        public static final DensityRules NONE = new DensityRules(null, null, null, null, null, null, null, null, null,
+                null, null);
     }
 
     /**
-     * The caps for an essay whose errors are in most of its sentences: GRA and LR from the shares of sentences with a
-     * grammar or a vocabulary error, and for Task 1 TA from the share of chart statements that are wrong. A rule needs
-     * both its cap and its share set, and something to count; otherwise it adds nothing.
+     * The caps for an essay whose errors are spread through its sentences: GRA, LR and CC from the shares of sentences
+     * with a grammar, a vocabulary or a coherence error, and for Task 1 TA from the share of chart statements that are
+     * wrong. A rule needs both its cap and its share set, and something to count; otherwise it adds nothing.
      */
     public static List<Limit> evaluateDensity(WritingTask task, Density density, DensityRules rules) {
         List<Limit> limits = new ArrayList<>();
@@ -71,10 +76,21 @@ public final class WritingBandCaps {
                     "Lỗi ngữ pháp có ở " + density.grammarSentences() + "/" + density.sentences() + " câu nên GRA bị giới hạn ở "
                             + rules.grammarCap().stripTrailingZeros().toPlainString()));
         }
+        if (density.sentences() > 0 && rules.impedingGrammarCap() != null
+                && reaches(density.impedingGrammarSentences(), density.sentences(), rules.impedingGrammarShare())) {
+            limits.add(new Limit(Reason.DENSE_IMPEDING_GRAMMAR, "GRA", rules.impedingGrammarCap(),
+                    "Lỗi ngữ pháp làm khó hiểu nghĩa có ở " + density.impedingGrammarSentences() + "/" + density.sentences()
+                            + " câu nên GRA bị giới hạn ở " + rules.impedingGrammarCap().stripTrailingZeros().toPlainString()));
+        }
         if (density.sentences() > 0 && rules.vocabularyCap() != null && reaches(density.vocabularySentences(), density.sentences(), rules.vocabularyShare())) {
             limits.add(new Limit(Reason.DENSE_VOCABULARY, "LR", rules.vocabularyCap(),
                     "Lỗi từ vựng có ở " + density.vocabularySentences() + "/" + density.sentences() + " câu nên LR bị giới hạn ở "
                             + rules.vocabularyCap().stripTrailingZeros().toPlainString()));
+        }
+        if (density.sentences() > 0 && rules.coherenceCap() != null && reaches(density.coherenceSentences(), density.sentences(), rules.coherenceShare())) {
+            limits.add(new Limit(Reason.DENSE_COHERENCE, "CC", rules.coherenceCap(),
+                    "Lỗi liên kết (từ nối, đại từ thay thế) có ở " + density.coherenceSentences() + "/" + density.sentences()
+                            + " câu nên CC bị giới hạn ở " + rules.coherenceCap().stripTrailingZeros().toPlainString()));
         }
         if (task == WritingTask.TASK_1 && density.dataStatements() > 0
                 && reaches(density.wrongDataStatements(), density.dataStatements(), rules.wrongDataShare())) {

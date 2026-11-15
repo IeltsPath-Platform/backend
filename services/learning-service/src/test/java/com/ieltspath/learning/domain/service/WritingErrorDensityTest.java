@@ -52,6 +52,35 @@ class WritingErrorDensityTest {
     }
 
     @Test
+    void aWrongLinkingWordOrReferenceCountsAsACoherenceError() {
+        Density density = WritingErrorDensity.measure(ESSAY, List.of(
+                correction("It have", "COHERENCE", "REFERENCE", "ERROR"),
+                correction("They was", "COHERENCE", "LINKER_MISUSE", "ERROR"),
+                correction("This sentence", "COHERENCE", "REFERENCE", "SUGGESTION")), null);
+
+        assertEquals(2, density.coherenceSentences());
+        assertEquals(0, density.grammarSentences());
+    }
+
+    private static WritingGrade.Correction impeding(String excerpt, String category, String certainty, Boolean impedes) {
+        return new WritingGrade.Correction(excerpt, "x", category, "CODE", "CODE", "", 1, null, null, null, certainty, impedes);
+    }
+
+    @Test
+    void onlyAGrammarErrorFlaggedAsImpedingMeaningCountsAsImpeding() {
+        Density density = WritingErrorDensity.measure(ESSAY, List.of(
+                impeding("It have", "GRAMMAR", "ERROR", true),
+                impeding("five group", "GRAMMAR", "ERROR", true),
+                impeding("The table talking", "GRAMMAR", "ERROR", false),
+                impeding("They was", "GRAMMAR", "SUGGESTION", true),
+                impeding("go library", "VOCABULARY", "ERROR", true),
+                impeding("This sentence", "GRAMMAR", "ERROR", null)), null);
+
+        assertEquals(1, density.impedingGrammarSentences(), "two flagged errors in one sentence count once");
+        assertEquals(3, density.grammarSentences());
+    }
+
+    @Test
     void task1CountsTheChartStatementsAndAWrongOverview() {
         var checks = new WritingGrade.Task1Checks(List.of(
                 new WritingGrade.DataCheck("a", WritingGrade.DataCheck.WRONG, "x"),
@@ -67,11 +96,13 @@ class WritingErrorDensityTest {
     }
 
     private static final DensityRules RULES = new DensityRules(new BigDecimal("0.8"), new BigDecimal("0.5"),
-            new BigDecimal("0.5"), new BigDecimal("4.0"), new BigDecimal("4.0"), new BigDecimal("4.0"), new BigDecimal("3.0"));
+            new BigDecimal("0.3"), new BigDecimal("0.5"), new BigDecimal("0.5"), new BigDecimal("4.0"),
+            new BigDecimal("4.0"), new BigDecimal("4.5"), new BigDecimal("4.0"), new BigDecimal("4.0"),
+            new BigDecimal("3.0"));
 
     @Test
     void grammarErrorsInFourSentencesOfFiveCapGra() {
-        var limits = WritingBandCaps.evaluateDensity(WritingTask.TASK_2, new Density(5, 4, 0, 0, 0, false), RULES);
+        var limits = WritingBandCaps.evaluateDensity(WritingTask.TASK_2, new Density(5, 4, 0, 0, 0, 0, 0, false), RULES);
 
         assertEquals(1, limits.size());
         assertEquals(Reason.DENSE_GRAMMAR, limits.getFirst().reason());
@@ -81,12 +112,42 @@ class WritingErrorDensityTest {
 
     @Test
     void justUnderTheShareAddsNothing() {
-        assertTrue(WritingBandCaps.evaluateDensity(WritingTask.TASK_2, new Density(10, 7, 4, 0, 0, false), RULES).isEmpty());
+        assertTrue(WritingBandCaps.evaluateDensity(WritingTask.TASK_2, new Density(10, 7, 4, 0, 0, 0, 0, false), RULES).isEmpty());
+    }
+
+    @Test
+    void coherenceErrorsInThreeSentencesOfTenCapCc() {
+        var limits = WritingBandCaps.evaluateDensity(WritingTask.TASK_1, new Density(10, 0, 0, 3, 0, 0, 0, false), RULES);
+
+        assertEquals(1, limits.size());
+        assertEquals(Reason.DENSE_COHERENCE, limits.getFirst().reason());
+        assertEquals("CC", limits.getFirst().criterion());
+        assertEquals(new BigDecimal("4.5"), limits.getFirst().cap());
+    }
+
+    @Test
+    void impedingGrammarInFiveSentencesOfTenCapsGra() {
+        var limits = WritingBandCaps.evaluateDensity(WritingTask.TASK_2, new Density(10, 5, 0, 0, 5, 0, 0, false), RULES);
+
+        assertEquals(1, limits.size());
+        assertEquals(Reason.DENSE_IMPEDING_GRAMMAR, limits.getFirst().reason());
+        assertEquals("GRA", limits.getFirst().criterion());
+        assertEquals(new BigDecimal("4.0"), limits.getFirst().cap());
+    }
+
+    @Test
+    void impedingGrammarInFourSentencesOfTenAddsNothing() {
+        assertTrue(WritingBandCaps.evaluateDensity(WritingTask.TASK_2, new Density(10, 6, 0, 0, 4, 0, 0, false), RULES).isEmpty());
+    }
+
+    @Test
+    void coherenceErrorsInTwoSentencesOfTenAddNothing() {
+        assertTrue(WritingBandCaps.evaluateDensity(WritingTask.TASK_2, new Density(10, 0, 0, 2, 0, 0, 0, false), RULES).isEmpty());
     }
 
     @Test
     void wrongChartStatementsCapTaAndAWrongOverviewCapsItLower() {
-        var limits = WritingBandCaps.evaluateDensity(WritingTask.TASK_1, new Density(8, 0, 0, 8, 5, true), RULES);
+        var limits = WritingBandCaps.evaluateDensity(WritingTask.TASK_1, new Density(8, 0, 0, 0, 0, 8, 5, true), RULES);
 
         assertEquals(List.of(Reason.WRONG_DATA, Reason.WRONG_DATA_OVERVIEW), limits.stream().map(WritingBandCaps.Limit::reason).toList());
         assertEquals(new BigDecimal("3.0"), limits.get(1).cap());
@@ -94,11 +155,11 @@ class WritingErrorDensityTest {
 
     @Test
     void theChartRulesDoNotApplyToTaskTwo() {
-        assertTrue(WritingBandCaps.evaluateDensity(WritingTask.TASK_2, new Density(8, 0, 0, 8, 8, true), RULES).isEmpty());
+        assertTrue(WritingBandCaps.evaluateDensity(WritingTask.TASK_2, new Density(8, 0, 0, 0, 0, 8, 8, true), RULES).isEmpty());
     }
 
     @Test
     void aRuleWithoutACapIsOff() {
-        assertTrue(WritingBandCaps.evaluateDensity(WritingTask.TASK_1, new Density(5, 5, 5, 5, 5, true), DensityRules.NONE).isEmpty());
+        assertTrue(WritingBandCaps.evaluateDensity(WritingTask.TASK_1, new Density(5, 5, 5, 0, 0, 5, 5, true), DensityRules.NONE).isEmpty());
     }
 }

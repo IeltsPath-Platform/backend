@@ -1,5 +1,6 @@
 package com.ieltspath.learning.infrastructure.persistence;
 
+import com.ieltspath.learning.domain.vo.BlockingReviewSummary;
 import com.ieltspath.learning.domain.vo.FailedWritingCriterion;
 import com.ieltspath.learning.domain.aggregate.ReviewItem;
 import com.ieltspath.learning.domain.entity.ReviewSet;
@@ -61,6 +62,39 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
                 row.getObject("lesson_id", UUID.class), row.getObject("knowledge_point_id", UUID.class),
                 row.getString("skill") == null ? null : LearningSkill.valueOf(row.getString("skill")),
                 row.getBoolean("blocking"), row.getString("trigger_kind")));
+    }
+
+    @Override
+    public Map<UUID, BlockingReviewSummary> findBlockingByPoint(UUID userId, Collection<UUID> knowledgePointIds) {
+        if (knowledgePointIds.isEmpty()) return Map.of();
+        // One row per point: its PENDING review when it has one (there can be only one), else the latest finished one.
+        List<BlockingReviewSummary> rows = jdbc.query("""
+                SELECT DISTINCT ON (r.knowledge_point_id)
+                       r.id, r.knowledge_point_id, r.lesson_id, r.status, r.created_at, r.done_at,
+                       (SELECT count(*) FROM review_sets c WHERE c.review_item_id = r.id AND c.submitted_at IS NOT NULL) AS sets_answered,
+                       latest.correct_count, latest.total_count
+                FROM review_items r
+                LEFT JOIN LATERAL (
+                    SELECT s.correct_count, s.total_count FROM review_sets s
+                    WHERE s.review_item_id = r.id AND s.submitted_at IS NOT NULL
+                    ORDER BY s.submitted_at DESC LIMIT 1
+                ) latest ON TRUE
+                WHERE r.user_id = :userId AND r.blocking AND r.knowledge_point_id IN (:ids)
+                ORDER BY r.knowledge_point_id, (r.status = 'PENDING') DESC, r.created_at DESC, r.id
+                """, Map.of("userId", userId, "ids", knowledgePointIds), (row, index) -> {
+            var doneAt = row.getTimestamp("done_at");
+            int correct = row.getInt("correct_count");
+            Integer lastCorrect = row.wasNull() ? null : correct;
+            int total = row.getInt("total_count");
+            Integer lastTotal = row.wasNull() ? null : total;
+            return new BlockingReviewSummary(row.getObject("id", UUID.class),
+                    row.getObject("knowledge_point_id", UUID.class), row.getObject("lesson_id", UUID.class),
+                    ReviewStatus.valueOf(row.getString("status")), row.getTimestamp("created_at").toInstant(),
+                    doneAt == null ? null : doneAt.toInstant(), row.getInt("sets_answered"), lastCorrect, lastTotal);
+        });
+        Map<UUID, BlockingReviewSummary> byPoint = new HashMap<>();
+        for (BlockingReviewSummary row : rows) byPoint.put(row.knowledgePointId(), row);
+        return byPoint;
     }
 
     @Override

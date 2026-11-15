@@ -236,16 +236,28 @@ public record WritingGrade(List<Criterion> criteria, List<Correction> correction
     /** {@code practiceKnowledgePointCode} is set with {@code practiceKnowledgePointId}; null for grades stored before it. */
     public record Correction(String excerpt, String suggestion, String category, String errorCode, String errorName,
                              String fixHint, Integer severity, UUID practiceKnowledgePointId,
-                             String practiceKnowledgePointCode, String reason, String certainty) {
+                             String practiceKnowledgePointCode, String reason, String certainty,
+                             Boolean impedesMeaning) {
         public static final String ERROR = "ERROR";
         public static final String SUGGESTION = "SUGGESTION";
+
+        /**
+         * {@code impedesMeaning} is true when the error leaves the reader guessing what the writer means; null for grades
+         * made before the field existed, which therefore never count as impeding.
+         */
+        public Correction(String excerpt, String suggestion, String category, String errorCode, String errorName,
+                          String fixHint, Integer severity, UUID practiceKnowledgePointId,
+                          String practiceKnowledgePointCode, String reason, String certainty) {
+            this(excerpt, suggestion, category, errorCode, errorName, fixHint, severity, practiceKnowledgePointId,
+                    practiceKnowledgePointCode, reason, certainty, null);
+        }
 
         /** {@code reason} and {@code certainty} are only returned by the second prompt template; null reads as ERROR. */
         public Correction(String excerpt, String suggestion, String category, String errorCode, String errorName,
                           String fixHint, Integer severity, UUID practiceKnowledgePointId,
                           String practiceKnowledgePointCode) {
             this(excerpt, suggestion, category, errorCode, errorName, fixHint, severity, practiceKnowledgePointId,
-                    practiceKnowledgePointCode, null, null);
+                    practiceKnowledgePointCode, null, null, null);
         }
 
         public Correction(String excerpt, String suggestion, String category, String errorCode, String errorName,
@@ -266,6 +278,9 @@ public record WritingGrade(List<Criterion> criteria, List<Correction> correction
          * {@code isSuggestion}: Jackson would store that as a boolean {@code suggestion} over the suggested text.
          */
         public boolean suggestionOnly() { return SUGGESTION.equals(certainty); }
+
+        /** True only when the model flagged the error; a missing flag never counts. Not named {@code isX}: see above. */
+        public boolean impeding() { return Boolean.TRUE.equals(impedesMeaning); }
     }
 
     /** A weak rubric criterion and its knowledge point, or a focus suggested by the grader's model. */

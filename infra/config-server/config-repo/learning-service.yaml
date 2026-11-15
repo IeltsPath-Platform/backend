@@ -89,6 +89,15 @@ learning:
       grammar-band-cap: ${LEARNING_WRITING_DENSE_GRAMMAR_BAND_CAP:}
       vocabulary-share: ${LEARNING_WRITING_DENSE_VOCABULARY_SHARE:0.5}
       vocabulary-band-cap: ${LEARNING_WRITING_DENSE_VOCABULARY_BAND_CAP:4.0}
+      # Sentences with a coherence error (wrong linking word, unclear reference). On the calibration essays the share
+      # stays at 0.2 or below for intended CC 5 to 7, so 0.3 leaves them alone; examiner to confirm on gold essays.
+      coherence-share: ${LEARNING_WRITING_DENSE_COHERENCE_SHARE:0.3}
+      coherence-band-cap: ${LEARNING_WRITING_DENSE_COHERENCE_BAND_CAP:4.5}
+      # Sentences whose grammar error leaves the reader guessing the meaning (the model's impedesMeaning flag). Plain
+      # grammar errors cannot separate band 4 from band 5, this flag can: on the calibration essays the share was 0.55
+      # for the weak essay and 0.40 or less for band 5 and above. Examiner to confirm the share on gold essays.
+      impeding-grammar-share: ${LEARNING_WRITING_DENSE_IMPEDING_GRAMMAR_SHARE:0.5}
+      impeding-grammar-band-cap: ${LEARNING_WRITING_DENSE_IMPEDING_GRAMMAR_BAND_CAP:4.0}
       wrong-data-share: ${LEARNING_WRITING_WRONG_DATA_SHARE:0.5}
       wrong-data-band-cap: ${LEARNING_WRITING_WRONG_DATA_BAND_CAP:4.0}
       wrong-data-overview-band-cap: ${LEARNING_WRITING_WRONG_DATA_OVERVIEW_BAND_CAP:3.0}

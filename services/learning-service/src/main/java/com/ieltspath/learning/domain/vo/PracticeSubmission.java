@@ -27,11 +27,19 @@ public record PracticeSubmission(UUID attemptId, int correct, int total, double 
                 null, null);
     }
     public record SkillScore(LearningSkill skill, int correct, int total, double percent, boolean passed) {}
-    /** {@code hint} is set only for a wrong objective answer whose question type a hint helps with. */
+    /**
+     * {@code hint} is set only for a wrong objective answer whose question type a hint helps with. {@code submitted} is the
+     * learner's own answer, kept so the set can be shown again as it was filled in; it is absent from submissions stored
+     * before it was kept, and for a question left unanswered.
+     */
     public record Answer(UUID questionVersionId, boolean correct, String correctAnswer, String explanation, String hint,
-                         ErrorTrap error) {
+                         ErrorTrap error, String submitted) {
+        public Answer(UUID questionVersionId, boolean correct, String correctAnswer, String explanation, String hint,
+                      ErrorTrap error) {
+            this(questionVersionId, correct, correctAnswer, explanation, hint, error, null);
+        }
         public Answer(UUID questionVersionId, boolean correct, String correctAnswer, String explanation, String hint) {
-            this(questionVersionId, correct, correctAnswer, explanation, hint, null);
+            this(questionVersionId, correct, correctAnswer, explanation, hint, null, null);
         }
         public Answer(UUID questionVersionId, boolean correct, String correctAnswer, String explanation) {
             this(questionVersionId, correct, correctAnswer, explanation, null, null);

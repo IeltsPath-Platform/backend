@@ -50,5 +50,31 @@ class WritingSettingsBindingTest {
         assertNull(rules.vocabularyCap());
         assertNull(rules.wrongDataCap());
         assertNull(rules.wrongDataOverviewCap());
+        assertNull(rules.coherenceCap());
+        assertNull(rules.impedingGrammarCap());
+    }
+
+    @Test
+    void theImpedingGrammarKeysBindToTheirRule() {
+        var source = new MapConfigurationPropertySource(Map.of(
+                "learning.writing.density.impeding-grammar-share", "0.5",
+                "learning.writing.density.impeding-grammar-band-cap", "4.0"));
+
+        var rules = new Binder(source).bind("learning.writing", WritingSettings.class).get().density().rules();
+
+        assertEquals(0, new BigDecimal("0.5").compareTo(rules.impedingGrammarShare()));
+        assertEquals(0, new BigDecimal("4.0").compareTo(rules.impedingGrammarCap()));
+    }
+
+    @Test
+    void theCoherenceKeysBindToTheirRule() {
+        var source = new MapConfigurationPropertySource(Map.of(
+                "learning.writing.density.coherence-share", "0.3",
+                "learning.writing.density.coherence-band-cap", "4.5"));
+
+        var rules = new Binder(source).bind("learning.writing", WritingSettings.class).get().density().rules();
+
+        assertEquals(0, new BigDecimal("0.3").compareTo(rules.coherenceShare()));
+        assertEquals(0, new BigDecimal("4.5").compareTo(rules.coherenceCap()));
     }
 }

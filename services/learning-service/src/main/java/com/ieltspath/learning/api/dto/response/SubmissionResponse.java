@@ -25,13 +25,18 @@ public record SubmissionResponse(boolean blockPassed, boolean lessonCompleted, L
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record SolvedAnswer(UUID questionVersionId, boolean correct, String correctAnswer,
                               String explanation, String hint,
-                              @JsonInclude(JsonInclude.Include.NON_NULL) ErrorTrapResult error) implements Result {
+                              @JsonInclude(JsonInclude.Include.NON_NULL) ErrorTrapResult error,
+                              @JsonInclude(JsonInclude.Include.NON_NULL) String submittedAnswer) implements Result {
+        public SolvedAnswer(UUID questionVersionId, boolean correct, String correctAnswer, String explanation,
+                            String hint, ErrorTrapResult error) {
+            this(questionVersionId, correct, correctAnswer, explanation, hint, error, null);
+        }
         public SolvedAnswer(UUID questionVersionId, boolean correct, String correctAnswer, String explanation) {
-            this(questionVersionId, correct, correctAnswer, explanation, null, null);
+            this(questionVersionId, correct, correctAnswer, explanation, null, null, null);
         }
         public SolvedAnswer(UUID questionVersionId, boolean correct, String correctAnswer, String explanation,
                             String hint) {
-            this(questionVersionId, correct, correctAnswer, explanation, hint, null);
+            this(questionVersionId, correct, correctAnswer, explanation, hint, null, null);
         }
     }
 

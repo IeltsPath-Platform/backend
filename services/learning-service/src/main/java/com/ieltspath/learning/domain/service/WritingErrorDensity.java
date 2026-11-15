@@ -26,16 +26,22 @@ public final class WritingErrorDensity {
         List<int[]> sentences = sentences(essay);
         BitSet grammar = new BitSet(sentences.size());
         BitSet vocabulary = new BitSet(sentences.size());
+        BitSet coherence = new BitSet(sentences.size());
+        BitSet impeding = new BitSet(sentences.size());
         for (WritingGrade.Correction correction : corrections) {
             if (WritingGrade.Correction.SUGGESTION.equals(correction.certainty()) || correction.excerpt() == null) continue;
             int start = essay.indexOf(correction.excerpt());
             if (start < 0) continue;
             int sentence = sentenceAt(sentences, start);
             if (sentence < 0) continue;
-            if ("GRAMMAR".equals(correction.category())) grammar.set(sentence);
+            if ("GRAMMAR".equals(correction.category())) {
+                grammar.set(sentence);
+                if (correction.impeding()) impeding.set(sentence);
+            }
             if ("VOCABULARY".equals(correction.category()) || WORD_LEVEL_CODES.contains(correction.errorCode())) {
                 vocabulary.set(sentence);
             }
+            if ("COHERENCE".equals(correction.category())) coherence.set(sentence);
         }
         int wrong = 0;
         int right = 0;
@@ -47,8 +53,8 @@ public final class WritingErrorDensity {
             }
             overviewWrong = Boolean.FALSE.equals(task1Checks.overviewAccurate());
         }
-        return new Density(sentences.size(), grammar.cardinality(), vocabulary.cardinality(), wrong + right, wrong,
-                overviewWrong);
+        return new Density(sentences.size(), grammar.cardinality(), vocabulary.cardinality(), coherence.cardinality(),
+                impeding.cardinality(), wrong + right, wrong, overviewWrong);
     }
 
     /** Sentence spans as {start, end}: a sentence ends after . ! or ? followed by a space, or at a line break. */

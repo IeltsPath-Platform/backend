@@ -57,12 +57,17 @@ public record WritingSettings(
             BigDecimal grammarBandCap,
             BigDecimal vocabularyBandCap,
             BigDecimal wrongDataBandCap,
-            BigDecimal wrongDataOverviewBandCap) {
-        public static final Density OFF = new Density(null, null, null, null, null, null, null);
+            BigDecimal wrongDataOverviewBandCap,
+            @DefaultValue("0.3") BigDecimal coherenceShare,
+            BigDecimal coherenceBandCap,
+            @DefaultValue("0.5") BigDecimal impedingGrammarShare,
+            BigDecimal impedingGrammarBandCap) {
+        public static final Density OFF = new Density(null, null, null, null, null, null, null, null, null, null, null);
 
         public WritingBandCaps.DensityRules rules() {
-            return new WritingBandCaps.DensityRules(grammarShare, vocabularyShare, wrongDataShare, grammarBandCap,
-                    vocabularyBandCap, wrongDataBandCap, wrongDataOverviewBandCap);
+            return new WritingBandCaps.DensityRules(grammarShare, vocabularyShare, coherenceShare, impedingGrammarShare,
+                    wrongDataShare, grammarBandCap, vocabularyBandCap, coherenceBandCap, impedingGrammarBandCap,
+                    wrongDataBandCap, wrongDataOverviewBandCap);
         }
     }
 

@@ -16,7 +16,9 @@ is open on it, and where it is taught (its chặng and lessons).
   "knowledgePoints": [{
     "knowledgePointId": "…", "code": "R60_TFNG_F_VS_NG", "name": "…", "skill": "READING", "kind": "STRATEGY",
     "cefrLevel": "B1", "canDo": "…", "mastery": 0.72, "tier": "CONSOLIDATE", "evidenceCount": 9, "nextReviewAt": "2026-10-25T00:00:00Z",
-    "prerequisiteIds": ["…"], "practiceAvailable": true,
+    "prerequisiteIds": ["…"], "practiceAvailable": true, "freePreview": true,
+    "blockingReview": { "reviewId": "…", "status": "DONE", "lessonId": "…", "createdAt": "2026-11-10T08:00:00Z",
+                        "doneAt": "2026-11-11T09:30:00Z", "setsAnswered": 2, "lastCorrect": 8, "lastTotal": 10 },
     "topic": { "topicId": "…", "name": "Demo IELTS Reading", "position": 1 },
     "lessons": [{ "lessonId": "…", "title": "Câu chủ đề nằm ở đâu", "position": 1,
                   "topicId": "…", "topicName": "Demo IELTS Reading", "topicPosition": 1 }] }] }
@@ -30,14 +32,46 @@ is open on it, and where it is taught (its chặng and lessons).
   It is also an upper bound: it does not subtract sets the start route will skip (above the course band, needing a plan the
   learner lacks, or holding an essay). Treat `practiceAvailable: true` as "may be possible" and handle
   `409 FREE_PRACTICE_EXHAUSTED` from the start route.
+- `freePreview` (added 2026-11-15) is true when a paying course teaches the KP in one of the first lessons of its skill, the
+  lessons it shows free ("Học thử miễn phí" on the course page): the earliest lesson that teaches it is within the first
+  `PaywallPolicy.FREE_LESSONS_PER_SKILL` of its skill. It is a fact about the KP, not about the learner: it stays true for a
+  Premium learner, and `locked` says what this learner can open. It is false for a KP of a free course (all of it is free, there
+  is no preview) and for a KP no lesson teaches.
+- `blockingReview` (added 2026-11-15) is the learner's **blocking** review of the KP, kept after it is finished so the tree can
+  keep showing it; `null` when the learner never had one. `status` is `PENDING` (it holds back lessons, Practice and topic tests
+  of its skill), `DONE` (a set was passed) or `SKIPPED` (no unseen package was left). A KP holds at most one `PENDING` review;
+  when it has none, the latest finished one is returned. Optional reviews (review basket, free practice test) never appear
+  here. `lessonId` is the lesson that raised it, `createdAt` and `doneAt` (`null` while pending) bound it in time,
+  `setsAnswered` counts the sets submitted, and `lastCorrect`/`lastTotal` score the latest one (`null` before any). `reviewId`
+  opens it at `/learn/reviews/{reviewId}`. A `referencePoints` entry carries the same field, since a diagnosis can send the
+  learner back to a point of a lower course.
 - `topic` is the chặng that owns the KP (`null` only if Content names none). `topic.position` and `lessons[].topicPosition`
   count the chặng from 1 inside its own skill, the number the course page shows ("Chặng 03"); `lessons[].position` counts the
   lesson from 1 inside its chặng. `lessons` are the lessons of this course that teach the KP, in the order of their chặng and
   then of the lesson, and are empty for a KP no lesson teaches. This says where a KP is taught; `prerequisiteIds` says only in
   which order the points build on each other, and the two orders do not have to agree.
+- `referencePoints` (added 2026-11-15) lists the points of **lower courses** that the course builds on, and what those build on
+  in turn, so the chart can show the order of learning back to the start. A course does not re-teach what a lower course
+  teaches, so they are not in `knowledgePoints`; they are named only for reference. They carry no standing of the learner and
+  cannot be practised from this tree:
+
+  ```json
+  "referencePoints": [{
+    "knowledgePointId": "…", "code": "G40_LINKING", "name": "…", "skill": "ALL", "cefrLevel": "A2",
+    "prerequisiteIds": ["…"],
+    "course": { "courseId": "…", "name": "Foundation 4.0", "bandLevel": 4.0 },
+    "topic": { "topicId": "…", "name": "…", "position": 2 } }]
+  ```
+
+  `prerequisiteIds` are what the reference point builds on; an id may name a point of the course, another reference or one that
+  is not listed. `topic.position` counts the chặng from 1 inside its skill **in its own course**. Only a point that some other
+  course owns is listed (one Content no longer lists is left out), and the list is empty when the course builds on nothing
+  outside it. At most three levels are followed (what the course builds on, what that builds on, and once more). A client that
+  does not know the field ignores it; `knowledgePoints` and its `prerequisiteIds` are unchanged.
 - The tree costs a fixed number of calls to Content (the tree and the prerequisites), one more call per chặng of the course for
-  its lessons, and one query for the profiles, however many points it has. A chặng whose lessons cannot be read is left out of
-  `lessons`; the tree is still returned.
+  its lessons, up to three more for the levels of `referencePoints` (none when the course builds on nothing outside it), and one
+  query for the profiles, however many points it has. A chặng whose lessons cannot be read is left out of `lessons`; the tree is
+  still returned.
 - `404 NOT_FOUND` for an unknown course, `403 COURSE_NOT_OPEN` for a closed course, `403 COURSE_NOT_JOINED` when the learner is
   not taking it.
 

@@ -97,14 +97,19 @@ Response 200:
   `PROMPT_VERSION_UNAVAILABLE`) gives its daily grading unit back. `INVALID_GRADE` keeps the unit, because a malformed
   output may be caused by the essay itself.
 - `bandLimits` (optional, present only when a cap lowered a band): `[{reason, criterion, cap, message}]`, the same shape
-  as Speaking's `bandLimits` plus `criterion` (TA, TR, GRA or LR). `reason` is `TOO_SHORT`, `OFF_TOPIC`, `T1_NO_OVERVIEW`,
-  `PARTIAL_ANSWER`, `NO_POSITION`, `DENSE_GRAMMAR`, `DENSE_VOCABULARY`, `WRONG_DATA` or `WRONG_DATA_OVERVIEW`. A criterion lowered by a cap carries `limited: true`. Caps are off until
+  as Speaking's `bandLimits` plus `criterion` (TA, TR, CC, GRA or LR). `reason` is `TOO_SHORT`, `OFF_TOPIC`, `T1_NO_OVERVIEW`,
+  `PARTIAL_ANSWER`, `NO_POSITION`, `DENSE_GRAMMAR`, `DENSE_IMPEDING_GRAMMAR`, `DENSE_VOCABULARY`, `DENSE_COHERENCE`, `WRONG_DATA` or
+  `WRONG_DATA_OVERVIEW`. A criterion lowered by a cap carries `limited: true`. Caps are off until
   `learning.writing.band-caps-enabled` is true and the thresholds are set; while off, responses carry neither field.
   The length rule needs only the essay. `T1_NO_OVERVIEW` fires when the second prompt template reports
   `hasOverview = false`; `PARTIAL_ANSWER` and `NO_POSITION` fire from the Task 2 checks below. `OFF_TOPIC` has no check
-  behind it yet and never fires. The four density reasons are counted from the corrections of the grade, not by the model:
+  behind it yet and never fires. The six density reasons are counted from the corrections of the grade, not by the model:
   `DENSE_GRAMMAR` and `DENSE_VOCABULARY` cap GRA and LR when the share of sentences with a grammar or a vocabulary error
-  reaches `learning.writing.density.grammar-share` or `vocabulary-share`; for Task 1, `WRONG_DATA` caps TA when the
+  reaches `learning.writing.density.grammar-share` or `vocabulary-share`; `DENSE_COHERENCE` caps CC when the share of
+  sentences with a coherence error (category `COHERENCE`: a wrong linking word, an unclear reference) reaches
+  `coherence-share`; `DENSE_IMPEDING_GRAMMAR` caps GRA when the share of sentences with a grammar error that the
+  model flagged `impedesMeaning: true` (the reader has to guess the meaning) reaches `impeding-grammar-share`; for
+  Task 1, `WRONG_DATA` caps TA when the
   share of chart statements judged wrong reaches `wrong-data-share`, and `WRONG_DATA_OVERVIEW` caps it lower when the
   overview is also wrong. A correction that is only a suggestion is not counted. Each cap is set by a
   `learning.writing.density.*-band-cap` key and a blank cap switches its rule off. The shared configuration leaves
