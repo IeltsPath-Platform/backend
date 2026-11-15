@@ -129,6 +129,36 @@ class GetLearnerTreeTeachingTest {
     }
 
     @Test
+    void marksThePointsThatAPayingCourseShowsFreeWhateverTheLearnerHasBought() {
+        PaywallGate.Request request = mock(PaywallGate.Request.class);
+        PaywallGate paywall = mock(PaywallGate.class);
+        when(paywall.forLearner(user)).thenReturn(request);
+        when(request.knowledgePointOpen(any(), any(), anyBoolean())).thenReturn(true);
+        when(request.knowledgePointFreePreview(any(), any())).thenAnswer(call -> {
+            KnowledgePoint asked = call.getArgument(1);
+            return asked.earliestLessonPosition() != null && asked.earliestLessonPosition() <= 3;
+        });
+        LearnerCurriculumRepository curricula = mock(LearnerCurriculumRepository.class, RETURNS_DEEP_STUBS);
+        TopicProgress taking = mock(TopicProgress.class);
+        when(taking.topicId()).thenReturn(readingOne);
+        when(curricula.find(user).topics()).thenReturn(List.of(taking));
+        tree = new GetLearnerTreeUseCase(curricula, mock(MasteryProfileRepository.class), mock(ReviewItemRepository.class),
+                mock(PracticeAttemptRepository.class), content, paywall, mock(LessonProgressRepository.class), 2);
+        KnowledgePoint early = new KnowledgePoint(matching, "PR_MATCHING_INFORMATION", "matching", "PROCEDURE", "READING",
+                null, true, null, null, null, null, 2);
+        KnowledgePoint late = new KnowledgePoint(scanning, "TR_R_SCANNING", "scanning", "PROCEDURE", "READING",
+                null, true, null, null, null, null, 7);
+        KnowledgePoint untaught = new KnowledgePoint(opinion, "TR_W_OPINION", "opinion", "PROCEDURE", "READING",
+                null, true, null, null, null, null, null);
+        when(content.getTopicSequence(true)).thenReturn(List.of(topic(readingOne, "Demo Reading", 900, LearningSkill.READING,
+                early, late, untaught)));
+
+        assertThat(node(matching).freePreview()).isTrue();
+        assertThat(node(scanning).freePreview()).isFalse();
+        assertThat(node(opinion).freePreview()).isFalse();
+    }
+
+    @Test
     void givesAPointNoLessonsWhenNoneTeachesIt() {
         when(content.getTopicSequence(true)).thenReturn(List.of(
                 topic(readingOne, "Demo Reading", 900, LearningSkill.READING, point(matching, "PR_MATCHING_INFORMATION", "READING"))));

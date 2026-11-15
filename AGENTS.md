@@ -1,7 +1,7 @@
 # AGENTS.md - Quy tắc bắt buộc cho AI Agent
 
 - Phiên bản: 2.3
-- Cập nhật lần cuối: 2026-11-12 (ngoại lệ `chartFacts`: học viên nhận phát biểu đúng cho câu số liệu viết sai); 2026-11-11 (ghi chú gamification học từ vựng mobile ở §3.8; thêm common-llm); 2026-11-02 (thêm §3.9 và nhóm điều cấm "Pattern hệ thống" ở §5: resilience, outbox, idempotency, scheduler, storage; bổ sung Redis, Resilience4j, Micrometer/OpenTelemetry, Supabase vào stack và hai module shared mới); 2026-10-30 (Content gọi Library một chiều, Library không gọi Content; Notification đã có DB, listener và API; mặc định DB của config-repo là `localhost:5440`); 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); dữ kiện khác giữ mốc kiểm 2026-10-07 sau course path, placement recommendation và course gate
+- Cập nhật lần cuối: 2026-11-14 (bài ôn tiêu chí Writing ôn KP của mã lỗi gặp nhiều nhất); 2026-11-13 (khối `judgments` khi chấm Writing chỉ dùng KP của đề, `kpj3`); 2026-11-12 (ngoại lệ `chartFacts`: học viên nhận phát biểu đúng cho câu số liệu viết sai); 2026-11-11 (ghi chú gamification học từ vựng mobile ở §3.8; thêm common-llm); 2026-11-02 (thêm §3.9 và nhóm điều cấm "Pattern hệ thống" ở §5: resilience, outbox, idempotency, scheduler, storage; bổ sung Redis, Resilience4j, Micrometer/OpenTelemetry, Supabase vào stack và hai module shared mới); 2026-10-30 (Content gọi Library một chiều, Library không gọi Content; Notification đã có DB, listener và API; mặc định DB của config-repo là `localhost:5440`); 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); dữ kiện khác giữ mốc kiểm 2026-10-07 sau course path, placement recommendation và course gate
 - Dự án: `IELTSPath` (Maven coordinates: `com.ieltspath:code-base:1.0-SNAPSHOT`)
 - Kiến trúc chi tiết (sơ đồ, flow, data ownership, quyết định): [`docs/system-architecture.md`](docs/system-architecture.md)
 
@@ -254,26 +254,34 @@ src/main/java/com/ieltspath/<service>
   trò (`work_items`, `WorkItemSync` đồng bộ khi mở danh sách và mỗi 3 giờ qua `WorkItemSyncJob`, khóa advisory để chỉ một instance chạy), thống kê câu và chất lượng cây (`learning-staff-area-v1.md`).
 - Essay: sửa và nộp lại essay lesson tối đa 3 lần, chỉ từ bản mới nhất (`essay-revision-v1.md`); học viên có tín dụng
   nhờ Mentor chữa essay lesson/Practice đã chấm (`human-review-v1.md`), chỉ là phản hồi: không đổi bằng chứng, cổng hay bài ôn.
-- Bằng chứng essay (lesson và Practice): KP của đề nhận `passed`; mỗi tiêu chí rubric (TA/TR, CC, LR, GRA) là một bằng chứng
-  riêng cho KP tiêu chí được ánh xạ (`DEMO_WRITING_CRITERION_*`, bảng `writing_criterion_knowledge_points` ở Content), đúng khi
-  band tiêu chí >= `passBand`. Các KP con trong `subKnowledgePoints` được đánh giá cùng band trong đúng một request LLM
-  (`kpj2`, nối hướng dẫn vào template band `v1` nguyên vẹn): chỉ `PASS`/
-  `FAIL` có excerpt nguyên văn mới ghi evidence, không phụ thuộc passBand; `NOT_ASSESSED` không ghi. Correction có error type
-  gắn KP con có thể hạ `PASS` hoặc nâng `NOT_ASSESSED` thành `FAIL`. KP tiêu chí thắng nếu cùng ID; KP con thắng KP của đề.
-  `judgments` thiếu/sai thì giữ band hợp lệ, KP `NOT_ASSESSED` trừ `FAIL` từ correction đã kiểm tra. Hai phần đến từ cùng
-  output AI; đối chiếu correction là luật application. `EssayKnowledgeJudge` không dùng LLM/clock; catalog Content được
-  lấy khi cần qua supplier do grader cung cấp, tối đa một lần. Không có call
-  sửa JSON hay HTTP retry tự động cho 429/503; JSON/band sai là `INVALID_GRADE`, không thu points. Timeout chung
+- Bằng chứng essay (lesson và Practice): mỗi tiêu chí rubric (TA/TR, CC, LR, GRA) là một bằng chứng riêng cho KP tiêu
+  chí được ánh xạ (`DEMO_WRITING_CRITERION_*`, bảng `writing_criterion_knowledge_points` ở Content), đúng khi band tiêu chí
+  >= `passBand`. Khối `judgments` trong prompt chỉ chứa KP gắn với đề (`question_knowledge_points`, tối đa 4, theo thứ tự của
+  đề; KP mà catalog không tra được thì bỏ khỏi prompt) và được đánh giá cùng band trong đúng một request LLM (`kpj3`, file
+  `essay-kp-judgment-v3.txt`); đề không có KP thì không có khối `judgments` và `judgmentVersion` null. Không còn dùng KP con theo tiêu chí
+  (`subKnowledgePoints`) khi dựng prompt; dữ liệu và API cũ giữ nguyên để đọc bài `kpj2`. Chỉ `PASS`/`FAIL` có excerpt
+  nguyên văn mới được nhận. KP của đề có judgment `PASS` ghi đúng, `FAIL` ghi sai; `NOT_ASSESSED`, hoặc KP không có trong
+  prompt (bị bỏ, hoặc vượt 4), nhận đạt/trượt của cả bài như trước. Correction có error type gắn đúng KP của đề có thể hạ
+  `PASS` xuống `NOT_ASSESSED` hoặc nâng `NOT_ASSESSED` thành `FAIL`. KP tiêu chí thắng nếu cùng ID; judgment của KP đề thắng
+  kết quả cả bài. KP của mã lỗi trong correction không tạo bằng chứng. Bài `kpj2` cũ đi theo luật cũ (KP con theo tiêu chí).
+  Judgment của KP đề nằm ở trường `taskKnowledgePointJudgments` của grade (không thuộc tiêu chí nào; `criteria[].knowledgePointJudgments`
+  luôn rỗng với bài `kpj3`); bài cũ đọc thành `[]`. `judgments` thiếu/sai thì giữ band hợp lệ, KP `NOT_ASSESSED` trừ `FAIL` từ correction
+  đã kiểm tra. Hai phần đến từ cùng output AI; đối chiếu correction là luật application. `EssayKnowledgeJudge` không dùng
+  LLM/clock; catalog Content được lấy qua supplier do grader cung cấp, tối đa một lần mỗi lần chấm, và chỉ khi đề có KP.
+  Không có call sửa JSON hay HTTP retry tự động cho 429/503; JSON/band sai là `INVALID_GRADE`, không thu points. Timeout chung
   `learning.writing.grading-timeout-seconds` mặc định 20 giây, không còn timeout/skip riêng cho judgment; quota một lượt.
-  `promptVersion` vẫn `+tplv1` cho activation band; `judgmentVersion=kpj2` ở JSON lưu bất cứ khi nào rubric có KP con (prompt đã nối hướng dẫn),
-  kể cả khi mô hình không trả mảng judgments; không có KP con thì null và không cần mảng judgments.
-  API không phát `judgmentVersion`. KP tiêu chí / KP con lưu trong JSON grade; bài cũ chưa có judgments đọc thành `[]`.
+  `promptVersion` vẫn `+tplv1`/`+tplv2`/`+tplv3` cho activation band; `judgmentVersion=kpj3` ở JSON lưu bất cứ khi nào prompt có
+  khối `judgments`, kể cả khi mô hình không trả mảng. API không phát `judgmentVersion`. Luyện tập tự do (`PT-WRITING-*`, kho đề
+  `SubmitFreeWritingUseCase`) cũng nhận judgments và gợi ý học nhưng **không ghi mastery**.
   Event essay vẫn một dòng cho KP của đề, `error_code` là mã lỗi gặp nhiều nhất. Bằng chứng tiêu chí và KP con của essay
-  Practice không được XP mốc. Essay lesson/Practice tính evidence có thể tạo bài ôn tùy chọn `WRITING_CRITERION` cho KP
-  tiêu chí rớt (mặc định tối đa 2, `learning.writing.criterion-review-limit`); không tạo cho bài viết tự do, revision hay KP con.
+  Practice không được XP mốc. Essay lesson/Practice tính evidence có thể tạo bài ôn tùy chọn `WRITING_CRITERION` cho tiêu chí
+  rớt (mặc định tối đa 2, `learning.writing.criterion-review-limit`): tiêu chí rớt quyết định có bài ôn, còn nội dung ôn là KP của mã lỗi
+  gặp nhiều nhất thuộc tiêu chí đó (đếm từ corrections không phải `SUGGESTION`, hòa thì `severity` cao hơn rồi mã A→Z), dự phòng là KP tiêu
+  chí; `review_items.criterion_knowledge_point_id` giữ KP tiêu chí để Mentor nâng/đóng đúng bài ôn. Không tạo cho bài viết tự do, revision hay KP của đề.
   Mỗi KP tiêu chí có 3 bộ luyện tự do demo (`PS-WCR-*`, V70;
-  nội dung AI soạn, cần giám khảo IELTS duyệt). Kết quả chấm trả thêm `studyPoints` (KP tiêu chí yếu, KP con `FAIL` và `focus`
-  của LLM), tính một lần lúc chấm và lưu trong JSON bài chấm; bài cũ trả mảng rỗng.
+  nội dung AI soạn, cần giám khảo IELTS duyệt). Kết quả chấm trả thêm `studyPoints` (KP tiêu chí yếu, KP của đề có judgment
+  `FAIL`, đặt sau các gợi ý tiêu chí và trước `focus` của LLM, không có `criterionCode`/`band`; rồi `focus` của LLM), tính một
+  lần lúc chấm và lưu trong JSON bài chấm; bài cũ trả mảng rỗng.
 - Luyện tự do theo KP (`POST /knowledge-points/{id}/free-practice`) không bao giờ chặn đường học: trượt không sinh bài
   ôn chặn và không khóa gì; mỗi KP luôn giữ lại `learning.free-practice.reserve` gói chưa xem cho bài ôn
   (`free-practice-v1.md`). Bằng chứng luyện tự do là bằng chứng luyện tập (trọng số và trần 3 bài luyện của MP-1.0).

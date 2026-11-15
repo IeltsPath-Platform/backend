@@ -33,6 +33,9 @@ Phải chạy lại eval prompt v1 với danh mục mới và so với số nề
 - Sửa một câu: ví dụ minh họa lỗi phải là câu mới, không lấy từ bài (bản cũ dễ hiểu thành "một câu khác trong bài").
 - Giữ yêu cầu liệt kê mọi lỗi; độ trễ với bài dài đo ở spike phase 0.
 - Giữ định nghĩa ERROR (vi phạm quy tắc) và SUGGESTION (đúng nhưng có cách rõ ràng tốt hơn).
+- **2026-11-12: chủ sản phẩm quyết bật v2 làm template mặc định** (`learning.writing.default-template: v2`) mà không chờ
+  examiner chấm gold set và không qua evaluation. Chưa có số đo chất lượng của v2. Activation từ evaluation (nếu có) vẫn
+  ghi đè; quay lại v1 bằng `LEARNING_WRITING_DEFAULT_TEMPLATE=v1`.
 
 ## 3. Ngưỡng band (phase 6)
 

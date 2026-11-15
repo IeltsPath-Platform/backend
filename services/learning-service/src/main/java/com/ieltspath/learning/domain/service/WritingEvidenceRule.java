@@ -16,10 +16,11 @@ import java.util.List;
 import java.util.ArrayList;
 
 /**
- * Turns one graded essay into mastery outcomes. The question's knowledge points take the essay's pass. Each rubric
- * criterion that names a knowledge point is evidence for that point on its own, correct when its band reaches the
- * pass band. Judged sub knowledge points add evidence independently of the essay pass mark. A point that is both a
- * question point and a criterion point takes the criterion's result; two criteria on one point must both pass.
+ * Turns one graded essay into mastery outcomes. A question knowledge point that the model judged PASS or FAIL takes that
+ * judgment; one it could not assess, or that was not put to it, takes the essay's pass. Each rubric criterion that names a
+ * knowledge point is evidence for that point on its own, correct when its band reaches the pass band, and wins over a
+ * judgment of the same point. Judged sub knowledge points of grades made before the question's points were judged add
+ * evidence independently of the essay pass mark. Two criteria on one point must both pass.
  */
 public final class WritingEvidenceRule {
 
@@ -51,8 +52,10 @@ public final class WritingEvidenceRule {
                 boolean reached = criterion.band().compareTo(passBand) >= 0;
                 UUID kp = criterion.knowledgePointId();
                 if (!reached && criterion.code() != null) {
+                    // The review practises the point of the error this criterion's essay made most, when it has one.
                     failedCriteria.add(new FailedWritingCriterion(kp,
-                            "DEMO_WRITING_CRITERION_" + criterion.code(), criterion.band()));
+                            "DEMO_WRITING_CRITERION_" + criterion.code(), criterion.band())
+                            .withReviewPoints(WritingErrorCriteria.reviewPoints(grade.corrections(), criterion.code())));
                 }
                 if (decidedByCriteria.add(kp)) correct.put(kp, reached);
                 else correct.put(kp, correct.get(kp) && reached);
@@ -73,6 +76,17 @@ public final class WritingEvidenceRule {
                 }
             }
         }
+        // The question's own points: a judgment overrides the essay's pass. It is not a criterion result, so it does not
+        // join the points that criterion evidence alone decides.
+        if (grade != null) {
+            for (WritingGrade.KnowledgeJudgment judgment : grade.taskKnowledgePointJudgments()) {
+                if (judgment == null || judgment.knowledgePointId() == null
+                        || judgment.judgment() == WritingGrade.Judgment.NOT_ASSESSED) continue;
+                UUID kp = judgment.knowledgePointId();
+                if (decidedByCriteria.contains(kp) || decidedByJudgments.contains(kp)) continue;
+                correct.put(kp, judgment.judgment() == WritingGrade.Judgment.PASS);
+            }
+        }
         Set<UUID> decidedPoints = new LinkedHashSet<>(decidedByCriteria);
         decidedPoints.addAll(decidedByJudgments);
         return new Outcome(correct, decidedPoints, dominantErrorCode(grade), failedCriteria);
@@ -83,7 +97,7 @@ public final class WritingEvidenceRule {
         if (grade == null || grade.corrections() == null) return null;
         Map<String, Integer> counts = new TreeMap<>();
         for (WritingGrade.Correction correction : grade.corrections()) {
-            if (correction == null || correction.isSuggestion() || correction.errorCode() == null
+            if (correction == null || correction.suggestionOnly() || correction.errorCode() == null
                     || correction.errorCode().isBlank()) continue;
             counts.merge(correction.errorCode(), 1, Integer::sum);
         }

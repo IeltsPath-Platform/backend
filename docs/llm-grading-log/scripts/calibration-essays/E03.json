@@ -1,0 +1,9 @@
+{
+  "intendedBands": {"TA": 6, "CC": 6, "LR": 6, "GRA": 6},
+  "note": "Accurate data and an overview, simple vocabulary, some article and verb errors. Written by the assistant for calibration; needs examiner review.",
+  "knowledgePointCodes": ["DEMO_READING_W1_CHART", "DEMO_WRITING_TREND_LANGUAGE"],
+  "task": "TASK_1",
+  "stem": "The table below shows the average number of visits each person made to public libraries in one year, by age group, in 2000 and in 2020. Under 16: 9 visits in 2000 and 6 in 2020; 16 to 24: 4 and 3; 25 to 44: 5 and 4; 45 to 64: 7 and 5; 65 and over: 11 and 12. Summarise the information by selecting and reporting the main features, and make comparisons where relevant.",
+  "chartFacts": "Average library visits per person per year. Under 16: 2000 9, 2020 6. 16 to 24: 2000 4, 2020 3. 25 to 44: 2000 5, 2020 4. 45 to 64: 2000 7, 2020 5. 65 and over: 2000 11, 2020 12.",
+  "essay": "The table shows the average number of times people of different ages went to public libraries in 2000 and 2020.\n\nOverall, most age groups visited the library less in 2020 than in 2000. The only group which visited more was people aged 65 and over, and they also had the highest number in both years.\n\nIn 2000, people over 65 visited library 11 times a year, and children under 16 visited 9 times. People between 45 and 64 went 7 times, while the 25 to 44 group went 5 times and the 16 to 24 group only 4 times, which was the lowest.\n\nIn 2020, the number of visits of children decreased to 6, which is a big drop. Also the 45 to 64 group fell from 7 to 5. The visits of people aged 16 to 24 and 25 to 44 was decreased slightly, to 3 and 4 times. However, the oldest people went to library more often, the number increased to 12 visits. So elderly people use library the most in both years."
+}

@@ -84,9 +84,10 @@ public class ContentErrorTypeClient implements ErrorTypeCatalog {
         }
         return response.stream().filter(Objects::nonNull).filter(item -> item.code() != null)
                 .map(item -> new ErrorType(item.code(), Objects.toString(item.name(), item.code()),
-                        Objects.toString(item.fixHint(), ""))).toList();
+                        Objects.toString(item.fixHint(), ""), item.modelDefinition(), item.writingTasks())).toList();
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    private record ErrorTypeResponse(String code, String name, String category, int severity, String fixHint) {}
+    private record ErrorTypeResponse(String code, String name, String category, int severity, String fixHint,
+                                     String modelDefinition, List<String> writingTasks) {}
 }

@@ -107,6 +107,16 @@ public class PaywallGate {
                     grandfathered, premium());
         }
 
+        /**
+         * Whether a paying course teaches the point in one of the first lessons of its skill, the ones it shows free: the same
+         * rule as {@link #freePreview} for a lesson, read from the earliest lesson that teaches the point. Whether this learner
+         * has paid does not matter, so a Premium learner still sees which points are the free ones; a free course has no preview.
+         */
+        public boolean knowledgePointFreePreview(Topic topic, KnowledgePoint point) {
+            UUID courseId = topic.course() == null ? null : topic.course().courseId();
+            return freePreview(courseId, point.earliestLessonPosition());
+        }
+
         public void requireLessonOpen(Lesson lesson, LessonProgress lessonProgress, Set<LearningSkill> skills) {
             if (!lessonOpen(lesson, lessonProgress, skills)) {
                 throw new LearningGateException("PAYWALL", java.util.List.of());

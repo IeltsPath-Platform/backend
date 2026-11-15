@@ -193,9 +193,41 @@ public interface LearningContentClient {
     record SubKnowledgePoint(UUID id, String code, String name, String description) {}
     record RubricBandDescriptor(java.math.BigDecimal band, String descriptor) {}
     record RubricExample(java.math.BigDecimal band, String prompt, String essay, String commentary) {}
-    record ErrorType(String code, String name, String category, int severity, String fixHint, UUID knowledgePointId) {
+    /**
+     * {@code modelDefinition} is the English definition shown to the grader model, null when Content has none.
+     * {@code writingTasks} lists TASK_1 or TASK_2; an empty list (also what an older Content sends) means both tasks.
+     */
+    record ErrorType(String code, String name, String category, int severity, String fixHint, UUID knowledgePointId,
+                     String modelDefinition, List<String> writingTasks, Boolean modelSelectable) {
+        public ErrorType {
+            writingTasks = writingTasks == null ? List.of() : List.copyOf(writingTasks);
+        }
+
+        /** An older Content that does not send the flag leaves it null, which reads as selectable. */
+        public ErrorType(String code, String name, String category, int severity, String fixHint, UUID knowledgePointId,
+                         String modelDefinition, List<String> writingTasks) {
+            this(code, name, category, severity, fixHint, knowledgePointId, modelDefinition, writingTasks, null);
+        }
+
+        /**
+         * False for a code that describes the whole essay (no overview, no position, a part of the question missed): the
+         * model is not offered it, because it has no passage to quote and the essay-level checks report it.
+         */
+        public boolean selectableByModel() {
+            return !Boolean.FALSE.equals(modelSelectable);
+        }
+
+        public ErrorType(String code, String name, String category, int severity, String fixHint, UUID knowledgePointId) {
+            this(code, name, category, severity, fixHint, knowledgePointId, null, List.of());
+        }
+
         public ErrorType(String code, String name, String category, int severity, String fixHint) {
             this(code, name, category, severity, fixHint, null);
+        }
+
+        /** Whether a Writing grader for the given task (TASK_1 or TASK_2) may use this code. */
+        public boolean appliesToWritingTask(String task) {
+            return writingTasks.isEmpty() || writingTasks.contains(task);
         }
     }
 

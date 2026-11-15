@@ -19,7 +19,8 @@ public record WritingSubmissionResponse(UUID submissionId, String status, String
                                         List<Correction> corrections, List<StudyPoint> studyPoints, String summary, Integer pointsCharged,
                                         String sampleAnswer, String code, String failureCode, String essayText,
                                         List<BandLimit> bandLimits, DataChecks dataChecks, TaskChecks taskChecks,
-                                        List<ErrorGroup> errorGroups, List<Priority> priorities, Revision revision) {
+                                        List<ErrorGroup> errorGroups, List<Priority> priorities, Revision revision,
+                                        List<KnowledgeJudgment> taskKnowledgePointJudgments) {
     /** Only for an essay sent again: the version it follows and how its error kinds compare with that version. */
     public record Revision(UUID previousSubmissionId, List<String> fixedCodes, List<String> repeatedCodes,
                            List<String> newCodes) {}
@@ -114,7 +115,15 @@ public record WritingSubmissionResponse(UUID submissionId, String status, String
                         point.title(), point.reason(), point.excerpt(), point.practiceKnowledgePointId())).toList(),
                 grade == null ? null : grade.summary(), result.pointsCharged(), result.sampleAnswer(), result.code(),
                 result.failureCode(), result.essayText(), bandLimits(grade), dataChecks(grade), taskChecks(grade),
-                errorGroups(grade), priorities(grade), revision(result));
+                errorGroups(grade), priorities(grade), revision(result), taskJudgments(grade));
+    }
+
+    /** The judgments of the question's own knowledge points; absent for grades made before they were asked for. */
+    private static List<KnowledgeJudgment> taskJudgments(WritingGrade grade) {
+        if (grade == null || grade.taskKnowledgePointJudgments().isEmpty()) return null;
+        return grade.taskKnowledgePointJudgments().stream().map(judgment -> new KnowledgeJudgment(
+                judgment.knowledgePointId(), judgment.code(), judgment.name(), judgment.judgment().name(),
+                judgment.excerpt(), judgment.reason())).toList();
     }
 
     private static Revision revision(WritingSubmissionResult result) {

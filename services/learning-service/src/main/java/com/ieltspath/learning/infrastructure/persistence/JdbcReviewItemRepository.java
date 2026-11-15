@@ -1,5 +1,6 @@
 package com.ieltspath.learning.infrastructure.persistence;
 
+import com.ieltspath.learning.domain.vo.BlockingReviewSummary;
 import com.ieltspath.learning.domain.vo.FailedWritingCriterion;
 import com.ieltspath.learning.domain.aggregate.ReviewItem;
 import com.ieltspath.learning.domain.entity.ReviewSet;
@@ -61,6 +62,39 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
                 row.getObject("lesson_id", UUID.class), row.getObject("knowledge_point_id", UUID.class),
                 row.getString("skill") == null ? null : LearningSkill.valueOf(row.getString("skill")),
                 row.getBoolean("blocking"), row.getString("trigger_kind")));
+    }
+
+    @Override
+    public Map<UUID, BlockingReviewSummary> findBlockingByPoint(UUID userId, Collection<UUID> knowledgePointIds) {
+        if (knowledgePointIds.isEmpty()) return Map.of();
+        // One row per point: its PENDING review when it has one (there can be only one), else the latest finished one.
+        List<BlockingReviewSummary> rows = jdbc.query("""
+                SELECT DISTINCT ON (r.knowledge_point_id)
+                       r.id, r.knowledge_point_id, r.lesson_id, r.status, r.created_at, r.done_at,
+                       (SELECT count(*) FROM review_sets c WHERE c.review_item_id = r.id AND c.submitted_at IS NOT NULL) AS sets_answered,
+                       latest.correct_count, latest.total_count
+                FROM review_items r
+                LEFT JOIN LATERAL (
+                    SELECT s.correct_count, s.total_count FROM review_sets s
+                    WHERE s.review_item_id = r.id AND s.submitted_at IS NOT NULL
+                    ORDER BY s.submitted_at DESC LIMIT 1
+                ) latest ON TRUE
+                WHERE r.user_id = :userId AND r.blocking AND r.knowledge_point_id IN (:ids)
+                ORDER BY r.knowledge_point_id, (r.status = 'PENDING') DESC, r.created_at DESC, r.id
+                """, Map.of("userId", userId, "ids", knowledgePointIds), (row, index) -> {
+            var doneAt = row.getTimestamp("done_at");
+            int correct = row.getInt("correct_count");
+            Integer lastCorrect = row.wasNull() ? null : correct;
+            int total = row.getInt("total_count");
+            Integer lastTotal = row.wasNull() ? null : total;
+            return new BlockingReviewSummary(row.getObject("id", UUID.class),
+                    row.getObject("knowledge_point_id", UUID.class), row.getObject("lesson_id", UUID.class),
+                    ReviewStatus.valueOf(row.getString("status")), row.getTimestamp("created_at").toInstant(),
+                    doneAt == null ? null : doneAt.toInstant(), row.getInt("sets_answered"), lastCorrect, lastTotal);
+        });
+        Map<UUID, BlockingReviewSummary> byPoint = new HashMap<>();
+        for (BlockingReviewSummary row : rows) byPoint.put(row.knowledgePointId(), row);
+        return byPoint;
     }
 
     @Override
@@ -217,7 +251,8 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
         return jdbc.query("""
                 UPDATE review_items SET blocking = TRUE
                 WHERE user_id = :userId AND status = 'PENDING' AND blocking = FALSE
-                  AND trigger_kind = 'WRITING_CRITERION' AND knowledge_point_id IN (:kpIds)
+                  AND trigger_kind = 'WRITING_CRITERION'
+                  AND (knowledge_point_id IN (:kpIds) OR criterion_knowledge_point_id IN (:kpIds))
                   AND source_submission_id IS DISTINCT FROM :submissionId
                 RETURNING id, knowledge_point_id, stage
                 """, params, (row, index) -> new PromotedReview(
@@ -231,7 +266,8 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
         jdbc.update("""
                 UPDATE review_items SET status = 'DONE', done_at = now()
                 WHERE user_id = :userId AND status = 'PENDING' AND blocking = FALSE
-                  AND trigger_kind = 'WRITING_CRITERION' AND knowledge_point_id IN (:kpIds)
+                  AND trigger_kind = 'WRITING_CRITERION'
+                  AND (knowledge_point_id IN (:kpIds) OR criterion_knowledge_point_id IN (:kpIds))
                 """, Map.of("userId", userId, "kpIds", knowledgePointIds));
     }
 
@@ -241,17 +277,27 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
         if (criteria.isEmpty()) return;
         jdbc.getJdbcOperations().batchUpdate("""
                 INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status, skill, trigger_kind,
-                                          blocking, source_submission_id)
-                VALUES (?, ?, ?, ?, 'PENDING', ?, ?, FALSE, ?)
+                                          blocking, source_submission_id, criterion_knowledge_point_id)
+                SELECT CAST(? AS uuid), CAST(? AS uuid), CAST(? AS uuid), CAST(? AS uuid), 'PENDING', CAST(? AS varchar),
+                       CAST(? AS varchar), FALSE, CAST(? AS uuid), CAST(? AS uuid)
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM review_items waiting
+                    WHERE waiting.user_id = ? AND waiting.status = 'PENDING' AND waiting.trigger_kind = ?
+                      AND (waiting.knowledge_point_id = ? OR waiting.criterion_knowledge_point_id = ?))
                 ON CONFLICT (user_id, knowledge_point_id) WHERE status = 'PENDING' DO NOTHING
                 """, criteria, criteria.size(), (statement, criterion) -> {
             statement.setObject(1, UUID.randomUUID());
             statement.setObject(2, userId);
-            statement.setObject(3, criterion.knowledgePointId());
+            statement.setObject(3, criterion.practisedPoint());
             statement.setObject(4, lessonId);
             statement.setString(5, skill.name());
             statement.setString(6, triggerKind);
             statement.setObject(7, criterion.sourceSubmissionId());
+            statement.setObject(8, criterion.knowledgePointId());
+            statement.setObject(9, userId);
+            statement.setString(10, triggerKind);
+            statement.setObject(11, criterion.knowledgePointId());
+            statement.setObject(12, criterion.knowledgePointId());
         });
     }
 

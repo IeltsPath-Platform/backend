@@ -15,6 +15,7 @@ import com.ieltspath.learning.domain.repository.MasteryProfileRepository;
 import com.ieltspath.learning.domain.repository.PracticeAttemptRepository;
 import com.ieltspath.learning.domain.repository.ReviewItemRepository;
 import com.ieltspath.learning.domain.repository.LessonProgressRepository;
+import com.ieltspath.learning.domain.vo.BlockingReviewSummary;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,11 +37,14 @@ import java.util.UUID;
  * The learner's knowledge tree for one course: every point with the learner's standing on it, what it builds on, and
  * whether free practice is open on it, the chặng it belongs to and the lessons that teach it. Content is asked once for
  * the tree, once for the prerequisites and once for the lessons of each chặng of the course; the profiles come in one
- * query and the unseen-set counts in one call, so the number of points does not multiply the calls.
+ * query and the unseen-set counts in one call, so the number of points does not multiply the calls. Points of lower courses
+ * that the course builds on come back as {@code referencePoints}, one more call to Content for each level followed.
  */
 @Service
 public class GetLearnerTreeUseCase {
     private static final Logger log = LoggerFactory.getLogger(GetLearnerTreeUseCase.class);
+    /** How many levels of lower-course prerequisites are followed: what the course builds on, and what that builds on. */
+    static final int REFERENCE_DEPTH = 3;
 
     private final LearnerCurriculumRepository curricula;
     private final MasteryProfileRepository profiles;
@@ -118,6 +122,14 @@ public class GetLearnerTreeUseCase {
         Set<UUID> grandfatheredPoints = ids.isEmpty() ? Set.of()
                 : lessonProgress.findGrandfatheredKnowledgePointIds(userId);
 
+        List<ReferencePoint> references = referencePoints(courseId, points.keySet(), prerequisites, topicSequence);
+        // The blocking reviews stay on the map after they are finished, so the history is read for every point drawn.
+        Set<UUID> drawn = new HashSet<>(parentIds);
+        references.forEach(reference -> drawn.add(reference.knowledgePointId()));
+        Map<UUID, BlockingReviewSummary> blocking = drawn.isEmpty() ? Map.of()
+                : reviews.findBlockingByPoint(userId, drawn.stream().sorted(Comparator.comparing(UUID::toString)).toList());
+        if (blocking == null) blocking = Map.of();
+
         List<Node> nodes = new ArrayList<>();
         PaywallGate.Request paywallRequest = paywall.forLearner(userId);
         for (UUID id : parentIds) {
@@ -131,6 +143,7 @@ public class GetLearnerTreeUseCase {
                 locked = true;
             }
             boolean practiceAvailable = unseen.getOrDefault(id, 0) > reserve && !locked;
+            boolean freePreview = paywallRequest.knowledgePointFreePreview(topicByPoint.get(id), point);
             nodes.add(new Node(id, point.code(), point.name(), point.skill(), point.learningType(),
                     point.cefrLevel(), point.canDo(),
                     profile == null ? null : profile.mastery(),
@@ -139,9 +152,74 @@ public class GetLearnerTreeUseCase {
                     profile == null ? null : profile.nextReviewAt(),
                     prerequisites.getOrDefault(id, List.of()),
                     locked, practiceAvailable, trapsByParent.getOrDefault(id, List.of()),
-                    teachingTopic(topicByPoint.get(id), topicPosition), lessonsByPoint.getOrDefault(id, List.of())));
+                    teachingTopic(topicByPoint.get(id), topicPosition), lessonsByPoint.getOrDefault(id, List.of()),
+                    freePreview, blockingReview(blocking.get(id))));
         }
-        return new Result(courseId, nodes);
+        List<ReferencePoint> withReviews = new ArrayList<>();
+        for (ReferencePoint reference : references) {
+            withReviews.add(reference.withBlockingReview(blockingReview(blocking.get(reference.knowledgePointId()))));
+        }
+        return new Result(courseId, nodes, withReviews);
+    }
+
+    private static BlockingReview blockingReview(BlockingReviewSummary summary) {
+        return summary == null ? null : new BlockingReview(summary.reviewId(), summary.status().name(), summary.lessonId(),
+                summary.createdAt(), summary.doneAt(), summary.setsAnswered(), summary.lastCorrect(), summary.lastTotal());
+    }
+
+    /**
+     * The points of lower courses that the course builds on, and what those build on in turn, for the chart to draw before the
+     * course's own points. A course does not re-teach what a lower course teaches, so these are not in its tree; they are
+     * named here only so the order of learning is not cut off at the course's edge. Content is asked for the prerequisites of
+     * one level at a time, at most {@link #REFERENCE_DEPTH} levels, however many points there are. A prerequisite that no other
+     * course owns (a point Content no longer lists) is left out.
+     */
+    private List<ReferencePoint> referencePoints(UUID courseId, Set<UUID> inCourse, Map<UUID, List<UUID>> prerequisites,
+                                                 List<Topic> topicSequence) {
+        Map<UUID, ReferencePoint> found = new LinkedHashMap<>();
+        Map<UUID, Topic> owner = new HashMap<>();
+        Map<UUID, List<Topic>> topicsByCourse = new LinkedHashMap<>();
+        for (Topic topic : topicSequence) {
+            if (topic.course() == null || courseId.equals(topic.course().courseId())) continue;
+            topicsByCourse.computeIfAbsent(topic.course().courseId(), ignored -> new ArrayList<>()).add(topic);
+            for (KnowledgePoint point : topic.knowledgePoints()) {
+                if (point.parentKnowledgePointId() == null) owner.putIfAbsent(point.id(), topic);
+            }
+        }
+        if (owner.isEmpty()) return List.of();
+        Map<UUID, Map<UUID, Integer>> positions = new HashMap<>();
+        topicsByCourse.forEach((id, topics) -> positions.put(id, positionsInSkill(topics)));
+
+        Map<UUID, List<UUID>> known = prerequisites;
+        Set<UUID> frontier = referencedOutside(known, inCourse, found.keySet());
+        for (int level = 0; level < REFERENCE_DEPTH && !frontier.isEmpty(); level++) {
+            List<UUID> wanted = frontier.stream().filter(owner::containsKey).sorted(Comparator.comparing(UUID::toString)).toList();
+            if (wanted.isEmpty()) break;
+            Map<UUID, List<UUID>> next = content.prerequisites(wanted);
+            if (next == null) next = Map.of();
+            for (UUID id : wanted) {
+                Topic topic = owner.get(id);
+                KnowledgePoint point = topic.knowledgePoints().stream().filter(candidate -> id.equals(candidate.id())).findFirst().orElseThrow();
+                found.put(id, new ReferencePoint(id, point.code(), point.name(), point.skill(), point.cefrLevel(),
+                        next.getOrDefault(id, List.of()),
+                        new ReferenceCourse(topic.course().courseId(), topic.course().name(), topic.course().bandLevel()),
+                        new TeachingTopic(topic.topicId(), topic.name(),
+                                positions.getOrDefault(topic.course().courseId(), Map.of()).getOrDefault(topic.topicId(), 0))));
+            }
+            known = next;
+            frontier = referencedOutside(known, inCourse, found.keySet());
+        }
+        return List.copyOf(found.values());
+    }
+
+    private static Set<UUID> referencedOutside(Map<UUID, List<UUID>> prerequisites, Set<UUID> inCourse, Set<UUID> already) {
+        Set<UUID> outside = new HashSet<>();
+        for (List<UUID> ids : prerequisites.values()) {
+            for (UUID id : ids) {
+                if (!inCourse.contains(id) && !already.contains(id)) outside.add(id);
+            }
+        }
+        return outside;
     }
 
     /** The place of each chặng inside its own skill, counted from 1: the number the course page shows on it. */
@@ -198,15 +276,34 @@ public class GetLearnerTreeUseCase {
      * zero, until the point has evidence. {@code practiceAvailable} says whether free practice can start on it.
      * {@code topic} is the chặng that owns the point and {@code lessons} are the lessons of the course that teach it; they
      * are what the learner opens to learn it, as opposed to {@code prerequisiteIds}, which only orders the points.
+     * {@code freePreview} marks a point that a paying course teaches in one of the first lessons of its skill, the lessons it
+     * shows free; it says nothing of what this learner has bought, which {@code locked} does. {@code blockingReview} is the
+     * learner's blocking review of the point, pending or finished, and null when it never had one.
      */
     public record Node(UUID knowledgePointId, String code, String name, String skill, String kind, String cefrLevel,
                        String canDo, Double mastery,
                        String tier, int evidenceCount, Instant nextReviewAt, List<UUID> prerequisiteIds,
                        boolean locked, boolean practiceAvailable, List<ErrorTrapPoint> errorTraps,
-                       TeachingTopic topic, List<TeachingLesson> lessons) {
+                       TeachingTopic topic, List<TeachingLesson> lessons, boolean freePreview,
+                       BlockingReview blockingReview) {
         public Node {
             errorTraps = errorTraps == null ? List.of() : List.copyOf(errorTraps);
             lessons = lessons == null ? List.of() : List.copyOf(lessons);
+        }
+        public Node(UUID knowledgePointId, String code, String name, String skill, String kind, String cefrLevel,
+                    String canDo, Double mastery, String tier, int evidenceCount, Instant nextReviewAt,
+                    List<UUID> prerequisiteIds, boolean locked, boolean practiceAvailable,
+                    List<ErrorTrapPoint> errorTraps, TeachingTopic topic, List<TeachingLesson> lessons,
+                    boolean freePreview) {
+            this(knowledgePointId, code, name, skill, kind, cefrLevel, canDo, mastery, tier, evidenceCount,
+                    nextReviewAt, prerequisiteIds, locked, practiceAvailable, errorTraps, topic, lessons, freePreview, null);
+        }
+        public Node(UUID knowledgePointId, String code, String name, String skill, String kind, String cefrLevel,
+                    String canDo, Double mastery, String tier, int evidenceCount, Instant nextReviewAt,
+                    List<UUID> prerequisiteIds, boolean locked, boolean practiceAvailable,
+                    List<ErrorTrapPoint> errorTraps, TeachingTopic topic, List<TeachingLesson> lessons) {
+            this(knowledgePointId, code, name, skill, kind, cefrLevel, canDo, mastery, tier, evidenceCount,
+                    nextReviewAt, prerequisiteIds, locked, practiceAvailable, errorTraps, topic, lessons, false);
         }
         public Node(UUID knowledgePointId, String code, String name, String skill, String kind, String cefrLevel,
                     String canDo, Double mastery, String tier, int evidenceCount, Instant nextReviewAt,
@@ -236,5 +333,45 @@ public class GetLearnerTreeUseCase {
     public record TeachingLesson(UUID lessonId, String title, int position, UUID topicId, String topicName,
                                  int topicPosition) {}
 
-    public record Result(UUID courseId, List<Node> knowledgePoints) {}
+    /**
+     * The learner's blocking review of a point, kept after it is finished so the tree can still show it. {@code status} is
+     * PENDING, DONE or SKIPPED; {@code lessonId} is the lesson that raised it; {@code doneAt} is null while it is pending;
+     * {@code setsAnswered} counts the sets the learner has submitted and {@code lastCorrect} and {@code lastTotal} score the
+     * latest (null before any).
+     */
+    public record BlockingReview(UUID reviewId, String status, UUID lessonId, Instant createdAt, Instant doneAt,
+                                 int setsAnswered, Integer lastCorrect, Integer lastTotal) {}
+
+    /**
+     * A point of a lower course that the course builds on, named only so the chart can show the order of learning back to the
+     * start: it carries no standing of the learner and cannot be practised from this tree. {@code topic.position} counts the
+     * chặng from 1 inside its skill in its own course.
+     */
+    public record ReferencePoint(UUID knowledgePointId, String code, String name, String skill, String cefrLevel,
+                                 List<UUID> prerequisiteIds, ReferenceCourse course, TeachingTopic topic,
+                                 BlockingReview blockingReview) {
+        public ReferencePoint {
+            prerequisiteIds = prerequisiteIds == null ? List.of() : List.copyOf(prerequisiteIds);
+        }
+        public ReferencePoint(UUID knowledgePointId, String code, String name, String skill, String cefrLevel,
+                              List<UUID> prerequisiteIds, ReferenceCourse course, TeachingTopic topic) {
+            this(knowledgePointId, code, name, skill, cefrLevel, prerequisiteIds, course, topic, null);
+        }
+        /** A diagnosis can send the learner back to a point of a lower course, so a reference point can carry a review too. */
+        ReferencePoint withBlockingReview(BlockingReview review) {
+            return new ReferencePoint(knowledgePointId, code, name, skill, cefrLevel, prerequisiteIds, course, topic, review);
+        }
+    }
+
+    /** The course that owns a reference point. */
+    public record ReferenceCourse(UUID courseId, String name, java.math.BigDecimal bandLevel) {}
+
+    public record Result(UUID courseId, List<Node> knowledgePoints, List<ReferencePoint> referencePoints) {
+        public Result {
+            referencePoints = referencePoints == null ? List.of() : List.copyOf(referencePoints);
+        }
+        public Result(UUID courseId, List<Node> knowledgePoints) {
+            this(courseId, knowledgePoints, List.of());
+        }
+    }
 }

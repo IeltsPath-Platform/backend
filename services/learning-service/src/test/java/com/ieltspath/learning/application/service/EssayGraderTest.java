@@ -66,7 +66,7 @@ class EssayGraderTest {
 
     private static EssayPrompt task2() {
         return new EssayPrompt(UUID.randomUUID(), "Should cities plant more trees?", "TASK_2", 250,
-                new BigDecimal("6.0"), null, "Sample", List.of(), List.of(UUID.randomUUID()));
+                new BigDecimal("6.0"), null, "Sample", List.of(), List.of());
     }
 
     @Test
@@ -116,7 +116,7 @@ class EssayGraderTest {
 
     private static EssayPrompt task1(String chartFacts) {
         return new EssayPrompt(UUID.randomUUID(), "Summarise the chart.", "TASK_1", 150, new BigDecimal("6.0"),
-                chartFacts, "Sample", List.of(), List.of(UUID.randomUUID()));
+                chartFacts, "Sample", List.of(), List.of());
     }
 
     static String reply(String... criteria) {
@@ -157,7 +157,7 @@ class EssayGraderTest {
     void aTooShortEssayIsCappedOnTaskTwoOnlyWhenTheBandCapsAreOn() {
         llm.reply(reply(criterion("TR", "7"), criterion("CC", "6"), criterion("LR", "6"), criterion("GRA", "6")));
         WritingSettings capped = new WritingSettings(3, 50, 1000, 10000, 20, 120, 10, "Asia/Ho_Chi_Minh", 2, true,
-                new BigDecimal("5.0"), null, null, null, null, 30);
+                new BigDecimal("5.0"), null, null, null, null, 30, "v1");
         EssayGrader grader = new EssayGrader(llm, new ObjectMapper(), content, activations,
                 new EssayKnowledgeJudge(), "configured-model", capped);
 
@@ -225,95 +225,105 @@ class EssayGraderTest {
         assertEquals(1, llm.prompts.size(), "bands require only one request without sub knowledge points");
     }
 
-    @Test
-    void oneReplyGradesBandsAndSubPointsWithoutFetchingContentTwice() {
-        UUID subPointId = UUID.randomUUID();
-        UUID criterionPointId = UUID.randomUUID();
-        var points = List.of("TR", "CC", "LR", "GRA").stream().map(code -> new LearningContentClient.RubricCriterion(
-                code, code, "Criterion description", code.equals("CC") ? 2 : 1, List.of(),
-                code.equals("CC") ? criterionPointId : null,
-                code.equals("CC") ? List.of(new LearningContentClient.SubKnowledgePoint(subPointId,
-                        "DEMO_WRITING_LINKING", "Linking", "Use linkers to connect ideas")) : List.of())).toList();
-        when(content.getActiveRubric("TASK_2")).thenReturn(new LearningContentClient.Rubric("IELTS_ESSAY", "TASK_2",
-                2, "source", points, List.of()));
-        when(content.getTopicSequence()).thenReturn(List.of(new LearningContentClient.Topic(UUID.randomUUID(), "WRITING",
-                "Writing", 1, null, List.of(new LearningContentClient.KnowledgePoint(subPointId,
-                "DEMO_WRITING_LINKING", "Linking", "PROCEDURE", "WRITING", "Use linkers", true)), null,
-                false, null, null)));
-        llm.reply(reply(criterion("TR", "6"), criterion("CC", "4"), criterion("LR", "6"), criterion("GRA", "6"))
-                .replace("\"focus\":[]", "\"focus\":[],\"judgments\":[{\"criterion\":\"CC\",\"code\":\"DEMO_WRITING_LINKING\","
-                        + "\"judgment\":\"FAIL\",\"excerpt\":\"Peoples can save energy.\",\"reason\":\"Use a linker.\"}]"));
+    private static EssayPrompt task2WithPoint(UUID pointId) {
+        return new EssayPrompt(UUID.randomUUID(), "Should cities plant more trees?", "TASK_2", 250,
+                new BigDecimal("6.0"), null, "Sample", List.of(), List.of(pointId));
+    }
 
-        var result = grader.grade(task2(), ESSAY);
+    private static LearningContentClient.Topic topicWith(LearningContentClient.KnowledgePoint point) {
+        return new LearningContentClient.Topic(UUID.randomUUID(), "WRITING", "Writing", 1, null, List.of(point), null,
+                false, null, null);
+    }
+
+    @Test
+    void oneReplyGradesBandsAndTheQuestionPointsWithoutFetchingContentTwice() {
+        UUID pointId = UUID.randomUUID();
+        when(content.getTopicSequence()).thenReturn(List.of(topicWith(new LearningContentClient.KnowledgePoint(pointId,
+                "DEMO_WRITING_TOPIC_SENTENCE", "Topic sentence", "PROCEDURE", "WRITING", "Open each paragraph with its idea", true))));
+        llm.reply(reply(criterion("TR", "6"), criterion("CC", "4"), criterion("LR", "6"), criterion("GRA", "6"))
+                .replace("\"focus\":[]", "\"focus\":[],\"judgments\":[{\"code\":\"DEMO_WRITING_TOPIC_SENTENCE\","
+                        + "\"judgment\":\"FAIL\",\"excerpt\":\"Peoples can save energy.\",\"reason\":\"Thiếu câu chủ đề.\"}]"));
+
+        var result = grader.grade(task2WithPoint(pointId), ESSAY);
 
         assertEquals("IELTS_ESSAY@2+tplv1", result.promptVersion());
         assertEquals(new BigDecimal("5.5"), result.grade().overallBand());
-        assertEquals("kpj2", result.grade().judgmentVersion());
-        assertEquals(WritingGrade.Judgment.FAIL,
-                result.grade().criteria().stream().filter(item -> item.code().equals("CC")).findFirst().orElseThrow()
-                        .knowledgePointJudgments().getFirst().judgment());
+        assertEquals("kpj3", result.grade().judgmentVersion());
+        var judgment = result.grade().taskKnowledgePointJudgments().getFirst();
+        assertEquals(WritingGrade.Judgment.FAIL, judgment.judgment());
+        assertEquals(pointId, judgment.knowledgePointId());
+        assertTrue(result.grade().criteria().stream().allMatch(item -> item.knowledgePointJudgments().isEmpty()),
+                "the question's points belong to no criterion");
+        var studyPoint = result.grade().studyPoints().getFirst();
+        assertEquals(WritingGrade.StudyPoint.KNOWLEDGE_POINT, studyPoint.kind());
+        assertNull(studyPoint.criterionCode());
+        assertEquals(pointId, studyPoint.practiceKnowledgePointId());
         assertEquals(1, llm.prompts.size());
-        assertTrue(llm.prompts.getFirst()[0].contains("DEMO_WRITING_LINKING"));
-        assertTrue(llm.prompts.getFirst()[0].contains("Use linkers to connect ideas"));
-        assertFalse(llm.prompts.getFirst()[0].contains(subPointId.toString()));
+        String system = llm.prompts.getFirst()[0];
+        assertTrue(system.contains("DEMO_WRITING_TOPIC_SENTENCE — Topic sentence: Open each paragraph with its idea"));
+        assertFalse(system.contains(pointId.toString()));
         verify(content, times(1)).getTopicSequence();
     }
 
     @Test
-    void optionalJudgmentsCannotInvalidateValidBandsOrTriggerAnotherCall() {
-        UUID subPointId = UUID.randomUUID();
-        var base = content.getActiveRubric("TASK_2");
-        var criteria = base.criteria().stream().map(c -> new LearningContentClient.RubricCriterion(
-                c.code(), c.name(), c.description(), c.sortOrder(), c.bandDescriptors(), c.knowledgePointId(),
-                "CC".equals(c.code()) ? List.of(new LearningContentClient.SubKnowledgePoint(subPointId,
-                        "LINKING", "Linking", "Connect ideas")) : List.of())).toList();
-        when(content.getActiveRubric("TASK_2")).thenReturn(new LearningContentClient.Rubric(
-                base.code(), base.task(), base.version(), base.sourceNote(), criteria, base.examples()));
+    void aQuestionWithoutPointsHasNoJudgmentsBlockAndNoJudgmentVersion() {
+        llm.reply(reply(criterion("TR", "6"), criterion("CC", "6"), criterion("LR", "6"), criterion("GRA", "6")));
 
-        int expectedCalls = 0;
-        for (String field : List.of("", ",\"judgments\":null", ",\"judgments\":{}",
-                ",\"judgments\":\"invalid\"", ",\"judgments\":[]",
-                ",\"judgments\":[{\"criterion\":\"CC\",\"code\":\"LINKING\",\"judgment\":\"FAIL\","
-                        + "\"excerpt\":\"not present in the essay\"}]")) {
-            llm.reply(reply(criterion("TR", "6"), criterion("CC", "6"), criterion("LR", "6"), criterion("GRA", "6"))
-                    .replace("\"focus\":[]", "\"focus\":[]" + field));
+        var result = grader.grade(task2(), ESSAY);
 
-            var result = grader.grade(task2(), ESSAY).grade();
-
-            assertEquals(new BigDecimal("6.0"), result.overallBand());
-            assertEquals(WritingGrade.Judgment.NOT_ASSESSED, result.criteria().get(1)
-                    .knowledgePointJudgments().getFirst().judgment());
-            assertTrue(result.studyPoints().isEmpty());
-            assertEquals(++expectedCalls, llm.prompts.size());
-        }
+        assertFalse(llm.prompts.getFirst()[0].contains("\"judgments\""));
+        assertNull(result.grade().judgmentVersion());
+        assertTrue(result.grade().taskKnowledgePointJudgments().isEmpty());
         verify(content, never()).getTopicSequence();
     }
 
     @Test
-    void catalogOutageFallsBackToTheCriterionKnowledgePointForPractice() {
-        UUID parentId = UUID.randomUUID();
-        UUID subPointId = UUID.randomUUID();
-        var descriptor = new LearningContentClient.RubricBandDescriptor(new BigDecimal("6.0"), "Descriptor");
-        var criteria = List.of("TR", "CC", "LR", "GRA").stream()
-                .map(code -> new LearningContentClient.RubricCriterion(code, code, "Description", 1, List.of(descriptor),
-                        code.equals("CC") ? parentId : null, code.equals("CC") ? List.of(
-                        new LearningContentClient.SubKnowledgePoint(subPointId, "DEMO_WRITING_LINKING", "Linking",
-                                "Connect ideas")) : List.of())).toList();
-        when(content.getActiveRubric("TASK_2")).thenReturn(new LearningContentClient.Rubric("IELTS_ESSAY", "TASK_2",
-                2, "source", criteria, List.of()));
+    void optionalJudgmentsCannotInvalidateValidBandsOrTriggerAnotherCall() {
+        UUID pointId = UUID.randomUUID();
+        when(content.getTopicSequence()).thenReturn(List.of(topicWith(new LearningContentClient.KnowledgePoint(pointId,
+                "LINKING", "Linking", "PROCEDURE", "WRITING", "Connect ideas", true))));
+
+        int expectedCalls = 0;
+        for (String field : List.of("", ",\"judgments\":null", ",\"judgments\":{}",
+                ",\"judgments\":\"invalid\"", ",\"judgments\":[]",
+                ",\"judgments\":[{\"code\":\"LINKING\",\"judgment\":\"FAIL\","
+                        + "\"excerpt\":\"not present in the essay\"}]")) {
+            llm.reply(reply(criterion("TR", "6"), criterion("CC", "6"), criterion("LR", "6"), criterion("GRA", "6"))
+                    .replace("\"focus\":[]", "\"focus\":[]" + field));
+
+            var result = grader.grade(task2WithPoint(pointId), ESSAY).grade();
+
+            assertEquals(new BigDecimal("6.0"), result.overallBand());
+            assertEquals(WritingGrade.Judgment.NOT_ASSESSED, result.taskKnowledgePointJudgments().getFirst().judgment());
+            assertTrue(result.studyPoints().isEmpty());
+            assertEquals(++expectedCalls, llm.prompts.size());
+        }
+    }
+
+    @Test
+    void anUnavailableCatalogGradesWithoutTheQuestionPoints() {
         when(content.getTopicSequence()).thenThrow(new com.ieltspath.learning.application.exception.LearningRequestException(
                 503, "CONTENT_UNAVAILABLE", "Content unavailable"));
-        llm.reply(reply(criterion("TR", "6.5"), criterion("CC", "5.5"), criterion("LR", "6"), criterion("GRA", "6"))
-                .replace("\"focus\":[]", "\"focus\":[],\"judgments\":[{\"criterion\":\"CC\",\"code\":\"DEMO_WRITING_LINKING\","
-                        + "\"judgment\":\"FAIL\",\"excerpt\":\"Peoples can save energy.\","
-                        + "\"reason\":\"Use a linker.\"}]"));
+        llm.reply(reply(criterion("TR", "6"), criterion("CC", "6"), criterion("LR", "6"), criterion("GRA", "6")));
 
-        var result = grader.grade(task2(), ESSAY);
+        var result = grader.grade(task2WithPoint(UUID.randomUUID()), ESSAY);
 
-        var studyPoint = result.grade().studyPoints().stream()
-                .filter(point -> WritingGrade.StudyPoint.KNOWLEDGE_POINT.equals(point.kind())).findFirst().orElseThrow();
-        assertEquals(parentId, studyPoint.practiceKnowledgePointId());
+        assertEquals(new BigDecimal("6.0"), result.grade().overallBand());
+        assertFalse(llm.prompts.getFirst()[0].contains("\"judgments\""));
+        assertNull(result.grade().judgmentVersion());
         verify(content, times(1)).getTopicSequence();
+    }
+
+    @Test
+    void aQuestionPointThatIsAlsoACriterionPointStillGoesIntoThePrompt() {
+        UUID shared = UUID.randomUUID();
+        when(content.getTopicSequence()).thenReturn(List.of(topicWith(new LearningContentClient.KnowledgePoint(shared,
+                "DEMO_WRITING_CRITERION_CC", "Coherence", "PROCEDURE", "WRITING", "Join ideas", true))));
+        llm.reply(reply(criterion("TR", "6"), criterion("CC", "6"), criterion("LR", "6"), criterion("GRA", "6")));
+
+        grader.grade(task2WithPoint(shared), ESSAY);
+
+        assertTrue(llm.prompts.getFirst()[0].contains("DEMO_WRITING_CRITERION_CC — Coherence: Join ideas"));
     }
 
     @Test

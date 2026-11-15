@@ -70,6 +70,7 @@ public class FreePracticeSubmission {
         // Only the first answer to a set counts, as in lessons; a repeat is logged but adds no evidence.
         boolean counted = !attempts.revealedPackageIds(userId).contains(attempt.packageId());
         Map<UUID, Long> durations = AnswerDurations.of(command.answers());
+        Map<UUID, String> submitted = SubmittedAnswers.of(command.answers());
         List<KnowledgeEvidence> firstAnswers = new ArrayList<>();
         List<QuestionAttemptEvent> events = new ArrayList<>();
         List<PracticeSubmission.Answer> results = new ArrayList<>();
@@ -96,7 +97,8 @@ public class FreePracticeSubmission {
             results.add(new PracticeSubmission.Answer(item.questionVersionId(), grade.correct(),
                     grade.correctAnswer(), item.explanation(),
                     hints.afterAnswer(grade.correct(), item.answerSpec(), item.options(), item.hint()),
-                    errorTrapEvidence.practiceFeedback(graded.errorCodes().get(index), errorTexts)));
+                    errorTrapEvidence.practiceFeedback(graded.errorCodes().get(index), errorTexts),
+                    submitted.get(item.questionVersionId())));
         }
         GamificationSummary xp = counted
                 ? gamificationRecorder.recordCorrectAnswers(userId, command.requestId(), graded.correctQuestionIds())
