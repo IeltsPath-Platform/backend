@@ -15,6 +15,13 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+    # db/callback holds afterMigrate__demo_data.sql: demo learner data written only when DEMO_DATA_ENABLED=true
+    # (dev/demo databases).
+    locations: classpath:db/migration,classpath:db/callback
+    placeholders:
+      demoData: ${DEMO_DATA_ENABLED:false}
+      # The learner the demo data belongs to: h2 by default; set DEMO_LEARNER_ID to give it to an existing account.
+      demoUserId: ${DEMO_LEARNER_ID:00000000-0000-0000-0000-000000000003}
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
