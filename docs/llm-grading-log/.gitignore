@@ -1,3 +1,9 @@
 ﻿runs.json
 replay-*.json
+# Output of the prompt-iteration runs (imp-E01-1.json, imp2-E01-1.json, kpj3-E01-1.json, run-v2-draft-1.json, ...)
+scripts/imp*.json
+scripts/kpj3-*.json
+scripts/run-*.json
+# Output of the runs made before the rubric draft
+scripts/runs-before-rubric-draft/
 __pycache__/
