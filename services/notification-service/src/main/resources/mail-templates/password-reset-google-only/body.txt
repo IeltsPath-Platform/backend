@@ -1,0 +1,5 @@
+Xin chào [(${displayName})],
+
+Có người vừa yêu cầu đặt lại mật khẩu cho tài khoản IELTSPath này. Tài khoản của bạn được tạo bằng Google nên không có mật khẩu để đặt lại. Bạn chỉ cần chọn "Tiếp tục với Google" ở màn hình đăng nhập.
+
+Nếu không phải bạn yêu cầu, bạn không cần làm gì thêm: tài khoản vẫn an toàn.

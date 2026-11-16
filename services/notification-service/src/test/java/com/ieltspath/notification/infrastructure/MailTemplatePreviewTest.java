@@ -42,6 +42,7 @@ class MailTemplatePreviewTest {
             case PASSWORD_RESET -> Map.of("displayName", "Nguyễn An", "resetLink", LINK, "expiresInMinutes", 15L);
             case PASSWORD_CHANGED -> Map.of("displayName", "Nguyễn An", "changedAt", "10:30 10/11/2026");
             case GOOGLE_ACCOUNT_LINKED -> Map.of("displayName", "Nguyễn An");
+            case PASSWORD_RESET_GOOGLE_ONLY -> Map.of("displayName", "Nguyễn An");
             case EMAIL_VERIFICATION -> Map.of("displayName", "Nguyễn An", "verifyLink", LINK, "expiresInMinutes", 60L);
             case SUBSCRIPTION_EXPIRING, SUBSCRIPTION_EXPIRED, SUBSCRIPTION_GRANTED ->
                     Map.of("displayName", "Nguyễn An", "endsAt", "10:30 10/12/2026");

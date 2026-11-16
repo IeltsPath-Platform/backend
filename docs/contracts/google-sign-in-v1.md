@@ -32,7 +32,9 @@ the same state.
 
 When the existing account was **unverified** and has a password, that password may have been set by someone other than the
 address owner, so the service clears it and revokes all active refresh tokens while holding the per-user lock. Password
-sign-in then fails until the user sets a new password through the reset email flow. A **verified** account keeps its
+sign-in then fails until the user sets a new password through the reset email flow (`users.password_cleared_at` records this, so the
+reset flow stays open for it; an account created by Google has no password and gets a "use Google" mail instead, see
+[password-reset-google-only-v1](password-reset-google-only-v1.md)). A **verified** account keeps its
 password and can sign in with either method. A `user.google-account-linked.v1` event is published whenever a Google identity
 is newly linked to an account that already existed.
 

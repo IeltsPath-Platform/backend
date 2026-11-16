@@ -63,7 +63,7 @@ after grading as a best-effort read. Report and tree responses nest children wit
 Chi tiết schema: [`.sdd/database/DATABASE_V5.md`](../.sdd/database/DATABASE_V5.md). Service Java tự chạy Flyway khi khởi
 động (`src/main/resources/db/migration`).
 Gateway giữ các path công khai nhưng trỏ từng nhóm tới chủ sở hữu mới; không còn route tổng quát
-`/api/learning-support/**`. Library V2 có bốn FK `ON DELETE RESTRICT` tới catalog; không có bảng `outbox_events`.
+`/api/learning-support/**`. Library V2 có bốn FK `ON DELETE RESTRICT` tới catalog. Library V43 thêm `outbox_events` và relay cho nhắc ôn từ vựng hằng ngày (`library.vocabulary-review-due.v1`).
 
 ## 3. Giao tiếp giữa service
 
@@ -156,6 +156,7 @@ Luồng `SubscriptionGranted` của Access thông báo cho người dùng khi ad
 | Producer | Consumer | Queue / retry / DLQ | Contract |
 | --- | --- | --- | --- |
 | Access `GrantSubscriptionUseCase` ghi `SubscriptionGranted` vào `outbox_events` cùng transaction; `AccessOutboxRelay` publish với confirm tới exchange `access.events`, routing key `access.subscription-granted.v1` | Notification `SubscriptionGrantedListener` gọi `RecordSubscriptionGrantedUseCase`; `eventId` chống ghi thông báo trùng | `notification.subscription-granted.v1`; retry `notification.subscription-granted.v1.retry`; DLQ `notification.subscription-granted.v1.dlq` | [`subscription-granted-v1.md`](contracts/subscription-granted-v1.md) |
+| Library `QueueVocabularyReviewDueUseCase` (lịch hằng ngày 08:00 giờ Việt Nam) ghi `VocabularyReviewDue` vào `outbox_events`, mỗi học viên một dòng mỗi ngày; `LibraryOutboxRelay` publish có confirm tới exchange `library.events`, routing key `library.vocabulary-review-due.v1` | Notification `VocabularyReviewDueListener` gọi `RecordVocabularyReviewDueUseCase`; `eventId` chống ghi thông báo trùng | `notification.vocabulary-review-due.v1`; retry `notification.vocabulary-review-due.v1.retry`; DLQ `notification.vocabulary-review-due.v1.dlq` | [`vocabulary-review-due-v1.md`](contracts/vocabulary-review-due-v1.md) |
 | User `ForgotPasswordUseCase` ghi token hash và `PasswordResetRequestedV1` trong cùng transaction; `UserOutboxRelay` publish có confirm, sau đó xóa payload | Notification `PasswordResetRequestedListener` gửi SMTP và deduplicates bằng `eventId` | `notification.password-reset-requested.v1` (+ retry, DLQ) | [`password-reset-requested-v1.md`](contracts/password-reset-requested-v1.md) |
 
 Lỗi xử lý tạm thời được chuyển qua retry queue; lỗi payload hoặc vi phạm contract được dead-letter. Retry queue trả message về đúng exchange nguồn với routing key ban đầu, nên consumer nhận lại đúng contract (`RetryTopologyTest`). Khi Community park message vào DLQ, consumer ghi routing key gốc vào header `x-original-routing-key`, vì routing key của dead-letter là tên DLQ; replay đọc header này để gửi lại đúng đường. Content và Game không có outbox: bảng đã bị xóa vì không có service nào đọc event của hai bên.
@@ -328,6 +329,8 @@ Backend hiện có 29 phương thức `@Scheduled` trong 28 file. Cơ chế ch�
 | access | `AccessOutboxRelayScheduler` | `FOR UPDATE SKIP LOCKED`; publish broker trong transaction ngắn | Broker trong transaction ngắn |
 | user | `UserOutboxRelayScheduler` | `FOR UPDATE SKIP LOCKED`; publish broker trong transaction ngắn | Broker trong transaction ngắn |
 | access | `SubscriptionExpiryNoticeScheduler` | Mỗi cặp (subscription, stage) được giành bằng `INSERT ... ON CONFLICT DO NOTHING` trước khi phát event; hai lịch trùng chỉ phát một lần | Không |
+| library | `VocabularyReviewDueScheduler` | Event id cố định theo (học viên, ngày) và `INSERT ... ON CONFLICT DO NOTHING` vào outbox; hai instance cùng chạy chỉ ghi một dòng | Không |
+| library | `LibraryOutboxRelayScheduler` | Giành dòng bằng `FOR UPDATE SKIP LOCKED`; publish có confirm, at-least-once | Không |
 | notification | `LearningMailScheduler` | Mỗi giám khảo được nhận job bằng một lệnh `DELETE ... RETURNING`; hai instance không nhận cùng job, job đến sau nằm cho lần sau | SMTP ngoài claim; job bị giữ lại nếu gửi lỗi hoặc chạm giới hạn ngày |
 | notification | `NotificationRetentionScheduler` | Xóa theo cutoff và lô giới hạn; chạy lặp an toàn | Không |
 | community | `CommunityOutboxRelayScheduler` | `FOR UPDATE SKIP LOCKED`; publish broker trong transaction ngắn | Broker trong transaction ngắn |
@@ -453,7 +456,7 @@ hoạt động upload.
 | Secret có giá trị fallback trong config-repo được track | Thiếu biến env thì service dùng secret công khai trong repo |
 | `.sdd/global/system-architecture.md`, `.sdd/constraints/global.md` (baseline 2026-09-18) ghi không có broker/outbox/learning service | Lỗi thời; `.sdd/global/constitution.md` vẫn là invariant cao nhất. Dữ kiện: code, `AGENTS.md`, tài liệu này |
 | Gateway CORS chỉ expose `Authorization`, `Content-Type` | Browser không đọc được header khác (ví dụ `Retry-After`) |
-| community có bảng `outbox_events` (V1) và relay (`CommunityOutboxRelay`) | Library không tạo bảng này; content và game đã bỏ bảng outbox |
+| community có bảng `outbox_events` (V1) và relay (`CommunityOutboxRelay`) | Library có bảng này từ V43 (`LibraryOutboxRelay`); content và game đã bỏ bảng outbox |
 | Consumer học chưa có automated integration test với RabbitMQ thật | Logic ack/nack/DLQ có unit test với channel giả; áp kết quả có test Postgres thật. [Live E2E 2026-10-02](../plans/260929-1640-lesson-learning-pipeline-mvp/reports/e2e-261002-foundation-learning-pipeline.md) đã kiểm outbox → broker → consumer và replay DLQ với broker thật |
 | Giá chấm Writing nằm ở hai nơi | Learning `learning.writing.point-cost` (3) cho bài luận trong bài học; assessment `grading_point_costs.WRITING` cho chấm qua `grading_jobs`. Đổi giá phải sửa cả hai |
 | Bài Writing lưu ở hai nơi | Bài luận trong bài học ở `learning_db.lesson_writing_submissions`; Writing trong đề (sau MVP) ở `assessment_db.learner_submissions` |

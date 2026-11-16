@@ -71,6 +71,9 @@ public class UserJpaEntity {
     @Column(name = "email_verified_at")
     private LocalDateTime emailVerifiedAt;
 
+    @Column(name = "password_cleared_at")
+    private LocalDateTime passwordClearedAt;
+
     @PrePersist
     void prePersist() {
         LocalDateTime now = LocalDateTime.now();
