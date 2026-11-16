@@ -27,7 +27,7 @@ class PersonalLibraryMigrationTest {
     }
 
     @Test
-    void createsSixPersonalTablesAndPreservesIndexesWithoutOutbox() throws Exception {
+    void createsSixPersonalTablesAndPreservesIndexes() throws Exception {
         try (Connection connection = connection(); var statement = connection.createStatement()) {
             for (String table : List.of("flashcard_decks", "flashcards", "flashcard_deck_items", "notes",
                     "video_learning_progress", "saved_video_segments")) {
@@ -35,10 +35,6 @@ class PersonalLibraryMigrationTest {
                     assertTrue(rows.next());
                     assertNotNull(rows.getString(1), table);
                 }
-            }
-            try (var rows = statement.executeQuery("SELECT to_regclass('public.outbox_events')")) {
-                assertTrue(rows.next());
-                assertNull(rows.getString(1));
             }
             for (String index : List.of("uq_flashcards_user_practice_question",
                     "uq_flashcard_decks_user_name_not_deleted", "idx_notes_user_source",

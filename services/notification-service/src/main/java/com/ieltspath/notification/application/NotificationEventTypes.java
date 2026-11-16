@@ -14,6 +14,7 @@ public final class NotificationEventTypes {
     public static final String SUBSCRIPTION_GRANTED = "access.subscription-granted.v1";
     public static final String SUBSCRIPTION_EXPIRY_NOTICE = "access.subscription-expiry-notice.v1";
     public static final String RESULT_READY = "assessment.result-ready.v1";
+    public static final String VOCABULARY_REVIEW_DUE = "library.vocabulary-review-due.v1";
 
     public static final List<String> ORDERED = List.of(
             CommunityEventTypes.POST_COMMENTED,
@@ -27,7 +28,8 @@ public final class NotificationEventTypes {
             GRADING_COMPLETED,
             SUBSCRIPTION_GRANTED,
             SUBSCRIPTION_EXPIRY_NOTICE,
-            RESULT_READY);
+            RESULT_READY,
+            VOCABULARY_REVIEW_DUE);
     public static final Set<String> ALL = Set.copyOf(ORDERED);
 
     private NotificationEventTypes() { }

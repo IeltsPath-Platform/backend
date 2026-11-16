@@ -475,6 +475,6 @@ Những điểm ảnh hưởng trực tiếp tới quy tắc:
   `infrastructure` và không đưa dependency dạng này vào `domain`.
 - `CONTENT_SERVICE_URL` của game mặc định `http://content-service:8082` trong config-repo; khi chạy game trên host,
   đặt `http://localhost:8082`. `LIBRARY_SERVICE_URL` đã mặc định `http://localhost:8081`.
-- Content và game không còn bảng outbox (đã xóa). Access, assessment, community và learning (`reward_grants`) có outbox và relay.
+- Content và game không còn bảng outbox (đã xóa). Access, assessment, community, library (`outbox_events`, V43) và learning (`reward_grants`) có outbox và relay.
 - Config-repo yêu cầu JWT, mật khẩu DB, RabbitMQ và Redis qua biến môi trường; không thêm giá trị dự phòng. Thiếu biến bắt buộc thì service không khởi động; `.env.example` chỉ chứa tên và giá trị rỗng.
 - Chưa xác định: nơi lưu bản sao lưu DB ngoài VPS, tên miền production, frontend contract, API versioning. CD đã có (workflow chạy tay); chưa chạy lần nào.
