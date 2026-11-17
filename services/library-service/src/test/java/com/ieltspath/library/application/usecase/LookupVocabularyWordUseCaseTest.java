@@ -52,15 +52,20 @@ class LookupVocabularyWordUseCaseTest {
     @Test
     void returnsOnlyTheActiveSensesInOrder() {
         VocabularyItem item = VocabularyItem.create("Trend", "/trend/", null);
-        item.addSense(sense(item, 2, ContentStatus.ACTIVE));
-        item.addSense(sense(item, 1, ContentStatus.ACTIVE));
+        VocabularySense second = sense(item, 2, ContentStatus.ACTIVE);
+        VocabularySense first = sense(item, 1, ContentStatus.ACTIVE);
+        item.addSense(second);
+        item.addSense(first);
         item.addSense(sense(item, 0, ContentStatus.INACTIVE));
         when(vocabulary.findByNormalizedLemmas(List.of("trend"))).thenReturn(List.of(item));
 
         List<WordLookupResult> result = useCase().execute(List.of("trend"));
 
-        assertThat(result).singleElement().satisfies(found ->
-                assertThat(found.senses()).hasSize(2).allSatisfy(sense -> assertThat(sense.partOfSpeech()).isEqualTo("NOUN")));
+        assertThat(result).singleElement().satisfies(found -> {
+            assertThat(found.senses()).hasSize(2).allSatisfy(sense -> assertThat(sense.partOfSpeech()).isEqualTo("NOUN"));
+            // The id is the sense's own, so the reader can save exactly the meaning it shows.
+            assertThat(found.senses()).extracting(WordLookupResult.Sense::id).containsExactly(first.getId(), second.getId());
+        });
     }
 
     @Test
