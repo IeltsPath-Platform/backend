@@ -86,11 +86,14 @@ public class JdbcSuggestionCandidateRepository implements SuggestionCandidateRep
     public List<SuggestionCandidatesResult.LessonCandidate> lessons(Collection<UUID> knowledgePointIds,
                                                                      BigDecimal maxBand) {
         return jdbc.query("""
+                WITH ranked_lessons AS (%s)
                 SELECT l.id AS lesson_id, l.topic_id, l.title, taught.knowledge_point_ids,
-                       c.band_level AS band, taught.skill, l.sort_order
+                       c.band_level AS band, taught.skill, l.sort_order, t.course_id, rl.skill_position,
+                       ARRAY(%s) AS lesson_skills
                 FROM lessons l
                 JOIN topics t ON t.id = l.topic_id AND t.status = 'ACTIVE'
                 JOIN courses c ON c.id = t.course_id AND c.status = 'ACTIVE'
+                JOIN ranked_lessons rl ON rl.id = l.id
                 JOIN LATERAL (
                     SELECT ARRAY_AGG(DISTINCT kp.id ORDER BY kp.id) AS knowledge_point_ids,
                            CASE WHEN COUNT(DISTINCT NULLIF(kp.skill, 'ALL')) = 1
@@ -108,10 +111,19 @@ public class JdbcSuggestionCandidateRepository implements SuggestionCandidateRep
                               JOIN courses kc ON kc.id = kt.course_id AND kc.status = 'ACTIVE'
                               WHERE lkp.lesson_id = l.id AND lkp.knowledge_point_id IN (:knowledgePointIds))
                 ORDER BY c.band_level, t.sort_order, l.sort_order, l.id
-                """, parameters(knowledgePointIds, maxBand), (rs, row) ->
+                """.formatted(JdbcLearningContentReader.RANKED_COURSE_LESSONS, JdbcLearningContentReader.LESSON_SKILLS),
+                parameters(knowledgePointIds, maxBand), (rs, row) ->
                 new SuggestionCandidatesResult.LessonCandidate(uuid(rs, "lesson_id"), uuid(rs, "topic_id"),
                         rs.getString("title"), uuids(rs, "knowledge_point_ids"), rs.getBigDecimal("band"),
-                        skill(rs), rs.getInt("sort_order")));
+                        skill(rs), rs.getInt("sort_order"), uuid(rs, "course_id"), rs.getInt("skill_position"),
+                        lessonSkills(rs)));
+    }
+
+    /** The reading-gate skills of the lesson, sorted as lesson summaries sort them. */
+    private static List<Skill> lessonSkills(ResultSet rs) throws SQLException {
+        var array = rs.getArray("lesson_skills");
+        if (array == null) return List.of();
+        return Arrays.stream((String[]) array.getArray()).map(Skill::valueOf).sorted().toList();
     }
 
     private static MapSqlParameterSource parameters(Collection<UUID> knowledgePointIds, BigDecimal maxBand) {

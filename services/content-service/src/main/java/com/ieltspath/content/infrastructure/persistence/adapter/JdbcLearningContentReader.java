@@ -49,7 +49,8 @@ import java.util.UUID;
  */
 @Component
 public class JdbcLearningContentReader implements LearningContentReader {
-    private static final String LESSON_SKILLS = """
+    /** The skills a lesson's exercises and text points teach, one row per skill; shared with suggestions. */
+    static final String LESSON_SKILLS = """
             SELECT q.skill FROM lesson_blocks b
             JOIN lesson_block_questions bq ON bq.block_id = b.id
             JOIN question_versions qv ON qv.id = bq.question_version_id
@@ -62,7 +63,8 @@ public class JdbcLearningContentReader implements LearningContentReader {
             WHERE b.lesson_id = l.id AND b.block_type = 'TEXT' AND kp.skill <> 'ALL'
             """;
 
-    private static final String RANKED_COURSE_LESSONS = """
+    /** The published lessons of active courses with their position within each course skill; shared with suggestions. */
+    static final String RANKED_COURSE_LESSONS = """
             SELECT l.id, l.topic_id, t.course_id, t.skill,
                    row_number() OVER (PARTITION BY t.course_id, t.skill
                        ORDER BY t.sort_order, t.id, l.sort_order, l.id) AS skill_position

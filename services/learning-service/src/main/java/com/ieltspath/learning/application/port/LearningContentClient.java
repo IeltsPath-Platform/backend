@@ -148,8 +148,13 @@ public interface LearningContentClient {
     record SuggestionCandidates(List<PackageCandidate> packages, List<LessonCandidate> lessons) {}
     record PackageCandidate(UUID packageId, UUID packageVersionId, String type, String title,
                             List<UUID> knowledgePointIds, BigDecimal band, String skill) {}
+    /**
+     * {@code courseId}, {@code skillPosition} and {@code skills} are null from an older Content; a null course is open to
+     * everyone. {@code skills} is the reading gate's set, which the paywall checks; {@code skill} is for display.
+     */
     record LessonCandidate(UUID lessonId, UUID topicId, String title, List<UUID> knowledgePointIds, BigDecimal band,
-                           String skill, int sortOrder) {}
+                           String skill, int sortOrder, UUID courseId, Integer skillPosition,
+                           Set<LearningSkill> skills) {}
 
     /** Active grading rubric for a writing task. */
     Rubric getActiveRubric(String task);

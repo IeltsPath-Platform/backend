@@ -1,8 +1,10 @@
 package com.ieltspath.learning.application.usecase;
 
+import com.ieltspath.learning.application.exception.AccessUnavailableException;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.result.SuggestionResult;
 import com.ieltspath.learning.application.service.KnowledgePointDirectory;
+import com.ieltspath.learning.application.service.PaywallGate;
 import com.ieltspath.learning.domain.aggregate.LessonProgress;
 import com.ieltspath.learning.domain.aggregate.MasteryProfile;
 import com.ieltspath.learning.domain.repository.LearnerCurriculumRepository;
@@ -17,6 +19,7 @@ import com.ieltspath.learning.domain.service.SuggestionRules.Candidate;
 import com.ieltspath.learning.domain.service.SuggestionRules.Reason;
 import com.ieltspath.learning.domain.service.SuggestionRules.Target;
 import com.ieltspath.learning.domain.service.SuggestionRules.Type;
+import com.ieltspath.learning.domain.vo.LearningSkill;
 import com.ieltspath.learning.domain.vo.MasteryTier;
 import com.ieltspath.learning.domain.vo.TopicStatus;
 import org.springframework.stereotype.Service;
@@ -54,6 +57,7 @@ public class GetSuggestionsUseCase {
     private final PracticeTestAssignmentRepository practiceTests;
     private final LearningContentClient content;
     private final KnowledgePointDirectory directory;
+    private final PaywallGate paywall;
     private final SuggestionRules rules = new SuggestionRules();
     private final Clock clock = Clock.systemUTC();
 
@@ -61,7 +65,7 @@ public class GetSuggestionsUseCase {
                                  LearnerPlacementRepository placements, LessonProgressRepository lessons,
                                  PracticeAttemptRepository attempts, ReviewItemRepository reviews,
                                  PracticeTestAssignmentRepository practiceTests, LearningContentClient content,
-                                 KnowledgePointDirectory directory) {
+                                 KnowledgePointDirectory directory, PaywallGate paywall) {
         this.profiles = profiles;
         this.curricula = curricula;
         this.placements = placements;
@@ -71,6 +75,7 @@ public class GetSuggestionsUseCase {
         this.practiceTests = practiceTests;
         this.content = content;
         this.directory = directory;
+        this.paywall = paywall;
     }
 
     @Transactional(readOnly = true)
@@ -150,11 +155,30 @@ public class GetSuggestionsUseCase {
             candidates.add(new Candidate(type, pkg.packageId(), pkg.packageVersionId(), pkg.title(),
                     pkg.knowledgePointIds(), pkg.band(), pkg.skill(), seen));
         }
+        // A lesson the learner cannot open is not offered; one already completed stays, marked as done.
+        PaywallGate.Request access = paywall.forLearner(userId);
         for (var lesson : found.lessons()) {
+            boolean done = doneLessons.contains(lesson.lessonId());
+            if (!done && !openForSuggestion(access, lesson)) continue;
             candidates.add(new Candidate(Type.LESSON, lesson.lessonId(), null, lesson.title(),
-                    lesson.knowledgePointIds(), lesson.band(), lesson.skill(), doneLessons.contains(lesson.lessonId())));
+                    lesson.knowledgePointIds(), lesson.band(), lesson.skill(), done));
         }
         return candidates;
+    }
+
+    /**
+     * Whether the lesson is open to the learner under the same rule that opens it for reading. Suggestions are optional, so
+     * when Access cannot say whether the learner has Premium, a closed lesson is left out instead of failing the request.
+     */
+    private static boolean openForSuggestion(PaywallGate.Request access, LearningContentClient.LessonCandidate lesson) {
+        // The gate's skills, the same ones the reader uses; a null set (older Content) grants no skill, only the open rules.
+        Set<LearningSkill> skills = lesson.skills() == null ? Set.of() : lesson.skills();
+        try {
+            // Not completed here, so the completion-time grandfathering of a lesson does not apply.
+            return access.lessonOpen(lesson.courseId(), lesson.skillPosition(), skills, false);
+        } catch (AccessUnavailableException unavailable) {
+            return false;
+        }
     }
 
     private static SuggestionResult.Item item(SuggestionRules.Suggestion suggestion,

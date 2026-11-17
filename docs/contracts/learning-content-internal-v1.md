@@ -353,7 +353,7 @@ Response (illustrative IDs):
 ```json
 {
   "packages":[{"packageId":"20000000-0000-4000-8000-000000000301","packageVersionId":"20000000-0000-4000-8000-000000000401","type":"PRACTICE_SET","title":"Topic sentence practice","knowledgePointIds":["20000000-0000-4000-8000-000000000003"],"band":5.5,"skill":"READING"}],
-  "lessons":[{"lessonId":"20000000-0000-4000-8000-000000000101","topicId":"10000000-0000-4000-8000-000000000001","title":"Câu chủ đề nằm ở đâu","knowledgePointIds":["20000000-0000-4000-8000-000000000003"],"band":5.5,"skill":"READING","sortOrder":1}]
+  "lessons":[{"lessonId":"20000000-0000-4000-8000-000000000101","topicId":"10000000-0000-4000-8000-000000000001","title":"Câu chủ đề nằm ở đâu","knowledgePointIds":["20000000-0000-4000-8000-000000000003"],"band":5.5,"skill":"READING","sortOrder":1,"courseId":"20000000-0000-4000-8000-000000000501","skillPosition":1,"skills":["READING"]}]
 }
 ```
 
@@ -366,6 +366,19 @@ version; lesson `band` comes from its course. Both are at most `maxBand`. `skill
 mapped KPs, or `null` for a mixed-skill item. Packages are ordered by band, type, then ID; lessons by band, topic
 order, lesson order, then ID. Invalid input returns `400`. Learning chooses at most five, removes already attempted
 content, and builds learner-facing paths; this internal endpoint makes no learner-specific selection.
+
+Each lesson item also carries:
+
+- `courseId` (UUID of the topic's course);
+- `skillPosition` (integer, 1-based position of the lesson among the published lessons of that course and topic skill,
+  the same ranking lesson summaries report);
+- `skills` (array of skill names, sorted): the set the reading gate uses for this lesson, built from its exercise
+  questions and text-block points exactly as lesson summaries build theirs. It can differ from `skill`, which is the single
+  skill of the lesson's own points (or `null` when they disagree) and is for display.
+
+Learning uses these to apply the course paywall to suggestions. The fields are additive: a Learning that ignores them
+behaves as before. A Content that omits them makes Learning treat the lesson as open when `courseId` is null, and
+grant no skill otherwise.
 
 ## `GET /package-versions/{id}`
 
