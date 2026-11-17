@@ -56,12 +56,7 @@ public class PaywallGate {
         private Request(UUID userId) { this.userId = userId; }
 
         public boolean lessonOpen(Lesson lesson, LessonProgress lessonProgress, Set<LearningSkill> skills) {
-            Ownership ownership = ownership(lesson.courseId());
-            if (PaywallPolicy.isOpen(lesson.courseId(), lesson.skillPosition(), skills, ownership.skills,
-                    ownership.combo, lessonProgress != null && lessonProgress.grandfathered(), false)) return true;
-            if (freeCourse(lesson.courseId())) return true;
-            return PaywallPolicy.isOpen(lesson.courseId(), lesson.skillPosition(), skills, ownership.skills,
-                    ownership.combo, lessonProgress != null && lessonProgress.grandfathered(), premium());
+            return lessonOpen(lesson.courseId(), lesson.skillPosition(), skills, grandfathered(lessonProgress));
         }
 
         public boolean lessonOpen(Lesson lesson, LessonProgress lessonProgress) {
@@ -69,13 +64,25 @@ public class PaywallGate {
         }
 
         public boolean lessonOpen(LessonSummary lesson, LessonProgress lessonProgress) {
-            Ownership ownership = ownership(lesson.courseId());
-            boolean grandfathered = lessonProgress != null && lessonProgress.grandfathered();
-            if (PaywallPolicy.isOpen(lesson.courseId(), lesson.skillPosition(), lesson.skills(), ownership.skills,
-                    ownership.combo, grandfathered, false)) return true;
-            if (freeCourse(lesson.courseId())) return true;
-            return PaywallPolicy.isOpen(lesson.courseId(), lesson.skillPosition(), lesson.skills(), ownership.skills,
-                    ownership.combo, grandfathered, premium());
+            return lessonOpen(lesson.courseId(), lesson.skillPosition(), lesson.skills(), grandfathered(lessonProgress));
+        }
+
+        /**
+         * The lesson rule on raw facts, for callers that hold only a catalog summary. A paid lesson whose Premium state
+         * cannot be read throws {@link AccessUnavailableException}; a lesson opened by a purchase, a free course or the
+         * free preview never asks.
+         */
+        public boolean lessonOpen(UUID courseId, Integer skillPosition, Set<LearningSkill> skills, boolean grandfathered) {
+            Ownership ownership = ownership(courseId);
+            if (PaywallPolicy.isOpen(courseId, skillPosition, skills, ownership.skills, ownership.combo,
+                    grandfathered, false)) return true;
+            if (freeCourse(courseId)) return true;
+            return PaywallPolicy.isOpen(courseId, skillPosition, skills, ownership.skills, ownership.combo,
+                    grandfathered, premium());
+        }
+
+        private static boolean grandfathered(LessonProgress lessonProgress) {
+            return lessonProgress != null && lessonProgress.grandfathered();
         }
 
         /** The first lessons of a skill that a paying course shows free; a free course has no preview, all is free. */
