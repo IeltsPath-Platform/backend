@@ -80,7 +80,7 @@ public class PracticeSetMaterializer {
     public UUID create(UUID lessonId, String lessonCode, int ordinal, PracticeSetPlan plan) {
         String code = "PS-" + clip(lessonCode, MAX_CODE_PREFIX) + "-" + ordinal;
         AuthorPackageResult pkg = createPackage.executeAsAuthor(new CreateContentPackageCommand(code,
-                clip(plan.title().trim(), 255), PackageType.PRACTICE_SET, null, null));
+                clip(plan.title().trim(), 255), PackageType.PRACTICE_SET, null, null, null, null, null, null));
         AuthorVersionResult version = createVersion.execute(pkg.id(), null);
         AuthorSectionResult section = createSection.execute(new SaveContentSectionCommand(pkg.id(), version.id(), null,
                 clip(plan.title().trim(), 255), Skill.READING, 1, null, blankToNull(plan.instructions()), null, null));

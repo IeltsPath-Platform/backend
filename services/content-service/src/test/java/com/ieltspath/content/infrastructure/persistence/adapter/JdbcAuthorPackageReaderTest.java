@@ -45,6 +45,23 @@ class JdbcAuthorPackageReaderTest {
     }
 
     @Test
+    void authorListFiltersPoolAndReportsNullForOtherTypes() {
+        String tag = tag();
+        UUID low = insertPackage(tag+"-LOW", "PLACEMENT_TEST", "DRAFT");
+        UUID high = insertPackage(tag+"-HIGH", "PLACEMENT_TEST", "DRAFT");
+        UUID practice = insertPackage(tag+"-PRACTICE", "PRACTICE_SET", "DRAFT");
+        jdbc.update("UPDATE content_packages SET placement_pool='BAND_0_3' WHERE id=:id", Map.of("id", low));
+        jdbc.update("UPDATE content_packages SET placement_pool='BAND_5_9' WHERE id=:id", Map.of("id", high));
+        var all = reader.list(filter(null, null, tag));
+        assertEquals(3, all.size());
+        assertEquals(com.ieltspath.content.domain.vo.PlacementPool.BAND_0_3, byId(all,low).placementPool());
+        assertNull(byId(all,practice).placementPool());
+        var filtered = reader.list(new AuthorPackageReader.Filter(null,null,null,null,null,tag,
+                com.ieltspath.content.domain.vo.PlacementPool.BAND_5_9));
+        assertEquals(java.util.List.of(high), filtered.stream().map(AuthorPackageSummary::id).toList());
+    }
+
+    @Test
     void listReportsLatestVersionAndWhetherADraftExists() {
         String tag = tag();
         UUID withDraft = insertPackage(tag + "-A", "PRACTICE_SET", "PUBLISHED");

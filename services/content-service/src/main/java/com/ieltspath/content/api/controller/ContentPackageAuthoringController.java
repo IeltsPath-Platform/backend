@@ -10,6 +10,7 @@ import com.ieltspath.content.application.port.AuthorPackageReader;
 import com.ieltspath.content.application.usecase.CreateContentPackageUseCase;
 import com.ieltspath.content.application.usecase.ListAuthorPackagesUseCase;
 import com.ieltspath.content.domain.vo.PackageType;
+import com.ieltspath.content.domain.vo.PlacementPool;
 import com.ieltspath.content.domain.vo.PublicationStatus;
 import com.ieltspath.content.application.result.AuthorSectionResult;
 import com.ieltspath.content.application.result.AuthorVersionResult;
@@ -65,8 +66,9 @@ public class ContentPackageAuthoringController {
             @RequestParam(value = "lessonId", required = false) UUID lessonId,
             @RequestParam(value = "topicId", required = false) UUID topicId,
             @RequestParam(value = "courseId", required = false) UUID courseId,
-            @RequestParam(value = "q", required = false) String q) {
-        return listPackages.execute(new AuthorPackageReader.Filter(type, status, lessonId, topicId, courseId, q))
+            @RequestParam(value = "q", required = false) String q,
+            @RequestParam(value = "placementPool", required = false) PlacementPool placementPool) {
+        return listPackages.execute(new AuthorPackageReader.Filter(type, status, lessonId, topicId, courseId, q, placementPool))
                 .stream().map(AuthorPackageSummaryResponse::from).toList();
     }
 
@@ -76,7 +78,7 @@ public class ContentPackageAuthoringController {
         return AuthorPackageResponse.from(createPackage.executeAsAuthor(new CreateContentPackageCommand(
                 request.code(), request.title(), request.packageType(),
                 AccessLevelCompatibility.toRequiredFeatureKey(request.accessLevel(), "PREMIUM_CONTENT"),
-                request.lessonId(), request.sourceCode(), request.topicId(), request.courseId())));
+                request.lessonId(), request.sourceCode(), request.topicId(), request.courseId(), request.placementPool())));
     }
 
     @GetMapping("/{packageId}")

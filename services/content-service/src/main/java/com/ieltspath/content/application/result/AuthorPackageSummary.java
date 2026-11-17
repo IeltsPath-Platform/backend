@@ -1,5 +1,6 @@
 package com.ieltspath.content.application.result;
 
+import com.ieltspath.content.domain.vo.PlacementPool;
 import com.ieltspath.content.domain.vo.PackageType;
 import com.ieltspath.content.domain.vo.PublicationStatus;
 
@@ -22,6 +23,7 @@ public record AuthorPackageSummary(
         Instant createdAt,
         Instant updatedAt,
         Integer latestVersionNumber,
-        boolean hasDraft
+        boolean hasDraft,
+        PlacementPool placementPool
 ) {
 }

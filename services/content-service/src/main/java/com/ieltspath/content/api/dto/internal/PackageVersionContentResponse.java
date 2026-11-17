@@ -1,5 +1,6 @@
 package com.ieltspath.content.api.dto.internal;
 
+import com.ieltspath.content.domain.vo.PlacementPool;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonRawValue;
 import com.ieltspath.content.application.result.PackageVersionContentResult;
@@ -16,7 +17,8 @@ public record PackageVersionContentResponse(
         PackageType packageType,
         UUID topicId,
         @JsonRawValue String rules,
-        List<Section> sections
+        List<Section> sections,
+        PlacementPool placementPool
 ) {
     /** {@code audio} appears only on sections with an AUDIO asset; its transcript is internal-only. */
     public record Section(UUID sectionId, String title, Skill skill, String instructions, int sortOrder,
@@ -62,6 +64,6 @@ public record PackageVersionContentResponse(
                                                 .toList(), i.guide(), i.images().stream()
                                                 .map(image -> new Image(image.mediaUrl(), image.altText())).toList()))
                                 .toList()))
-                        .toList());
+                        .toList(), result.placementPool());
     }
 }

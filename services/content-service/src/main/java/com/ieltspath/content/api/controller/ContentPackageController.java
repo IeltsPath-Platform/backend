@@ -69,7 +69,7 @@ public class ContentPackageController {
                 request.packageType(),
                 AccessLevelCompatibility.toRequiredFeatureKey(request.accessLevel(), "PREMIUM_CONTENT"),
                 request.lessonId(),
-                request.sourceCode()
+                request.sourceCode(), null, null, request.placementPool()
         ));
         return ContentPackageResponse.from(result);
     }

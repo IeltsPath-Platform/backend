@@ -233,7 +233,7 @@ public class CourseMaterializer {
 
     private UUID createFinalTest(PackageType type, FinalTestPlan test, UUID topicId, UUID courseId) {
         var created = createPackage.executeAsAuthor(new CreateContentPackageCommand(test.code(), test.title(), type,
-                null, null, null, topicId, courseId));
+                null, null, null, topicId, courseId, null));
         createDraftVersion.execute(created.id(), null);
         return created.id();
     }

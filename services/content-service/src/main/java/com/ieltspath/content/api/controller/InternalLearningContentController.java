@@ -1,5 +1,7 @@
 package com.ieltspath.content.api.controller;
 
+import com.ieltspath.content.api.dto.internal.PlacementPackageResponse;
+import com.ieltspath.content.domain.vo.PlacementPool;
 import com.ieltspath.content.api.dto.internal.LessonContentResponse;
 import com.ieltspath.content.api.dto.internal.KnowledgePointPrerequisitesRequest;
 import com.ieltspath.content.api.dto.internal.PracticeSetSkillFilter;
@@ -80,8 +82,9 @@ public class InternalLearningContentController {
     }
 
     @GetMapping("/placement-packages")
-    public List<TopicTestPackageResponse> placementPackages() {
-        return getPlacementTestPackages.execute().stream().map(TopicTestPackageResponse::from).toList();
+    public List<PlacementPackageResponse> placementPackages(
+            @RequestParam(value = "pool", required = false) PlacementPool pool) {
+        return getPlacementTestPackages.execute(pool).stream().map(PlacementPackageResponse::from).toList();
     }
 
     /**

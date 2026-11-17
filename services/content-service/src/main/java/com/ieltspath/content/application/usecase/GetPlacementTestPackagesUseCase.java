@@ -1,7 +1,8 @@
 package com.ieltspath.content.application.usecase;
 
 import com.ieltspath.content.application.port.LearningContentReader;
-import com.ieltspath.content.application.result.TopicTestPackageResult;
+import com.ieltspath.content.application.result.PlacementPackageResult;
+import com.ieltspath.content.domain.vo.PlacementPool;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,7 +17,7 @@ public class GetPlacementTestPackagesUseCase {
         this.reader = reader;
     }
 
-    public List<TopicTestPackageResult> execute() {
-        return reader.placementTestPackages();
+    public List<PlacementPackageResult> execute(PlacementPool pool) {
+        return reader.placementTestPackages(pool);
     }
 }

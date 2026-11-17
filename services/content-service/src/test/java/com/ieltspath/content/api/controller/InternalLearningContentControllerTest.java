@@ -49,6 +49,37 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class InternalLearningContentControllerTest {
     @Test
+    void placementPoolFilterIsForwardedAndUnknownValueRejected() throws Exception {
+        var pool = com.ieltspath.content.domain.vo.PlacementPool.BAND_0_3;
+        when(placementTests.execute(pool)).thenReturn(List.of());
+        mockMvc.perform(get("/internal/learning-content/placement-packages").param("pool", "BAND_0_3"))
+                .andExpect(status().isOk());
+        verify(placementTests).execute(pool);
+        mockMvc.perform(get("/internal/learning-content/placement-packages").param("pool", "UNKNOWN"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void nonPlacementVersionSerializesNullPool() throws Exception {
+        UUID version = UUID.randomUUID();
+        when(packageVersion.execute(version)).thenReturn(new PackageVersionContentResult(version, UUID.randomUUID(),
+                PackageType.PRACTICE_SET, null, "{}", List.of(), null));
+        mockMvc.perform(get("/internal/learning-content/package-versions/{id}", version))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.placementPool").value(org.hamcrest.Matchers.nullValue()));
+        verify(packageVersion).execute(version);
+    }
+
+    @Test
+    void placementVersionSerializesPool() throws Exception {
+        UUID version = UUID.randomUUID();
+        when(packageVersion.execute(version)).thenReturn(new PackageVersionContentResult(version, UUID.randomUUID(),
+                PackageType.PLACEMENT_TEST, null, "{}", List.of(), com.ieltspath.content.domain.vo.PlacementPool.BAND_3_5));
+        mockMvc.perform(get("/internal/learning-content/package-versions/{id}", version))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.placementPool").value("BAND_3_5"));
+    }
+
+    @Test
     void practiceSkillFilterIsForwardedAndSetSkillsAreSerialized() throws Exception {
         UUID lessonId = UUID.randomUUID();
         var filter = java.util.Optional.of(Skill.READING);
@@ -107,12 +138,14 @@ class InternalLearningContentControllerTest {
     void placementPackagesUseTheExistingPackageShape() throws Exception {
         UUID pkg = UUID.randomUUID();
         UUID version = UUID.randomUUID();
-        when(placementTests.execute()).thenReturn(List.of(
-                new com.ieltspath.content.application.result.TopicTestPackageResult(pkg, version, "PLACEMENT")));
+        when(placementTests.execute(null)).thenReturn(List.of(
+                new com.ieltspath.content.application.result.PlacementPackageResult(pkg, version, "PLACEMENT",
+                        com.ieltspath.content.domain.vo.PlacementPool.BAND_5_9)));
         mockMvc.perform(get("/internal/learning-content/placement-packages"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$[0].packageId").value(pkg.toString()))
                 .andExpect(jsonPath("$[0].packageVersionId").value(version.toString()))
-                .andExpect(jsonPath("$[0].code").value("PLACEMENT"));
+                .andExpect(jsonPath("$[0].code").value("PLACEMENT"))
+                .andExpect(jsonPath("$[0].pool").value("BAND_5_9"));
     }
 
     @Test

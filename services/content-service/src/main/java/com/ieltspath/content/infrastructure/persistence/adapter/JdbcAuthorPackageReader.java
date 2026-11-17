@@ -4,6 +4,7 @@ import com.ieltspath.content.application.port.AuthorPackageReader;
 import com.ieltspath.content.application.result.AuthorPackageExtras;
 import com.ieltspath.content.application.result.AuthorPackageSummary;
 import com.ieltspath.content.domain.vo.PackageType;
+import com.ieltspath.content.domain.vo.PlacementPool;
 import com.ieltspath.content.domain.vo.PublicationStatus;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -37,6 +38,10 @@ public class JdbcAuthorPackageReader implements AuthorPackageReader {
             where.append(" AND p.package_type = :type");
             params.addValue("type", filter.type().name());
         }
+        if (filter.placementPool() != null) {
+            where.append(" AND p.placement_pool = :placementPool");
+            params.addValue("placementPool", filter.placementPool().name());
+        }
         if (filter.status() != null) {
             where.append(" AND p.status = :status");
             params.addValue("status", filter.status().name());
@@ -60,7 +65,7 @@ public class JdbcAuthorPackageReader implements AuthorPackageReader {
         return jdbc.query("""
                 SELECT p.id, p.code, p.title, p.package_type, p.required_feature_key, p.status,
                        p.current_published_version_id, p.lesson_id, p.topic_id, p.course_id, p.source_code,
-                       p.created_at, p.updated_at,
+                       p.created_at, p.updated_at, p.placement_pool,
                        (SELECT MAX(v.version_number) FROM content_package_versions v
                         WHERE v.package_id = p.id) AS latest_version_number,
                        EXISTS (SELECT 1 FROM content_package_versions v
@@ -76,7 +81,8 @@ public class JdbcAuthorPackageReader implements AuthorPackageReader {
                 uuid(rs, "current_published_version_id"), uuid(rs, "lesson_id"), uuid(rs, "topic_id"),
                 uuid(rs, "course_id"), rs.getString("source_code"), instant(rs, "created_at"),
                 instant(rs, "updated_at"), (Integer) rs.getObject("latest_version_number"),
-                rs.getBoolean("has_draft")));
+                rs.getBoolean("has_draft"), rs.getString("placement_pool") == null ? null
+                        : PlacementPool.valueOf(rs.getString("placement_pool"))));
     }
 
     @Override

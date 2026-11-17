@@ -77,6 +77,10 @@ public class PublishContentPackageUseCase {
 
     private void validate(ContentPackage pkg, ContentPackageVersion targetVersion) {
 
+        if (pkg.getPackageType() == PackageType.PLACEMENT_TEST && pkg.getPlacementPool() == null) {
+            throw new InvalidContentStateException("PLACEMENT_POOL_REQUIRED");
+        }
+
         // A lesson's Practice measures only skills taught by that lesson.
         if (pkg.getLessonId() != null
                 && lessons.packageVersionLeavesLessonSkills(targetVersion.getId(), pkg.getLessonId())) {
