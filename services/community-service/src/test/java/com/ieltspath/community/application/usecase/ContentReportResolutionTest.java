@@ -67,7 +67,7 @@ class ContentReportResolutionTest {
         for (UUID id : List.of(hidden.getId(), deleted.getId(), missing)) {
             var error = assertThrows(CommunityNotFoundException.class, () -> useCase.execute(
                     new CommunityActor(UUID.randomUUID(), false), new SubmitContentReportCommand(ReportContentType.COMMENT, id, "Abuse")));
-            assertEquals("Comment not found", error.getMessage());
+            assertEquals("Không tìm thấy bình luận", error.getMessage());
         }
         verify(reports, never()).save(any());
     }
@@ -102,7 +102,7 @@ class ContentReportResolutionTest {
         for (ReportDecision decision : ReportDecision.values()) {
             var error = assertThrows(CommunityNotFoundException.class,
                     () -> useCase.execute(admin, new ResolveContentReportCommand(reportId, decision)));
-            assertEquals("Report not found", error.getMessage());
+            assertEquals("Không tìm thấy báo cáo", error.getMessage());
         }
     }
 

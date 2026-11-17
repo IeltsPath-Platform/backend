@@ -38,6 +38,6 @@ public class WordlyRoomAdmission {
         games.closeIdleSoloRooms(userId, clock.instant());
         if (lobbySeats != null) lobbySeats.expireFor(userId);
         if (games.find(userId).isPresent())
-            throw new SoloGameplayException(409, ACTIVE_GAME_EXISTS, "You are already in a game room");
+            throw new SoloGameplayException(409, ACTIVE_GAME_EXISTS, "Bạn đang ở trong một phòng chơi khác");
     }
 }

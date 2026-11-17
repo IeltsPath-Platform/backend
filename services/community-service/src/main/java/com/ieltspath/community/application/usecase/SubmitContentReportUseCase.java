@@ -27,10 +27,10 @@ public class SubmitContentReportUseCase {
         var authorId = switch (command.contentType()) {
             case POST -> posts.findById(command.contentId())
                     .filter(post -> post.getStatus() == ContentStatus.ACTIVE)
-                    .orElseThrow(() -> new CommunityNotFoundException("Post not found")).getAuthorId();
+                    .orElseThrow(() -> new CommunityNotFoundException("Không tìm thấy bài viết")).getAuthorId();
             case COMMENT -> comments.findById(command.contentId())
                     .filter(comment -> comment.getStatus() == ContentStatus.ACTIVE)
-                    .orElseThrow(() -> new CommunityNotFoundException("Comment not found")).getAuthorId();
+                    .orElseThrow(() -> new CommunityNotFoundException("Không tìm thấy bình luận")).getAuthorId();
         };
         if (authorId.equals(actor.userId())) throw new CommunityForbiddenException("You cannot report your own content");
         return ContentReportResult.from(reports.save(ContentReport.create(actor.userId(), command.contentType(),

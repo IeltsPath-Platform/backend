@@ -65,9 +65,9 @@ public class UserPublicProfileClient implements PublicProfileClient {
                 response.profiles().forEach(profile -> { if (ids.contains(profile.id())) result.put(profile.id(), profile); });
             return withStreaks(result.values()).stream().collect(Collectors.toMap(PublicProfile::id, profile -> profile));
         } catch (DownstreamUnavailableException exception) {
-            throw new CommunityUnavailableException("Public profiles are temporarily unavailable");
+            throw new CommunityUnavailableException("Hồ sơ công khai tạm thời không tải được. Vui lòng thử lại sau.");
         } catch (org.springframework.web.client.RestClientException exception) {
-            throw new CommunityUnavailableException("Public profiles are temporarily unavailable");
+            throw new CommunityUnavailableException("Hồ sơ công khai tạm thời không tải được. Vui lòng thử lại sau.");
         }
     }
 
@@ -79,9 +79,9 @@ public class UserPublicProfileClient implements PublicProfileClient {
                     .headers(ForwardedRequestHeaders::copy).retrieve().body(Batch.class));
             return response == null || response.profiles() == null ? List.of() : withStreaks(response.profiles());
         } catch (DownstreamUnavailableException exception) {
-            throw new CommunityUnavailableException("Public profiles are temporarily unavailable");
+            throw new CommunityUnavailableException("Hồ sơ công khai tạm thời không tải được. Vui lòng thử lại sau.");
         } catch (org.springframework.web.client.RestClientException exception) {
-            throw new CommunityUnavailableException("Public profiles are temporarily unavailable");
+            throw new CommunityUnavailableException("Hồ sơ công khai tạm thời không tải được. Vui lòng thử lại sau.");
         }
     }
 

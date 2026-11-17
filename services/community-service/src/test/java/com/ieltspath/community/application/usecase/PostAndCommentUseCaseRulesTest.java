@@ -101,7 +101,7 @@ class PostAndCommentUseCaseRulesTest {
     @Test
     void mediaPolicyRejectionSavesNoPost() {
         var useCase = new CreatePostUseCase(posts, reactions, (author, images, video) -> {
-            throw new CommunityException("Media URL must use HTTPS and an allowed host");
+            throw new CommunityException("Liên kết media không hợp lệ");
         });
         var command = new CreatePostCommand(PostCategory.GENERAL, null, "text",
                 List.of("https://evil.com/a.png"), null, null, null);
@@ -116,7 +116,7 @@ class PostAndCommentUseCaseRulesTest {
         var error = assertThrows(CommunityNotFoundException.class,
                 () -> new EditPostUseCase(posts, reactions, (author, images, video) -> { }).execute(user(UUID.randomUUID()),
                         new EditPostCommand(postId, PostCategory.GENERAL, null, "New", List.of(), null, null, null)));
-        assertEquals("Post not found", error.getMessage());
+        assertEquals("Không tìm thấy bài viết", error.getMessage());
         verify(posts, never()).save(any());
     }
 
@@ -163,7 +163,7 @@ class PostAndCommentUseCaseRulesTest {
         when(posts.findById(postId)).thenReturn(Optional.empty());
         var error = assertThrows(CommunityNotFoundException.class,
                 () -> new DeletePostUseCase(posts).execute(user(UUID.randomUUID()), new DeletePostCommand(postId)));
-        assertEquals("Post not found", error.getMessage());
+        assertEquals("Không tìm thấy bài viết", error.getMessage());
         verify(posts, never()).save(any());
     }
 
@@ -198,7 +198,7 @@ class PostAndCommentUseCaseRulesTest {
         when(comments.findById(commentId)).thenReturn(Optional.empty());
         var error = assertThrows(CommunityNotFoundException.class,
                 () -> new DeleteCommentUseCase(comments).execute(user(UUID.randomUUID()), new DeleteCommentCommand(commentId)));
-        assertEquals("Comment not found", error.getMessage());
+        assertEquals("Không tìm thấy bình luận", error.getMessage());
         verify(comments, never()).save(any());
     }
 
@@ -276,7 +276,7 @@ class PostAndCommentUseCaseRulesTest {
         when(comments.findByIdForUpdate(parentId)).thenReturn(Optional.empty());
         var error = assertThrows(CommunityNotFoundException.class, () -> createComment().execute(user(UUID.randomUUID()),
                 new CreateCommentCommand(p.getId(), parentId, "child")));
-        assertEquals("Comment not found", error.getMessage());
+        assertEquals("Không tìm thấy bình luận", error.getMessage());
         verify(comments, never()).save(any());
     }
 
@@ -290,7 +290,7 @@ class PostAndCommentUseCaseRulesTest {
         for (UUID postId : List.of(p.getId(), missing)) {
             var error = assertThrows(CommunityNotFoundException.class,
                     () -> createComment().execute(user(UUID.randomUUID()), new CreateCommentCommand(postId, null, "text")));
-            assertEquals("Post not found", error.getMessage());
+            assertEquals("Không tìm thấy bài viết", error.getMessage());
         }
         verify(comments, never()).save(any());
     }
@@ -361,7 +361,7 @@ class PostAndCommentUseCaseRulesTest {
         for (UUID postId : List.of(p.getId(), missing)) {
             var error = assertThrows(CommunityNotFoundException.class, () -> new AddReactionUseCase(posts, reactions, outbox)
                     .execute(user(UUID.randomUUID()), new AddReactionCommand(postId, ReactionType.LIKE)));
-            assertEquals("Post not found", error.getMessage());
+            assertEquals("Không tìm thấy bài viết", error.getMessage());
         }
         verify(reactions, never()).add(any(), any(), any());
     }
@@ -440,7 +440,7 @@ class PostAndCommentUseCaseRulesTest {
         when(posts.findById(p.getId())).thenReturn(Optional.of(p));
         var error = assertThrows(CommunityNotFoundException.class,
                 () -> new GetPostUseCase(posts, reactions).execute(p.getId(), user(UUID.randomUUID())));
-        assertEquals("Post not found", error.getMessage());
+        assertEquals("Không tìm thấy bài viết", error.getMessage());
         verifyNoInteractions(reactions);
     }
 
@@ -451,7 +451,7 @@ class PostAndCommentUseCaseRulesTest {
         when(posts.findById(p.getId())).thenReturn(Optional.of(p));
         var error = assertThrows(CommunityNotFoundException.class,
                 () -> new ListCommentsUseCase(posts, comments).execute(user(UUID.randomUUID()), p.getId(), new PageQuery(0, 20)));
-        assertEquals("Post not found", error.getMessage());
+        assertEquals("Không tìm thấy bài viết", error.getMessage());
         verifyNoInteractions(comments);
     }
 

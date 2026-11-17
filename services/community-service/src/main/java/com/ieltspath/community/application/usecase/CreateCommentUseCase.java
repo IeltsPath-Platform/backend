@@ -55,7 +55,7 @@ public class CreateCommentUseCase {
         var reply = command.parentCommentId() != null;
         if (command.parentCommentId() != null) {
             var parent = comments.findByIdForUpdate(command.parentCommentId())
-                    .orElseThrow(() -> new CommunityNotFoundException("Comment not found"));
+                    .orElseThrow(() -> new CommunityNotFoundException("Không tìm thấy bình luận"));
             if (!parent.getPostId().equals(command.postId()) || parent.getStatus() != com.ieltspath.community.domain.vo.ContentStatus.ACTIVE) {
                 throw new CommunityException("Parent comment must be active and belong to the same post");
             }

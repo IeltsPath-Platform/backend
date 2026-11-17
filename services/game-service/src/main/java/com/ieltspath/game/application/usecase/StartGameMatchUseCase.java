@@ -83,7 +83,7 @@ public class StartGameMatchUseCase {
         return tx.execute(status -> {
             GameRoom room=roomRepository.findForUpdate(roomId).orElseThrow(()->new GameRoomNotFoundException(roomId));
             if(!java.util.Objects.equals(settings,room.wordlySettings()))
-                throw new com.ieltspath.game.domain.exception.InvalidGameRoomStateException("Room settings changed; retry start");
+                throw new com.ieltspath.game.domain.exception.InvalidGameRoomStateException("Cài đặt phòng vừa thay đổi, hãy bấm bắt đầu lại");
             Instant now=clock.instant();
             room.startMatch(hostUserId,now);
             return start(room,hostUserId,preparedWords,preparedDictionary,now);

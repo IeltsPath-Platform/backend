@@ -65,13 +65,13 @@ public class StartRocketMatchUseCase {
 
     public GameMatchResult execute(GameRoom preview, UUID hostUserId) {
         if (!(preview.settings() instanceof RocketRoomSettings settings))
-            throw new InvalidGameRoomStateException("Room is not a Rocket room");
+            throw new InvalidGameRoomStateException("Phòng này không phải Rocket");
         UUID matchId = UUID.randomUUID();
         List<RocketRound> prepared = prepareRounds(matchId, settings, vocabulary(settings.wordFilter()));
         return tx.execute(status -> {
             GameRoom room = rooms.findForUpdate(preview.id()).orElseThrow(() -> new GameRoomNotFoundException(preview.id()));
             if (!settings.equals(room.settings()))
-                throw new InvalidGameRoomStateException("Room settings changed; retry start");
+                throw new InvalidGameRoomStateException("Cài đặt phòng vừa thay đổi, hãy bấm bắt đầu lại");
             Instant now = clock.instant();
             room.startMatch(hostUserId, now);
             rooms.save(room);

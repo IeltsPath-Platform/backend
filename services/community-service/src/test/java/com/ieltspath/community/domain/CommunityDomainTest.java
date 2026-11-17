@@ -113,7 +113,7 @@ class CommunityDomainTest {
         for (String body : new String[]{"   ", "", null}) {
             var error = assertThrows(CommunityException.class,
                     () -> Post.create(UUID.randomUUID(), PostCategory.GENERAL, null, body));
-            assertEquals("Body is required", error.getMessage());
+            assertEquals("Nội dung không được để trống", error.getMessage());
         }
     }
 
@@ -134,6 +134,6 @@ class CommunityDomainTest {
     void blankCommentBodyIsRejected() {
         var error = assertThrows(CommunityException.class,
                 () -> Comment.create(UUID.randomUUID(), UUID.randomUUID(), null, "  "));
-        assertEquals("Body is required", error.getMessage());
+        assertEquals("Nội dung không được để trống", error.getMessage());
     }
 }

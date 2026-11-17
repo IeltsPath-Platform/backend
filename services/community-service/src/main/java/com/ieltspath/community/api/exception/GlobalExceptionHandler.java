@@ -41,7 +41,7 @@ public class GlobalExceptionHandler {
     ResponseEntity<ErrorResponse> validation(MethodArgumentNotValidException e, HttpServletRequest r) {
         Map<String, String> d = new LinkedHashMap<>();
         e.getBindingResult().getFieldErrors().forEach(f -> d.put(f.getField(), f.getDefaultMessage()));
-        return error(HttpStatus.BAD_REQUEST, "Request validation failed", r, d);
+        return error(HttpStatus.BAD_REQUEST, "Dữ liệu gửi lên không hợp lệ", r, d);
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)

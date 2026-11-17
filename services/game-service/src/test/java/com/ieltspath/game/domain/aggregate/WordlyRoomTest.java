@@ -42,7 +42,7 @@ class WordlyRoomTest {
         var exception = assertThrows(InvalidGameRoomStateException.class,
                 () -> room.join(guest, Instant.now()));
 
-        assertEquals("User is already a member of this room", exception.getMessage());
+        assertEquals("Bạn đã ở trong phòng này", exception.getMessage());
         assertEquals(original, room.members().get(guest));
         assertEquals(2, room.members().size());
     }

@@ -18,15 +18,15 @@ public class UseWordlyHintUseCase {
   var context=hints.lock(matchId,wordId,userId).orElseThrow(()->new GameMatchNotFoundException(matchId));
   var history=hints.guesses(wordId);
   if(context.requestId()!=null) {
-   if(!context.requestId().equals(requestId))throw new IllegalStateException("Hint already used for this word");
+   if(!context.requestId().equals(requestId))throw new IllegalStateException("Bạn đã dùng gợi ý cho từ này");
    var source=history.stream().filter(g->g.id().equals(context.sourceGuessId())).findFirst().orElseThrow();
    return result(wordId,source,context.column(),context.letter());
   }
   Instant now=clock.instant();
   if(!"IN_PROGRESS".equals(context.matchStatus()) || !"ACTIVE".equals(context.wordStatus()) || !"ACTIVE".equals(context.playerStatus()))
-   throw new IllegalStateException("Hint requires an active word and player");
-  if(context.deadline()!=null && !now.isBefore(context.deadline()))throw new IllegalStateException("Word deadline has passed");
-  if(history.isEmpty())throw new IllegalArgumentException("A valid guess is required before using a hint");
+   throw new IllegalStateException("Không thể dùng gợi ý lúc này");
+  if(context.deadline()!=null && !now.isBefore(context.deadline()))throw new IllegalStateException("Đã hết thời gian cho từ này");
+  if(history.isEmpty())throw new IllegalArgumentException("Hãy đoán ít nhất một từ hợp lệ trước khi dùng gợi ý");
   int column=WordlyHintSelector.firstUnknown(context.answer(),history.stream().map(WordlyHintRepository.Guess::letters).toList());
   String letter=context.answer().substring(column,column+1);
   var source=history.get(history.size()-1);

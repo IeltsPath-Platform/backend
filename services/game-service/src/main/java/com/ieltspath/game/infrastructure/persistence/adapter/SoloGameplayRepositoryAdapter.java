@@ -428,7 +428,7 @@ WHERE m.id=? AND p.user_id=? AND m.game_type='WORDLY' AND NOT m.is_delete AND NO
         if (rows.isEmpty()) throw new GameMatchNotFoundException(matchId);
         var r = rows.get(0);
         if (!"COMPLETED".equals(r.get("status")))
-            throw new SoloGameplayException(409, "MATCH_NOT_FINISHED", "Match has not finished");
+            throw new SoloGameplayException(409, "MATCH_NOT_FINISHED", "Ván chơi chưa kết thúc");
         Map<String, Object> settings = new LinkedHashMap<>();
         settings.put("initialLives", r.get("initial_lives"));
         settings.put("playMode", r.get("play_mode"));

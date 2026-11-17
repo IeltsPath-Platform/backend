@@ -17,18 +17,18 @@ final class CommunityApplicationSupport {
 
     static Post requireVisiblePost(PostRepository posts, UUID postId, CommunityActor actor) {
         Post post = posts.findById(postId)
-                .orElseThrow(() -> new CommunityNotFoundException("Post not found"));
+                .orElseThrow(() -> new CommunityNotFoundException("Không tìm thấy bài viết"));
         if (post.getStatus() != ContentStatus.ACTIVE && !actor.administrator()) {
-            throw new CommunityNotFoundException("Post not found");
+            throw new CommunityNotFoundException("Không tìm thấy bài viết");
         }
         return post;
     }
 
     static Comment requireVisibleComment(CommentRepository comments, PostRepository posts, UUID commentId, CommunityActor actor) {
         var comment = comments.findById(commentId)
-                .orElseThrow(() -> new CommunityNotFoundException("Comment not found"));
+                .orElseThrow(() -> new CommunityNotFoundException("Không tìm thấy bình luận"));
         if (comment.getStatus() != ContentStatus.ACTIVE && !actor.administrator()) {
-            throw new CommunityNotFoundException("Comment not found");
+            throw new CommunityNotFoundException("Không tìm thấy bình luận");
         }
         requireVisiblePost(posts, comment.getPostId(), actor);
         return comment;

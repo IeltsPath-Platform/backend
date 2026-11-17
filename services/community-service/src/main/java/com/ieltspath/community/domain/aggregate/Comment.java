@@ -51,7 +51,7 @@ public class Comment {
 
     private static String requireBody(String value) {
         if (value == null || value.isBlank()) {
-            throw new CommunityException("Body is required");
+            throw new CommunityException("Nội dung không được để trống");
         }
         String v = value.trim();
         if (v.length() > 5000) {

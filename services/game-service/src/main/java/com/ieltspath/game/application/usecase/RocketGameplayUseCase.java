@@ -96,15 +96,15 @@ public class RocketGameplayUseCase {
             Player player = state.player(userId).orElseThrow(() -> new GameMatchNotFoundException(matchId));
             List<RocketRound> all = rounds.findByMatch(matchId);
             RocketRound round = all.stream().filter(candidate -> candidate.id().equals(roundId)).findFirst()
-                    .orElseThrow(() -> new SoloGameplayException(404, "ROUND_NOT_FOUND", "Round not found"));
+                    .orElseThrow(() -> new SoloGameplayException(404, "ROUND_NOT_FOUND", "Không tìm thấy vòng chơi"));
             boolean replay = round.answerOf(player.id()).map(RocketRound.Answer::requestId)
                     .filter(requestId::equals).isPresent();
             if (!replay && all.stream().anyMatch(other -> other != round && other.answerOf(player.id())
                     .map(RocketRound.Answer::requestId).filter(requestId::equals).isPresent()))
                 throw new SoloGameplayException(409, "REQUEST_ID_CONFLICT", "Request id was used for another answer");
-            if (!replay && state.finished()) throw new SoloGameplayException(409, "MATCH_FINISHED", "This match has finished");
+            if (!replay && state.finished()) throw new SoloGameplayException(409, "MATCH_FINISHED", "Ván chơi đã kết thúc");
             if (!replay && !player.playing())
-                throw new SoloGameplayException(409, "PLAYER_NOT_ACTIVE", "You are no longer playing this match");
+                throw new SoloGameplayException(409, "PLAYER_NOT_ACTIVE", "Bạn không còn chơi trong ván này");
             Instant at = matches.now();
             RocketRound.Answer answer = round.accept(player.id(), optionId, requestId, at);
             State after = state;
@@ -168,7 +168,7 @@ public class RocketGameplayUseCase {
         return tx.execute(status -> {
             State state = matches.find(matchId).orElseThrow(() -> new GameMatchNotFoundException(matchId));
             Player player = state.player(userId).orElseThrow(() -> new GameMatchNotFoundException(matchId));
-            if (!state.finished()) throw new SoloGameplayException(409, "MATCH_NOT_FINISHED", "This match is still running");
+            if (!state.finished()) throw new SoloGameplayException(409, "MATCH_NOT_FINISHED", "Ván chơi vẫn đang diễn ra");
             var progress = player.progress();
             Instant ended = state.endedAt() == null ? state.startedAt() : state.endedAt();
             return new Result(matchId, state.endReason(), settings(state), state.settings().questionCount(),

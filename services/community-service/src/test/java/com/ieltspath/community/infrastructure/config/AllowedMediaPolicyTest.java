@@ -44,7 +44,7 @@ class AllowedMediaPolicyTest {
         UUID authorId = UUID.randomUUID();
         CommunityException ex = assertThrows(CommunityException.class,
                 () -> policy.validate(authorId, List.of("https://evil.com/pic.jpg"), null));
-        assertEquals("Media URL must use HTTPS and an allowed host", ex.getMessage());
+        assertEquals("Liên kết media không hợp lệ", ex.getMessage());
     }
 
     @Test
@@ -52,7 +52,7 @@ class AllowedMediaPolicyTest {
         UUID authorId = UUID.randomUUID();
         CommunityException ex = assertThrows(CommunityException.class,
                 () -> policy.validate(authorId, null, "https://vimeo.com/123"));
-        assertEquals("Media URL must use HTTPS and an allowed host", ex.getMessage());
+        assertEquals("Liên kết media không hợp lệ", ex.getMessage());
     }
 
     @Test
@@ -60,7 +60,7 @@ class AllowedMediaPolicyTest {
         UUID authorId = UUID.randomUUID();
         CommunityException ex = assertThrows(CommunityException.class,
                 () -> policy.validate(authorId, List.of("http://images.unsplash.com/pic.jpg"), null));
-        assertEquals("Media URL must use HTTPS and an allowed host", ex.getMessage());
+        assertEquals("Liên kết media không hợp lệ", ex.getMessage());
     }
 
     @Test
@@ -102,7 +102,7 @@ class AllowedMediaPolicyTest {
 
         CommunityException ex = assertThrows(CommunityException.class,
                 () -> policy.validate(authorId, null, url));
-        assertEquals("Media URL must use HTTPS and an allowed host", ex.getMessage());
+        assertEquals("Liên kết media không hợp lệ", ex.getMessage());
     }
 
     @Test
@@ -125,7 +125,7 @@ class AllowedMediaPolicyTest {
         assertDoesNotThrow(() -> policy.validate(authorId, List.of(at500), null));
         CommunityException ex = assertThrows(CommunityException.class,
                 () -> policy.validate(authorId, List.of(at501), null));
-        assertEquals("Media URL must use HTTPS and an allowed host", ex.getMessage());
+        assertEquals("Liên kết media không hợp lệ", ex.getMessage());
     }
 
     @Test

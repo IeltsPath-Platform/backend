@@ -21,7 +21,7 @@ public class ManageSocialUseCase {
  public void follow(CommunityActor actor,UUID target) {
  if(actor.userId().equals(target))throw new CommunityException("Cannot follow yourself");
  // The remote profile check runs before the transaction so a slow user-service never holds a connection.
- if(!profiles.findProfiles(Set.of(target)).containsKey(target))throw new CommunityNotFoundException("User not found");
+ if(!profiles.findProfiles(Set.of(target)).containsKey(target))throw new CommunityNotFoundException("Không tìm thấy người dùng");
  transaction.executeWithoutResult(status -> {
  if(social.follow(actor.userId(),target))outbox.record(CommunityEventTypes.USER_FOLLOWED,actor.userId(),target,null,null);
  });
