@@ -21,6 +21,7 @@ public record PushCopy(String title, String body) {
             case NotificationEventTypes.GRADING_DUE_SOON -> new PushCopy("Bài chấm sắp đến hạn", "Một bài bạn đang chấm sắp hết hạn.");
             case NotificationEventTypes.SUBSCRIPTION_GRANTED -> new PushCopy("Gói học đã được kích hoạt", "Bạn đã có quyền truy cập nội dung của gói vừa mua.");
             case NotificationEventTypes.SUBSCRIPTION_EXPIRY_NOTICE -> new PushCopy("Gói học sắp hết hạn", "Gia hạn để không bị gián đoạn việc học.");
+            case NotificationEventTypes.VOCABULARY_REVIEW_DUE -> new PushCopy("Đến giờ ôn từ vựng", "Bạn có từ vựng cần ôn hôm nay. Ôn ngay để nhớ lâu hơn.");
             default -> DEFAULT;
         };
     }
