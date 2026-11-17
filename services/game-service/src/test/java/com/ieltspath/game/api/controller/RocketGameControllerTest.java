@@ -116,7 +116,7 @@ class RocketGameControllerTest {
                 .andExpect(jsonPath("$.settings.questionCount").value(6));
 
         when(gameplay.answer(eq(match), eq(round), any(), eq("r1"), eq(option)))
-                .thenThrow(new SoloGameplayException(409, "ROUND_CLOSED", "This round is closed"));
+                .thenThrow(new SoloGameplayException(409, "ROUND_CLOSED", "Vòng này đã kết thúc"));
         mvc.perform(post("/api/games/rocket/matches/" + match + "/rounds/" + round + "/answers")
                         .header("Authorization", bearer()).contentType("application/json")
                         .content("{\"requestId\":\"r1\",\"optionId\":\"" + option + "\"}"))

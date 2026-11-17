@@ -77,7 +77,7 @@ public class ClientRateLimitGatewayFilterFactory
         exchange.getResponse().getHeaders().set("Retry-After", Integer.toString(retryAfter));
         exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);
         String body = "{\"timestamp\":\"" + Instant.now() + "\",\"status\":429,"
-                + "\"error\":\"Too Many Requests\",\"message\":\"Request rate limit exceeded\","
+                + "\"error\":\"Too Many Requests\",\"message\":\"Bạn thao tác quá nhanh. Vui lòng thử lại sau ít giây.\","
                 + "\"path\":\"" + escape(exchange.getRequest().getURI().getRawPath()) + "\","
                 + "\"code\":\"RATE_LIMITED\"}";
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);

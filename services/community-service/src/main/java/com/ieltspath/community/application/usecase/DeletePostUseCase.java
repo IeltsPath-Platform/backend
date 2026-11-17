@@ -16,7 +16,7 @@ public class DeletePostUseCase {
     @Transactional
     public void execute(CommunityActor actor, DeletePostCommand command) {
         var post = posts.findById(command.postId())
-                .orElseThrow(() -> new CommunityNotFoundException("Post not found"));
+                .orElseThrow(() -> new CommunityNotFoundException("Không tìm thấy bài viết"));
         post.delete(actor.userId(), actor.administrator());
         posts.save(post);
     }

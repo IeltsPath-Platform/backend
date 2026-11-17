@@ -21,7 +21,7 @@ public class EditPostUseCase {
     public PostResult execute(CommunityActor actor, EditPostCommand command) {
         mediaPolicy.validate(actor.userId(), command.imageUrls(), command.videoUrl());
         var post = posts.findById(command.postId())
-                .orElseThrow(() -> new CommunityNotFoundException("Post not found"));
+                .orElseThrow(() -> new CommunityNotFoundException("Không tìm thấy bài viết"));
         post.edit(actor.userId(), command.category(), command.title(), command.body());
         post.setMedia(command.imageUrls(), command.videoUrl(), command.targetBand());
         post.setBackground(command.background());

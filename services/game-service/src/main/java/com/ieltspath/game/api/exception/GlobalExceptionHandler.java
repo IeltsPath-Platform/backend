@@ -16,6 +16,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.client.RestClientException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -23,6 +25,7 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
     @ExceptionHandler(com.ieltspath.game.domain.exception.SoloGameplayException.class)
     public ResponseEntity<java.util.Map<String, Object>> soloError(
             com.ieltspath.game.domain.exception.SoloGameplayException e,
@@ -58,6 +61,9 @@ public class GlobalExceptionHandler {
     })
     public ResponseEntity<ErrorResponse> notFound(
             RuntimeException exception, HttpServletRequest request) {
+        if (exception instanceof GameRoomNotFoundException roomNotFound) {
+            log.debug("Game room not found roomRef={}", roomNotFound.roomRef());
+        }
         return error(HttpStatus.NOT_FOUND, exception.getMessage(), request, null);
     }
 
@@ -95,7 +101,7 @@ public class GlobalExceptionHandler {
                 .forEach(
                         fieldError ->
                                 details.put(fieldError.getField(), fieldError.getDefaultMessage()));
-        return error(HttpStatus.BAD_REQUEST, "Request validation failed", request, details);
+        return error(HttpStatus.BAD_REQUEST, "Dữ liệu gửi lên không hợp lệ", request, details);
     }
 
     @ExceptionHandler(Exception.class)

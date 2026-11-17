@@ -21,7 +21,7 @@ public class AddReactionUseCase {
     @Transactional
     public void execute(CommunityActor actor, AddReactionCommand command) {
         var post = posts.findById(command.postId())
-                .orElseThrow(() -> new CommunityNotFoundException("Post not found"));
+                .orElseThrow(() -> new CommunityNotFoundException("Không tìm thấy bài viết"));
         if (post.getStatus() != com.ieltspath.community.domain.vo.ContentStatus.ACTIVE && !actor.administrator()) {
             CommunityApplicationSupport.requireVisiblePost(posts, command.postId(), actor);
         }

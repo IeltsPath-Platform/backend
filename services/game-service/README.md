@@ -121,7 +121,7 @@ When the host leaves or closes a waiting room, the room is CLOSED and soft-delet
 The leave/close response includes a message naming the host. After commit, connected
 WebSocket clients receive ROOM_CLOSED and their room connections are closed.
 A guest leaving remains recorded as LEFT, frees the slot, and loses room-read access.
-A fifth active player is rejected with HTTP 400 (Room is full).
+A fifth active player is rejected with HTTP 400 (Phòng đã đủ người).
 
 ## Ready and start
 

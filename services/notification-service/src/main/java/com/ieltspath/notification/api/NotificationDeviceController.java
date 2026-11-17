@@ -39,7 +39,7 @@ public class NotificationDeviceController {
             register.execute(users.requireCurrentUser().id(), installationId, request.provider(), request.platform(),
                     request.token(), request.appVersion());
         } catch (IllegalArgumentException invalid) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid device registration");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Đăng ký thiết bị nhận thông báo không hợp lệ");
         }
     }
 

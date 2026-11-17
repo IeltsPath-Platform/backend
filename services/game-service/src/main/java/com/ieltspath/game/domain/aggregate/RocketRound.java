@@ -110,10 +110,10 @@ public class RocketRound {
             return existing;
         }
         if (status != Status.OPEN || !receivedAt.isBefore(deadlineAt))
-            throw new SoloGameplayException(409, "ROUND_CLOSED", "This round is closed");
-        if (existing != null) throw new SoloGameplayException(409, "ALREADY_ANSWERED", "You already answered this round");
+            throw new SoloGameplayException(409, "ROUND_CLOSED", "Vòng này đã kết thúc");
+        if (existing != null) throw new SoloGameplayException(409, "ALREADY_ANSWERED", "Bạn đã trả lời vòng này");
         if (options.stream().noneMatch(option -> option.optionId().equals(optionId)))
-            throw new SoloGameplayException(400, "INVALID_OPTION", "Unknown option for this round");
+            throw new SoloGameplayException(400, "INVALID_OPTION", "Lựa chọn không hợp lệ");
         boolean correct = correctOptionId.equals(optionId);
         Answer answer = new Answer(playerId, optionId, correct, RocketRules.points(correct, receivedAt, deadlineAt, limit),
                 receivedAt, Math.max(0, Duration.between(opensAt, receivedAt).toMillis()), requestId);

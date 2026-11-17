@@ -75,7 +75,7 @@ public class SubmitGameAnswerUseCase {
         var match = matchRepository.findForUpdate(initialPlayer.matchId())
                 .orElseThrow(() -> new GameMatchNotFoundException(initialPlayer.matchId()));
         if (match.status() != com.ieltspath.game.domain.aggregate.GameMatch.Status.IN_PROGRESS) {
-            throw new IllegalStateException("Match is no longer in progress");
+            throw new IllegalStateException("Ván chơi không còn diễn ra");
         }
 
         Instant now = Instant.now();

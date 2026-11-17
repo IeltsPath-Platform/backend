@@ -20,7 +20,7 @@ public class ModeratePostUseCase {
     public PostResult execute(CommunityActor actor, ModeratePostCommand command) {
         CommunityApplicationSupport.requireAdministrator(actor);
         var post = posts.findById(command.postId())
-                .orElseThrow(() -> new CommunityNotFoundException("Post not found"));
+                .orElseThrow(() -> new CommunityNotFoundException("Không tìm thấy bài viết"));
         post.moderate(command.status());
         var saved = posts.save(post);
         return PostResult.from(saved, reactions.counts(saved.getId()));

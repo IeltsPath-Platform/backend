@@ -59,7 +59,7 @@ public class GameSession {
     }
 
     public void recordAnswer(boolean correct, Instant answeredAt) {
-        if (status != GameSessionStatus.IN_PROGRESS) throw new InvalidGameSessionStateException("Session is not in progress");
+        if (status != GameSessionStatus.IN_PROGRESS) throw new InvalidGameSessionStateException("Lượt chơi không còn diễn ra");
         if (answeredCount >= itemCount) throw new InvalidGameSessionStateException("All session items have already been answered");
         answeredCount++;
         if (correct) score++;
@@ -67,13 +67,13 @@ public class GameSession {
     }
 
     public void complete(Instant at) {
-        if (status != GameSessionStatus.IN_PROGRESS) throw new InvalidGameSessionStateException("Session is not in progress");
+        if (status != GameSessionStatus.IN_PROGRESS) throw new InvalidGameSessionStateException("Lượt chơi không còn diễn ra");
         status = GameSessionStatus.COMPLETED;
         endedAt = at;
     }
 
     public void abandon(Instant at) {
-        if (status != GameSessionStatus.IN_PROGRESS) throw new InvalidGameSessionStateException("Session is not in progress");
+        if (status != GameSessionStatus.IN_PROGRESS) throw new InvalidGameSessionStateException("Lượt chơi không còn diễn ra");
         status = GameSessionStatus.ABANDONED;
         endedAt = at;
     }

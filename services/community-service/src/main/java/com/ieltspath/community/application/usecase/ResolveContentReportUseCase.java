@@ -29,7 +29,7 @@ public class ResolveContentReportUseCase {
         CommunityApplicationSupport.requireAdministrator(actor);
         if (command.decision() == com.ieltspath.community.domain.vo.ReportDecision.HIDE_CONTENT) {
             var snapshot = reports.findById(command.reportId())
-                    .orElseThrow(() -> new CommunityNotFoundException("Report not found"));
+                    .orElseThrow(() -> new CommunityNotFoundException("Không tìm thấy báo cáo"));
             var pending = reports.findPendingByContentForUpdate(snapshot.getContentType(), snapshot.getContentId());
             var report = pending.stream().filter(item -> item.getId().equals(command.reportId())).findFirst()
                     .orElseThrow(() -> new CommunityConflictException("Report is no longer pending"));
@@ -42,7 +42,7 @@ public class ResolveContentReportUseCase {
         }
 
         var report = reports.findByIdForUpdate(command.reportId())
-                .orElseThrow(() -> new CommunityNotFoundException("Report not found"));
+                .orElseThrow(() -> new CommunityNotFoundException("Không tìm thấy báo cáo"));
         report.resolve(actor.userId(), command.decision());
         return ContentReportResult.from(reports.update(report));
     }

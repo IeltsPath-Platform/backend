@@ -18,7 +18,7 @@ public class GameMatch {
     public static GameMatch reconstitute(UUID id, UUID roomId, String gameType, String learningDomain, Map<String,Object> config, Map<String,Object> content, Status status, Instant startedAt, Instant endedAt, Instant createdAt) {
         return new GameMatch(id,roomId,gameType,learningDomain,config,content,status,startedAt,endedAt,createdAt);
     }
-    public void complete(Instant at) { if(status!=Status.IN_PROGRESS) throw new IllegalStateException("Match is not in progress"); status=Status.COMPLETED; endedAt=at; }
+    public void complete(Instant at) { if(status!=Status.IN_PROGRESS) throw new IllegalStateException("Ván chơi không còn diễn ra"); status=Status.COMPLETED; endedAt=at; }
     public UUID id(){return id;} public UUID roomId(){return roomId;} public String gameType(){return gameType;} public String learningDomain(){return learningDomain;}
     public Map<String,Object> configSnapshot(){return configSnapshot;} public Map<String,Object> contentSnapshot(){return contentSnapshot;}
     public Status status(){return status;} public Instant startedAt(){return startedAt;} public Instant endedAt(){return endedAt;} public Instant createdAt(){return createdAt;}
