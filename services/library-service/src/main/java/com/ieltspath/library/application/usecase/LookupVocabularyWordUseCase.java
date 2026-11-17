@@ -48,7 +48,7 @@ public class LookupVocabularyWordUseCase {
         List<WordLookupResult.Sense> senses = item.getSenses().stream()
                 .filter(sense -> sense.getStatus() == ContentStatus.ACTIVE)
                 .sorted(Comparator.comparingInt(VocabularySense::getSortOrder))
-                .map(sense -> new WordLookupResult.Sense(
+                .map(sense -> new WordLookupResult.Sense(sense.getId(),
                         sense.getPartOfSpeech() == null ? null : sense.getPartOfSpeech().name(),
                         sense.getEnglishDefinition(), sense.getVietnameseMeaning(), sense.getExampleSentence()))
                 .toList();

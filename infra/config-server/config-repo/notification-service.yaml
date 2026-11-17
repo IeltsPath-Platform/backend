@@ -14,6 +14,13 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+    # db/callback holds afterMigrate__demo_data.sql: demo learner data written only when DEMO_DATA_ENABLED=true
+    # (dev/demo databases).
+    locations: classpath:db/migration,classpath:db/callback
+    placeholders:
+      demoData: ${DEMO_DATA_ENABLED:false}
+      # The learner the demo data belongs to: h2 by default; set DEMO_LEARNER_ID to give it to an existing account.
+      demoUserId: ${DEMO_LEARNER_ID:00000000-0000-0000-0000-000000000003}
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
@@ -65,6 +72,8 @@ notification:
         enabled: ${NOTIFICATION_MAIL_PASSWORD_RESET_ENABLED:true}
       password-changed:
         enabled: ${NOTIFICATION_MAIL_PASSWORD_CHANGED_ENABLED:true}
+      password-reset-google-only:
+        enabled: ${NOTIFICATION_MAIL_PASSWORD_RESET_GOOGLE_ONLY_ENABLED:true}
       google-account-linked:
         enabled: ${NOTIFICATION_MAIL_GOOGLE_ACCOUNT_LINKED_ENABLED:true}
       email-verification:

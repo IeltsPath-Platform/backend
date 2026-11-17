@@ -43,3 +43,33 @@ JOIN key_products product ON product.code = demo.product_code
 WHERE '${demoData}' = 'true'
   AND EXISTS (SELECT 1 FROM key_batches existing WHERE existing.code = demo.batch_code)
 ON CONFLICT DO NOTHING;
+
+-- Demo learner for the IELTS 5.0 demo (placeholder demoUserId: h2 unless DEMO_LEARNER_ID names another account):
+-- Premium for six months with three human gradings, and a wallet that went 1000 -> 975 points after a few gradings and
+-- course unlocks. Written once: later debits are not topped up again. DEV/DEMO ONLY.
+INSERT INTO subscriptions (id, user_id, plan_id, status, starts_at, ends_at, source_type, human_grading_credits_total,
+                           human_grading_credits_used)
+SELECT md5('${demoUserId}:demo:subscription')::uuid, '${demoUserId}'::uuid, '22222222-2222-2222-2222-222222222222'::uuid,
+       'ACTIVE', now() - interval '15 days', now() + interval '165 days', 'ADMIN', 3, 1
+WHERE '${demoData}' = 'true'
+  AND NOT EXISTS (SELECT 1 FROM subscriptions s WHERE s.user_id = '${demoUserId}'::uuid AND s.status = 'ACTIVE')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO point_wallets (user_id, balance, total_credited, total_debited)
+SELECT '${demoUserId}'::uuid, 975, 1100, 125
+WHERE '${demoData}' = 'true'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO point_ledger_entries (id, user_id, delta, balance_after, transaction_type, reference_type, reference_id,
+                                  idempotency_key, description, created_at)
+SELECT md5('${demoUserId}:demo:ledger:' || e.n)::uuid, '${demoUserId}'::uuid, e.delta, e.balance_after, e.type, e.ref_type,
+       md5('${demoUserId}:demo:ledger-ref:' || e.n), 'demo-seed:' || '${demoUserId}' || ':ledger:' || e.n, e.note,
+       now() - e.age
+FROM (VALUES (1, 1000, 1000, 'KEY_CREDIT', 'ACTIVATION_KEY', 'Kích hoạt key POINT_100 x10 (demo)', interval '15 days'),
+             (2, -60, 940, 'AI_GRADING_DEBIT', 'WRITING_SUBMISSION', 'Chấm Writing bằng AI (3 bài)', interval '12 days'),
+             (3, -50, 890, 'COURSE_UNLOCK_DEBIT', 'COURSE', 'Mở khóa kỹ năng khóa IELTS 5.0', interval '14 days'),
+             (4, 100, 990, 'LEARNING_REWARD', 'DAILY_QUEST', 'Thưởng nhiệm vụ ngày', interval '5 days'),
+             (5, -15, 975, 'HEART_REFILL_DEBIT', 'HEARTS', 'Hồi tim', interval '2 days'))
+     AS e(n, delta, balance_after, type, ref_type, note, age)
+WHERE '${demoData}' = 'true'
+ON CONFLICT DO NOTHING;

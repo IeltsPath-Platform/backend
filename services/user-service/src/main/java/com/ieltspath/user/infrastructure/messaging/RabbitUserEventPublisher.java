@@ -5,6 +5,7 @@ import com.ieltspath.commonobservability.Correlation;
 import com.ieltspath.events.user.EmailVerificationRequestedV1;
 import com.ieltspath.events.user.GoogleAccountLinkedV1;
 import com.ieltspath.events.user.PasswordChangedV1;
+import com.ieltspath.events.user.PasswordResetGoogleOnlyV1;
 import com.ieltspath.events.user.PasswordResetRequestedV1;
 import com.ieltspath.events.user.UserEmailVerificationStateV1;
 import com.ieltspath.events.user.UserMessaging;
@@ -31,7 +32,8 @@ import java.util.concurrent.TimeoutException;
 public class RabbitUserEventPublisher implements UserEventPublisher {
     private static final Set<String> SUPPORTED_EVENT_TYPES = Set.of(
             PasswordResetRequestedV1.EVENT_TYPE, PasswordChangedV1.EVENT_TYPE, GoogleAccountLinkedV1.EVENT_TYPE,
-            EmailVerificationRequestedV1.EVENT_TYPE, UserEmailVerificationStateV1.EVENT_TYPE);
+            PasswordResetGoogleOnlyV1.EVENT_TYPE, EmailVerificationRequestedV1.EVENT_TYPE,
+            UserEmailVerificationStateV1.EVENT_TYPE);
 
     private final RabbitTemplate rabbitTemplate;
     private final ObjectMapper mapper;

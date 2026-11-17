@@ -3,6 +3,7 @@ package com.ieltspath.notification.application;
 import com.ieltspath.events.access.SubscriptionExpiryNoticeV1;
 import com.ieltspath.events.user.EmailVerificationRequestedV1;
 import com.ieltspath.events.user.GoogleAccountLinkedV1;
+import com.ieltspath.events.user.PasswordResetGoogleOnlyV1;
 import com.ieltspath.events.user.PasswordChangedV1;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,6 +37,7 @@ public class SendAccountNoticeMailUseCase {
 
     @Value("${notification.mail.templates.password-changed.enabled:true}") private boolean passwordChangedEnabled;
     @Value("${notification.mail.templates.google-account-linked.enabled:true}") private boolean googleAccountLinkedEnabled;
+    @Value("${notification.mail.templates.password-reset-google-only.enabled:true}") private boolean passwordResetGoogleOnlyEnabled;
     @Value("${notification.mail.templates.email-verification.enabled:true}") private boolean emailVerificationEnabled;
     @Value("${notification.mail.frontend-base-url:}") private String frontendBaseUrl;
     @Value("${notification.mail.templates.subscription-expiring.enabled:true}") private boolean subscriptionExpiringEnabled;
@@ -61,6 +63,18 @@ public class SendAccountNoticeMailUseCase {
         send(MailTemplate.GOOGLE_ACCOUNT_LINKED, event.eventId(), event.email(), Map.of(
                 "displayName", name(event.displayName())));
     }
+
+    /** Someone asked to reset the password of a Google-only account: tell the owner to use Google, with no link. */
+    public void passwordResetGoogleOnly(PasswordResetGoogleOnlyV1 event) {
+        if (event == null || event.eventId() == null || !PasswordResetGoogleOnlyV1.EVENT_TYPE.equals(event.eventType())
+                || event.userId() == null || isBlank(event.email()) || event.occurredAt() == null) {
+            throw new IllegalArgumentException("Password reset Google-only event is invalid");
+        }
+        if (!passwordResetGoogleOnlyEnabled) return;
+        send(MailTemplate.PASSWORD_RESET_GOOGLE_ONLY, event.eventId(), event.email(), Map.of(
+                "displayName", name(event.displayName())));
+    }
+
 
     /** The verification link expires with its token; the minutes left are shown rather than a fixed number. */
     public void emailVerificationRequested(EmailVerificationRequestedV1 event) {

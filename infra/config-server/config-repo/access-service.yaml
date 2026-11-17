@@ -14,6 +14,8 @@ spring:
     locations: classpath:db/migration,classpath:db/callback
     placeholders:
       demoData: ${DEMO_DATA_ENABLED:false}
+      # The learner the demo data belongs to: h2 by default; set DEMO_LEARNER_ID to give it to an existing account.
+      demoUserId: ${DEMO_LEARNER_ID:00000000-0000-0000-0000-000000000003}
   # Learning sends the points it owes (streak, quests, badges, mastered points) over RabbitMQ; Access answers on the same broker.
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}

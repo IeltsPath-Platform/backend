@@ -10,6 +10,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -21,6 +22,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class VocabularyLookupControllerTest {
+
+    private static final UUID SENSE_ID = UUID.fromString("5b0f9a52-0d6e-4f57-9a31-3c2f6b1d8e10");
 
     private final LookupVocabularyWordUseCase lookup = mock(LookupVocabularyWordUseCase.class);
     private MockMvc mvc;
@@ -36,7 +39,7 @@ class VocabularyLookupControllerTest {
         when(lookup.execute(List.of("downloads", "download"))).thenReturn(List.of(
                 new WordLookupResult("download", "download", "/ˈdaʊnləʊd/", "https://media/uk/download.mp3",
                         "https://media/us/download.mp3", List.of(
-                        new WordLookupResult.Sense("VERB", "to copy a file", "tải xuống", "I download music."))),
+                        new WordLookupResult.Sense(SENSE_ID, "VERB", "to copy a file", "tải xuống", "I download music."))),
                 new WordLookupResult("live", "live", "/laɪv/", null, null, List.of())));
 
         mvc.perform(get("/api/content/vocabulary/lookup").param("forms", "downloads, download,"))
@@ -46,6 +49,7 @@ class VocabularyLookupControllerTest {
                 .andExpect(jsonPath("$[0].audioUk").value("https://media/uk/download.mp3"))
                 .andExpect(jsonPath("$[0].audioUs").value("https://media/us/download.mp3"))
                 .andExpect(jsonPath("$[1].audioUk").isEmpty())
+                .andExpect(jsonPath("$[0].senses[0].id").value(SENSE_ID.toString()))
                 .andExpect(jsonPath("$[0].senses[0].vietnameseMeaning").value("tải xuống"))
                 .andExpect(jsonPath("$[0].senses[0].partOfSpeech").value("VERB"))
                 .andExpect(jsonPath("$[1].senses").isEmpty());
