@@ -3,7 +3,7 @@ title: Sửa luồng bài ôn, chẩn đoán dò ngược và giỏ ôn
 description: >-
   Gỡ các đường làm học viên kẹt vĩnh viễn ở bài ôn bắt buộc, làm UI chẩn đoán dò ngược, cho giỏ ôn đỡ các KP yếu
   bị rơi khỏi mọi danh sách, và thống nhất công thức mastery
-status: proposed
+status: in_progress
 priority: P1
 branch: main
 tags:
@@ -72,11 +72,11 @@ SKIPPED/DONE mà KP vẫn yếu → không hiện ở đâu      KP vẫn yếu 
 
 | Phase | Tên | Mục | Trạng thái |
 |-------|-----|-----|------------|
-| 1 | [Gỡ kẹt: gói bị gỡ, chẩn đoán trễ, HTTP ngoài khóa](./phase-01-unstick-review-and-probe.md) | 1, 2, 3 | Pending |
-| 2 | [Luật trượt bài ôn và chẩn đoán](./phase-02-review-failure-and-diagnosis-rules.md) | 4, 4a–c, 5, 6, 7 | Pending |
-| 3 | [Giỏ ôn và nhất quán mastery](./phase-03-basket-and-mastery-consistency.md) | 8, 9, 10, 11 | Pending |
-| 4 | [Frontend: UI chẩn đoán và giỏ ôn](./phase-04-frontend-diagnosis-and-basket.md) | 13, hiển thị 4, 5, 7, 8, 9 | Pending |
-| 5 | [Contract, tài liệu, kiểm chứng](./phase-05-contracts-docs-verification.md) | 12, docs, rollback | Pending |
+| 1 | [Gỡ kẹt: gói bị gỡ, chẩn đoán trễ, HTTP ngoài khóa](./phase-01-unstick-review-and-probe.md) | 1, 2, 3 | Completed |
+| 2 | [Luật trượt bài ôn và chẩn đoán](./phase-02-review-failure-and-diagnosis-rules.md) | 4, 4a–c, 5, 6, 7 | Completed |
+| 3 | [Giỏ ôn và nhất quán mastery](./phase-03-basket-and-mastery-consistency.md) | 8, 9, 10, 11 | Completed |
+| 4 | [Frontend: UI chẩn đoán và giỏ ôn](./phase-04-frontend-diagnosis-and-basket.md) | 13, hiển thị 4, 5, 7, 8, 9 | Completed (repo frontend, chưa kiểm cùng backend thật) |
+| 5 | [Contract, tài liệu, kiểm chứng](./phase-05-contracts-docs-verification.md) | 12, docs, rollback | Tài liệu xong; còn kiểm chứng cuối |
 
 Thứ tự: 1 → 2 → 3 → 4 → 5.
 - Phase 1 và 2 cùng sửa `GetReviewUseCase`, `SubmitReviewUseCase`, `DiagnosticFlow`, nên làm nối tiếp, không song song.

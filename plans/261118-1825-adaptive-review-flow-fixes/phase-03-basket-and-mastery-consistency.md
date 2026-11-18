@@ -68,8 +68,10 @@ không hiện ở đâu; `StartBasketReview` trả `409 NOT_IN_REVIEW_BASKET`.
 - **Định nghĩa bằng dữ liệu, không suy từ `evidenceCount`:** `MasteryProfileUpdater` ở chế độ DECAY ghi
   `decayed_from_tier = <tier cũ>` khi job chuyển một KP từ tier đủ dữ liệu (`CONSOLIDATE`/`MAINTAIN`) sang `INSUFFICIENT`.
   Xóa về null khi KP đủ dữ liệu trở lại. KP mới có ít câu, hay nhiều câu trọng số thấp, không bao giờ có cột này.
-- `GetReviewBasketUseCase`: KP có `decayed_from_tier` vào nhóm `due`, `reason = "DECAYED"`, với cùng điều kiện "bắt đầu
-  được" như mục 8. Tối đa **10** KP decay mỗi lần, ưu tiên KP có bằng chứng cuối cũ nhất. Sắp `due` bằng
+- `GetReviewBasketUseCase`: KP có `decayed_from_tier` vào nhóm `due`, `reason = "DECAYED"`. **Khác bản đầu:** nhóm này không
+  bị lọc theo "bắt đầu được" như `PRIORITY`; nó hiện như các mục `due` khác, nút "Bắt đầu ôn" tắt kèm ghi chú khi hết bộ đề
+  (`hasUnrevealedSet = false`), và lúc start vẫn kiểm bài học, paywall, reserve rồi trả 409. Nhờ vậy badge `due` và nhóm `due`
+  đếm cùng một tập. Tối đa **10** KP decay mỗi lần, ưu tiên KP có bằng chứng cuối cũ nhất. Sắp `due` bằng
   `Comparator.nullsFirst` (KP decay lên đầu). <!-- Updated: Validation Session 1 - giới hạn 10 KP DECAYED -->
 - Chỉ ghi `decayed_from_tier` từ lúc deploy; không backfill KP đã decay trước đó (người dùng chốt).
   <!-- Updated: Validation Session 1 - không backfill -->
