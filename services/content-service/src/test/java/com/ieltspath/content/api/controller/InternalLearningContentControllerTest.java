@@ -60,6 +60,22 @@ class InternalLearningContentControllerTest {
     }
 
     @Test
+    void withoutAPoolOnlyTheFullLengthPoolIsRequestedSoALearningInstanceThatTakesTheFirstExamIsSafe() throws Exception {
+        when(placementTests.execute(com.ieltspath.content.domain.vo.PlacementPool.BAND_5_9)).thenReturn(List.of());
+        mockMvc.perform(get("/internal/learning-content/placement-packages")).andExpect(status().isOk());
+        verify(placementTests).execute(com.ieltspath.content.domain.vo.PlacementPool.BAND_5_9);
+        verify(placementTests, never()).execute(null);
+    }
+
+    @Test
+    void poolAllRequestsEveryPool() throws Exception {
+        when(placementTests.execute(null)).thenReturn(List.of());
+        mockMvc.perform(get("/internal/learning-content/placement-packages").param("pool", "ALL"))
+                .andExpect(status().isOk());
+        verify(placementTests).execute(null);
+    }
+
+    @Test
     void nonPlacementVersionSerializesNullPool() throws Exception {
         UUID version = UUID.randomUUID();
         when(packageVersion.execute(version)).thenReturn(new PackageVersionContentResult(version, UUID.randomUUID(),
@@ -138,7 +154,7 @@ class InternalLearningContentControllerTest {
     void placementPackagesUseTheExistingPackageShape() throws Exception {
         UUID pkg = UUID.randomUUID();
         UUID version = UUID.randomUUID();
-        when(placementTests.execute(null)).thenReturn(List.of(
+        when(placementTests.execute(com.ieltspath.content.domain.vo.PlacementPool.BAND_5_9)).thenReturn(List.of(
                 new com.ieltspath.content.application.result.PlacementPackageResult(pkg, version, "PLACEMENT",
                         com.ieltspath.content.domain.vo.PlacementPool.BAND_5_9)));
         mockMvc.perform(get("/internal/learning-content/placement-packages"))

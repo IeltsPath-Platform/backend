@@ -40,7 +40,7 @@ class RestLearningContentClientTest {
 
     @Test
     void requestsEveryPlacementPackageInOneCallAndMapsThePoolField() {
-        server.expect(requestTo(INTERNAL_PATH + "/placement-packages"))
+        server.expect(requestTo(INTERNAL_PATH + "/placement-packages?pool=ALL"))
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess("[{\"packageId\":\"" + PACKAGE_ID + "\",\"packageVersionId\":\""
                         + VERSION_ID + "\",\"code\":\"P35\",\"pool\":\"BAND_3_5\"}]", MediaType.APPLICATION_JSON));

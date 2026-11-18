@@ -383,10 +383,13 @@ grant no skill otherwise.
 ## `GET /placement-packages?pool=` (2026-11-17)
 
 Returns published placement packages with their current published version. Optional `pool` is one of
-`BAND_0_3`, `BAND_3_5`, `BAND_5_9`; an unknown value returns `400`. Omitting it returns all pools.
+`BAND_0_3`, `BAND_3_5`, `BAND_5_9` or `ALL`; an unknown value returns `400`. **Omitting it returns the
+`BAND_5_9` pool only**: a Learning instance from before the pools existed takes the first exam of the list, and during
+a release or a rollback it must never be handed a shortened exam. `pool=ALL` returns every pool, which is what the
+current Learning uses to read the catalogue in one call.
 Each item is `{packageId, packageVersionId, code, pool}` and rows are ordered by package ID. Both the
-package and its current version must be `PUBLISHED`; draft and archived packages are excluded. Learning requests
-one pool when assigning and treats a missing or mismatched pool in a response as unavailable.
+package and its current version must be `PUBLISHED`; draft and archived packages are excluded. Learning treats a
+missing pool in a response as unavailable and groups the items by pool itself.
 An empty pool returns `200 []`. Topic and course test listings retain their existing response shape.
 
 The original `PLACEMENT-4SKILLS` package is backfilled to `BAND_5_9`, preserving its 9.0 ceiling.
