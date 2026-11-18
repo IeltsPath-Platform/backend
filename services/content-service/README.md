@@ -154,6 +154,13 @@ clears the range.
 
   The original shared V25 Placement sample uses the separate public key `listening/placement/placement-ls1.mp3`.
 
+- The placement pool exams (V138 to V140: `PLACEMENT-B03-A`, `B03-B`, `B35-A`, `B35-B` and `B59-B`) add twelve more
+  files under `listening/placement/<package code in lower case>/part<N>.mp3`. They are published when the
+  migrations run, so the files must be uploaded and checked before the deploy. The migrations, the recording scripts
+  and the review copies are generated from `scripts/placement-exams/exams/`; see `docs/placement-exams/README.md` for the
+  keys, the declared durations, the recording format and the check command
+  (`node scripts/placement-exams/generate-placement-seed.mjs --audio "$CONTENT_MEDIA_BASE_URL"`).
+
 - The Listening practice tests (V32, durations from V35, keys kept by V39) reference 12 files. The recordings are
   text-to-speech renderings of the transcripts; keep a local copy in `services/content-service/media/` (ignored by
   Git) and upload them under the same keys. The database only ever holds the key, never the audio:
