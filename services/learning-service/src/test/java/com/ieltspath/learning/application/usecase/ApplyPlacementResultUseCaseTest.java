@@ -37,7 +37,8 @@ class ApplyPlacementResultUseCaseTest {
     private final ApplyAssessmentResultUseCase useCase = new ApplyAssessmentResultUseCase(
             lock, evidence, curricula, results, assignments, reviews, placements, courseProgress, courseAssignments,
             mock(com.ieltspath.learning.domain.repository.PracticeTestAssignmentRepository.class),
-            placementAssignments, questionEvents, masteryProfiles,
+            new com.ieltspath.learning.application.service.PlacementAssignmentCompleter(placementAssignments),
+            questionEvents, masteryProfiles,
             mock(com.ieltspath.learning.application.service.CourseOutcomeService.class));
     private final UUID user = UUID.randomUUID();
     private final Instant completed = Instant.parse("2026-10-06T10:00:00Z");
@@ -99,6 +100,18 @@ class ApplyPlacementResultUseCaseTest {
         verify(placementAssignments).save(assignment);
         assertThat(assignment.attemptId()).isEqualTo(attemptId);
         assertThat(assignment.completedAt()).isEqualTo(completed);
+    }
+
+    @Test
+    void theBandIsWrittenBeforeTheAssignmentIsMatched() {
+        UUID packageVersionId = UUID.randomUUID();
+        when(placementAssignments.findOpenForResult(user, packageVersionId, completed)).thenReturn(Optional.empty());
+
+        useCase.execute(event(UUID.randomUUID(), 1, "6.0", completed, packageVersionId));
+
+        var order = inOrder(placements, placementAssignments);
+        order.verify(placements).save(any(LearnerPlacement.class));
+        order.verify(placementAssignments).findOpenForResult(user, packageVersionId, completed);
     }
 
     @Test
