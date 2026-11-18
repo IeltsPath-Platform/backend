@@ -10,12 +10,13 @@ import java.util.List;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record ReviewSubmissionResponse(String reviewStatus, List<SubmissionResponse.Result> results,
                                        String transcript, String stage, Integer failedSets,
+                                       Boolean blocking,
                                        GamificationSummary gamification) {
     public static ReviewSubmissionResponse from(ReviewSubmissionResult result) {
         List<SubmissionResponse.Result> answers = result.results().stream().<SubmissionResponse.Result>map(answer ->
                 new SubmissionResponse.SolvedAnswer(answer.questionVersionId(), answer.correct(),
                         answer.correctAnswer(), answer.explanation(), null, answer.error())).toList();
         return new ReviewSubmissionResponse(result.reviewStatus(), answers, result.transcript(), result.stage(),
-                result.failedSets(), result.gamification());
+                result.failedSets(), result.blocking(), result.gamification());
     }
 }

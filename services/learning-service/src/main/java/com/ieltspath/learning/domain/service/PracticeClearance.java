@@ -69,7 +69,8 @@ public final class PracticeClearance {
         }
         List<ReviewFact> ofSkill = reviews.stream()
                 .filter(review -> review.skill() == null || review.skill() == skill).toList();
-        boolean nonePending = ofSkill.stream().noneMatch(review -> review.status() == ReviewStatus.PENDING);
+        boolean nonePending = ofSkill.stream().noneMatch(review -> review.status() == ReviewStatus.PENDING
+                && !review.unblocked());
         if (!ofSkill.isEmpty() && nonePending) return PracticePassReason.REVIEW_FINISHED;
         if (revealed.containsAll(sets) && nonePending) return PracticePassReason.ALL_SETS_ATTEMPTED;
         boolean noBlockingPending = ofSkill.stream()
@@ -86,7 +87,8 @@ public final class PracticeClearance {
         if (attempts.stream().anyMatch(attempt -> attempt.passed() && attempt.countedAsEvidence())) {
             return new Clearance(PracticeStatus.PASSED, PracticePassReason.FIRST_SUBMISSION);
         }
-        boolean nonePending = reviews.stream().noneMatch(review -> review.status() == ReviewStatus.PENDING);
+        boolean nonePending = reviews.stream().noneMatch(review -> review.status() == ReviewStatus.PENDING
+                && !review.unblocked());
         if (!reviews.isEmpty() && nonePending) {
             return new Clearance(PracticeStatus.PASSED, PracticePassReason.REVIEW_FINISHED);
         }
@@ -110,10 +112,13 @@ public final class PracticeClearance {
     }
 
     /** {@code skill} is the skill of the review's knowledge point; null for reviews created before skills. */
-    public record ReviewFact(ReviewStatus status, LearningSkill skill, boolean blocking) {
-        public ReviewFact(ReviewStatus status, LearningSkill skill) { this(status, skill, true); }
+    public record ReviewFact(ReviewStatus status, LearningSkill skill, boolean blocking, boolean unblocked) {
+        public ReviewFact(ReviewStatus status, LearningSkill skill, boolean blocking) {
+            this(status, skill, blocking, false);
+        }
+        public ReviewFact(ReviewStatus status, LearningSkill skill) { this(status, skill, true, false); }
         public ReviewFact(ReviewStatus status) {
-            this(status, null, true);
+            this(status, null, true, false);
         }
     }
 

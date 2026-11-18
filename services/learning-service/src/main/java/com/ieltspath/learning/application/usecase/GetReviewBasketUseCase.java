@@ -100,7 +100,8 @@ public class GetReviewBasketUseCase {
             boolean isDue = profile.tier() == MasteryTier.MAINTAIN;
             boolean isWeak = profile.tier() != MasteryTier.CONSOLIDATE && !isDue(profile, now);
             PendingReview optional = optionalByPoint.get(profile.knowledgePointId());
-            String reason = isWeak && optional != null ? optional.triggerKind() : isDue ? "DUE" : "CONSOLIDATE";
+            String reason = optional != null && optional.unblocked() ? "UNBLOCKED"
+                    : isWeak && optional != null ? optional.triggerKind() : isDue ? "DUE" : "CONSOLIDATE";
             String skill = meta.skill() != null ? meta.skill()
                     : optional != null && optional.skill() != null ? optional.skill().name() : null;
             var item = new OptionalItem(profile.knowledgePointId(), meta.code(), meta.name(), skill,

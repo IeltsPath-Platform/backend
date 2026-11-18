@@ -100,7 +100,8 @@ public class PracticeProgress {
         Map<UUID, List<PracticeClearance.ReviewFact>> reviewFacts = new HashMap<>();
         for (PracticeReviewState review : allReviews) {
             reviewFacts.computeIfAbsent(review.lessonId(), ignored -> new ArrayList<>())
-                    .add(new PracticeClearance.ReviewFact(review.status(), review.skill(), review.blocking()));
+                    .add(new PracticeClearance.ReviewFact(review.status(), review.skill(), review.blocking(),
+                            review.unblocked()));
         }
         Map<UUID, Clearance> result = new HashMap<>();
         for (var entry : sets.entrySet()) {

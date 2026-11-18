@@ -20,6 +20,7 @@ import com.ieltspath.learning.application.service.TheoryFocus;
 import com.ieltspath.learning.application.service.ErrorTrapCatalog;
 import com.ieltspath.learning.application.service.ErrorTypeTexts;
 import com.ieltspath.learning.application.service.DiagnosticPreparation;
+import com.ieltspath.learning.application.service.ReviewSettings;
 import com.ieltspath.learning.domain.aggregate.ReviewItem;
 import com.ieltspath.learning.domain.entity.ReviewSet;
 import com.ieltspath.learning.domain.repository.PracticeAttemptRepository;
@@ -61,6 +62,7 @@ public class GetReviewUseCase {
     private final MasteryProfileRepository profiles;
     private final ErrorTypeTexts errorTypeTexts;
     private final DiagnosticPreparation diagnosticPreparation;
+    private final ReviewSettings reviewSettings;
     private final TransactionTemplate transaction;
     private final TheoryFocus theoryFocus = new TheoryFocus();
 
@@ -70,8 +72,9 @@ public class GetReviewUseCase {
                             FirstAttemptMistakes mistakes, DiagnosticRepository diagnostics,
                             DiagnosticFlow diagnosticFlow, ErrorTrapCatalog errorTraps,
                             MasteryProfileRepository profiles, ErrorTypeTexts errorTypeTexts,
-                            DiagnosticPreparation diagnosticPreparation,
+                            DiagnosticPreparation diagnosticPreparation, ReviewSettings reviewSettings,
                             PlatformTransactionManager transactionManager) {
+        this.reviewSettings = reviewSettings;
         this.diagnostics = diagnostics;
         this.diagnosticFlow = diagnosticFlow;
         this.errorTraps = errorTraps;
@@ -249,7 +252,7 @@ public class GetReviewUseCase {
                 List.of(), errorTrap));
     }
 
-    private static ReviewResult result(ReviewItem review, TheoryFocus.Focus focus, ReviewResult.ReviewSet set,
+    private ReviewResult result(ReviewItem review, TheoryFocus.Focus focus, ReviewResult.ReviewSet set,
                                        List<LessonResult.Question> quickCheck, Optional<DiagnosticSession> diagnosis,
                                        List<UUID> waitingOn, ErrorTrapResult errorTrap) {
         boolean probing = review.status() == ReviewStatus.PENDING && diagnosis.isPresent() && diagnosis.get().probing();
@@ -260,7 +263,8 @@ public class GetReviewUseCase {
         return new ReviewResult(review.id(), review.status().name(), review.lessonId(), focus.theory(), set,
                 review.knowledgePointId(), review.skill(), review.stage().name(),
                 review.theoryReason() == null ? null : review.theoryReason().name(), focus.scope(),
-                review.failedSets(), null, quickCheck, state, sessionId,
+                review.failedSets(), review.blocking() ? reviewSettings.unblockAfterFailedSets() : null,
+                quickCheck, state, sessionId,
                 review.blocking(), waitingOn, errorTrap, review.triggerKind());
     }
 

@@ -17,6 +17,7 @@ import com.ieltspath.learning.domain.vo.GamificationSummary;
 import com.ieltspath.learning.application.service.LessonEvidenceReference;
 import com.ieltspath.learning.application.service.ItemGrading;
 import com.ieltspath.learning.application.service.PracticeProgress;
+import com.ieltspath.learning.application.service.ReviewSettings;
 import com.ieltspath.learning.domain.aggregate.ReviewItem;
 import com.ieltspath.learning.domain.entity.ReviewSet;
 import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
@@ -64,6 +65,7 @@ public class SubmitReviewUseCase {
     private final MasteryProfileUpdater masteryProfiles;
     private final GamificationRecorder gamificationRecorder;
     private final ErrorTrapEvidence errorTrapEvidence;
+    private final ReviewSettings reviewSettings;
     private final TransactionTemplate transaction;
     private final ItemGrading grading = new ItemGrading();
 
@@ -73,7 +75,9 @@ public class SubmitReviewUseCase {
                                PracticeProgress practice, QuestionEventLog questionEvents,
                                MasteryProfileUpdater masteryProfiles,
                                GamificationRecorder gamificationRecorder, ErrorTrapEvidence errorTrapEvidence,
+                               ReviewSettings reviewSettings,
                                PlatformTransactionManager transactionManager) {
+        this.reviewSettings = reviewSettings;
         this.gamificationRecorder = gamificationRecorder;
         this.errorTrapEvidence = errorTrapEvidence;
         this.questionEvents = questionEvents;
@@ -197,14 +201,15 @@ public class SubmitReviewUseCase {
         masteryProfiles.recordEvidence(userId, setAnswers, withoutMilestone);
         errorTrapEvidence.createReviews(userId, review.lessonId(), setAnswers);
 
-        ReviewStatus status = review.recordSetResult(preparedSet.id(), command.requestId(), graded.correct(), graded.total());
+        ReviewStatus status = review.recordSetResult(preparedSet.id(), command.requestId(), graded.correct(),
+                graded.total(), reviewSettings.unblockAfterFailedSets());
         Section first = ItemGrading.orderedSections(version).stream().findFirst().orElse(null);
         String transcript = first != null && first.audio() != null ? first.audio().transcript() : null;
         // Every set is answered once, so each set's correct answers earn XP.
         GamificationSummary gamification = gamificationRecorder.recordCorrectAnswers(userId, command.requestId(),
                 graded.correctQuestionIds());
         ReviewSubmissionResult response = new ReviewSubmissionResult(status.name(), passed, List.copyOf(results),
-                transcript, review.stage().name(), review.failedSets(), gamification);
+                transcript, review.stage().name(), review.failedSets(), review.blocking(), gamification);
         reviews.save(review);
         submissions.save(preparedSet.id(), response);
         if (status != ReviewStatus.PENDING && practiceSets != null) {

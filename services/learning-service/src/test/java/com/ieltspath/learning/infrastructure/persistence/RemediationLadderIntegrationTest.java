@@ -60,6 +60,7 @@ class RemediationLadderIntegrationTest {
     @Autowired StartPracticeAttemptUseCase start;
     @Autowired SubmitPracticeAttemptUseCase practice;
     @Autowired GetReviewUseCase getReview;
+    @Autowired GetReviewBasketUseCase basket;
     @Autowired SubmitReviewUseCase submitReview;
     @Autowired SubmitTheoryCheckUseCase theoryCheck;
     @MockitoBean LearningContentClient content;
@@ -167,18 +168,19 @@ class RemediationLadderIntegrationTest {
         var exhausted = getReview.execute(user, reviewId);
         assertEquals("SKIPPED", exhausted.reviewStatus());
         assertNull(exhausted.set());
-        assertNull(exhausted.maxFailedSets());
+        assertEquals(4, exhausted.maxFailedSets());
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM review_items WHERE user_id = ? AND status = 'PENDING'",
                 Integer.class, user));
     }
 
     @Test
-    void aReviewKeepsGivingNewSetsAfterEveryFailureUntilOneIsPassed() {
+    void aReviewRepeatsTheoryAndUnblocksAfterItsFourthFailedSet() {
         UUID user = UUID.randomUUID();
         PackageVersion first = practiceSet(kpA, kpA, kpA, kpA, kpA);
         PackageVersion second = practiceSet(kpA, kpA);
         PackageVersion third = practiceSet(kpA, kpA);
         PackageVersion fourth = practiceSet(kpA, kpA);
+        PackageVersion fifth = practiceSet(kpA, kpA);
         topics.execute(user);
         exercise.execute(user, lesson, block, answers(List.of(lessonQuestionA, lessonQuestionB), "A", "A"));
         var attempt = start.execute(user, lesson, first.packageId());
@@ -205,14 +207,32 @@ class RemediationLadderIntegrationTest {
 
         var setThree = getReview.execute(user, reviewId);
         assertEquals(fourth.packageId(), setThree.set().packageId());
-        assertNull(setThree.maxFailedSets());
+        assertEquals(4, setThree.maxFailedSets());
         clearInvocations(content);
-        var passed = submitReview.execute(user, reviewId, new SubmitReviewCommand(setThree.set().reviewSetId(),
-                UUID.randomUUID(), answers(items(fourth), "A", "A").answers()));
-        verify(content, times(1)).lessonPracticeSets(lesson);
-        assertEquals("DONE", passed.reviewStatus());
-        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM review_items WHERE user_id = ? AND status = 'PENDING'",
-                Integer.class, user));
+        var failedThird = submitReview.execute(user, reviewId, new SubmitReviewCommand(setThree.set().reviewSetId(),
+                UUID.randomUUID(), answers(items(fourth), "B", "B").answers()));
+        verify(content, org.mockito.Mockito.never()).lessonPracticeSets(any());
+        assertEquals("THEORY", failedThird.stage());
+        assertEquals("REPEATED_FAIL", jdbc.queryForObject("SELECT theory_reason FROM review_items WHERE id = ?",
+                String.class, reviewId));
+        theoryCheck.execute(user, reviewId, new SubmitExerciseCommand(UUID.randomUUID(), List.of()));
+
+        var setFour = getReview.execute(user, reviewId);
+        assertEquals(fifth.packageId(), setFour.set().packageId());
+        var unblocked = submitReview.execute(user, reviewId, new SubmitReviewCommand(setFour.set().reviewSetId(),
+                UUID.randomUUID(), answers(items(fifth), "B", "B").answers()));
+        assertEquals("PENDING", unblocked.reviewStatus());
+        assertEquals(Boolean.FALSE, unblocked.blocking());
+        assertEquals(Boolean.FALSE, jdbc.queryForObject("SELECT blocking FROM review_items WHERE id = ?",
+                Boolean.class, reviewId));
+        assertNotNull(jdbc.queryForObject("SELECT unblocked_at FROM review_items WHERE id = ?", java.sql.Timestamp.class,
+                reviewId));
+        assertEquals(4, jdbc.queryForObject("SELECT count(*) FROM review_sets WHERE review_item_id = ? AND passed = FALSE",
+                Integer.class, reviewId));
+        var basketItems = basket.execute(user);
+        assertTrue(java.util.stream.Stream.of(basketItems.consolidate(), basketItems.due(), basketItems.weak())
+                .flatMap(Collection::stream)
+                .anyMatch(item -> reviewId.equals(item.reviewId()) && "UNBLOCKED".equals(item.reason())));
     }
 
     @Test

@@ -48,6 +48,9 @@ app:
           - /v3/api-docs/**
 
 learning:
+  review:
+    # After this many failed sets a blocking review remains available as optional practice.
+    unblock-after-failed-sets: 4
   assessment:
     base-url: ${ASSESSMENT_SERVICE_URL:http://localhost:8083}
   content:
