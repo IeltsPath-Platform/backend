@@ -91,16 +91,21 @@ public class GetReviewUseCase {
     }
 
     public ReviewResult execute(UUID userId, UUID reviewId) {
+        return execute(userId, reviewId, null);
+    }
+
+    /** Uses the candidate list prepared by a new basket start, so its access and reserve checks apply to the first set. */
+    public ReviewResult execute(UUID userId, UUID reviewId, List<PracticeSet> preparedCandidates) {
         for (int retry = 0; retry < 2; retry++) {
             ReviewItem snapshot = ownedReview(userId, reviewId);
-            Prepared prepared = prepare(userId, snapshot);
+            Prepared prepared = prepare(userId, snapshot, preparedCandidates);
             ReadResult read = transaction.execute(status -> readUnderLock(userId, reviewId, prepared));
             if (!read.retry()) return read.result();
         }
         throw new LearningRequestException(409, "REVIEW_SET_CLOSED", "Review changed while it was being opened");
     }
 
-    private Prepared prepare(UUID userId, ReviewItem review) {
+    private Prepared prepare(UUID userId, ReviewItem review, List<PracticeSet> preparedCandidates) {
         Lesson lesson = null;
         try {
             lesson = content.getLesson(review.lessonId());
@@ -136,8 +141,15 @@ public class GetReviewUseCase {
                 }
             }
             if (review.openSet().isEmpty() || staleOpenSet) {
-                next = nextPackage(userId, review.knowledgePointId(), review.lessonId(), revealed,
-                        trap == null ? null : trap.code());
+                if (preparedCandidates == null) {
+                    next = nextPackage(userId, review.knowledgePointId(), review.lessonId(), revealed,
+                            trap == null ? null : trap.code());
+                } else {
+                    Set<UUID> unavailable = new HashSet<>(revealed);
+                    unavailable.addAll(reviews.assignedPackageIds(userId));
+                    next = preparedCandidates.stream().filter(candidate -> !unavailable.contains(candidate.packageId()))
+                            .findFirst();
+                }
                 if (next.isPresent()) {
                     try {
                         currentVersion = content.getPackageVersion(next.get().packageVersionId());

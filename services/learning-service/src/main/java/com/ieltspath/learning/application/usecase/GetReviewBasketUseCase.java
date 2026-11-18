@@ -7,6 +7,7 @@ import com.ieltspath.learning.application.result.ReviewBasketResult.RequiredItem
 import com.ieltspath.learning.application.result.ErrorTrapResult;
 import com.ieltspath.learning.application.service.ErrorTrapCatalog;
 import com.ieltspath.learning.application.service.ErrorTypeTexts;
+import com.ieltspath.learning.application.service.CompletedLessonLocator;
 import com.ieltspath.learning.application.service.KnowledgePointDirectory;
 import com.ieltspath.learning.domain.aggregate.MasteryProfile;
 import com.ieltspath.learning.domain.repository.MasteryProfileRepository;
@@ -17,7 +18,7 @@ import com.ieltspath.learning.domain.vo.MasteryTier;
 import com.ieltspath.learning.domain.vo.PendingReview;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -35,6 +36,7 @@ import java.util.UUID;
 public class GetReviewBasketUseCase {
     /** The smallest set Content may hand out as a review. */
     static final int MIN_SET_QUESTIONS = 3;
+    private static final int MAX_DECAYED_POINTS = 10;
 
     private final MasteryProfileRepository profiles;
     private final ReviewItemRepository reviews;
@@ -43,13 +45,16 @@ public class GetReviewBasketUseCase {
     private final KnowledgePointDirectory directory;
     private final ErrorTrapCatalog errorTraps;
     private final ErrorTypeTexts errorTypeTexts;
+    private final CompletedLessonLocator lessonLocator;
+    private final int reserve;
     private final Clock clock = Clock.systemUTC();
 
     @Autowired
     public GetReviewBasketUseCase(MasteryProfileRepository profiles, ReviewItemRepository reviews,
                                   PracticeAttemptRepository attempts, LearningContentClient content,
                                   KnowledgePointDirectory directory, ErrorTrapCatalog errorTraps,
-                                  ErrorTypeTexts errorTypeTexts) {
+                                  ErrorTypeTexts errorTypeTexts, CompletedLessonLocator lessonLocator,
+                                  @Value("${learning.free-practice.reserve:2}") int reserve) {
         this.profiles = profiles;
         this.reviews = reviews;
         this.attempts = attempts;
@@ -57,9 +62,10 @@ public class GetReviewBasketUseCase {
         this.directory = directory;
         this.errorTraps = errorTraps;
         this.errorTypeTexts = errorTypeTexts;
+        this.lessonLocator = lessonLocator;
+        this.reserve = reserve;
     }
 
-    @Transactional(readOnly = true)
     public ReviewBasketResult execute(UUID userId) {
         Instant now = clock.instant();
         List<PendingReview> pending = reviews.findPending(userId);
@@ -80,11 +86,23 @@ public class GetReviewBasketUseCase {
         List<MasteryProfile> candidates = profiles.findAll(userId).stream()
                 .filter(profile -> !blockedPoints.contains(profile.knowledgePointId()))
                 .filter(profile -> profile.tier() == MasteryTier.CONSOLIDATE || isDue(profile, now)
+                        || isDecayed(profile) || profile.tier() == MasteryTier.PRIORITY
                         || optionalByPoint.containsKey(profile.knowledgePointId())).toList();
         if (blocking.isEmpty() && candidates.isEmpty()) return new ReviewBasketResult(List.of(), List.of(), List.of());
 
         Map<UUID, KnowledgePointDirectory.Entry> described = directory.describe();
         Map<UUID, Integer> availability = availability(userId, candidates);
+        // One read of the completed lessons for every weak point that has no review yet, not one per point.
+        Set<UUID> taught = lessonLocator.taughtAmong(userId, candidates.stream()
+                .filter(profile -> profile.tier() == MasteryTier.PRIORITY
+                        && !optionalByPoint.containsKey(profile.knowledgePointId()))
+                .map(MasteryProfile::knowledgePointId).toList());
+        candidates = candidates.stream()
+                .filter(profile -> profile.tier() != MasteryTier.PRIORITY
+                        || optionalByPoint.containsKey(profile.knowledgePointId())
+                        || (availability.getOrDefault(profile.knowledgePointId(), 0) > reserve
+                        && taught.contains(profile.knowledgePointId())))
+                .toList();
 
         List<RequiredItem> required = blocking.stream().map(review -> {
             var meta = described.getOrDefault(review.knowledgePointId(), KnowledgePointDirectory.Entry.UNKNOWN);
@@ -94,14 +112,25 @@ public class GetReviewBasketUseCase {
         List<OptionalItem> consolidate = new ArrayList<>();
         List<OptionalItem> due = new ArrayList<>();
         List<OptionalItem> weak = new ArrayList<>();
+        Set<UUID> decayedIncluded = new HashSet<>();
+        candidates.stream().filter(GetReviewBasketUseCase::isDecayed)
+                .sorted(Comparator.comparing(MasteryProfile::lastEvidenceAt,
+                        Comparator.nullsFirst(Comparator.naturalOrder()))
+                        .thenComparing(profile -> profile.knowledgePointId().toString()))
+                .limit(MAX_DECAYED_POINTS).forEach(profile -> decayedIncluded.add(profile.knowledgePointId()));
         Map<UUID, ErrorTrapResult> errorTrapByParent = errorTrapLabels(userId, optionalByPoint);
         for (MasteryProfile profile : candidates) {
+            if (isDecayed(profile) && !decayedIncluded.contains(profile.knowledgePointId())) continue;
             var meta = described.getOrDefault(profile.knowledgePointId(), KnowledgePointDirectory.Entry.UNKNOWN);
-            boolean isDue = profile.tier() == MasteryTier.MAINTAIN;
-            boolean isWeak = profile.tier() != MasteryTier.CONSOLIDATE && !isDue(profile, now);
+            boolean isDecayed = isDecayed(profile);
+            boolean isDue = isDecayed || isDue(profile, now);
+            boolean isWeak = profile.tier() == MasteryTier.PRIORITY
+                    || !isDecayed && profile.tier() != MasteryTier.CONSOLIDATE && !isDue(profile, now);
             PendingReview optional = optionalByPoint.get(profile.knowledgePointId());
             String reason = optional != null && optional.unblocked() ? "UNBLOCKED"
-                    : isWeak && optional != null ? optional.triggerKind() : isDue ? "DUE" : "CONSOLIDATE";
+                    : isWeak && optional != null ? optional.triggerKind()
+                    : profile.tier() == MasteryTier.PRIORITY ? "PRIORITY"
+                    : isDecayed ? "DECAYED" : isDue ? "DUE" : "CONSOLIDATE";
             String skill = meta.skill() != null ? meta.skill()
                     : optional != null && optional.skill() != null ? optional.skill().name() : null;
             var item = new OptionalItem(profile.knowledgePointId(), meta.code(), meta.name(), skill,
@@ -116,13 +145,17 @@ public class GetReviewBasketUseCase {
                 .thenComparing(item -> item.code() == null ? "" : item.code());
         consolidate.sort(weakestFirst);
         weak.sort(weakestFirst);
-        due.sort(Comparator.comparing(OptionalItem::dueAt));
+        due.sort(Comparator.comparing(OptionalItem::dueAt, Comparator.nullsFirst(Comparator.naturalOrder())));
         return new ReviewBasketResult(required, List.copyOf(consolidate), List.copyOf(due), List.copyOf(weak));
     }
 
     static boolean isDue(MasteryProfile profile, Instant now) {
         return profile.tier() == MasteryTier.MAINTAIN && profile.nextReviewAt() != null
                 && !profile.nextReviewAt().isAfter(now);
+    }
+
+    static boolean isDecayed(MasteryProfile profile) {
+        return profile.tier() == MasteryTier.INSUFFICIENT && profile.decayedFromTier() != null;
     }
 
     /** How many sets Content still has per point that the learner has not seen. */

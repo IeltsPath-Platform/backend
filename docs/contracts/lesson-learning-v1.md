@@ -225,6 +225,12 @@ updates the mastery profile.
 - `required`: the blocking reviews that are `PENDING`.
 - `consolidate`: points at the consolidate tier (mastery 60–79%). `due`: points at the maintain tier whose `dueAt`
   (`next_review_at`) has passed. A point with a blocking review is only listed under `required`.
+- A `PRIORITY` point with no open review is also listed in `weak`, reason `PRIORITY`, only when a completed lesson
+  teaches it and the number of unseen sets exceeds `learning.free-practice.reserve`. Starting it creates an optional
+  review and preserves the reserved sets for required reviews.
+- A point is `DECAYED` only when MP-1.0 decay changes a previously `CONSOLIDATE` or `MAINTAIN` profile to
+  `INSUFFICIENT`. It appears in `due`, reason `DECAYED`; at most the ten oldest evidence dates are included. This
+  marker is recorded after deployment and is not backfilled.
 - `hasUnrevealedSet` is true when Content still has a set the learner has not seen, or the point already has an optional
   review in progress (`reviewId`).
 - `weak` is an additive array of points with an optional `PENDING` review that appear in none of the other groups,
@@ -256,8 +262,9 @@ Role `CUSTOMER`. The counts of the basket without its items, for a badge that is
 ```
 
 - `required`: the learner's `PENDING` blocking reviews, the size of `required` in `GET /review-basket`.
-- `due`: maintained points whose `dueAt` (`next_review_at`) has come and that no blocking review holds, the size of `due`
-  in `GET /review-basket`. Error-trap child points are not counted, as in the basket.
+- `due`: maintained points whose `dueAt` (`next_review_at`) has come plus up to ten `DECAYED` points, when no blocking
+  review holds. It equals the size of `due` in `GET /review-basket`. Error-trap child points are not counted, as in the
+  basket.
 - `consolidate` and `weak` are not counted: they stay for as long as the learner is unsure and would keep the number high.
 - It reads only the learner's own mastery profiles and reviews in Learning's database and never asks Content, so it has
   no `hasUnrevealedSet`: a counted due point may have no unseen set left, which `GET /review-basket` shows.
@@ -268,10 +275,14 @@ Role `CUSTOMER`. Starts an optional review of the point and returns it like `GET
 
 - The point already has a `PENDING` review (blocking or optional): that review is returned and nothing is created.
   This includes a `WRITING_CRITERION` or `SPEAKING_CRITERION` review at `PRIORITY`; it does not require a lesson teaching that criterion.
-- Otherwise the point must be at the consolidate tier, or at the maintain tier and due; any other point answers
-  `409 NOT_IN_REVIEW_BASKET`. A point no completed lesson teaches answers `409 NO_LESSON_FOR_KNOWLEDGE_POINT`. When
-  Content has no set the learner has not seen, `409 NO_UNREVEALED_SET` is returned and nothing is created.
-- The review has `trigger_kind` `CONSOLIDATE` or `MAINTAIN` and is not blocking.
+- Otherwise the point must be at the consolidate tier, at the maintain tier and due, or be an eligible `PRIORITY` or
+  `DECAYED` point; any other point answers `409 NOT_IN_REVIEW_BASKET`. A point no completed lesson teaches answers
+  `409 NO_LESSON_FOR_KNOWLEDGE_POINT`. A new `PRIORITY` or `DECAYED` review requires more unseen sets than
+  `learning.free-practice.reserve`; otherwise `409 NO_UNREVEALED_SET` is returned, preserving those sets for required
+  reviews. Without Premium, packages with a `requiredFeatureKey` are skipped; if no eligible package remains, the same
+  `409` is returned.
+- The review has `trigger_kind` `CONSOLIDATE`, `MAINTAIN`, `PRIORITY` or `DECAYED`, as appropriate, and is not
+  blocking. A `DECAYED` profile's mastery tier is `INSUFFICIENT`, so its trigger is written explicitly.
 
 An error-trap child at `PRIORITY` can create an optional parent review with `trigger_kind: ERROR_PATTERN` after a
 lesson, counted Practice, review, counted free-practice or diagnostic submission records its evidence and refreshes mastery.

@@ -26,7 +26,7 @@ import java.util.UUID;
 public class JdbcMasteryProfileRepository implements MasteryProfileRepository {
     private static final String COLUMNS = """
             user_id, knowledge_point_id, mastery, tier, evidence_count, success_streak, last_evidence_at,
-            next_review_at, median_duration_ms, top_error_codes, confidence""";
+            next_review_at, median_duration_ms, top_error_codes, confidence, decayed_from_tier""";
     private static final RowMapper<MasteryProfile> MAPPER = JdbcMasteryProfileRepository::map;
     private final JdbcTemplate jdbc;
 
@@ -61,15 +61,25 @@ public class JdbcMasteryProfileRepository implements MasteryProfileRepository {
 
     @Override
     public int countDue(UUID userId, Instant now, Collection<UUID> excludedKnowledgePointIds) {
-        Integer due = jdbc.query("SELECT count(*) FROM kp_mastery_profiles p WHERE p.user_id = ? "
+        Integer due = jdbc.query("SELECT "
+                        + "(SELECT count(*) FROM kp_mastery_profiles p WHERE p.user_id = ? "
                         + "AND p.tier = 'MAINTAIN' AND p.next_review_at IS NOT NULL AND p.next_review_at <= ? "
                         + "AND NOT (p.knowledge_point_id = ANY (?)) "
                         + "AND NOT EXISTS (SELECT 1 FROM knowledge_point_catalog c "
-                        + "WHERE c.kp_id = p.knowledge_point_id AND c.parent_kp_id IS NOT NULL)",
+                        + "WHERE c.kp_id = p.knowledge_point_id AND c.parent_kp_id IS NOT NULL)) + "
+                        + "(SELECT count(*) FROM (SELECT p.knowledge_point_id FROM kp_mastery_profiles p "
+                        + "WHERE p.user_id = ? AND p.tier = 'INSUFFICIENT' AND p.decayed_from_tier IS NOT NULL "
+                        + "AND NOT (p.knowledge_point_id = ANY (?)) "
+                        + "AND NOT EXISTS (SELECT 1 FROM knowledge_point_catalog c "
+                        + "WHERE c.kp_id = p.knowledge_point_id AND c.parent_kp_id IS NOT NULL) "
+                        + "ORDER BY p.last_evidence_at, p.knowledge_point_id LIMIT 10) decayed)",
                 statement -> {
                     statement.setObject(1, userId);
                     statement.setTimestamp(2, Timestamp.from(now));
                     statement.setArray(3, JdbcKnowledgeEvidenceRepository.uuidArray(statement.getConnection(),
+                            excludedKnowledgePointIds));
+                    statement.setObject(4, userId);
+                    statement.setArray(5, JdbcKnowledgeEvidenceRepository.uuidArray(statement.getConnection(),
                             excludedKnowledgePointIds));
                 }, rows -> rows.next() ? rows.getInt(1) : 0);
         return due == null ? 0 : due;
@@ -89,13 +99,15 @@ public class JdbcMasteryProfileRepository implements MasteryProfileRepository {
         jdbc.batchUpdate("""
                 INSERT INTO kp_mastery_profiles (user_id, knowledge_point_id, mastery, tier, evidence_count,
                     success_streak, last_evidence_at, next_review_at, median_duration_ms, top_error_codes, confidence,
+                    decayed_from_tier,
                     updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 ON CONFLICT (user_id, knowledge_point_id) DO UPDATE SET mastery = EXCLUDED.mastery,
                     tier = EXCLUDED.tier, evidence_count = EXCLUDED.evidence_count,
                     success_streak = EXCLUDED.success_streak, last_evidence_at = EXCLUDED.last_evidence_at,
                     next_review_at = EXCLUDED.next_review_at, median_duration_ms = EXCLUDED.median_duration_ms,
                     top_error_codes = EXCLUDED.top_error_codes, confidence = EXCLUDED.confidence,
+                    decayed_from_tier = EXCLUDED.decayed_from_tier,
                     updated_at = CURRENT_TIMESTAMP
                 """, profiles, profiles.size(), (statement, profile) -> {
             statement.setObject(1, profile.userId());
@@ -113,6 +125,8 @@ public class JdbcMasteryProfileRepository implements MasteryProfileRepository {
             if (profile.confidence() == null) statement.setNull(11, Types.NUMERIC);
             else statement.setBigDecimal(11, BigDecimal.valueOf(profile.confidence())
                     .setScale(3, java.math.RoundingMode.HALF_UP));
+            if (profile.decayedFromTier() == null) statement.setNull(12, Types.VARCHAR);
+            else statement.setString(12, profile.decayedFromTier().name());
         });
     }
 
@@ -120,18 +134,21 @@ public class JdbcMasteryProfileRepository implements MasteryProfileRepository {
     public void reclassify(List<MasteryProfile> profiles) {
         if (profiles.isEmpty()) return;
         jdbc.batchUpdate("""
-                UPDATE kp_mastery_profiles SET tier = ?, next_review_at = ?, updated_at = CURRENT_TIMESTAMP
+                UPDATE kp_mastery_profiles SET tier = ?, next_review_at = ?,
+                    decayed_from_tier = CASE WHEN ? = 'INSUFFICIENT' THEN decayed_from_tier ELSE NULL END,
+                    updated_at = CURRENT_TIMESTAMP
                 WHERE user_id = ? AND knowledge_point_id = ? AND mastery = ? AND evidence_count = ?
                     AND success_streak = ?
                 """, profiles, profiles.size(), (statement, profile) -> {
             statement.setString(1, profile.tier().name());
             if (profile.nextReviewAt() == null) statement.setNull(2, Types.TIMESTAMP_WITH_TIMEZONE);
             else statement.setTimestamp(2, Timestamp.from(profile.nextReviewAt()));
-            statement.setObject(3, profile.userId());
-            statement.setObject(4, profile.knowledgePointId());
-            statement.setBigDecimal(5, BigDecimal.valueOf(profile.mastery()).setScale(3, java.math.RoundingMode.HALF_UP));
-            statement.setInt(6, profile.evidenceCount());
-            statement.setInt(7, profile.successStreak());
+            statement.setString(3, profile.tier().name());
+            statement.setObject(4, profile.userId());
+            statement.setObject(5, profile.knowledgePointId());
+            statement.setBigDecimal(6, BigDecimal.valueOf(profile.mastery()).setScale(3, java.math.RoundingMode.HALF_UP));
+            statement.setInt(7, profile.evidenceCount());
+            statement.setInt(8, profile.successStreak());
         });
     }
 
@@ -199,6 +216,8 @@ public class JdbcMasteryProfileRepository implements MasteryProfileRepository {
                 rows.getInt("success_streak"), rows.getTimestamp("last_evidence_at").toInstant(),
                 next == null ? null : next.toInstant(), medianMs,
                 Arrays.stream(codes).map(String::valueOf).toList(),
-                confidenceValue == null ? null : confidenceValue.doubleValue());
+                confidenceValue == null ? null : confidenceValue.doubleValue(),
+                rows.getString("decayed_from_tier") == null ? null
+                        : MasteryTier.valueOf(rows.getString("decayed_from_tier")));
     }
 }

@@ -6,10 +6,13 @@ import com.ieltspath.learning.domain.repository.LearnerCurriculumRepository;
 import com.ieltspath.learning.domain.repository.LessonProgressRepository;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /** Finds the lesson a review of a knowledge point points at: one the learner has completed and that teaches it. */
@@ -21,6 +24,19 @@ public class CompletedLessonLocator {
     public CompletedLessonLocator(LessonProgressRepository lessons, LearnerCurriculumRepository curricula) {
         this.lessons = lessons;
         this.curricula = curricula;
+    }
+
+    /** Which of the points some completed lesson teaches, from one read of the completed lessons. */
+    public Set<UUID> taughtAmong(UUID userId, Collection<UUID> knowledgePointIds) {
+        if (knowledgePointIds.isEmpty()) return Set.of();
+        Set<UUID> wanted = new HashSet<>(knowledgePointIds);
+        Set<UUID> taught = new HashSet<>();
+        for (LessonProgress lesson : lessons.findCompleted(userId)) {
+            for (UUID knowledgePointId : lesson.knowledgePointIds()) {
+                if (wanted.contains(knowledgePointId)) taught.add(knowledgePointId);
+            }
+        }
+        return taught;
     }
 
     /** The first completed lesson, in topic then lesson order, that teaches the point. */
