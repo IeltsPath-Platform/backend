@@ -34,7 +34,7 @@ Request: `{"pool":"BAND_0_3"}`. Valid pools are `BAND_0_3`, `BAND_3_5` and `BAND
 
 Learning permits three unreleased assignments per learner in a rolling 24-hour window. The window counts `assignedAt > now - 24 hours`; released assignments are excluded. At the limit, the route returns HTTP 429 `PLACEMENT_LIMIT_REACHED`. When an incomplete assignment for the same pool is less than 15 minutes old, the same assignment is returned and does not consume another slot. Assessment separately limits started attempts, so releasing an assignment does not refund a started-attempt slot.
 
-Assignment reads the published catalogue for the requested pool outside the database transaction. The catalog is cached for 30 seconds. If no published package is available, the route returns 404 `NO_PLACEMENT_TEST`. An unused package is selected at random; after all packages in the pool have been assigned, Learning chooses the package with the oldest latest assignment. Released assignments are excluded from this rotation.
+Assignment reads the published catalogue of every pool in one call to Content, outside the database transaction and without holding any lock, and groups it by pool. The catalogue is cached for 30 seconds. If no published package is available, the route returns 404 `NO_PLACEMENT_TEST`. An unused package is selected at random; after all packages in the pool have been assigned, Learning chooses the package with the oldest latest assignment. Released assignments are excluded from this rotation.
 
 ### `POST /api/learning/placement-test/assignments/{assignmentId}/release`
 

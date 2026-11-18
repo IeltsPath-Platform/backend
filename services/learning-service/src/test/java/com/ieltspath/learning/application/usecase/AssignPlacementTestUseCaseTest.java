@@ -51,7 +51,7 @@ class AssignPlacementTestUseCaseTest {
     void picksAnUnusedPublishedPackageFromTheRequestedPoolAndSavesIt() {
         var first = packageIn(PlacementPool.BAND_3_5);
         var otherPool = packageIn(PlacementPool.BAND_0_3);
-        when(content.getPlacementPackages(PlacementPool.BAND_3_5)).thenReturn(List.of(first, otherPool));
+        when(content.getPlacementPackages()).thenReturn(List.of(first, otherPool));
 
         var result = useCase.execute(userId, PlacementPool.BAND_3_5);
 
@@ -66,7 +66,7 @@ class AssignPlacementTestUseCaseTest {
     void picksOldestPackageWhenEveryPublishedPackageHasBeenAssigned() {
         var first = packageIn(PlacementPool.BAND_3_5);
         var second = packageIn(PlacementPool.BAND_3_5);
-        when(content.getPlacementPackages(PlacementPool.BAND_3_5)).thenReturn(List.of(first, second));
+        when(content.getPlacementPackages()).thenReturn(List.of(first, second));
         when(assignments.latestByPackage(userId)).thenReturn(Map.of(first.packageId(), NOW.minusSeconds(100),
                 second.packageId(), NOW.minusSeconds(50)));
         var rotationCreator = new CreatePlacementAssignment(assignments, lock, bound -> bound - 1);
@@ -106,7 +106,7 @@ class AssignPlacementTestUseCaseTest {
     @Test
     void assignmentExactlyTwentyFourHoursOldIsOutsideTheLimit() {
         when(assignments.countSince(userId, NOW.minusSeconds(24 * 60 * 60))).thenReturn(0);
-        when(content.getPlacementPackages(PlacementPool.BAND_3_5)).thenReturn(List.of(packageIn(PlacementPool.BAND_3_5)));
+        when(content.getPlacementPackages()).thenReturn(List.of(packageIn(PlacementPool.BAND_3_5)));
 
         assertThat(useCase.execute(userId, PlacementPool.BAND_3_5)).isNotNull();
     }
@@ -116,14 +116,14 @@ class AssignPlacementTestUseCaseTest {
         when(placements.find(userId)).thenReturn(Optional.of(com.ieltspath.learning.domain.aggregate.LearnerPlacement
                 .create(userId, new com.ieltspath.learning.domain.vo.BandLevel(new java.math.BigDecimal("5.5")),
                         UUID.randomUUID(), NOW)));
-        when(content.getPlacementPackages(PlacementPool.BAND_3_5)).thenReturn(List.of(packageIn(PlacementPool.BAND_3_5)));
+        when(content.getPlacementPackages()).thenReturn(List.of(packageIn(PlacementPool.BAND_3_5)));
 
         assertThat(useCase.execute(userId, PlacementPool.BAND_3_5).pool()).isEqualTo(PlacementPool.BAND_3_5);
     }
 
     @Test
     void emptyPoolReturnsNotFound() {
-        when(content.getPlacementPackages(PlacementPool.BAND_3_5)).thenReturn(List.of());
+        when(content.getPlacementPackages()).thenReturn(List.of());
 
         assertThatThrownBy(() -> useCase.execute(userId, PlacementPool.BAND_3_5))
                 .isInstanceOfSatisfying(LearningRequestException.class, error -> {

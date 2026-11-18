@@ -39,13 +39,13 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 class RestLearningContentClientTest {
 
     @Test
-    void requestsPlacementPackagesForTheExactPoolAndMapsThePoolField() {
-        server.expect(requestTo(INTERNAL_PATH + "/placement-packages?pool=BAND_3_5"))
+    void requestsEveryPlacementPackageInOneCallAndMapsThePoolField() {
+        server.expect(requestTo(INTERNAL_PATH + "/placement-packages"))
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess("[{\"packageId\":\"" + PACKAGE_ID + "\",\"packageVersionId\":\""
                         + VERSION_ID + "\",\"code\":\"P35\",\"pool\":\"BAND_3_5\"}]", MediaType.APPLICATION_JSON));
 
-        var result = client.getPlacementPackages(PlacementPool.BAND_3_5);
+        var result = client.getPlacementPackages();
 
         assertEquals(1, result.size());
         assertEquals(PlacementPool.BAND_3_5, result.getFirst().pool());

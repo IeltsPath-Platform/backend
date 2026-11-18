@@ -38,11 +38,8 @@ class GetPlacementTestOptionsUseCaseTest {
         when(assignments.findOpen(user)).thenReturn(Optional.of(open));
         when(placements.find(user)).thenReturn(Optional.of(LearnerPlacement.create(user,
                 new BandLevel(new BigDecimal("5.5")), UUID.randomUUID(), now.minusSeconds(300))));
-        for (PlacementPool pool : PlacementPool.values()) {
-            when(content.getPlacementPackages(pool)).thenReturn(pool == PlacementPool.BAND_3_5
-                    ? List.of(new LearningContentClient.PlacementPackage(UUID.randomUUID(), UUID.randomUUID(),
-                    "test", pool)) : List.of());
-        }
+        when(content.getPlacementPackages()).thenReturn(List.of(new LearningContentClient.PlacementPackage(
+                UUID.randomUUID(), UUID.randomUUID(), "test", PlacementPool.BAND_3_5)));
         var catalog = new PlacementCatalog(content, Clock.fixed(now, ZoneOffset.UTC), 30);
 
         var result = new GetPlacementTestOptionsUseCase(assignments, placements, catalog,
