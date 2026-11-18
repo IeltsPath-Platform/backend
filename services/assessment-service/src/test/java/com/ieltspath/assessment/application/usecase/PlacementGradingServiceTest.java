@@ -147,13 +147,60 @@ class PlacementGradingServiceTest {
         when(results.findLatestForUpdateByAttemptId(attempt.getId())).thenReturn(Optional.empty());
         when(jobs.aiJobs(attempt.getId())).thenReturn(List.of(
                 new GateEssayJobStore.JobState(writing.id(), "COMPLETED", null)));
-        when(jobs.submittedEssays(List.of(writing.id()))).thenReturn(Map.of(writing.id(), UUID.randomUUID()));
 
         service().completeIfGraded(attempt.getId());
 
         AssessmentResult result = savedResult();
         assertThat(result.overallBand()).isEqualTo(4.5);
         assertThat(result.partial()).isTrue();
+    }
+
+    @Test
+    void aGradedTask1AndAnUngradedTask2LeaveWritingOutAltogether() {
+        AttemptItem task1 = item("WRITING", essay("TASK_1"));
+        AttemptItem task2 = item("WRITING", essay("TASK_2"));
+        arrangeCustomItems(List.of(listening, reading, task1, task2));
+        when(jobs.aiJobs(attempt.getId())).thenReturn(List.of(
+                new GateEssayJobStore.JobState(task1.id(), "COMPLETED", new BigDecimal("6.0")),
+                new GateEssayJobStore.JobState(task2.id(), "COMPLETED", null)));
+
+        service().completeIfGraded(attempt.getId());
+
+        // Task 1 alone must not stand in for Writing: Listening 9.0 and Reading 0.0 average to 4.5.
+        assertThat(savedSkillBands()).containsOnlyKeys(Skill.LISTENING, Skill.READING);
+        assertThat(savedResult().overallBand()).isEqualTo(4.5);
+        assertThat(savedResult().partial()).isTrue();
+    }
+
+    @Test
+    void anUnsentTask1DoesNotTurnAnUngradedTask2IntoAWritingBandOfZero() {
+        AttemptItem task1 = item("WRITING", essay("TASK_1"));
+        AttemptItem task2 = item("WRITING", essay("TASK_2"));
+        arrangeCustomItems(List.of(listening, reading, task1, task2));
+        when(jobs.aiJobs(attempt.getId())).thenReturn(List.of(
+                new GateEssayJobStore.JobState(task2.id(), "COMPLETED", null)));
+
+        service().completeIfGraded(attempt.getId());
+
+        assertThat(savedSkillBands()).containsOnlyKeys(Skill.LISTENING, Skill.READING);
+        assertThat(savedResult().partial()).isTrue();
+        assertThat(gradedItems()).extracting(ItemResult::correct).containsExactly(true, false, false, null);
+    }
+
+    @Test
+    void whenEverySentEssayIsGradedWritingCountsAndTheResultIsNotPartial() {
+        AttemptItem task1 = item("WRITING", essay("TASK_1"));
+        AttemptItem task2 = item("WRITING", essay("TASK_2"));
+        arrangeCustomItems(List.of(listening, reading, task1, task2));
+        when(jobs.aiJobs(attempt.getId())).thenReturn(List.of(
+                new GateEssayJobStore.JobState(task1.id(), "COMPLETED", new BigDecimal("5.0")),
+                new GateEssayJobStore.JobState(task2.id(), "COMPLETED", new BigDecimal("6.5"))));
+
+        service().completeIfGraded(attempt.getId());
+
+        // (5.0 x 1 + 6.5 x 2) / 3 = 6.0
+        assertThat(savedSkillBands()).containsEntry(Skill.WRITING, 6.0);
+        assertThat(savedResult().partial()).isFalse();
     }
 
     @Test
@@ -212,6 +259,26 @@ class PlacementGradingServiceTest {
     private List<AttemptSection> sectionRows() {
         return items.stream().map(item -> new AttemptSection(item.attemptSectionId(), attempt.getId(),
                 UUID.randomUUID(), 0, "{\"skill\":\"" + skillBySection.get(item.attemptSectionId()) + "\"}")).toList();
+    }
+
+    private static String essay(String task) {
+        return "{\"answerSpec\":{\"type\":\"ESSAY\",\"task\":\"" + task + "\",\"passBand\":5.5},\"maxScore\":1.0}";
+    }
+
+    /** Arranges a completed-grading run over {@code custom}: Listening is correct, Reading wrong. */
+    private void arrangeCustomItems(List<AttemptItem> custom) {
+        when(attempts.findById(attempt.getId())).thenReturn(Optional.of(attempt));
+        when(results.findLatestForUpdateByAttemptId(attempt.getId())).thenReturn(Optional.empty());
+        when(attemptItems.findByAttemptId(attempt.getId())).thenReturn(custom);
+        when(sections.findByAttemptId(attempt.getId())).thenReturn(custom.stream()
+                .map(item -> new AttemptSection(item.attemptSectionId(), attempt.getId(), UUID.randomUUID(), 0,
+                        "{\"skill\":\"" + skillBySection.get(item.attemptSectionId()) + "\"}")).toList());
+        when(responses.findByAttemptItemIds(anyList())).thenReturn(List.of());
+        when(autoGrader.isCorrect(any(), any())).thenAnswer(invocation -> {
+            AnswerSnapshot answer = invocation.getArgument(0);
+            return "A".equals(answer.answerSpec().get("correct"));
+        });
+        when(results.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     private void arrangeItems() {

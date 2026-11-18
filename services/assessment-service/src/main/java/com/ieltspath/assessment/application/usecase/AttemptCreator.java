@@ -21,7 +21,6 @@ import java.time.Instant;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -43,7 +42,6 @@ public class AttemptCreator {
     private final JdbcTemplate jdbc;
     private final int placementLimit;
 
-    @Autowired
     public AttemptCreator(AssessmentAttemptRepository attempts, AttemptSectionRepository sections,
                           AttemptItemRepository items, AttemptItemKnowledgePointRepository knowledgeSnapshot,
                           ObjectMapper json, JdbcTemplate jdbc,
@@ -55,12 +53,6 @@ public class AttemptCreator {
         this.json = json;
         this.jdbc = jdbc;
         this.placementLimit = placementLimit;
-    }
-
-    public AttemptCreator(AssessmentAttemptRepository attempts, AttemptSectionRepository sections,
-                          AttemptItemRepository items, AttemptItemKnowledgePointRepository knowledgeSnapshot,
-                          ObjectMapper json) {
-        this(attempts, sections, items, knowledgeSnapshot, json, null, 3);
     }
 
     /** MVP packages define no time limit, so {@code expiresAt} is always null; the client never sets it. */
@@ -92,7 +84,7 @@ public class AttemptCreator {
             throw new PackageNotAttemptableException("Package identity is missing");
         }
         if (type == AttemptType.PLACEMENT) {
-            if (jdbc != null) jdbc.query("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", rs -> {},
+            jdbc.query("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", rs -> {},
                     "assessment-placement:" + command.userId());
             long count = attempts.countPlacementAttemptsSince(command.userId(), Instant.now().minusSeconds(86400));
             if (count >= placementLimit) throw new com.ieltspath.assessment.domain.exception.PlacementLimitReachedException();

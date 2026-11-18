@@ -227,6 +227,7 @@ class StartAssessmentAttemptUseCaseTest {
 
     private StartAssessmentAttemptUseCase useCase() {
         return new StartAssessmentAttemptUseCase(content,
-                new AttemptCreator(attempts, sections, items, knowledgeSnapshot, json));
+                new AttemptCreator(attempts, sections, items, knowledgeSnapshot, json,
+                        org.mockito.Mockito.mock(org.springframework.jdbc.core.JdbcTemplate.class), 3));
     }
 }

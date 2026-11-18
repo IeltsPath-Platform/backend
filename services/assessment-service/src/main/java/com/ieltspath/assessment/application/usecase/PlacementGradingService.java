@@ -36,6 +36,7 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -102,7 +103,7 @@ public class PlacementGradingService {
                 .map(AttemptItem::id).toList();
         Map<UUID, UUID> submitted = jobs.submittedEssays(essayItems);
         if (submitted.isEmpty()) {
-            finish(attempt, items, Map.of());
+            finish(attempt, items, Map.of(), Set.of());
             return;
         }
         jobs.enqueueAi(submitted, attempt.getUserId());
@@ -121,11 +122,18 @@ public class PlacementGradingService {
         Map<UUID, BigDecimal> bands = new HashMap<>();
         states.stream().filter(state -> state.band() != null)
                 .forEach(state -> bands.put(state.attemptItemId(), state.band()));
-        finish(attempt, attemptItems.findByAttemptId(attemptId), bands);
+        Set<UUID> sentEssays = states.stream().map(GateEssayJobStore.JobState::attemptItemId)
+                .collect(Collectors.toSet());
+        finish(attempt, attemptItems.findByAttemptId(attemptId), bands, sentEssays);
         return true;
     }
 
-    private void finish(AssessmentAttempt attempt, List<AttemptItem> items, Map<UUID, BigDecimal> essayBands) {
+    /**
+     * @param essayBands  LLM band of each essay that was graded
+     * @param sentEssays  every essay the learner sent; one of these without a band could not be graded
+     */
+    private void finish(AssessmentAttempt attempt, List<AttemptItem> items, Map<UUID, BigDecimal> essayBands,
+                        Set<UUID> sentEssays) {
         Map<UUID, Skill> skillBySection = sections.findByAttemptId(attempt.getId()).stream()
                 .collect(Collectors.toMap(AttemptSection::id, this::skillOf));
         Map<UUID, AttemptResponse> responseByItem = responses.findByAttemptItemIds(
@@ -135,7 +143,7 @@ public class PlacementGradingService {
         UUID resultId = UUID.randomUUID();
         Map<Skill, int[]> objective = new EnumMap<>(Skill.class);
         Map<Skill, double[]> banded = new EnumMap<>(Skill.class);
-        boolean partial = false;
+        boolean writingUngraded = false;
         List<ItemResult> graded = new ArrayList<>(items.size());
         for (AttemptItem item : items) {
             AnswerSnapshot answer = AnswerSnapshot.parse(json, item.answerSnapshot())
@@ -147,11 +155,11 @@ public class PlacementGradingService {
             if (skill == Skill.WRITING) {
                 BigDecimal essayBand = essayBands.get(item.id());
                 if (essayBand == null) {
-                    boolean submitted = jobs.submittedEssays(List.of(item.id())).containsKey(item.id());
-                    if (submitted) partial = true;
+                    boolean sent = sentEssays.contains(item.id());
+                    if (sent) writingUngraded = true;
                     else addBand(banded, skill, 0.0, writingWeight(answer));
                     correct = false;
-                    judged = submitted ? null : false;
+                    judged = sent ? null : false;
                 } else {
                     double band = essayBand.doubleValue();
                     addBand(banded, skill, band, writingWeight(answer));
@@ -177,6 +185,9 @@ public class PlacementGradingService {
             graded.add(new ItemResult(UUID.randomUUID(), resultId, item.id(), correct ? answer.maxScore() : 0.0,
                     answer.maxScore(), judged, null, NO_FEEDBACK));
         }
+        // One essay the LLM could not grade leaves Writing unknown: the graded part alone must not stand in for it.
+        boolean partial = writingUngraded;
+        if (writingUngraded) banded.remove(Skill.WRITING);
         Map<Skill, Double> skillBands = bandsBySkill(objective, banded);
         double uncapped = PlacementBandCalculator.overallBand(skillBands.values());
         PlacementPool pool = attempt.getPlacementPool();
