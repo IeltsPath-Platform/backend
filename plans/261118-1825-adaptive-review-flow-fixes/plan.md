@@ -63,8 +63,8 @@ SKIPPED/DONE mà KP vẫn yếu → không hiện ở đâu      KP vẫn yếu 
 | 7 | KP hổng chưa từng được học | Bài ôn gắn vào bài học của KP gốc; lý thuyết `LESSON_FALLBACK` là của KP khác | Bài ôn `DIAGNOSTIC` không có lý thuyết đúng KP: lý thuyết rỗng, scope `NO_LESSON`, bỏ bước lý thuyết | Tự chọn |
 | 8 | KP `PRIORITY` không còn bài ôn | Không hiện trong giỏ ôn; start trả `409 NOT_IN_REVIEW_BASKET` | Hiện ở `weak`, lý do `PRIORITY`, chỉ khi bắt đầu được (có bài học dạy KP, set > reserve); start kiểm paywall và lọc premium; `trigger_kind = PRIORITY` | Đã chốt; lọc premium chỉ ở đường mới |
 | 9 | KP bị decay | `MAINTAIN` lâu không làm → `INSUFFICIENT` → rơi khỏi "due" | Job decay ghi `decayed_from_tier` (từ lúc deploy, không backfill); KP này ở `due`, lý do `DECAYED`, tối đa 10 KP cũ nhất; start như mục 8; badge đếm cả loại này | Đã chốt |
-| 10 | Hai công thức mastery | `GET /mastery` và `ReviewReevaluation` dùng DeepTutor; tier, lịch ôn dùng MP1 | Cả hai đọc điểm từ `kp_mastery_profiles` theo công thức đang cấu hình | Tự chọn |
-| 11 | Luyện tự do tạo bài ôn | `FreePracticeSubmission` gọi `createReviews`, trái javadoc và `free-practice-v1.md` | Bỏ lời gọi | Tự chọn: theo contract |
+| 10 | Hai công thức mastery | `GET /mastery` và `ReviewReevaluation` dùng DeepTutor; tier, lịch ôn dùng MP1 | Chỉ `ReviewReevaluation` đọc điểm từ `kp_mastery_profiles`. `GET /mastery` giữ nguyên (SRS FT-26, `learner-report-v1.md` ghi "unchanged", FE không gọi) | Đã chốt, thu hẹp so với bản đầu |
+| 11 | Luyện tự do tạo bài ôn | `FreePracticeSubmission` gọi `createReviews`, trái javadoc và `free-practice-v1.md`; nhưng `FreePracticeIntegrationTest:181` cố ý kiểm bài ôn tùy chọn `ERROR_PATTERN` | Giữ code; sửa javadoc và contract thành "không tạo bài ôn chặn; có thể thêm bài ôn tùy chọn theo mẫu lỗi" | Đã chốt, đổi so với bản đầu |
 | 12 | GET bài ôn có tác dụng phụ | Giao set, `SKIPPED`, mở chẩn đoán; contract không nói | Giữ GET; contract ghi rõ; test hai GET liên tiếp cho cùng kết quả | Tự chọn |
 | 13 | FE chưa có UI chẩn đoán | `ReviewPage` không đọc `state`, `diagnosticSessionId`, `waitingOnReviewIds`; không gọi `/diagnostics`; hiển thị "2/" và "sau null bộ" | Trang probe, danh sách "cần ôn trước", nút bỏ qua (bật sau ≥ 1 probe); "x/4"; thông báo chuyển vào giỏ ôn; nhãn `PRIORITY`/`UNBLOCKED`/`DECAYED` | Đã chốt: gồm FE |
 
@@ -99,8 +99,8 @@ Thứ tự: 1 → 2 → 3 → 4 → 5.
 - KP `PRIORITY` không có bài ôn và KP decay hiện trong giỏ ôn chỉ khi bắt đầu được; bắt đầu không lỗi; học viên miễn phí
   không nhận set premium; reserve cho bài ôn bắt buộc không bị dùng hết.
 - Badge `due` khớp nhóm `due` của giỏ ôn.
-- `GET /mastery` trả cùng điểm với `kp_mastery_profiles`.
-- Luyện tự do không tạo bài ôn nào.
+- `ReviewReevaluation` quyết định bài ôn bắt buộc theo điểm trong `kp_mastery_profiles`; `GET /mastery` không đổi.
+- Luyện tự do không tạo bài ôn chặn; chỉ có thể thêm bài ôn tùy chọn `ERROR_PATTERN` (như trước).
 - Các use case trong phạm vi không gọi Content khi đang giữ khóa học viên, kể cả lời gọi gián tiếp.
 - Gửi lại cùng `requestId` (bài ôn, probe) trả phản hồi cũ, kể cả sau khi gói bị gỡ.
 - Kiểm tra chạy xanh:

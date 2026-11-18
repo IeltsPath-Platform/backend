@@ -67,7 +67,8 @@ Thay đổi:
   - `failedSets >= N` → `blocking = false`, status `PENDING`, stage `PRACTICE`, đánh dấu vừa hạ cấp (repository ghi
     `unblocked_at`).
 - Cấu hình `learning.review.unblock-after-failed-sets: 4` ở `infra/config-server/config-repo/learning-service.yaml` + lớp
-  `*Properties`; kiểm `>= 3` khi khởi động.
+  `*Properties`; kiểm `>= 4` khi khởi động (lần trượt thứ 3 đã dành cho bước lý thuyết nên không thể thả bài ôn sớm hơn
+  lần thứ 4).
 - **Practice không còn bị chặn bởi bài ôn đã hạ cấp:** `PracticeClearance.ReviewFact` thêm cờ `unblocked`; bài ôn có
   `unblocked_at` tính như đã xong ở `nonePending` (dòng 72, 89). Bài ôn tùy chọn khác giữ luật cũ. **Không** thêm lời gọi
   `refreshPassForLesson` (không có tác dụng: `ATTEMPT_NOT_BLOCKED` không được lưu, `PracticeProgress.java:78`).

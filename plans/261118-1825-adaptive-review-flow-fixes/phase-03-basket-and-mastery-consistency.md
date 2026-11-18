@@ -87,28 +87,30 @@ không hiện ở đâu; `StartBasketReview` trả `409 NOT_IN_REVIEW_BASKET`.
 | `GET /api/learning/mastery` | DeepTutor: 5 câu gần nhất, không trọng số |
 | `ReviewReevaluation` (quyết định tạo bài ôn bắt buộc sau đề thi) | DeepTutor |
 
-**Sau:** cả hai đọc `profile.mastery()` từ `kp_mastery_profiles`. Hồ sơ tính theo `learning.mastery.policy` đang cấu hình,
-nên đổi policy về DeepTutor vẫn đúng. Không cần chạy lại hồ sơ.
+**Sau (đã chốt, thu hẹp):** chỉ `ReviewReevaluation` đọc `profile.mastery()` từ `kp_mastery_profiles`. Hồ sơ tính theo
+`learning.mastery.policy` đang cấu hình, nên đổi policy về DeepTutor vẫn đúng. Không cần chạy lại hồ sơ.
 
 - `ReviewReevaluation`: thay `masteryCalculator.compute(history.correctness())` bằng điểm hồ sơ; vẫn dùng
-  `evidence.findMasteryHistories` cho skill và cờ Practice. KP chưa có hồ sơ thì bỏ qua. Dùng `mastery` kể cả khi tier
-  `INSUFFICIENT`, để giữ hành vi "sai ở đề thi → có bài ôn" với KP mới. Thứ tự ghi hồ sơ trước đã đúng
+  `evidence.findMasteryHistories` cho skill và cờ Practice. KP chưa có hồ sơ có điểm 0 (không có bằng chứng). Dùng `mastery`
+  kể cả khi tier `INSUFFICIENT`, để giữ hành vi "sai ở đề thi → có bài ôn" với KP mới. Thứ tự ghi hồ sơ trước đã đúng
   (`ApplyAssessmentResultUseCase.java:153` trước `:164`), không cần đổi.
-- `GetMasteryUseCase`: điểm lấy từ hồ sơ; `topicId`, `evidenceCount`, `skill` giữ nguồn cũ.
+- `GetMasteryUseCase` **giữ nguyên**: `GetMasteryUseCaseTest` ghi SRS FT-26 (5 kết quả gần nhất), `learner-report-v1.md:65`
+  ghi `GET /api/learning/mastery is unchanged`, và frontend không gọi endpoint này.
 
-## Mục 11: luyện tự do không tạo bài ôn
+## Mục 11: luyện tự do và bài ôn
 
-**Trước:** `FreePracticeSubmission:120` gọi `errorTrapEvidence.createReviews(userId, null, firstAnswers)`, trái javadoc của
-lớp (dòng 30) và `docs/contracts/free-practice-v1.md`.
+**Trước:** `FreePracticeSubmission:120` gọi `errorTrapEvidence.createReviews(userId, null, firstAnswers)`; javadoc của lớp và
+`docs/contracts/free-practice-v1.md` nói "không tạo bài ôn". Nhưng lời gọi này tạo bài ôn **tùy chọn** `ERROR_PATTERN` khi KP
+bẫy lỗi vào `PRIORITY`, và `FreePracticeIntegrationTest:181` kiểm đúng điều đó.
 
-**Sau:** bỏ lời gọi. Bằng chứng bẫy lỗi vẫn ghi; bài ôn bẫy lỗi tạo ở lần nộp bài học, Practice hoặc bài ôn tiếp theo nếu
-KP con vẫn `PRIORITY`.
+**Sau (đã chốt, đổi so với bản đầu):** giữ code. Sửa javadoc và contract thành "luyện tự do không tạo bài ôn chặn; chỉ có thể
+thêm bài ôn tùy chọn `ERROR_PATTERN`".
 
 ## File sửa
 
-- `application/usecase/GetReviewBasketUseCase.java`, `StartBasketReviewUseCase.java`, `GetReviewBasketSummaryUseCase.java`,
-  `GetMasteryUseCase.java`
-- `application/service/ReviewReevaluation.java`, `FreePracticeSubmission.java`, `MasteryProfileUpdater.java`
+- `application/usecase/GetReviewBasketUseCase.java`, `StartBasketReviewUseCase.java`, `GetReviewBasketSummaryUseCase.java`
+- `application/service/ReviewReevaluation.java`, `MasteryProfileUpdater.java`; `FreePracticeSubmission.java` (chỉ javadoc)
+- `docs/contracts/free-practice-v1.md`
 - `domain/aggregate/MasteryProfile.java` (trường `decayedFromTier`)
 - `infrastructure/persistence/JdbcMasteryProfileRepository.java`
 - `src/main/resources/db/migration/V57__mastery_decayed_from_tier.sql`
@@ -126,9 +128,10 @@ KP con vẫn `PRIORITY`.
 - 15 KP decay → giỏ ôn hiện 10 KP có bằng chứng cuối cũ nhất; badge `due` đếm đúng 10.
 - Badge `due` (`/review-basket/summary`) = số mục nhóm `due` của giỏ ôn.
 - Bài ôn đã hạ cấp → `weak`, lý do `UNBLOCKED`.
-- `GET /mastery` = `kp_mastery_profiles.mastery` cho cùng KP.
-- `ReviewReevaluation`: KP có 4 câu đúng cũ + 1 câu sai mới, DeepTutor và MP1 cho điểm khác nhau → bài ôn chỉ tạo theo MP1.
-- Nộp luyện tự do sai câu bẫy → không có `review_items` mới.
+- `ReviewReevaluation`: cùng bằng chứng (3 câu sai gần nhất), điểm hồ sơ 0.65 (trên ngưỡng) → không có bài ôn; hạ điểm hồ sơ
+  xuống 0.2 → một bài ôn bắt buộc. Test `aReviewIsRaisedFromTheStoredMasteryScoreNotFromTheLatestAnswersAlone`.
+- Nộp luyện tự do sai câu bẫy → có đúng một bài ôn tùy chọn `ERROR_PATTERN`, không có bài ôn chặn
+  (`FreePracticeIntegrationTest`, giữ nguyên).
 
 ## Rủi ro
 
