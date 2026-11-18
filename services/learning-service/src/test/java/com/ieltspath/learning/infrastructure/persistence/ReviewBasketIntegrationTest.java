@@ -680,6 +680,10 @@ class ReviewBasketIntegrationTest {
                     + "VALUES (?, ?, ?, FALSE, 'lesson_exercise', ?)", UUID.randomUUID(), user, kpConsolidate,
                     UUID.randomUUID());
         }
+        // Submissions record the profile together with the evidence before a re-evaluation; this test writes
+        // the evidence directly, so it lowers the stored score the way those answers would have.
+        jdbc.update("UPDATE kp_mastery_profiles SET mastery = 0.2, tier = 'PRIORITY', next_review_at = NULL "
+                + "WHERE user_id = ? AND knowledge_point_id = ?", user, kpConsolidate);
 
         reevaluation.execute(user, Set.of(kpConsolidate), Set.of(kpConsolidate));
 
@@ -692,6 +696,29 @@ class ReviewBasketIntegrationTest {
         assertDoesNotThrow(() -> getLesson.execute(user, lesson), "completed lessons stay readable for revision");
         assertEquals("REVIEW_REQUIRED", assertThrows(com.ieltspath.learning.domain.exception.LearningGateException.class,
                 () -> completeLesson.execute(user, lesson)).getCode());
+    }
+
+    @Test
+    void aReviewIsRaisedFromTheStoredMasteryScoreNotFromTheLatestAnswersAlone() {
+        UUID user = learner();
+        practiceSet(kpConsolidate, kpConsolidate);
+        for (int index = 0; index < 3; index++) {
+            jdbc.update("INSERT INTO kp_evidence (id, user_id, kp_id, correct, source, source_reference_id) "
+                    + "VALUES (?, ?, ?, FALSE, 'lesson_exercise', ?)", UUID.randomUUID(), user, kpConsolidate,
+                    UUID.randomUUID());
+        }
+
+        // The stored score (0.65) is above the priority threshold, so three recent wrong answers raise no review.
+        reevaluation.execute(user, Set.of(kpConsolidate), Set.of(kpConsolidate));
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM review_items WHERE user_id = ?",
+                Integer.class, user));
+
+        // The same evidence with a stored score under the threshold does raise one.
+        jdbc.update("UPDATE kp_mastery_profiles SET mastery = 0.2, tier = 'PRIORITY', next_review_at = NULL "
+                + "WHERE user_id = ? AND knowledge_point_id = ?", user, kpConsolidate);
+        reevaluation.execute(user, Set.of(kpConsolidate), Set.of(kpConsolidate));
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM review_items WHERE user_id = ? AND status = 'PENDING' "
+                + "AND blocking = TRUE AND knowledge_point_id = ?", Integer.class, user, kpConsolidate));
     }
 
     @Test
