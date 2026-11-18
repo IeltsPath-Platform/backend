@@ -1,7 +1,7 @@
 # AGENTS.md - Quy tắc bắt buộc cho AI Agent
 
 - Phiên bản: 2.3
-- Cập nhật lần cuối: 2026-11-14 (bài ôn tiêu chí Writing ôn KP của mã lỗi gặp nhiều nhất); 2026-11-13 (khối `judgments` khi chấm Writing chỉ dùng KP của đề, `kpj3`); 2026-11-12 (ngoại lệ `chartFacts`: học viên nhận phát biểu đúng cho câu số liệu viết sai); 2026-11-11 (ghi chú gamification học từ vựng mobile ở §3.8; thêm common-llm); 2026-11-02 (thêm §3.9 và nhóm điều cấm "Pattern hệ thống" ở §5: resilience, outbox, idempotency, scheduler, storage; bổ sung Redis, Resilience4j, Micrometer/OpenTelemetry, Supabase vào stack và hai module shared mới); 2026-10-30 (Content gọi Library một chiều, Library không gọi Content; Notification đã có DB, listener và API; mặc định DB của config-repo là `localhost:5440`); 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); dữ kiện khác giữ mốc kiểm 2026-10-07 sau course path, placement recommendation và course gate
+- Cập nhật lần cuối: 2026-11-18 (placement chia ba kho đề và cho làm lại, bỏ luật "chỉ làm một lần" ở §3.8); 2026-11-14 (bài ôn tiêu chí Writing ôn KP của mã lỗi gặp nhiều nhất); 2026-11-13 (khối `judgments` khi chấm Writing chỉ dùng KP của đề, `kpj3`); 2026-11-12 (ngoại lệ `chartFacts`: học viên nhận phát biểu đúng cho câu số liệu viết sai); 2026-11-11 (ghi chú gamification học từ vựng mobile ở §3.8; thêm common-llm); 2026-11-02 (thêm §3.9 và nhóm điều cấm "Pattern hệ thống" ở §5: resilience, outbox, idempotency, scheduler, storage; bổ sung Redis, Resilience4j, Micrometer/OpenTelemetry, Supabase vào stack và hai module shared mới); 2026-10-30 (Content gọi Library một chiều, Library không gọi Content; Notification đã có DB, listener và API; mặc định DB của config-repo là `localhost:5440`); 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); dữ kiện khác giữ mốc kiểm 2026-10-07 sau course path, placement recommendation và course gate
 - Dự án: `IELTSPath` (Maven coordinates: `com.ieltspath:code-base:1.0-SNAPSHOT`)
 - Kiến trúc chi tiết (sơ đồ, flow, data ownership, quyết định): [`docs/system-architecture.md`](docs/system-architecture.md)
 
@@ -230,8 +230,11 @@ src/main/java/com/ieltspath/<service>
 - Skill của lesson suy ra từ câu hỏi trong các block; lesson có thể chứa nhiều skill. Khóa lesson, review và Practice
   được áp theo từng skill; bài học hoàn thành theo các block bắt buộc, Practice phải đạt riêng cho từng skill có yêu cầu.
 - Thứ tự topic theo user từ Content `topic-sequence`, không LLM/goal; mỗi course là một chuỗi chung mọi skill. Placement
-  không bắt buộc: mọi course luôn mở, placement chỉ làm được một lần (`409 PLACEMENT_ALREADY_DONE`); band chỉ gợi ý
-  course và không đổi trạng thái topic. Lesson sau chỉ mở khi mọi lesson trước đã hoàn thành **và** Practice của chúng đã đạt
+  không bắt buộc: mọi course luôn mở; band chỉ gợi ý course và không đổi trạng thái topic. Đề placement chia theo ba
+  kho (`BAND_0_3`, `BAND_3_5`, `BAND_5_9`, trần band 3.0/5.0/9.0) và học viên làm lại được: Learning cho tối đa 3
+  assignment trong mỗi 24 giờ trượt (assignment chưa hoàn thành có thể release, không tính vào hạn mức), Assessment độc
+  lập giới hạn 3 lượt placement đã bắt đầu trong mỗi 24 giờ trượt (vượt thì `429 PLACEMENT_LIMIT_REACHED`); kết quả mới
+  nhất thay band cũ (`docs/contracts/placement-retake-v1.md`). Lesson sau chỉ mở khi mọi lesson trước đã hoàn thành **và** Practice của chúng đã đạt
   (`403 PRACTICE_REQUIRED` + `lessonIds`); bài ôn còn chờ của lesson trước chặn lesson sau bất kể skill
   (`403 REVIEW_REQUIRED`). Bài ôn lặp set mới đến khi đạt (chỉ lần trượt đầu quay lại theory), chỉ `SKIPPED` khi hết
   package chưa lộ. Bài ôn **chặn** (`blocking = true`) vẫn chặn Practice và thi topic của cùng skill; bài ôn **tùy chọn**
