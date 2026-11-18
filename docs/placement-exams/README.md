@@ -45,14 +45,25 @@ Tổng cộng 12 file audio.
    placement-b59-b/part1.mp3   part2.mp3   part3.mp3   part4.mp3
    ```
 
-2. Kiểm bằng generator (cần `CONTENT_MEDIA_BASE_URL`, là https của bucket):
+   **Để file ở đâu:** trong `services/content-service/media/listening/placement/`, giữ nguyên thư mục con như trên (thư mục `media/` nằm trong `.gitignore`, không bị commit). Ví dụ `services/content-service/media/listening/placement/placement-b03-a/part1.mp3`. Thư mục con đã được tạo sẵn.
+
+2. **Upload** bằng script (cần `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, và `CONTENT_MEDIA_BUCKET` nếu bucket không phải `media`; script tự đọc từ `.env` ở thư mục gốc nếu biến chưa được đặt, không in ra):
+
+   ```
+   powershell -File scripts/placement-exams/upload-placement-audio.ps1 -DryRun   # liệt kê file có và thiếu, không gọi Supabase
+   powershell -File scripts/placement-exams/upload-placement-audio.ps1           # upload; không ghi đè object đã có
+   ```
+
+   Script chỉ upload khi đủ 12 file, mỗi file dài hơn 1 KB. Thu lại một file đã upload thì thêm `-Overwrite`. **Không cần chèn gì vào database**: các migration `V138` đến `V140` đã ghi sẵn key vào `content_assets.media_reference`; Content ghép key với `CONTENT_MEDIA_BASE_URL` để ra URL, và database không bao giờ lưu URL hay file.
+
+3. Kiểm bằng generator (cần `CONTENT_MEDIA_BASE_URL`, là https của bucket):
 
    ```
    node scripts/placement-exams/generate-placement-seed.mjs --audio "$CONTENT_MEDIA_BASE_URL"
    ```
 
    Lệnh kiểm từng key: HTTP 200, content type `audio/*`, thời lượng trong ±15% khai báo. Lệnh thoát khác 0 nếu có file lỗi.
-3. Chỉ deploy migration Content khi lệnh trên báo đủ 12 file đạt.
+4. Chỉ deploy migration Content khi lệnh ở bước 3 báo đủ 12 file đạt.
 
 | File khi thu (thư mục/tên file) | Key trên bucket | Thời lượng khai báo |
 | --- | --- | --- |
