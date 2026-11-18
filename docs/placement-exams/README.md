@@ -35,7 +35,16 @@ Tổng cộng 12 file audio.
 
 ## Upload
 
-1. Đặt tên file đúng `part1.mp3`, `part2.mp3`, ... và upload lên bucket `media` (biến `CONTENT_MEDIA_BUCKET`) theo **đúng key** trong bảng dưới. Key sai thì Listening báo `INVALID_MEDIA_REFERENCE` cho mọi học viên được giao đề đó.
+1. **Quy ước đặt tên.** Mỗi đề có một thư mục riêng tên là mã gói viết thường; trong đó là các file `part1.mp3`, `part2.mp3`, ... theo thứ tự part trong kịch bản. Tên file nằm trong thư mục, nên 5 đề không bị trùng tên khi lưu cùng một chỗ. Thư mục và tên file **chính là phần cuối của key** trên bucket `media` (biến `CONTENT_MEDIA_BUCKET`): giữ nguyên thư mục khi upload (key đầy đủ có tiền tố `listening/placement/`). Key sai thì Listening báo `INVALID_MEDIA_REFERENCE` cho mọi học viên được giao đề đó. Chỉ chữ thường, không dấu cách, đuôi `.mp3`.
+
+   ```
+   placement-b03-a/part1.mp3   placement-b03-a/part2.mp3
+   placement-b03-b/part1.mp3   placement-b03-b/part2.mp3
+   placement-b35-a/part1.mp3   placement-b35-a/part2.mp3
+   placement-b35-b/part1.mp3   placement-b35-b/part2.mp3
+   placement-b59-b/part1.mp3   part2.mp3   part3.mp3   part4.mp3
+   ```
+
 2. Kiểm bằng generator (cần `CONTENT_MEDIA_BASE_URL`, là https của bucket):
 
    ```
@@ -45,20 +54,20 @@ Tổng cộng 12 file audio.
    Lệnh kiểm từng key: HTTP 200, content type `audio/*`, thời lượng trong ±15% khai báo. Lệnh thoát khác 0 nếu có file lỗi.
 3. Chỉ deploy migration Content khi lệnh trên báo đủ 12 file đạt.
 
-| Key | Thời lượng khai báo |
-| --- | --- |
-| `listening/placement/placement-b03-a/part1.mp3` | 98 giây |
-| `listening/placement/placement-b03-a/part2.mp3` | 113 giây |
-| `listening/placement/placement-b03-b/part1.mp3` | 105 giây |
-| `listening/placement/placement-b03-b/part2.mp3` | 88 giây |
-| `listening/placement/placement-b35-a/part1.mp3` | 130 giây |
-| `listening/placement/placement-b35-a/part2.mp3` | 139 giây |
-| `listening/placement/placement-b35-b/part1.mp3` | 116 giây |
-| `listening/placement/placement-b35-b/part2.mp3` | 142 giây |
-| `listening/placement/placement-b59-b/part1.mp3` | 137 giây |
-| `listening/placement/placement-b59-b/part2.mp3` | 157 giây |
-| `listening/placement/placement-b59-b/part3.mp3` | 182 giây |
-| `listening/placement/placement-b59-b/part4.mp3` | 165 giây |
+| File khi thu (thư mục/tên file) | Key trên bucket | Thời lượng khai báo |
+| --- | --- | --- |
+| `placement-b03-a/part1.mp3` | `listening/placement/placement-b03-a/part1.mp3` | 98 giây |
+| `placement-b03-a/part2.mp3` | `listening/placement/placement-b03-a/part2.mp3` | 113 giây |
+| `placement-b03-b/part1.mp3` | `listening/placement/placement-b03-b/part1.mp3` | 105 giây |
+| `placement-b03-b/part2.mp3` | `listening/placement/placement-b03-b/part2.mp3` | 88 giây |
+| `placement-b35-a/part1.mp3` | `listening/placement/placement-b35-a/part1.mp3` | 130 giây |
+| `placement-b35-a/part2.mp3` | `listening/placement/placement-b35-a/part2.mp3` | 139 giây |
+| `placement-b35-b/part1.mp3` | `listening/placement/placement-b35-b/part1.mp3` | 116 giây |
+| `placement-b35-b/part2.mp3` | `listening/placement/placement-b35-b/part2.mp3` | 142 giây |
+| `placement-b59-b/part1.mp3` | `listening/placement/placement-b59-b/part1.mp3` | 137 giây |
+| `placement-b59-b/part2.mp3` | `listening/placement/placement-b59-b/part2.mp3` | 157 giây |
+| `placement-b59-b/part3.mp3` | `listening/placement/placement-b59-b/part3.mp3` | 182 giây |
+| `placement-b59-b/part4.mp3` | `listening/placement/placement-b59-b/part4.mp3` | 165 giây |
 
 ## Duyệt nội dung (trước khi merge)
 
