@@ -6,6 +6,7 @@ import com.ieltspath.assessment.domain.vo.AttemptStatus;
 import com.ieltspath.assessment.domain.vo.AttemptType;
 import com.ieltspath.assessment.domain.vo.AttemptScope;
 import com.ieltspath.assessment.domain.vo.Skill;
+import com.ieltspath.assessment.domain.vo.PlacementPool;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -50,4 +51,6 @@ public class AssessmentAttemptJpaEntity {
     private AttemptScope scope = AttemptScope.FULL;
     @Enumerated(EnumType.STRING) @Column(length = 20)
     private Skill skill;
+    @Enumerated(EnumType.STRING) @Column(name = "placement_pool", length = 10)
+    private PlacementPool placementPool;
 }

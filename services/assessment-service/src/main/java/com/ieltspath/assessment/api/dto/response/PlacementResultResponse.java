@@ -5,13 +5,15 @@ import com.ieltspath.assessment.application.result.PlacementResult;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import com.ieltspath.assessment.domain.vo.PlacementPool;
 
 /**
  * The graded placement. {@code sections} is the report detail in test order: Listening and Reading list their
  * questions with the learner's and the expected answer, Writing its essays with the examiner comments.
  */
 public record PlacementResultResponse(UUID attemptId, Double overallBand, Instant completedAt, List<SkillBand> skills,
-                                      List<Section> sections) {
+                                      List<Section> sections, PlacementPool pool, Double ceiling,
+                                      boolean reachedCeiling, boolean partial) {
     public record SkillBand(String skill, double band) {}
 
     public record Section(String skill, String title, List<Question> questions, List<Essay> essays) {}
@@ -28,7 +30,8 @@ public record PlacementResultResponse(UUID attemptId, Double overallBand, Instan
     public static PlacementResultResponse from(PlacementResult r) {
         return new PlacementResultResponse(r.attemptId(), r.overallBand(), r.completedAt(),
                 r.skills().stream().map(s -> new SkillBand(s.skill().name(), s.band())).toList(),
-                r.sections().stream().map(PlacementResultResponse::section).toList());
+                r.sections().stream().map(PlacementResultResponse::section).toList(), r.pool(), r.ceiling(),
+                r.reachedCeiling(), r.partial());
     }
 
     private static Section section(PlacementResult.Section s) {

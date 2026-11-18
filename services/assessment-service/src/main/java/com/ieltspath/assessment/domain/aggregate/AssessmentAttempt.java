@@ -30,13 +30,14 @@ public final class AssessmentAttempt {
     private final UUID packageId;
     private final AttemptScope scope;
     private final Skill skill;
+    private final PlacementPool placementPool;
 
     public AssessmentAttempt(UUID id, UUID userId, UUID packageVersionId, AttemptType attemptType,
                              AttemptMode mode, AttemptChannel channel, AttemptStatus status,
                              Instant startedAt, Instant submittedAt, Instant expiresAt,
                              long rowVersion, Instant createdAt, Instant updatedAt) {
         this(id, userId, packageVersionId, attemptType, mode, channel, status, startedAt, submittedAt, expiresAt,
-                rowVersion, createdAt, updatedAt, null, null, AttemptScope.FULL, null);
+                rowVersion, createdAt, updatedAt, null, null, AttemptScope.FULL, null, null);
     }
 
     public AssessmentAttempt(UUID id, UUID userId, UUID packageVersionId, AttemptType attemptType,
@@ -44,7 +45,7 @@ public final class AssessmentAttempt {
                              Instant startedAt, Instant submittedAt, Instant expiresAt,
                              long rowVersion, Instant createdAt, Instant updatedAt, UUID learningGoalId) {
         this(id, userId, packageVersionId, attemptType, mode, channel, status, startedAt, submittedAt, expiresAt,
-                rowVersion, createdAt, updatedAt, learningGoalId, null, AttemptScope.FULL, null);
+                rowVersion, createdAt, updatedAt, learningGoalId, null, AttemptScope.FULL, null, null);
     }
 
     public AssessmentAttempt(UUID id, UUID userId, UUID packageVersionId, AttemptType attemptType,
@@ -52,6 +53,15 @@ public final class AssessmentAttempt {
                              Instant startedAt, Instant submittedAt, Instant expiresAt,
                              long rowVersion, Instant createdAt, Instant updatedAt, UUID learningGoalId,
                              UUID packageId, AttemptScope scope, Skill skill) {
+        this(id, userId, packageVersionId, attemptType, mode, channel, status, startedAt, submittedAt, expiresAt,
+                rowVersion, createdAt, updatedAt, learningGoalId, packageId, scope, skill, null);
+    }
+
+    public AssessmentAttempt(UUID id, UUID userId, UUID packageVersionId, AttemptType attemptType,
+                             AttemptMode mode, AttemptChannel channel, AttemptStatus status,
+                             Instant startedAt, Instant submittedAt, Instant expiresAt, long rowVersion,
+                             Instant createdAt, Instant updatedAt, UUID learningGoalId, UUID packageId,
+                             AttemptScope scope, Skill skill, PlacementPool placementPool) {
         this.id = id;
         this.userId = userId;
         this.packageVersionId = packageVersionId;
@@ -69,6 +79,7 @@ public final class AssessmentAttempt {
         this.packageId = packageId;
         this.scope = scope == null ? AttemptScope.FULL : scope;
         this.skill = skill;
+        this.placementPool = placementPool;
     }
 
     public static AssessmentAttempt start(UUID userId, UUID packageVersionId, AttemptType type,
@@ -79,9 +90,16 @@ public final class AssessmentAttempt {
     public static AssessmentAttempt start(UUID userId, UUID packageVersionId, UUID packageId, AttemptType type,
                                           AttemptMode mode, AttemptChannel channel, Instant expiresAt,
                                           AttemptScope scope, Skill skill) {
+        return start(userId, packageVersionId, packageId, type, mode, channel, expiresAt, scope, skill, null);
+    }
+
+    public static AssessmentAttempt start(UUID userId, UUID packageVersionId, UUID packageId, AttemptType type,
+                                          AttemptMode mode, AttemptChannel channel, Instant expiresAt,
+                                          AttemptScope scope, Skill skill, PlacementPool placementPool) {
         Instant now = Instant.now();
         return new AssessmentAttempt(UUID.randomUUID(), userId, packageVersionId, type, mode, channel,
-                AttemptStatus.IN_PROGRESS, now, null, expiresAt, 0, now, now, null, packageId, scope, skill);
+                AttemptStatus.IN_PROGRESS, now, null, expiresAt, 0, now, now, null, packageId, scope, skill,
+                type == AttemptType.PLACEMENT ? placementPool : null);
     }
 
     /**
@@ -124,6 +142,14 @@ public final class AssessmentAttempt {
         updatedAt = now;
     }
 
+    public void cancel(Instant now) {
+        if (attemptType != AttemptType.PLACEMENT || status != AttemptStatus.IN_PROGRESS) {
+            throw new InvalidAssessmentStateException("Only an in-progress placement attempt can be cancelled");
+        }
+        status = AttemptStatus.CANCELLED;
+        updatedAt = now;
+    }
+
     public boolean belongsTo(UUID currentUserId) { return userId.equals(currentUserId); }
     public UUID getId() { return id; }
     public UUID getUserId() { return userId; }
@@ -142,4 +168,5 @@ public final class AssessmentAttempt {
     public UUID getPackageId() { return packageId; }
     public AttemptScope getScope() { return scope; }
     public Skill getSkill() { return skill; }
+    public PlacementPool getPlacementPool() { return placementPool; }
 }

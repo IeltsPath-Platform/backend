@@ -20,6 +20,8 @@ import com.ieltspath.assessment.domain.vo.Skill;
 import java.time.Instant;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -38,15 +40,27 @@ public class AttemptCreator {
     private final AttemptItemRepository items;
     private final AttemptItemKnowledgePointRepository knowledgeSnapshot;
     private final ObjectMapper json;
+    private final JdbcTemplate jdbc;
+    private final int placementLimit;
 
+    @Autowired
     public AttemptCreator(AssessmentAttemptRepository attempts, AttemptSectionRepository sections,
                           AttemptItemRepository items, AttemptItemKnowledgePointRepository knowledgeSnapshot,
-                          ObjectMapper json) {
+                          ObjectMapper json, JdbcTemplate jdbc,
+                          @org.springframework.beans.factory.annotation.Value("${assessment.placement.limit-per-24h:3}") int placementLimit) {
         this.attempts = attempts;
         this.sections = sections;
         this.items = items;
         this.knowledgeSnapshot = knowledgeSnapshot;
         this.json = json;
+        this.jdbc = jdbc;
+        this.placementLimit = placementLimit;
+    }
+
+    public AttemptCreator(AssessmentAttemptRepository attempts, AttemptSectionRepository sections,
+                          AttemptItemRepository items, AttemptItemKnowledgePointRepository knowledgeSnapshot,
+                          ObjectMapper json) {
+        this(attempts, sections, items, knowledgeSnapshot, json, null, 3);
     }
 
     /** MVP packages define no time limit, so {@code expiresAt} is always null; the client never sets it. */
@@ -61,14 +75,30 @@ public class AttemptCreator {
                                           ContentPackageProvider.PackageVersion packageVersion,
                                           List<ContentPackageProvider.Section> selectedSections,
                                           AttemptScope scope, Skill skill, Instant expiresAt) {
+        return create(command, type, packageVersion, selectedSections, scope, skill, expiresAt,
+                type == AttemptType.PLACEMENT ? packageVersion.placementPool() : null);
+    }
+
+    @Transactional
+    public AssessmentAttemptResult create(StartAssessmentAttemptCommand command, AttemptType type,
+                                          ContentPackageProvider.PackageVersion packageVersion,
+                                          List<ContentPackageProvider.Section> selectedSections,
+                                          AttemptScope scope, Skill skill, Instant expiresAt,
+                                          com.ieltspath.assessment.domain.vo.PlacementPool placementPool) {
         if (selectedSections.isEmpty() || selectedSections.stream().anyMatch(section -> section.items().isEmpty())) {
             throw new PackageNotAttemptableException("Package version has a section without questions");
         }
         if (type == AttemptType.OFFICIAL_PRACTICE && packageVersion.packageId() == null) {
             throw new PackageNotAttemptableException("Package identity is missing");
         }
+        if (type == AttemptType.PLACEMENT) {
+            if (jdbc != null) jdbc.query("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", rs -> {},
+                    "assessment-placement:" + command.userId());
+            long count = attempts.countPlacementAttemptsSince(command.userId(), Instant.now().minusSeconds(86400));
+            if (count >= placementLimit) throw new com.ieltspath.assessment.domain.exception.PlacementLimitReachedException();
+        }
         var attempt = AssessmentAttempt.start(command.userId(), command.packageVersionId(), packageVersion.packageId(),
-                type, command.mode(), command.channel(), expiresAt, scope, skill);
+                type, command.mode(), command.channel(), expiresAt, scope, skill, placementPool);
         attempts.save(attempt);
 
         var sectionEntities = new ArrayList<AttemptSection>();

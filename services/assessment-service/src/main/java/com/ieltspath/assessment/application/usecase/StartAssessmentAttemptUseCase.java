@@ -68,6 +68,7 @@ public class StartAssessmentAttemptUseCase {
             long seconds = selected.stream().mapToLong(ContentPackageProvider.Section::timeLimitSeconds).sum();
             expiresAt = Instant.now().plusSeconds(seconds);
         }
-        return creator.create(command, type, packageVersion, selected, scope, skill, expiresAt);
+        return creator.create(command, type, packageVersion, selected, scope, skill, expiresAt,
+                type == AttemptType.PLACEMENT ? packageVersion.placementPool() : null);
     }
 }

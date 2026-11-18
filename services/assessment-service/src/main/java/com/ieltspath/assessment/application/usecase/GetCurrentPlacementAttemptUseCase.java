@@ -27,6 +27,7 @@ public class GetCurrentPlacementAttemptUseCase {
     public Optional<AssessmentAttemptResult> execute(UUID userId) {
         return attempts.findByUserId(userId).stream()
                 .filter(attempt -> attempt.getAttemptType() == AttemptType.PLACEMENT)
+                .filter(attempt -> attempt.getStatus() != com.ieltspath.assessment.domain.vo.AttemptStatus.CANCELLED)
                 .max(Comparator.comparing(AssessmentAttempt::getCreatedAt))
                 .map(AssessmentAttemptResult::from);
     }

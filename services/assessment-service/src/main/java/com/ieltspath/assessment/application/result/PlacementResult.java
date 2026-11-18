@@ -5,15 +5,21 @@ import com.ieltspath.assessment.domain.vo.Skill;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import com.ieltspath.assessment.domain.vo.PlacementPool;
 
 /**
  * A learner's completed placement: the overall band, the skill bands it was averaged from and, per section in test
  * order, what the report shows (each objective question with its answers, or each essay with the grader's comments).
  */
 public record PlacementResult(UUID attemptId, Double overallBand, Instant completedAt, List<SkillBand> skills,
-                              List<Section> sections) {
+                              List<Section> sections, PlacementPool pool, Double ceiling,
+                              boolean reachedCeiling, boolean partial) {
+    public PlacementResult(UUID attemptId, Double overallBand, Instant completedAt, List<SkillBand> skills,
+                           List<Section> sections) {
+        this(attemptId, overallBand, completedAt, skills, sections, null, null, false, false);
+    }
     public PlacementResult(UUID attemptId, Double overallBand, Instant completedAt, List<SkillBand> skills) {
-        this(attemptId, overallBand, completedAt, skills, List.of());
+        this(attemptId, overallBand, completedAt, skills, List.of(), null, null, false, false);
     }
 
     public record SkillBand(Skill skill, double band) {}

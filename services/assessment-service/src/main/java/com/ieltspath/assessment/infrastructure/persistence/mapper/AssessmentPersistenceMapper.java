@@ -12,7 +12,8 @@ public class AssessmentPersistenceMapper {
     public AssessmentAttempt toDomain(AssessmentAttemptJpaEntity e) {
         return new AssessmentAttempt(e.getId(), e.getUserId(), e.getPackageVersionId(), e.getAttemptType(), e.getMode(),
                 e.getChannel(), e.getStatus(), e.getStartedAt(), e.getSubmittedAt(), e.getExpiresAt(),
-                e.getRowVersion(), e.getCreatedAt(), e.getUpdatedAt(), e.getLearningGoalId(), e.getPackageId(), e.getScope(), e.getSkill());
+                e.getRowVersion(), e.getCreatedAt(), e.getUpdatedAt(), e.getLearningGoalId(), e.getPackageId(),
+                e.getScope(), e.getSkill(), e.getPlacementPool());
     }
     public AssessmentAttemptJpaEntity toEntity(AssessmentAttempt d) {
         var e = new AssessmentAttemptJpaEntity();
@@ -22,6 +23,7 @@ public class AssessmentPersistenceMapper {
         e.setRowVersion(d.getRowVersion()); e.setCreatedAt(d.getCreatedAt()); e.setUpdatedAt(d.getUpdatedAt());
         e.setLearningGoalId(d.getLearningGoalId());
         e.setPackageId(d.getPackageId()); e.setScope(d.getScope()); e.setSkill(d.getSkill());
+        e.setPlacementPool(d.getPlacementPool());
         return e;
     }
     public AttemptSection toDomain(AttemptSectionJpaEntity e) { return new AttemptSection(e.getId(), e.getAttemptId(), e.getContentSectionId(), e.getSortOrder(), e.getSnapshot(), e.getStartedAt(), e.getCompletedAt(), e.getPartNo(), e.getTimeSpentSeconds()); }
@@ -38,7 +40,9 @@ public class AssessmentPersistenceMapper {
     }
 
     public AssessmentResult toDomain(AssessmentResultJpaEntity e) {
-        return new AssessmentResult(e.getId(), e.getAttemptId(), e.getResultVersion(), e.getStatus(), toDouble(e.getOverallBand()), e.getCompletedAt());
+        return new AssessmentResult(e.getId(), e.getAttemptId(), e.getResultVersion(), e.getStatus(),
+                toDouble(e.getOverallBand()), e.getCompletedAt(), e.getPlacementPool(), toDouble(e.getUncappedBand()),
+                e.isPartial());
     }
     public AssessmentResultJpaEntity toEntity(AssessmentResult d) {
         var e = new AssessmentResultJpaEntity();
@@ -48,6 +52,9 @@ public class AssessmentPersistenceMapper {
         e.setStatus(d.status());
         e.setOverallBand(toBigDecimal(d.overallBand()));
         e.setCompletedAt(d.completedAt());
+        e.setPlacementPool(d.placementPool());
+        e.setUncappedBand(toBigDecimal(d.uncappedBand()));
+        e.setPartial(d.partial());
         return e;
     }
     public LearnerSubmission toDomain(LearnerSubmissionJpaEntity e) { return new LearnerSubmission(e.getId(), e.getUserId(), e.getAttemptItemId(), e.getPromptSnapshot(), e.getSkill(), e.getTextPayload(), e.getAudioReference(), e.getStatus(), e.getSubmissionKey(), e.getSubmittedAt()); }
