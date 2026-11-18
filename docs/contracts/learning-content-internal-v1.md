@@ -385,7 +385,8 @@ grant no skill otherwise.
 Returns published placement packages with their current published version. Optional `pool` is one of
 `BAND_0_3`, `BAND_3_5`, `BAND_5_9`; an unknown value returns `400`. Omitting it returns all pools.
 Each item is `{packageId, packageVersionId, code, pool}` and rows are ordered by package ID. Both the
-package and its current version must be `PUBLISHED`; draft and archived packages are excluded.
+package and its current version must be `PUBLISHED`; draft and archived packages are excluded. Learning requests
+one pool when assigning and treats a missing or mismatched pool in a response as unavailable.
 An empty pool returns `200 []`. Topic and course test listings retain their existing response shape.
 
 The original `PLACEMENT-4SKILLS` package is backfilled to `BAND_5_9`, preserving its 9.0 ceiling.

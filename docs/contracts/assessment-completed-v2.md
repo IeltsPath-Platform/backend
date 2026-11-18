@@ -106,6 +106,11 @@ Each `knowledge_point_mappings[]` entry:
 
 The event carries no correct answers, expected answers or examiner reasoning.
 
+For a `PLACEMENT` result, Assessment stores and emits the overall band after applying the package pool ceiling
+(`BAND_0_3` → 3.0, `BAND_3_5` → 5.0, `BAND_5_9` → 9.0). The event schema is unchanged. Learning uses the
+completed timestamp and package version to match an open placement assignment on a best-effort basis; this match
+does not affect placement-band persistence or event acknowledgement.
+
 Example for seed code `X1`, with Q15 answered wrongly. The seed assigns codes but not UUIDs, so UUIDs and timestamps below illustrate the envelope and relationships:
 
 ```json
