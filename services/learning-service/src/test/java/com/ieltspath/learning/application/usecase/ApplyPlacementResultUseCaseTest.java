@@ -29,13 +29,17 @@ class ApplyPlacementResultUseCaseTest {
     private final LearnerPlacementRepository placements = mock(LearnerPlacementRepository.class);
     private final CourseProgressRepository courseProgress = mock(CourseProgressRepository.class);
     private final CourseTestAssignmentRepository courseAssignments = mock(CourseTestAssignmentRepository.class);
+    private final PlacementAssignmentRepository placementAssignments = mock(PlacementAssignmentRepository.class);
     private final com.ieltspath.learning.application.port.QuestionEventLog questionEvents =
             mock(com.ieltspath.learning.application.port.QuestionEventLog.class);
     private final com.ieltspath.learning.application.service.MasteryProfileUpdater masteryProfiles =
             mock(com.ieltspath.learning.application.service.MasteryProfileUpdater.class);
     private final ApplyAssessmentResultUseCase useCase = new ApplyAssessmentResultUseCase(
             lock, evidence, curricula, results, assignments, reviews, placements, courseProgress, courseAssignments,
-            mock(com.ieltspath.learning.domain.repository.PracticeTestAssignmentRepository.class), questionEvents, masteryProfiles, mock(com.ieltspath.learning.application.service.CourseOutcomeService.class));
+            mock(com.ieltspath.learning.domain.repository.PracticeTestAssignmentRepository.class),
+            new com.ieltspath.learning.application.service.PlacementAssignmentCompleter(placementAssignments),
+            questionEvents, masteryProfiles,
+            mock(com.ieltspath.learning.application.service.CourseOutcomeService.class));
     private final UUID user = UUID.randomUUID();
     private final Instant completed = Instant.parse("2026-10-06T10:00:00Z");
 
@@ -81,8 +85,52 @@ class ApplyPlacementResultUseCaseTest {
         verify(results, never()).recordVersion(user, replay.attemptId(), 2);
     }
 
+    @Test
+    void placementCompletionMarksTheMatchingAssignmentAndSavesItsAttemptId() {
+        UUID attemptId = UUID.randomUUID();
+        UUID packageVersionId = UUID.randomUUID();
+        var assignment = com.ieltspath.learning.domain.aggregate.PlacementAssignment.assign(UUID.randomUUID(), user,
+                UUID.randomUUID(), packageVersionId, com.ieltspath.learning.domain.vo.PlacementPool.BAND_3_5,
+                completed.minusSeconds(30));
+        when(placementAssignments.findOpenForResult(user, packageVersionId, completed))
+                .thenReturn(Optional.of(assignment));
+
+        useCase.execute(event(attemptId, 1, "6.0", completed, packageVersionId));
+
+        verify(placementAssignments).save(assignment);
+        assertThat(assignment.attemptId()).isEqualTo(attemptId);
+        assertThat(assignment.completedAt()).isEqualTo(completed);
+    }
+
+    @Test
+    void theBandIsWrittenBeforeTheAssignmentIsMatched() {
+        UUID packageVersionId = UUID.randomUUID();
+        when(placementAssignments.findOpenForResult(user, packageVersionId, completed)).thenReturn(Optional.empty());
+
+        useCase.execute(event(UUID.randomUUID(), 1, "6.0", completed, packageVersionId));
+
+        var order = inOrder(placements, placementAssignments);
+        order.verify(placements).save(any(LearnerPlacement.class));
+        order.verify(placementAssignments).findOpenForResult(user, packageVersionId, completed);
+    }
+
+    @Test
+    void failingToMatchAssignmentDoesNotUndoThePlacementBand() {
+        UUID packageVersionId = UUID.randomUUID();
+        when(placementAssignments.findOpenForResult(user, packageVersionId, completed))
+                .thenThrow(new IllegalStateException("database unavailable"));
+
+        useCase.execute(event(UUID.randomUUID(), 1, "6.0", completed, packageVersionId));
+
+        verify(placements).save(any(LearnerPlacement.class));
+    }
+
     private AssessmentResult event(UUID attempt, int version, String band, Instant completedAt) {
-        return new AssessmentResult(UUID.randomUUID(), user, null, attempt, UUID.randomUUID(), version,
+        return event(attempt, version, band, completedAt, null);
+    }
+
+    private AssessmentResult event(UUID attempt, int version, String band, Instant completedAt, UUID packageVersionId) {
+        return new AssessmentResult(UUID.randomUUID(), user, packageVersionId, attempt, UUID.randomUUID(), version,
                 "PLACEMENT", completedAt, List.of(), band == null ? null : new BigDecimal(band));
     }
 }

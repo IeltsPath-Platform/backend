@@ -196,3 +196,18 @@ See [internal Content rubric contract](./learning-content-internal-v1.md#essay-r
 
 Phase 11 remains `in_progress` until an expert-rated gold set and a real evaluation run with persisted metrics exist.
 Bootstrap seed data and automated test fixtures do not satisfy that acceptance criterion.
+
+## Placement grading and retakes
+
+Placement grading is automatic. Listening and Reading use the existing raw-score-to-band tables. Writing uses graded
+submitted essays, with Task 2 weighted twice as much as Task 1. An omitted essay contributes 0; if a submitted essay
+does not receive a grade, Writing is omitted from the result and `partial` is true. Speaking is omitted unless
+`assessment.placement.speaking-band` is configured; no default Speaking score is added.
+
+The overall band is the mean of the available skill bands rounded to a half band, then capped by the package pool:
+`BAND_0_3` → 3.0, `BAND_3_5` → 5.0, `BAND_5_9` → 9.0. The completed result and
+`AssessmentCompleted.v2.data.overall_band` contain the capped band. `GET /attempts/{id}/placement-result` also returns
+`pool`, `ceiling`, `reachedCeiling` and `partial`, alongside skill bands and report sections. Placement attempts are
+limited independently to three started attempts in a rolling 24-hour window; the fourth start is rejected with HTTP
+429 `PLACEMENT_LIMIT_REACHED`. See [placement-retake-v1](placement-retake-v1.md) for assignment, cancellation and quota
+behavior.

@@ -1,5 +1,6 @@
 package com.ieltspath.content.application.result;
 
+import com.ieltspath.content.domain.vo.PlacementPool;
 import com.ieltspath.content.domain.aggregate.ContentPackage;
 import com.ieltspath.content.domain.vo.PackageType;
 import com.ieltspath.content.domain.vo.PublicationStatus;
@@ -23,7 +24,8 @@ public record AuthorPackageResult(
         String sourceCode,
         Instant createdAt,
         Instant updatedAt,
-        List<AuthorVersionResult> versions
+        List<AuthorVersionResult> versions,
+        PlacementPool placementPool
 ) {
     public static AuthorPackageResult of(ContentPackage pkg) {
         List<AuthorVersionResult> versions = pkg.getVersions().stream()
@@ -33,6 +35,6 @@ public record AuthorPackageResult(
         return new AuthorPackageResult(pkg.getId(), pkg.getCode(), pkg.getTitle(), pkg.getPackageType(),
                 pkg.getRequiredFeatureKey(), pkg.getStatus(), pkg.getCurrentPublishedVersionId(), pkg.getLessonId(),
                 pkg.getTopicId(), pkg.getCourseId(), pkg.getSourceCode(), pkg.getCreatedAt(), pkg.getUpdatedAt(),
-                versions);
+                versions, pkg.getPlacementPool());
     }
 }

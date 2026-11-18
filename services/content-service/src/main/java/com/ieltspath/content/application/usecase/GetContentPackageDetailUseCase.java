@@ -99,7 +99,8 @@ public class GetContentPackageDetailUseCase {
                 pkg.getCreatedAt(),
                 pkg.getUpdatedAt(),
                 sectionResults,
-                pkg.getSourceCode()
+                pkg.getSourceCode(),
+                pkg.getPlacementPool()
         );
     }
 }

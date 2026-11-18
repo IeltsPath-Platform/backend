@@ -1,5 +1,7 @@
 package com.ieltspath.content.infrastructure.persistence.adapter;
 
+import com.ieltspath.content.application.result.PlacementPackageResult;
+import com.ieltspath.content.domain.vo.PlacementPool;
 import com.ieltspath.content.application.port.LearningContentReader;
 import com.ieltspath.content.application.result.LessonContentResult;
 import com.ieltspath.content.application.result.LessonPracticeSetResult;
@@ -747,16 +749,26 @@ public class JdbcLearningContentReader implements LearningContentReader {
     }
 
     @Override
-    public List<TopicTestPackageResult> placementTestPackages() {
+    public List<PlacementPackageResult> placementTestPackages(PlacementPool pool) {
+        var params = new MapSqlParameterSource();
+        String poolFilter = "";
+        if (pool != null) {
+            poolFilter = " AND p.placement_pool = :pool";
+            params.addValue("pool", pool.name());
+        }
         return jdbc.query("""
-                SELECT p.id, p.current_published_version_id, p.code
+                SELECT p.id, p.current_published_version_id, p.code, p.placement_pool
                 FROM content_packages p
                 JOIN content_package_versions v ON v.id = p.current_published_version_id AND v.package_id = p.id
                 WHERE p.package_type = 'PLACEMENT_TEST'
                   AND p.status = 'PUBLISHED' AND v.status = 'PUBLISHED'
-                ORDER BY p.id
-                """, (rs, i) -> new TopicTestPackageResult(uuid(rs, "id"),
-                uuid(rs, "current_published_version_id"), rs.getString("code")));
+                """ + poolFilter + " ORDER BY p.id", params, (rs, i) -> new PlacementPackageResult(uuid(rs, "id"),
+                uuid(rs, "current_published_version_id"), rs.getString("code"), placementPool(rs)));
+    }
+
+    private static PlacementPool placementPool(ResultSet rs) throws SQLException {
+        String pool = rs.getString("placement_pool");
+        return pool == null ? null : PlacementPool.valueOf(pool);
     }
 
     @Override
@@ -852,16 +864,16 @@ public class JdbcLearningContentReader implements LearningContentReader {
     }
 
     private Optional<PackageVersionContentResult> packageVersionContent(UUID packageVersionId, boolean publishedOnly) {
-        record VersionRow(UUID packageId, PackageType packageType, UUID topicId, String rules) {}
+        record VersionRow(UUID packageId, PackageType packageType, UUID topicId, String rules, PlacementPool placementPool) {}
         Map<String, Object> byVersion = Map.of("versionId", packageVersionId);
         String publicationFilter = publishedOnly ? " AND v.status = 'PUBLISHED'" : "";
         List<VersionRow> found = jdbc.query(("""
-                SELECT v.package_id, p.package_type, p.topic_id, v.rules::text AS rules
+                SELECT v.package_id, p.package_type, p.topic_id, v.rules::text AS rules, p.placement_pool
                 FROM content_package_versions v
                 JOIN content_packages p ON p.id = v.package_id
                 WHERE v.id = :versionId%s
                 """).formatted(publicationFilter), byVersion, (rs, i) -> new VersionRow(uuid(rs, "package_id"),
-                PackageType.valueOf(rs.getString("package_type")), uuid(rs, "topic_id"), rs.getString("rules")));
+                PackageType.valueOf(rs.getString("package_type")), uuid(rs, "topic_id"), rs.getString("rules"), placementPool(rs)));
         if (found.isEmpty()) {
             return Optional.empty();
         }
@@ -961,7 +973,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
         });
 
         return Optional.of(new PackageVersionContentResult(packageVersionId, version.packageId(),
-                version.packageType(), version.topicId(), version.rules(), sections));
+                version.packageType(), version.topicId(), version.rules(), sections, version.placementPool()));
     }
 
     @Override

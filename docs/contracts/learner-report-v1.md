@@ -92,8 +92,8 @@ The report body also carries four blocks added after `knowledgePoints`; the fiel
     skipped, neither reached nor blocking.
   - A skill reaches a band when at least 80% of the points studied at that band are `MAINTAIN` and every judged band below
     it is reached too; the skill's band is the highest band reached before the first judged band that fails. When it
-    reaches none, the placement band stands in, but only for a skill that has points; a skill with no points has no band
-    (Speaking has none for now).
+    reaches none, the placement band stands in for a skill with catalog points. Speaking never uses the placement band
+    as a fallback and is included only after its own mastery estimate reaches a band.
   - `value` is the mean of the skill bands rounded to a half band, and is `null` unless at least 2 skills have a band.
     Grammar and vocabulary do not enter it. `speakingIncluded` is true only when Speaking has a band. Weekly and monthly
     snapshots use the same rule from the day it ships; snapshots already stored keep their old values.

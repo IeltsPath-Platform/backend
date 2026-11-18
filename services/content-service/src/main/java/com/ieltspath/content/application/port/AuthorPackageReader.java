@@ -3,6 +3,7 @@ package com.ieltspath.content.application.port;
 import com.ieltspath.content.application.result.AuthorPackageExtras;
 import com.ieltspath.content.application.result.AuthorPackageSummary;
 import com.ieltspath.content.domain.vo.PackageType;
+import com.ieltspath.content.domain.vo.PlacementPool;
 import com.ieltspath.content.domain.vo.PublicationStatus;
 
 import java.util.List;
@@ -12,7 +13,10 @@ import java.util.UUID;
 public interface AuthorPackageReader {
 
     /** Any filter may be null; {@code q} matches the code or the title, ignoring case. */
-    record Filter(PackageType type, PublicationStatus status, UUID lessonId, UUID topicId, UUID courseId, String q) {
+    record Filter(PackageType type, PublicationStatus status, UUID lessonId, UUID topicId, UUID courseId, String q, PlacementPool placementPool) {
+        public Filter(PackageType type, PublicationStatus status, UUID lessonId, UUID topicId, UUID courseId, String q) {
+            this(type, status, lessonId, topicId, courseId, q, null);
+        }
     }
 
     int LIST_LIMIT = 500;

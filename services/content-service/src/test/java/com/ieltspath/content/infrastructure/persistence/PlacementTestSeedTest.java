@@ -38,10 +38,11 @@ class PlacementTestSeedTest {
 
     @Test
     void onePublishedPlacementPackageCoversAllFourSkills() {
-        var packages = reader.placementTestPackages();
+        var packages = reader.placementTestPackages(null);
         assertThat(packages).singleElement().satisfies(pkg -> assertThat(pkg.code()).isEqualTo("PLACEMENT-4SKILLS"));
         var payload = reader.publishedPackageVersion(packages.getFirst().packageVersionId()).orElseThrow();
         assertThat(payload.packageType()).isEqualTo(PackageType.PLACEMENT_TEST);
+        assertThat(payload.placementPool()).isEqualTo(com.ieltspath.content.domain.vo.PlacementPool.BAND_5_9);
         Set<Skill> skills = payload.sections().stream().map(section -> section.skill()).collect(Collectors.toSet());
         assertThat(skills).containsExactlyInAnyOrder(Skill.LISTENING, Skill.READING, Skill.WRITING, Skill.SPEAKING);
         // Same parts and order as the real test.
@@ -58,7 +59,7 @@ class PlacementTestSeedTest {
 
     @Test
     void listeningAndReadingHaveFortyQuestionsEachWithOneAudioOrPassagePerPart() {
-        var payload = reader.publishedPackageVersion(reader.placementTestPackages().getFirst().packageVersionId())
+        var payload = reader.publishedPackageVersion(reader.placementTestPackages(null).getFirst().packageVersionId())
                 .orElseThrow();
         Map<Skill, Integer> questions = payload.sections().stream().collect(Collectors.groupingBy(
                 section -> section.skill(), Collectors.summingInt(section -> section.items().size())));
@@ -72,7 +73,7 @@ class PlacementTestSeedTest {
 
     @Test
     void placementQuestionsHaveTheirOwnPurposeAndNoOtherOwner() {
-        var version = reader.placementTestPackages().getFirst().packageVersionId();
+        var version = reader.placementTestPackages(null).getFirst().packageVersionId();
         assertThat(reader.questionsWithWrongPurpose(version, QuestionPurpose.PLACEMENT)).isEmpty();
         assertThat(reader.questionsUsedElsewhere(version)).isEmpty();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM questions WHERE purpose = 'PLACEMENT'", Map.of(), Integer.class))

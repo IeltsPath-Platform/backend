@@ -67,6 +67,7 @@ class AssessmentAnswerExposureWebMvcTest {
     @MockitoBean SaveAttemptResponseUseCase saveResponse;
     @MockitoBean GetAssessmentResultUseCase getResult;
     @MockitoBean GetCurrentPlacementAttemptUseCase currentPlacement;
+    @MockitoBean CancelPlacementAttemptUseCase cancelPlacement;
     @MockitoBean ListAttemptResponsesUseCase listResponses;
     @MockitoBean CompleteAttemptSectionUseCase completeSection;
     @MockitoBean StartAttemptSectionUseCase startSection;

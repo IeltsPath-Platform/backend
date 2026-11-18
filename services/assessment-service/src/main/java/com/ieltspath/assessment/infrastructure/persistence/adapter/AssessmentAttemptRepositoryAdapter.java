@@ -17,4 +17,10 @@ public class AssessmentAttemptRepositoryAdapter implements AssessmentAttemptRepo
     public Optional<AssessmentAttempt> findById(UUID id) { return repository.findById(id).map(mapper::toDomain); }
     public Optional<AssessmentAttempt> findByIdAndUserId(UUID id, UUID userId) { return repository.findByIdAndUserId(id, userId).map(mapper::toDomain); }
     public List<AssessmentAttempt> findByUserId(UUID userId) { return repository.findByUserIdOrderByCreatedAtDesc(userId).stream().map(mapper::toDomain).toList(); }
+    public long countPlacementAttemptsSince(UUID userId, java.time.Instant since) {
+        // A cancelled attempt is not counted: Learning gives its slot back when the assignment is released.
+        return repository.countByUserIdAndAttemptTypeAndCreatedAtGreaterThanEqualAndStatusNot(userId,
+                com.ieltspath.assessment.domain.vo.AttemptType.PLACEMENT, since,
+                com.ieltspath.assessment.domain.vo.AttemptStatus.CANCELLED);
+    }
 }

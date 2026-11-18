@@ -8,6 +8,7 @@ import lombok.Setter;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
+import com.ieltspath.assessment.domain.vo.PlacementPool;
 
 @Entity
 @Table(name = "assessment_results", uniqueConstraints = @UniqueConstraint(name = "uk_result_version", columnNames = {
@@ -28,4 +29,10 @@ public class AssessmentResultJpaEntity {
     private BigDecimal overallBand;
     @Column(name = "completed_at")
     private Instant completedAt;
+    @Enumerated(EnumType.STRING) @Column(name = "placement_pool", length = 10)
+    private PlacementPool placementPool;
+    @Column(name = "uncapped_band", precision = 3, scale = 1)
+    private BigDecimal uncappedBand;
+    @Column(nullable = false)
+    private boolean partial;
 }

@@ -46,7 +46,10 @@ show available bands and the optional placement recommendation, then group topic
 
 | Method | Path | Behavior |
 | --- | --- | --- |
-| GET | `/placement-test` | CUSTOMER only; returns `{packageId, packageVersionId}` of the published placement test, `409 PLACEMENT_ALREADY_DONE` once a placement exists, `404 NO_PLACEMENT_TEST` without a package. The only route open before a placement. |
+| GET | `/placement-test` | **Deprecated**, kept for clients that predate the pools (the mobile app). CUSTOMER only; a learner without a placement gets `{packageId, packageVersionId}` of an exam of the `BAND_5_9` pool, a learner with one gets `409 PLACEMENT_ALREADY_DONE`, no published exam is `404 NO_PLACEMENT_TEST`. Records no assignment. |
+| GET | `/placement-test/options` | CUSTOMER only; returns available exam counts by pool, the rolling-24-hour limit and remaining assignments, latest placement status/band, and the open assignment if any. |
+| POST | `/placement-test/assignments` | CUSTOMER only; `{ "pool": "BAND_0_3" | "BAND_3_5" | "BAND_5_9" }` returns a pool-matched assignment. Reuses a recent open assignment for 15 minutes; the Learning assignment quota is three per rolling 24 hours. |
+| POST | `/placement-test/assignments/{id}/release` | CUSTOMER only; releases an owned incomplete assignment when it cannot be used (`204`). Released assignments do not count toward the Learning quota. |
 | GET | `/courses` | CUSTOMER only; returns courses by band with placement-based `recommended`, topic counts, course-test `testStatus`, skill/combo prices, available and unlocked skills, combo payable price, and current `premium` status. Reconciles pending unlock debits first; Access outages leave pending purchases for retry and report `premium: false`. The placement test is optional. |
 | POST | `/courses/{id}/unlocks` | CUSTOMER only; `{ "target": "READING" | "LISTENING" | "WRITING" | "SPEAKING" | "COMBO" }` plus UUID `Idempotency-Key` buys a skill or band combo with Points. Unlock intent is durable before debit and replayed safely after failures. |
 | GET | `/topics` | One Content `topic-sequence` read refreshes the shared KP catalog and the user's topic order; returns `skill`, `course`, `hasTopicTest`, statuses and completed lesson counts. Each course skill has an independent topic sequence. |

@@ -62,7 +62,8 @@ public class GlobalExceptionHandler {
         log.warn("Bad request: {}", ex.getMessage());
         Map<String, Object> details = ex instanceof InvalidErrorTypeException
                 && "TRAP_KNOWLEDGE_POINT_NOT_ASSIGNABLE".equals(ex.getMessage())
-                ? Map.of("code", "TRAP_KNOWLEDGE_POINT_NOT_ASSIGNABLE") : null;
+                ? Map.of("code", "TRAP_KNOWLEDGE_POINT_NOT_ASSIGNABLE")
+                : "PLACEMENT_POOL_REQUIRED".equals(ex.getMessage()) ? Map.of("code", "PLACEMENT_POOL_REQUIRED") : null;
         return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI(), details);
     }
 

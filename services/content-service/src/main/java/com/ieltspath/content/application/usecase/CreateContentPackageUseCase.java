@@ -45,6 +45,10 @@ public class CreateContentPackageUseCase {
     }
 
     private ContentPackage create(CreateContentPackageCommand command) {
+        if ((command.packageType() == PackageType.PLACEMENT_TEST) != (command.placementPool() != null)) {
+            throw new IllegalArgumentException(command.packageType() == PackageType.PLACEMENT_TEST
+                    ? "PLACEMENT_POOL_REQUIRED" : "placementPool is only valid for PLACEMENT_TEST");
+        }
         if (command.packageType() == PackageType.LESSON) {
             throw new IllegalArgumentException("LESSON packages cannot be created through this API");
         }
@@ -70,7 +74,7 @@ public class CreateContentPackageUseCase {
                 ? ContentPackage.createFinalTest(command.code(), command.title(), command.packageType(),
                         command.requiredFeatureKey(), command.topicId(), command.courseId())
                 : ContentPackage.create(command.code(), command.title(), command.packageType(),
-                        command.requiredFeatureKey(), command.lessonId(), command.sourceCode());
+                        command.requiredFeatureKey(), command.lessonId(), command.sourceCode(), command.placementPool());
         return contentPackageRepository.save(pkg);
     }
 

@@ -5,6 +5,8 @@ import com.ieltspath.content.application.result.TopicSequenceResult;
 import com.ieltspath.content.domain.vo.*;
 import com.ieltspath.content.infrastructure.persistence.adapter.JdbcLearningContentReader;
 import org.flywaydb.core.Flyway;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.junit.jupiter.api.*;
 import org.postgresql.ds.PGSimpleDataSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -26,6 +28,9 @@ class CourseSeedTest {
         source.setUser(POSTGRES.getUsername());
         source.setPassword(POSTGRES.getPassword());
         Flyway.configure().dataSource(source).locations("classpath:db/migration").target("58").load().migrate();
+        // Retain historical seed data while applying the current package reader schema.
+        new ResourceDatabasePopulator(new ClassPathResource("db/migration/V137__placement_pool.sql"))
+                .execute(source);
         jdbc = new NamedParameterJdbcTemplate(source);
         // Keep the seed fixture at its intended migration snapshot while satisfying the current reader projection.
         jdbc.getJdbcTemplate().execute("ALTER TABLE content_assets ADD COLUMN access_tier VARCHAR(16) NOT NULL DEFAULT 'PUBLIC'");

@@ -130,19 +130,19 @@ public class GradeGateEssayJobUseCase {
     }
 
     private void handOver(GateEssayJobStore.ClaimedJob job, String code) {
+        if (placement.handles(job.attemptId())) {
+            log.warn("Placement essay was not graded: jobId={}, code={}", job.jobId(), code);
+            transaction.executeWithoutResult(status -> {
+                jobs.complete(job.jobId(), null, null, clock.instant());
+                placement.completeIfGraded(job.attemptId());
+            });
+            return;
+        }
         boolean rubricFailure = switch (code) {
             case "PROMPT_NOT_ACTIVATED", "RUBRIC_UNAVAILABLE", "PROMPT_VERSION_UNAVAILABLE",
                  "ContentUnavailableException", "DataAccessException", "EmptyResultDataAccessException" -> true;
             default -> false;
         };
-        if (placement.handles(job.attemptId()) && !rubricFailure) {
-            log.warn("Placement essay graded with the default band: jobId={}, code={}", job.jobId(), code);
-            transaction.executeWithoutResult(status -> {
-                jobs.complete(job.jobId(), placement.defaultWritingBand(), null, clock.instant());
-                placement.completeIfGraded(job.attemptId());
-            });
-            return;
-        }
         log.warn("Gate essay grading moved to an examiner: jobId={}, code={}", job.jobId(), code);
         transaction.executeWithoutResult(status -> {
             jobs.fail(job.jobId(), clock.instant());
