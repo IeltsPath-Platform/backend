@@ -188,6 +188,29 @@ class PlacementGradingServiceTest {
     }
 
     @Test
+    void writingIsLabelledAsGradedByTheAiOnlyWhenAnEssayWasReallyGraded() {
+        // No essay sent: the zero is computed, not graded.
+        arrangeItems();
+        when(jobs.submittedEssays(List.of(writing.id()))).thenReturn(Map.of());
+        service().onSubmit(attempt);
+        assertThat(savedSources()).containsEntry(Skill.WRITING, GradingSource.AUTO)
+                .containsEntry(Skill.LISTENING, GradingSource.AUTO);
+    }
+
+    @Test
+    void aGradedEssayMakesTheWritingSourceAi() {
+        arrangeItems();
+        when(attempts.findById(attempt.getId())).thenReturn(Optional.of(attempt));
+        when(results.findLatestForUpdateByAttemptId(attempt.getId())).thenReturn(Optional.empty());
+        when(jobs.aiJobs(attempt.getId())).thenReturn(List.of(
+                new GateEssayJobStore.JobState(writing.id(), "COMPLETED", new BigDecimal("7.0"))));
+
+        service().completeIfGraded(attempt.getId());
+
+        assertThat(savedSources()).containsEntry(Skill.WRITING, GradingSource.AI);
+    }
+
+    @Test
     void whenEverySentEssayIsGradedWritingCountsAndTheResultIsNotPartial() {
         AttemptItem task1 = item("WRITING", essay("TASK_1"));
         AttemptItem task2 = item("WRITING", essay("TASK_2"));
@@ -313,6 +336,13 @@ class PlacementGradingServiceTest {
         ArgumentCaptor<List<SkillScore>> captor = ArgumentCaptor.forClass(List.class);
         verify(skillScores).saveAll(captor.capture());
         return captor.getValue().stream().collect(java.util.stream.Collectors.toMap(SkillScore::skill, SkillScore::band));
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<Skill, GradingSource> savedSources() {
+        ArgumentCaptor<List<SkillScore>> captor = ArgumentCaptor.forClass(List.class);
+        verify(skillScores).saveAll(captor.capture());
+        return captor.getValue().stream().collect(java.util.stream.Collectors.toMap(SkillScore::skill, SkillScore::gradingSource));
     }
 
     @SuppressWarnings("unchecked")

@@ -195,7 +195,7 @@ public class PlacementGradingService {
         AssessmentResult draft = results.save(new AssessmentResult(resultId, attempt.getId(), 1,
                 AssessmentResult.DRAFT, capped.band(), null, pool, uncapped, partial));
         skillScores.saveAll(skillBands.entrySet().stream().map(entry -> new SkillScore(UUID.randomUUID(), resultId,
-                entry.getKey(), null, entry.getValue(), entry.getKey() == Skill.WRITING ? GradingSource.AI : GradingSource.AUTO,
+                entry.getKey(), null, entry.getValue(), sourceOf(entry.getKey(), essayBands),
                 null)).toList());
         itemResults.saveAll(graded);
         completer.complete(attempt, draft, items, graded);
@@ -237,6 +237,14 @@ public class PlacementGradingService {
             }
         }
         return bandsBySkill(objective, banded);
+    }
+
+    /**
+     * AI only for a Writing band that comes from an essay the LLM graded. Every other band is computed: Listening and
+     * Reading from the correct answers, Writing from essays that were not sent (zero), Speaking from its configured band.
+     */
+    private static GradingSource sourceOf(Skill skill, Map<UUID, BigDecimal> essayBands) {
+        return skill == Skill.WRITING && !essayBands.isEmpty() ? GradingSource.AI : GradingSource.AUTO;
     }
 
     private double writingWeight(AnswerSnapshot answer) {
