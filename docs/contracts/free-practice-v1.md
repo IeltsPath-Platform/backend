@@ -1,8 +1,10 @@
 # Free practice and the learner tree v1
 
 A learner can practise any knowledge point (KP) of a course they are taking, without waiting for a lesson or a review. Free
-practice never blocks the learner's path: a failed free set creates no review and locks nothing. FE: the knowledge tree screen
-with a "Practise" button on each point.
+practice never blocks the learner's path: a failed free set creates no blocking review and locks nothing. The one review it
+can add is an optional `ERROR_PATTERN` review of the point, when an error-trap child of that point reaches the `PRIORITY`
+tier through the answers of this set; that review is offered in the review basket and never blocks. FE: the knowledge tree
+screen with a "Practise" button on each point.
 
 Both routes are under `/api/learning`, role `CUSTOMER`.
 
