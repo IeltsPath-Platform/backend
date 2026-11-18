@@ -23,6 +23,7 @@ import com.ieltspath.learning.domain.repository.TopicTestAssignmentRepository;
 import com.ieltspath.learning.domain.repository.LearnerPlacementRepository;
 import com.ieltspath.learning.domain.repository.CourseProgressRepository;
 import com.ieltspath.learning.domain.repository.CourseTestAssignmentRepository;
+import com.ieltspath.learning.domain.repository.PlacementAssignmentRepository;
 import com.ieltspath.learning.domain.vo.BandLevel;
 import com.ieltspath.learning.domain.vo.KnowledgeEvidence;
 import org.slf4j.Logger;
@@ -60,6 +61,7 @@ public class ApplyAssessmentResultUseCase {
     private final CourseProgressRepository courseProgress;
     private final CourseTestAssignmentRepository courseAssignments;
     private final com.ieltspath.learning.domain.repository.PracticeTestAssignmentRepository practiceAssignments;
+    private final PlacementAssignmentRepository placementAssignments;
     private final QuestionEventLog questionEvents;
     private final MasteryProfileUpdater masteryProfiles;
     private final CourseOutcomeService outcomes;
@@ -71,9 +73,11 @@ public class ApplyAssessmentResultUseCase {
                                         LearnerPlacementRepository placements, CourseProgressRepository courseProgress,
                                         CourseTestAssignmentRepository courseAssignments,
                                         com.ieltspath.learning.domain.repository.PracticeTestAssignmentRepository practiceAssignments,
+                                        PlacementAssignmentRepository placementAssignments,
                                         QuestionEventLog questionEvents, MasteryProfileUpdater masteryProfiles,
                                         CourseOutcomeService outcomes) {
         this.practiceAssignments = practiceAssignments;
+        this.placementAssignments = placementAssignments;
         this.outcomes = outcomes;
         this.questionEvents = questionEvents;
         this.masteryProfiles = masteryProfiles;
@@ -180,6 +184,19 @@ public class ApplyAssessmentResultUseCase {
     }
 
     private void applyPlacement(AssessmentResult result) {
+        if (result.packageVersionId() != null) {
+            try {
+                placementAssignments.findOpenForResult(result.userId(), result.packageVersionId(), result.completedAt())
+                        .ifPresent(assignment -> {
+                            if (assignment.complete(result.attemptId(), result.completedAt())) {
+                                placementAssignments.save(assignment);
+                            }
+                        });
+            } catch (RuntimeException exception) {
+                log.warn("Could not match completed placement assignment: eventId={}, attemptId={}",
+                        result.eventId(), result.attemptId(), exception);
+            }
+        }
         if (result.overallBand() == null) return;
         BandLevel band = new BandLevel(result.overallBand());
         var existing = placements.find(result.userId());

@@ -5,9 +5,13 @@ import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.learning.api.controller.CourseController;
 import com.ieltspath.learning.api.controller.PlacementController;
 import com.ieltspath.learning.application.exception.LearningRequestException;
-import com.ieltspath.learning.application.result.PlacementTestResult;
+import com.ieltspath.learning.application.result.PlacementAssignmentResult;
+import com.ieltspath.learning.application.result.PlacementTestOptionsResult;
 import com.ieltspath.learning.application.usecase.AssignCourseTestUseCase;
-import com.ieltspath.learning.application.usecase.GetPlacementTestUseCase;
+import com.ieltspath.learning.application.usecase.AssignPlacementTestUseCase;
+import com.ieltspath.learning.application.usecase.GetPlacementTestOptionsUseCase;
+import com.ieltspath.learning.application.usecase.ReleasePlacementAssignmentUseCase;
+import com.ieltspath.learning.domain.vo.PlacementPool;
 import com.ieltspath.learning.application.usecase.ListCoursesUseCase;
 import com.ieltspath.learning.application.usecase.UnlockCourseUseCase;
 import org.junit.jupiter.api.Test;
@@ -67,7 +71,9 @@ class LearningSecurityWebMvcTest {
     @MockitoBean ListCoursesUseCase listCourses;
     @MockitoBean UnlockCourseUseCase unlockCourse;
     @MockitoBean AssignCourseTestUseCase assignCourseTest;
-    @MockitoBean GetPlacementTestUseCase getPlacementTest;
+    @MockitoBean GetPlacementTestOptionsUseCase placementOptions;
+    @MockitoBean AssignPlacementTestUseCase assignPlacement;
+    @MockitoBean ReleasePlacementAssignmentUseCase releasePlacement;
 
     @MockitoBean com.ieltspath.learning.application.usecase.GetLearningProgressStatisticsUseCase statistics;
     @MockitoBean com.ieltspath.learning.application.usecase.GetStudyContextUseCase studyContext;
@@ -151,32 +157,90 @@ class LearningSecurityWebMvcTest {
         when(listCourses.execute(userId)).thenReturn(List.of());
 
         mockMvc.perform(get("/api/learning/courses")).andExpect(status().isOk());
-        verifyNoInteractions(getPlacementTest);
+        verifyNoInteractions(placementOptions, assignPlacement, releasePlacement);
     }
 
     @Test
     @WithMockUser(roles = "CUSTOMER")
-    void learnerWithoutPlacementReceivesThePlacementTest() throws Exception {
+    void learnerCanRequestAPlacementAssignment() throws Exception {
         UUID packageId = UUID.randomUUID();
         UUID versionId = UUID.randomUUID();
+        UUID assignmentId = UUID.randomUUID();
         when(currentUser.requireUserId()).thenReturn(userId);
-        when(getPlacementTest.execute(userId)).thenReturn(new PlacementTestResult(packageId, versionId));
+        when(assignPlacement.execute(userId, PlacementPool.BAND_3_5)).thenReturn(
+                new PlacementAssignmentResult(assignmentId, PlacementPool.BAND_3_5, packageId, versionId, 2, null));
 
-        mockMvc.perform(get("/api/learning/placement-test"))
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .post("/api/learning/placement-test/assignments")
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"pool\":\"BAND_3_5\"}"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.assignmentId").value(assignmentId.toString()))
+                .andExpect(jsonPath("$.pool").value("BAND_3_5"))
                 .andExpect(jsonPath("$.packageId").value(packageId.toString()))
-                .andExpect(jsonPath("$.packageVersionId").value(versionId.toString()));
+                .andExpect(jsonPath("$.packageVersionId").value(versionId.toString()))
+                .andExpect(jsonPath("$.retakesLeft").value(2));
     }
 
     @Test
     @WithMockUser(roles = "CUSTOMER")
-    void placementTestReportsThatItWasAlreadyTaken() throws Exception {
+    void placementOptionsIncludePoolsAndCurrentPlacementFields() throws Exception {
         when(currentUser.requireUserId()).thenReturn(userId);
-        when(getPlacementTest.execute(userId)).thenThrow(
-                new LearningRequestException(409, "PLACEMENT_ALREADY_DONE", "The placement test was already taken"));
+        when(placementOptions.execute(userId)).thenReturn(new PlacementTestOptionsResult(List.of(
+                new PlacementTestOptionsResult.PoolOption(PlacementPool.BAND_0_3, 2)), 3, 1, null, true, 5.5, null));
 
-        mockMvc.perform(get("/api/learning/placement-test"))
-                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PLACEMENT_ALREADY_DONE"));
+        mockMvc.perform(get("/api/learning/placement-test/options"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pools[0].pool").value("BAND_0_3"))
+                .andExpect(jsonPath("$.pools[0].examCount").value(2))
+                .andExpect(jsonPath("$.limitPer24h").value(3))
+                .andExpect(jsonPath("$.retakesLeft").value(1))
+                .andExpect(jsonPath("$.hasPlacement").value(true))
+                .andExpect(jsonPath("$.currentBand").value(5.5));
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void learnerCanReleaseAnOwnedFailedStartAssignment() throws Exception {
+        UUID assignmentId = UUID.randomUUID();
+        when(currentUser.requireUserId()).thenReturn(userId);
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .post("/api/learning/placement-test/assignments/{id}/release", assignmentId))
+                .andExpect(status().isNoContent());
+        org.mockito.Mockito.verify(releasePlacement).execute(userId, assignmentId);
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void invalidPlacementPoolIsBadRequest() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .post("/api/learning/placement-test/assignments")
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"pool\":\"UNKNOWN\"}"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(assignPlacement);
+    }
+
+    @Test
+    void placementRoutesRequireAuthentication() throws Exception {
+        mockMvc.perform(get("/api/learning/placement-test/options")).andExpect(status().isUnauthorized());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .post("/api/learning/placement-test/assignments").content("{\"pool\":\"BAND_5_9\"}")
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)).andExpect(status().isUnauthorized());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .post("/api/learning/placement-test/assignments/{id}/release", UUID.randomUUID()))
+                .andExpect(status().isUnauthorized());
+        verifyNoInteractions(placementOptions, assignPlacement, releasePlacement);
+    }
+
+    @Test
+    @WithMockUser(roles = "CONTENT_AUTHOR")
+    void staffCannotUsePlacementAssignmentRoutes() throws Exception {
+        mockMvc.perform(get("/api/learning/placement-test/options")).andExpect(status().isForbidden());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .post("/api/learning/placement-test/assignments").content("{\"pool\":\"BAND_5_9\"}")
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)).andExpect(status().isForbidden());
+        verifyNoInteractions(placementOptions, assignPlacement);
     }
 
     @Test

@@ -69,8 +69,13 @@ public interface LearningContentClient {
     record PracticeTestMilestone(UUID packageId, UUID packageVersionId, String code, String title,
                                  int afterTopicSequence) {}
 
-    /** Published placement tests, ordered by package id. */
-    List<TestPackage> getPlacementTestPackages();
+    /** Published placement tests. A missing pool is not inferred by consumers. */
+    default List<PlacementPackage> getPlacementPackages(com.ieltspath.learning.domain.vo.PlacementPool pool) {
+        return List.of();
+    }
+
+    record PlacementPackage(UUID packageId, UUID packageVersionId, String code,
+                            com.ieltspath.learning.domain.vo.PlacementPool pool) {}
 
     List<LessonPracticeSet> lessonPracticeSets(UUID lessonId);
 

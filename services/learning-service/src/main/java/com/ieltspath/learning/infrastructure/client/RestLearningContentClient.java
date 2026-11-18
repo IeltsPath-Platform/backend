@@ -144,8 +144,8 @@ public class RestLearningContentClient implements LearningContentClient {
     }
 
     @Override
-    public List<TestPackage> getPlacementTestPackages() {
-        return get("/placement-packages", new ParameterizedTypeReference<>() { });
+    public List<PlacementPackage> getPlacementPackages(com.ieltspath.learning.domain.vo.PlacementPool pool) {
+        return get("/placement-packages?pool={pool}", new ParameterizedTypeReference<>() { }, pool.name());
     }
 
     @Override

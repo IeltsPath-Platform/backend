@@ -93,6 +93,16 @@ class BandEstimatorTest {
     }
 
     @Test
+    void placementFallbackDoesNotClaimSpeakingWasIncludedWithoutAGradedSpeakingBand() {
+        List<Point> speaking = points("SPEAKING", B60, INSUFFICIENT, INSUFFICIENT);
+
+        Estimate estimate = estimate(speaking, B55);
+
+        assertThat(estimate.skillBands()).doesNotContainKey("SPEAKING");
+        assertThat(estimate.speakingIncluded()).isFalse();
+    }
+
+    @Test
     void aSkillBandIsTheHighestBandWhereEightyPercentOfPointsMaintain() {
         List<Point> reading = join(
                 points("READING", B60, MAINTAIN, MAINTAIN, MAINTAIN, MAINTAIN, CONSOLIDATE),
