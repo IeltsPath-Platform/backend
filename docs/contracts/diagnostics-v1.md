@@ -19,23 +19,28 @@ A review gets at most one diagnosis. A review that itself came from a diagnosis 
 diagnosed again, which keeps the walk back finite. Optional reviews (review basket) never open one.
 
 After the second failed set, the next review GET opens the diagnosis. If Content returns no active prerequisites,
-Learning Service records a concluded session with no probes and an empty conclusion in the same transaction as the review
-decision; the review response keeps `state = ACTIVE` and `diagnosticSessionId = null`. The empty session prevents repeated
-prerequisite lookups from turning every later GET into another diagnosis attempt. The no-unseen-set path still skips the
-review and records a content gap, whether or not prerequisite probes can be opened.
+Learning Service records a concluded session with `conclusionKind = NO_PREREQUISITES`, no probes, and an empty conclusion
+in the same transaction as the review decision; the review response keeps `state = ACTIVE` and
+`diagnosticSessionId = null`. The empty session prevents repeated prerequisite lookups from turning every later GET into
+another diagnosis attempt. The no-unseen-set path still skips the review and records a content gap, whether or not
+prerequisite probes can be opened.
 
 ## How it runs
 
 - **Probes.** Each direct prerequisite of B gets one probe: a practice set of at least 3 questions whose answers the learner
   has not seen (not revealed in Practice, a review or another probe). With no such set the probe is `NO_SET`: the result is
-  *unknown*, never a gap.
+  *unknown*, never a gap, and Content receives a content-gap signal for that KP.
 - **Pass mark.** A probe passes at 70% correct, like a review set.
 - **Walk back.** A failed probe at depth < 3 opens probes on its own prerequisites (depth + 1), skipping KPs already probed
   in the session and B itself. At most 6 probes per session.
 - **Conclusion**, once no probe is `OPEN`:
   - a *gap* is a failed probe none of whose probed prerequisites failed (so a probe without prerequisites, one at depth 3,
     or one whose prerequisites passed or are unknown);
-  - no failed probe → the conclusion is B itself (`rootIsGap = true`): the base is solid, B stays under its own review.
+  - one or more failed probes → `conclusionKind = GAPS_FOUND`, and the gap points are concluded;
+  - one or more answered probes and no failed probes → `conclusionKind = ROOT_IS_GAP`, and the conclusion is B itself
+    (`rootIsGap = true`): the base is solid, B stays under its own review;
+  - no answered probes → `conclusionKind = INCONCLUSIVE` and an empty conclusion. This includes sessions where every probe
+    had no available set or was skipped; unknown probes never count as gaps.
 - **Actions.**
   - each gap KP gets a blocking review with `trigger_kind = DIAGNOSTIC` (a pending optional review of it is made blocking);
   - B's review stays `PENDING` but gives no set until the gap reviews are `DONE` or `SKIPPED`; if B was already `SKIPPED`
@@ -65,6 +70,7 @@ Role `CUSTOMER`; 404 for another learner's session.
 ```json
 {
   "sessionId": "…", "rootReviewId": "…", "rootKnowledgePointId": "…", "status": "CONCLUDED",
+  "conclusionKind": "GAPS_FOUND",
   "probes": [{
     "probeId": "…", "knowledgePoint": { "knowledgePointId": "…", "code": "R40_SKIM", "name": "…" },
     "parentKnowledgePointId": "…", "depth": 1, "status": "ANSWERED",
@@ -76,9 +82,19 @@ Role `CUSTOMER`; 404 for another learner's session.
 }
 ```
 
-- `probes` is the result matrix, in the order the probes were opened. `status`: `OPEN`, `ANSWERED`, `NO_SET`. `result`:
-  `PASSED`, `FAILED`, `UNKNOWN` (`NO_SET`), `null` while `OPEN`.
+- `probes` is the result matrix, in the order the probes were opened. `status`: `OPEN`, `ANSWERED`, `NO_SET`, `SKIPPED`.
+  `result`: `PASSED`, `FAILED`, `UNKNOWN` (`NO_SET` or `SKIPPED`), `null` while `OPEN`.
 - `conclusion` is empty while `status = PROBING`. `rootIsGap = true` when the conclusion is B itself.
+- `conclusionKind` is `GAPS_FOUND`, `ROOT_IS_GAP`, `INCONCLUSIVE`, or `NO_PREREQUISITES`; it is `null` for sessions
+  created before the field was stored. For those old sessions, `rootIsGap` keeps its legacy inference.
+
+## `POST /api/learning/diagnostics/{sessionId}/skip`
+
+Closes an in-progress diagnosis after at least one probe is `ANSWERED`. Any remaining `OPEN` probes become `SKIPPED` and
+their `packageId` and `packageVersionId` are cleared, so an unseen package can be assigned elsewhere. The response is the
+same shape as `GET /diagnostics/{sessionId}`. A concluded session returns its current result, making repeated skip calls
+idempotent. A session with no answered probe returns `409 DIAGNOSIS_PROBE_REQUIRED`; another learner's session returns
+`404 NOT_FOUND`.
 
 ## `GET /api/learning/diagnostics/{sessionId}/probes/{probeId}`
 
@@ -99,9 +115,10 @@ Body as `SubmitExerciseRequest`: `{ "requestId": "…", "answers": [{ "questionV
 }
 ```
 
-Solutions and the audio transcript are shown whatever the result. Sending the same `requestId` again returns the same body
-and writes nothing. Errors: `404 NOT_FOUND`; `409 PROBE_CLOSED` (already answered with another `requestId`, `NO_SET`, or its
-set was seen elsewhere); `422 UNGRADABLE_EXERCISE`.
+Solutions and the audio transcript are shown whatever the result. Sending the same `requestId` again returns the stored
+body and writes nothing, even if the package version was later removed from Content. Legacy answered probes without a
+stored response keep their previous replay behavior. Errors: `404 NOT_FOUND`; `409 PROBE_CLOSED` (already answered with
+another `requestId`, `NO_SET`, or its set was seen elsewhere); `422 UNGRADABLE_EXERCISE`.
 
 An incorrect probe answer with a recognized active error code may include `error: {code, name, fixHint}` in its result.
 Unknown codes or a failed Content lookup omit the field; the diagnostic submission still succeeds. Correct and untagged

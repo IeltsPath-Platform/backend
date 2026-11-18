@@ -10,6 +10,7 @@ import com.ieltspath.learning.domain.service.PrerequisiteDiagnosis.ProbeFact;
 import com.ieltspath.learning.domain.service.ReviewRule.ReviewCandidate;
 import com.ieltspath.learning.domain.vo.DiagnosticProbe;
 import com.ieltspath.learning.domain.vo.DiagnosticSession;
+import com.ieltspath.learning.domain.vo.DiagnosticSession.ConclusionKind;
 import com.ieltspath.learning.domain.vo.LearningSkill;
 import com.ieltspath.learning.domain.vo.PendingReview;
 import com.ieltspath.learning.domain.vo.ReviewStatus;
@@ -80,7 +81,8 @@ public class DiagnosticFlow {
         Instant now = Instant.now();
         DiagnosticSession session = new DiagnosticSession(UUID.randomUUID(), review.userId(), review.id(), root,
                 first.isEmpty() ? DiagnosticSession.Status.CONCLUDED : DiagnosticSession.Status.PROBING,
-                List.of(), now, first.isEmpty() ? now : null);
+                List.of(), first.isEmpty() ? ConclusionKind.NO_PREREQUISITES : null, now,
+                first.isEmpty() ? now : null);
         diagnostics.insertSession(session);
         if (!first.isEmpty()) {
             addProbes(session, root, 1, first, prepared);
@@ -107,21 +109,30 @@ public class DiagnosticFlow {
     public void replaceStaleSet(DiagnosticSession session, DiagnosticProbe probe,
                                 Optional<LearningContentClient.PracticeSet> next,
                                 Map<UUID, KnowledgePointDirectory.Entry> described) {
+        if (next.isEmpty()) diagnostics.recordContentGap(probe.knowledgePointId());
         diagnostics.replaceProbeSet(probe.id(), next.map(LearningContentClient.PracticeSet::packageId).orElse(null),
                 next.map(LearningContentClient.PracticeSet::packageVersionId).orElse(null));
         advance(session, described);
     }
 
+    /** Skips unanswered probes after the learner has completed at least one probe. */
+    public void skip(DiagnosticSession session, Map<UUID, KnowledgePointDirectory.Entry> described) {
+        diagnostics.skipOpenProbes(session.id());
+        conclude(session, diagnostics.findProbes(session.id()), described);
+    }
+
     private void addProbes(DiagnosticSession session, UUID parent, int depth, List<UUID> knowledgePointIds,
                            Prepared prepared) {
         Set<UUID> taken = new HashSet<>();
+        Set<UUID> unavailable = new HashSet<>(attempts.revealedPackageIds(session.userId()));
+        unavailable.addAll(reviews.assignedPackageIds(session.userId()));
         for (UUID kp : knowledgePointIds) {
             Optional<LearningContentClient.PracticeSet> set = prepared.candidates().getOrDefault(kp, List.of()).stream()
                     .filter(candidate -> !taken.contains(candidate.packageId()))
-                    .filter(candidate -> !attempts.revealedPackageIds(session.userId()).contains(candidate.packageId()))
-                    .filter(candidate -> !reviews.assignedPackageIds(session.userId()).contains(candidate.packageId()))
+                    .filter(candidate -> !unavailable.contains(candidate.packageId()))
                     .findFirst();
             set.ifPresent(found -> taken.add(found.packageId()));
+            if (set.isEmpty()) diagnostics.recordContentGap(kp);
             diagnostics.insertProbe(DiagnosticProbe.open(session.id(), kp, parent, depth,
                     set.map(LearningContentClient.PracticeSet::packageId).orElse(null),
                     set.map(LearningContentClient.PracticeSet::packageVersionId).orElse(null)));
@@ -140,8 +151,8 @@ public class DiagnosticFlow {
                 probe.parentKnowledgePointId(), probe.depth(),
                 probe.status() == DiagnosticProbe.Status.ANSWERED ? probe.passed() : null)).toList();
         PrerequisiteDiagnosis.Conclusion conclusion = rule.conclude(session.rootKnowledgePointId(), facts);
-        diagnostics.conclude(session.id(), conclusion.knowledgePointIds());
-        if (conclusion.rootIsGap()) return;
+        diagnostics.conclude(session.id(), conclusion.knowledgePointIds(), conclusion.kind());
+        if (conclusion.kind() != ConclusionKind.GAPS_FOUND) return;
 
         UUID userId = session.userId();
         ReviewItem rootReview = reviews.findOwned(userId, session.rootReviewId()).orElseThrow();

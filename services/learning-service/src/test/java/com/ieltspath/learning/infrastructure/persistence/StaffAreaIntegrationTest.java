@@ -284,6 +284,20 @@ class StaffAreaIntegrationTest {
                     + "'ANSWERED', 3, 3, TRUE, ?)", UUID.randomUUID(), session, prerequisite, failing,
                     UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
         }
+        for (String conclusionKind : List.of("INCONCLUSIVE", "NO_PREREQUISITES")) {
+            UUID user = UUID.randomUUID();
+            UUID review = UUID.randomUUID();
+            UUID session = UUID.randomUUID();
+            jdbc.update("INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status) "
+                    + "VALUES (?, ?, ?, ?, 'DONE')", review, user, failing, UUID.randomUUID());
+            jdbc.update("INSERT INTO diagnostic_sessions (id, user_id, root_review_id, root_kp_id, status, "
+                    + "conclusion_kp_ids, conclusion_kind) VALUES (?, ?, ?, ?, 'CONCLUDED', '{}'::uuid[], ?)",
+                    session, user, review, failing, conclusionKind);
+            jdbc.update("INSERT INTO diagnostic_probes (id, session_id, kp_id, parent_kp_id, depth, package_id, "
+                    + "package_version_id, status, correct, total, passed, request_id) VALUES (?, ?, ?, ?, 1, ?, ?, "
+                    + "'ANSWERED', 0, 3, FALSE, ?)", UUID.randomUUID(), session, prerequisite, failing,
+                    UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+        }
 
         sync.sync();
         var suspect = work.list(CONTENT, null, null).stream().filter(item -> item.kind() == WorkKind.EDGE_SUSPECT)

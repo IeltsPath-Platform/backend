@@ -277,6 +277,7 @@ public class JdbcStaffInsightRepository implements StaffInsightRepository {
                        count(*) FILTER (WHERE p.kp_id = ANY (s.conclusion_kp_ids)) AS as_root
                 FROM diagnostic_probes p JOIN diagnostic_sessions s ON s.id = p.session_id
                 WHERE s.status = 'CONCLUDED' AND p.status = 'ANSWERED'
+                  AND (s.conclusion_kind IS NULL OR s.conclusion_kind NOT IN ('INCONCLUSIVE', 'NO_PREREQUISITES'))
                 GROUP BY p.kp_id, p.parent_kp_id ORDER BY p.kp_id, p.parent_kp_id
                 """, new MapSqlParameterSource(), (row, index) -> new EdgeStat(row.getObject("from_kp", UUID.class),
                 row.getObject("to_kp", UUID.class), row.getInt("probes"), row.getInt("passed"),

@@ -1,5 +1,7 @@
 package com.ieltspath.learning.application.usecase;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.learning.application.command.SubmitExerciseCommand;
 import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.port.LearnerLock;
@@ -60,6 +62,7 @@ public class SubmitDiagnosticProbeUseCase {
     private final DiagnosticFlow flow;
     private final ErrorTrapEvidence errorTrapEvidence;
     private final DiagnosticPreparation preparation;
+    private final ObjectMapper json;
     private final TransactionTemplate transaction;
     private final ItemGrading grading = new ItemGrading();
 
@@ -69,7 +72,7 @@ public class SubmitDiagnosticProbeUseCase {
                                         KnowledgeEvidenceRepository evidence, QuestionEventLog questionEvents,
                                         MasteryProfileUpdater masteryProfiles, DiagnosticFlow flow,
                                         ErrorTrapEvidence errorTrapEvidence, DiagnosticPreparation preparation,
-                                        PlatformTransactionManager transactionManager) {
+                                        ObjectMapper json, PlatformTransactionManager transactionManager) {
         this.lock = lock;
         this.diagnostics = diagnostics;
         this.attempts = attempts;
@@ -81,6 +84,7 @@ public class SubmitDiagnosticProbeUseCase {
         this.flow = flow;
         this.errorTrapEvidence = errorTrapEvidence;
         this.preparation = preparation;
+        this.json = json;
         this.transaction = new TransactionTemplate(transactionManager);
     }
 
@@ -93,6 +97,10 @@ public class SubmitDiagnosticProbeUseCase {
                     () -> new LearningRequestException(404, "NOT_FOUND", "Diagnostic probe was not found"));
             boolean replay = owned.status() == DiagnosticProbe.Status.ANSWERED
                     && command.requestId().equals(owned.requestId());
+            if (replay) {
+                var stored = diagnostics.probeResponse(owned.id());
+                if (stored.isPresent()) return readResponse(stored.get());
+            }
             if (owned.status() != DiagnosticProbe.Status.OPEN && !replay) {
                 throw new LearningRequestException(409, "PROBE_CLOSED", "Diagnostic probe is closed");
             }
@@ -133,6 +141,10 @@ public class SubmitDiagnosticProbeUseCase {
                 () -> new LearningRequestException(404, "NOT_FOUND", "Diagnostic probe was not found"));
         boolean replay = probe.status() == DiagnosticProbe.Status.ANSWERED
                 && command.requestId().equals(probe.requestId());
+        if (replay) {
+            var stored = diagnostics.probeResponse(probe.id());
+            if (stored.isPresent()) return ProbeSubmissionRead.done(readResponse(stored.get()));
+        }
         if (replay && !preparedProbe.packageVersionId().equals(probe.packageVersionId())) {
             return ProbeSubmissionRead.retryRead();
         }
@@ -160,6 +172,7 @@ public class SubmitDiagnosticProbeUseCase {
                 PassMark.passes(graded.correct(), graded.total()),
                 graded.correct(), graded.total(), List.copyOf(results), transcript, current.status().name(),
                 current.conclusionKnowledgePointIds());
+        if (!replay) saveResponse(probeId, result);
         return ProbeSubmissionRead.done(result);
     }
 
@@ -214,5 +227,21 @@ public class SubmitDiagnosticProbeUseCase {
             return new ProbeSubmissionRead(result, false);
         }
         static ProbeSubmissionRead retryRead() { return new ProbeSubmissionRead(null, true); }
+    }
+
+    private void saveResponse(UUID probeId, DiagnosticProbeSubmissionResult result) {
+        try {
+            diagnostics.saveProbeResponse(probeId, json.writeValueAsString(result));
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Cannot store diagnostic response", exception);
+        }
+    }
+
+    private DiagnosticProbeSubmissionResult readResponse(String response) {
+        try {
+            return json.readValue(response, DiagnosticProbeSubmissionResult.class);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Cannot read diagnostic response", exception);
+        }
     }
 }

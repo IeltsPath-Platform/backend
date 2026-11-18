@@ -26,6 +26,7 @@ class PrerequisiteDiagnosisTest {
     void whenEveryProbePassesTheRootIsTheConclusion() {
         var result = rule.conclude(b, List.of(probe(a, b, 1, true), probe(x, b, 1, true)));
         assertTrue(result.rootIsGap());
+        assertEquals(com.ieltspath.learning.domain.vo.DiagnosticSession.ConclusionKind.ROOT_IS_GAP, result.kind());
         assertEquals(List.of(b), result.knowledgePointIds());
     }
 
@@ -33,6 +34,7 @@ class PrerequisiteDiagnosisTest {
     void aFailedProbeWithoutPrerequisitesIsTheGap() {
         var result = rule.conclude(b, List.of(probe(a, b, 1, false), probe(x, b, 1, true)));
         assertFalse(result.rootIsGap());
+        assertEquals(com.ieltspath.learning.domain.vo.DiagnosticSession.ConclusionKind.GAPS_FOUND, result.kind());
         assertEquals(List.of(a), result.knowledgePointIds());
     }
 
@@ -57,9 +59,17 @@ class PrerequisiteDiagnosisTest {
     @Test
     void aProbeWithoutASetIsUnknownAndNeverAGap() {
         var onlyUnknown = rule.conclude(b, List.of(probe(a, b, 1, null)));
-        assertTrue(onlyUnknown.rootIsGap());
+        assertEquals(com.ieltspath.learning.domain.vo.DiagnosticSession.ConclusionKind.INCONCLUSIVE, onlyUnknown.kind());
+        assertTrue(onlyUnknown.knowledgePointIds().isEmpty());
         var failedWithUnknownChild = rule.conclude(b, List.of(probe(a, b, 1, false), probe(z, a, 2, null)));
         assertEquals(List.of(a), failedWithUnknownChild.knowledgePointIds());
+    }
+
+    @Test
+    void skippedProbeIsUnknownAndCannotBeAnIdentifiedGap() {
+        var skipped = rule.conclude(b, List.of(probe(a, b, 1, null)));
+        assertEquals(com.ieltspath.learning.domain.vo.DiagnosticSession.ConclusionKind.INCONCLUSIVE, skipped.kind());
+        assertTrue(skipped.knowledgePointIds().isEmpty());
     }
 
     @Test

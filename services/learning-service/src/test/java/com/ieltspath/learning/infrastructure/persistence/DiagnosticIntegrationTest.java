@@ -60,6 +60,7 @@ class DiagnosticIntegrationTest {
     @Autowired SubmitReviewUseCase submitReview;
     @Autowired SubmitTheoryCheckUseCase theoryCheck;
     @Autowired GetDiagnosticUseCase getDiagnostic;
+    @Autowired SkipDiagnosticUseCase skipDiagnostic;
     @Autowired GetDiagnosticProbeUseCase getProbe;
     @Autowired SubmitDiagnosticProbeUseCase submitProbe;
     @Autowired GetLearnerReportUseCase report;
@@ -151,6 +152,7 @@ class DiagnosticIntegrationTest {
         assertFalse(failed.passed());
         assertEquals("CONCLUDED", failed.sessionStatus());
         assertEquals(List.of(kpA), failed.conclusionKnowledgePointIds());
+        assertEquals("GAPS_FOUND", getDiagnostic.execute(user, sessionId).conclusionKind());
         assertEquals("A", failed.results().getFirst().correctAnswer());
         assertEquals(3, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE user_id = ? "
                 + "AND source = 'diagnostic_probe'", Integer.class, user));
@@ -229,10 +231,14 @@ class DiagnosticIntegrationTest {
         assertTrue(first.passed());
         assertEquals("CONCLUDED", first.sessionStatus());
         assertEquals(List.of(kpB), first.conclusionKnowledgePointIds());
+        assertEquals("ROOT_IS_GAP", getDiagnostic.execute(user, sessionId).conclusionKind());
+        assertEquals(Boolean.TRUE, jdbc.queryForObject("SELECT response IS NOT NULL FROM diagnostic_probes WHERE id = ?",
+                Boolean.class, probe));
         int evidence = jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE user_id = ?", Integer.class, user);
 
-        // This checks replay while Content is still available; preserving a probe response after its package is removed
-        // depends on the replay persistence added in the later phase.
+        org.mockito.Mockito.doThrow(new com.ieltspath.learning.application.exception.LearningRequestException(
+                404, "NOT_FOUND", "Package version was removed")).when(content)
+                .getPackageVersion(a1.packageVersionId());
         assertEquals(first, submitProbe.execute(user, sessionId, probe, passing));
         assertEquals(evidence, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE user_id = ?",
                 Integer.class, user));
@@ -314,8 +320,158 @@ class DiagnosticIntegrationTest {
         DiagnosticResult result = getDiagnostic.execute(user, sessionId);
         assertEquals("CONCLUDED", result.status());
         assertEquals("UNKNOWN", result.probes().getFirst().result());
-        assertTrue(result.rootIsGap());
-        assertEquals(b3.packageId(), getReview.execute(user, review).set().packageId());
+        assertEquals("INCONCLUSIVE", result.conclusionKind());
+        assertTrue(result.conclusion().isEmpty());
+        assertFalse(result.rootIsGap());
+        assertEquals(1, jdbc.queryForObject("SELECT occurrences FROM content_gap_signals WHERE kp_id = ?",
+                Integer.class, kpA));
+        ReviewResult resumed = getReview.execute(user, review);
+        assertEquals(sessionId, resumed.diagnosticSessionId());
+        assertEquals(b3.packageId(), resumed.set().packageId());
+    }
+
+    @Test
+    void skipRequiresAtLeastOneAnsweredProbe() {
+        UUID user = UUID.randomUUID();
+        prerequisites.put(kpB, List.of(kpA));
+        // The prerequisite needs a set, or its probe is NO_SET and the diagnosis concludes at once.
+        practiceSet(kpA);
+        UUID review = failTwice(user, practiceSet(kpB), practiceSet(kpB));
+        UUID sessionId = jdbc.queryForObject("SELECT id FROM diagnostic_sessions WHERE root_review_id = ?",
+                UUID.class, review);
+
+        var error = assertThrows(com.ieltspath.learning.application.exception.LearningRequestException.class,
+                () -> skipDiagnostic.execute(user, sessionId));
+
+        assertEquals(409, error.getStatus());
+        assertEquals("DIAGNOSIS_PROBE_REQUIRED", error.getCode());
+        assertEquals("PROBING", getDiagnostic.execute(user, sessionId).status());
+    }
+
+    @Test
+    void skipKeepsFailedProbeGapsAndReleasesUnansweredProbePackage() {
+        UUID user = UUID.randomUUID();
+        prerequisites.put(kpB, List.of(kpA, kpZ));
+        PackageVersion b1 = practiceSet(kpB), b2 = practiceSet(kpB);
+        PackageVersion a1 = practiceSet(kpA);
+        PackageVersion z1 = practiceSet(kpZ);
+        UUID rootReview = failTwice(user, b1, b2);
+        UUID sessionId = jdbc.queryForObject("SELECT id FROM diagnostic_sessions WHERE root_review_id = ?",
+                UUID.class, rootReview);
+        var opened = getDiagnostic.execute(user, sessionId);
+        var failed = opened.probes().stream().filter(probe -> kpA.equals(probe.knowledgePoint().knowledgePointId()))
+                .findFirst().orElseThrow();
+        submitProbe.execute(user, sessionId, failed.probeId(), answers(a1, "B", "B", "B"));
+
+        DiagnosticResult skipped = skipDiagnostic.execute(user, sessionId);
+        DiagnosticResult replay = skipDiagnostic.execute(user, sessionId);
+
+        assertEquals(skipped, replay);
+        assertEquals("GAPS_FOUND", skipped.conclusionKind());
+        assertEquals(List.of(kpA), skipped.conclusion().stream()
+                .map(DiagnosticResult.Point::knowledgePointId).toList());
+        var skippedProbe = skipped.probes().stream().filter(probe -> kpZ.equals(probe.knowledgePoint().knowledgePointId()))
+                .findFirst().orElseThrow();
+        assertEquals("SKIPPED", skippedProbe.status());
+        assertEquals("UNKNOWN", skippedProbe.result());
+        assertNull(jdbc.queryForObject("SELECT package_id FROM diagnostic_probes WHERE id = ?", UUID.class,
+                skippedProbe.probeId()));
+        assertNull(jdbc.queryForObject("SELECT package_version_id FROM diagnostic_probes WHERE id = ?", UUID.class,
+                skippedProbe.probeId()));
+        UUID gapReview = jdbc.queryForObject("SELECT id FROM review_items WHERE user_id = ? "
+                + "AND knowledge_point_id = ? AND trigger_kind = 'DIAGNOSTIC'", UUID.class, user, kpA);
+        assertEquals("WAITING_ON_PREREQUISITES", getReview.execute(user, rootReview).state());
+
+        UUID optional = insertReview(user, kpZ, "ASSESSMENT");
+        assertEquals(z1.packageId(), getReview.execute(user, optional).set().packageId());
+        assertNotNull(gapReview);
+    }
+
+    @Test
+    void skippingAfterPassingAProbeKeepsTheRootReviewActive() {
+        UUID user = UUID.randomUUID();
+        prerequisites.put(kpB, List.of(kpA, kpZ));
+        PackageVersion b1 = practiceSet(kpB), b2 = practiceSet(kpB), b3 = practiceSet(kpB);
+        PackageVersion a1 = practiceSet(kpA);
+        practiceSet(kpZ);
+        UUID rootReview = failTwice(user, b1, b2);
+        UUID sessionId = jdbc.queryForObject("SELECT id FROM diagnostic_sessions WHERE root_review_id = ?",
+                UUID.class, rootReview);
+        UUID probeOfA = getDiagnostic.execute(user, sessionId).probes().stream()
+                .filter(probe -> kpA.equals(probe.knowledgePoint().knowledgePointId()))
+                .findFirst().orElseThrow().probeId();
+        submitProbe.execute(user, sessionId, probeOfA, answers(a1, "A", "A", "A"));
+
+        DiagnosticResult result = skipDiagnostic.execute(user, sessionId);
+
+        assertEquals("ROOT_IS_GAP", result.conclusionKind());
+        assertTrue(result.conclusion().stream().anyMatch(point -> kpB.equals(point.knowledgePointId())));
+        assertEquals(ReviewResult.ACTIVE, getReview.execute(user, rootReview).state());
+        assertEquals(b3.packageId(), getReview.execute(user, rootReview).set().packageId());
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM review_items WHERE user_id = ? "
+                + "AND trigger_kind = 'DIAGNOSTIC'", Integer.class, user));
+    }
+
+    @Test
+    void noPrerequisitesAreStoredWithoutOpeningAProbeSessionInTheReviewResponse() {
+        UUID user = UUID.randomUUID();
+        prerequisites.put(kpB, List.of());
+        UUID review = failTwice(user, practiceSet(kpB), practiceSet(kpB));
+
+        ReviewResult result = getReview.execute(user, review);
+        String kind = jdbc.queryForObject("SELECT conclusion_kind FROM diagnostic_sessions WHERE root_review_id = ?",
+                String.class, review);
+
+        assertEquals(ReviewResult.ACTIVE, result.state());
+        assertNull(result.diagnosticSessionId());
+        assertEquals("NO_PREREQUISITES", kind);
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM diagnostic_probes p JOIN diagnostic_sessions s "
+                + "ON s.id = p.session_id WHERE s.root_review_id = ?", Integer.class, review));
+    }
+
+    @Test
+    void diagnosticReviewWithoutItsKnowledgePointInTheLessonSkipsTheory() {
+        UUID user = UUID.randomUUID();
+        topics.execute(user);
+        UUID review = insertReview(user, kpA, "DIAGNOSTIC");
+        jdbc.update("UPDATE review_items SET stage = 'THEORY', theory_reason = 'REPEATED_FAIL' WHERE id = ?", review);
+        PackageVersion a1 = practiceSet(kpA);
+
+        ReviewResult result = getReview.execute(user, review);
+
+        assertEquals("NO_LESSON", result.theoryScope());
+        assertTrue(result.theory().isEmpty());
+        assertTrue(result.quickCheck().isEmpty());
+        assertEquals("PRACTICE", result.stage());
+        assertEquals(a1.packageId(), result.set().packageId());
+    }
+
+    @Test
+    void getDiagnosticSupportsSkippedProbesAndLegacySessionsWithoutConclusionKinds() {
+        UUID user = UUID.randomUUID();
+        UUID rootReview = insertReview(user);
+        UUID session = UUID.randomUUID();
+        UUID probe = UUID.randomUUID();
+        jdbc.update("INSERT INTO diagnostic_sessions (id, user_id, root_review_id, root_kp_id, status, "
+                        + "conclusion_kp_ids, conclusion_kind) VALUES (?, ?, ?, ?, 'CONCLUDED', CAST(? AS uuid[]), "
+                        + "'INCONCLUSIVE')",
+                session, user, rootReview, kpB, "{}");
+        jdbc.update("INSERT INTO diagnostic_probes (id, session_id, kp_id, parent_kp_id, depth, status) "
+                + "VALUES (?, ?, ?, ?, 1, 'SKIPPED')", probe, session, kpA, kpB);
+
+        DiagnosticResult skipped = getDiagnostic.execute(user, session);
+        UUID legacySession = UUID.randomUUID();
+        UUID legacyReview = insertReview(user, UUID.randomUUID(), "ASSESSMENT");
+        jdbc.update("INSERT INTO diagnostic_sessions (id, user_id, root_review_id, root_kp_id, status, "
+                        + "conclusion_kp_ids) VALUES (?, ?, ?, ?, 'CONCLUDED', CAST(? AS uuid[]))",
+                legacySession, user, legacyReview, kpB, "{" + kpB + "}");
+        DiagnosticResult legacy = getDiagnostic.execute(user, legacySession);
+
+        assertEquals("INCONCLUSIVE", skipped.conclusionKind());
+        assertEquals("SKIPPED", skipped.probes().getFirst().status());
+        assertEquals("UNKNOWN", skipped.probes().getFirst().result());
+        assertNull(legacy.conclusionKind());
+        assertTrue(legacy.rootIsGap());
     }
 
     @Test
@@ -389,6 +545,9 @@ class DiagnosticIntegrationTest {
         assertTrue(unavailable.questions().isEmpty());
         assertEquals("CONCLUDED", concluded.status());
         assertEquals("UNKNOWN", concluded.probes().getFirst().result());
+        assertEquals("INCONCLUSIVE", concluded.conclusionKind());
+        assertEquals(1, jdbc.queryForObject("SELECT occurrences FROM content_gap_signals WHERE kp_id = ?",
+                Integer.class, kpA));
     }
 
     @Test
@@ -434,11 +593,14 @@ class DiagnosticIntegrationTest {
         var submissionNotFound = assertThrows(com.ieltspath.learning.application.exception.LearningRequestException.class,
                 () -> submitProbe.execute(requester, sessionId, probeId,
                         new SubmitExerciseCommand(UUID.randomUUID(), List.of())));
+        var skipNotFound = assertThrows(com.ieltspath.learning.application.exception.LearningRequestException.class,
+                () -> skipDiagnostic.execute(requester, sessionId));
 
         assertEquals(404, reviewNotFound.getStatus());
         assertEquals(404, diagnosticNotFound.getStatus());
         assertEquals(404, probeNotFound.getStatus());
         assertEquals(404, submissionNotFound.getStatus());
+        assertEquals(404, skipNotFound.getStatus());
         verifyNoInteractions(content);
     }
 
@@ -451,9 +613,10 @@ class DiagnosticIntegrationTest {
     @Test
     void reviewAndDiagnosisUseCasesNeverCallContentInsideATransaction() {
         UUID user = UUID.randomUUID();
-        prerequisites.put(kpB, List.of(kpA));
+        prerequisites.put(kpB, List.of(kpA, kpZ));
         PackageVersion b1 = practiceSet(kpB), b2 = practiceSet(kpB);
         PackageVersion a1 = practiceSet(kpA);
+        practiceSet(kpZ);
         topics.execute(user);
         UUID review = insertReview(user);
 
@@ -504,9 +667,17 @@ class DiagnosticIntegrationTest {
             assertEquals(ReviewResult.DIAGNOSING, diagnosing.state());
 
             UUID sessionId = diagnosing.diagnosticSessionId();
-            UUID probeId = getDiagnostic.execute(user, sessionId).probes().getFirst().probeId();
+            DiagnosticResult opening = getDiagnostic.execute(user, sessionId);
+            UUID probeId = opening.probes().stream()
+                    .filter(probe -> kpA.equals(probe.knowledgePoint().knowledgePointId()))
+                    .findFirst().orElseThrow().probeId();
             watched(watching, () -> getProbe.execute(user, sessionId, probeId));
             watched(watching, () -> submitProbe.execute(user, sessionId, probeId, answers(a1, "B", "B", "B")));
+            var skipped = watched(watching, () -> skipDiagnostic.execute(user, sessionId));
+            assertEquals("CONCLUDED", skipped.status());
+            assertEquals("SKIPPED", skipped.probes().stream()
+                    .filter(probe -> kpZ.equals(probe.knowledgePoint().knowledgePointId()))
+                    .findFirst().orElseThrow().status());
         } finally {
             listeners.remove(listener);
         }
@@ -526,9 +697,14 @@ class DiagnosticIntegrationTest {
     }
 
     private UUID insertReview(UUID user) {
+        return insertReview(user, kpB, "ASSESSMENT");
+    }
+
+    private UUID insertReview(UUID user, UUID knowledgePointId, String triggerKind) {
         UUID review = UUID.randomUUID();
         jdbc.update("INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status, skill, "
-                + "trigger_kind) VALUES (?, ?, ?, ?, 'PENDING', 'READING', 'ASSESSMENT')", review, user, kpB, lesson);
+                + "trigger_kind) VALUES (?, ?, ?, ?, 'PENDING', 'READING', ?)", review, user, knowledgePointId,
+                lesson, triggerKind);
         return review;
     }
 

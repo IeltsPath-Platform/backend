@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
 @Repository
 public class JdbcDiagnosticRepository implements DiagnosticRepository {
     private static final String SESSION_COLUMNS = """
-            id, user_id, root_review_id, root_kp_id, status, conclusion_kp_ids, created_at, concluded_at""";
+            id, user_id, root_review_id, root_kp_id, status, conclusion_kp_ids, conclusion_kind, created_at, concluded_at""";
     private static final String PROBE_COLUMNS = """
             id, session_id, kp_id, parent_kp_id, depth, package_id, package_version_id, status, correct, total,
             passed, request_id, answered_at""";
@@ -44,12 +44,13 @@ public class JdbcDiagnosticRepository implements DiagnosticRepository {
         params.put("kpId", session.rootKnowledgePointId());
         params.put("status", session.status().name());
         params.put("conclusions", uuidArray(session.conclusionKnowledgePointIds()));
+        params.put("conclusionKind", session.conclusionKind() == null ? null : session.conclusionKind().name());
         params.put("createdAt", Timestamp.from(session.createdAt()));
         params.put("concludedAt", session.concludedAt() == null ? null : Timestamp.from(session.concludedAt()));
         jdbc.update("""
                 INSERT INTO diagnostic_sessions (id, user_id, root_review_id, root_kp_id, status,
-                                                conclusion_kp_ids, created_at, concluded_at)
-                VALUES (:id, :userId, :reviewId, :kpId, :status, CAST(:conclusions AS uuid[]),
+                                                conclusion_kp_ids, conclusion_kind, created_at, concluded_at)
+                VALUES (:id, :userId, :reviewId, :kpId, :status, CAST(:conclusions AS uuid[]), :conclusionKind,
                         :createdAt, :concludedAt)
                 """, params);
     }
@@ -114,6 +115,27 @@ public class JdbcDiagnosticRepository implements DiagnosticRepository {
     }
 
     @Override
+    public void saveProbeResponse(UUID probeId, String responseJson) {
+        int updated = jdbc.update("UPDATE diagnostic_probes SET response = CAST(:response AS jsonb) WHERE id = :id",
+                Map.of("id", probeId, "response", responseJson));
+        if (updated != 1) throw new IllegalStateException("Diagnostic probe response was not stored");
+    }
+
+    @Override
+    public Optional<String> probeResponse(UUID probeId) {
+        return jdbc.query("SELECT response::text FROM diagnostic_probes WHERE id = :id AND response IS NOT NULL",
+                Map.of("id", probeId), (row, index) -> row.getString(1)).stream().findFirst();
+    }
+
+    @Override
+    public void skipOpenProbes(UUID sessionId) {
+        jdbc.update("""
+                UPDATE diagnostic_probes SET status = 'SKIPPED', package_id = NULL, package_version_id = NULL
+                WHERE session_id = :sessionId AND status = 'OPEN'
+                """, Map.of("sessionId", sessionId));
+    }
+
+    @Override
     public void replaceProbeSet(UUID probeId, UUID packageId, UUID packageVersionId) {
         Map<String, Object> params = new HashMap<>();
         params.put("id", probeId);
@@ -127,12 +149,15 @@ public class JdbcDiagnosticRepository implements DiagnosticRepository {
     }
 
     @Override
-    public void conclude(UUID sessionId, Collection<UUID> knowledgePointIds) {
+    public void conclude(UUID sessionId, Collection<UUID> knowledgePointIds,
+                         DiagnosticSession.ConclusionKind conclusionKind) {
         jdbc.update("""
                 UPDATE diagnostic_sessions SET status = 'CONCLUDED', conclusion_kp_ids = CAST(:kpIds AS uuid[]),
+                conclusion_kind = :conclusionKind,
                 concluded_at = clock_timestamp()
                 WHERE id = :id AND status = 'PROBING'
-                """, Map.of("id", sessionId, "kpIds", uuidArray(knowledgePointIds)));
+                """, Map.of("id", sessionId, "kpIds", uuidArray(knowledgePointIds),
+                "conclusionKind", conclusionKind.name()));
     }
 
     @Override
@@ -176,8 +201,13 @@ public class JdbcDiagnosticRepository implements DiagnosticRepository {
         return (row, index) -> new DiagnosticSession(row.getObject("id", UUID.class),
                 row.getObject("user_id", UUID.class), row.getObject("root_review_id", UUID.class),
                 row.getObject("root_kp_id", UUID.class), DiagnosticSession.Status.valueOf(row.getString("status")),
-                SqlArrays.uuids(row.getArray("conclusion_kp_ids")), instant(row, "created_at"),
+                SqlArrays.uuids(row.getArray("conclusion_kp_ids")), conclusionKind(row.getString("conclusion_kind")),
+                instant(row, "created_at"),
                 instant(row, "concluded_at"));
+    }
+
+    private static DiagnosticSession.ConclusionKind conclusionKind(String value) {
+        return value == null ? null : DiagnosticSession.ConclusionKind.valueOf(value);
     }
 
     private static RowMapper<DiagnosticProbe> probe() {

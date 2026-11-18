@@ -110,6 +110,9 @@ public class GetReviewUseCase {
         TheoryFocus.Focus focus = lesson == null
                 ? new TheoryFocus.Focus(List.of(), "LESSON_FALLBACK", List.of())
                 : theoryFocus.of(lesson, review.knowledgePointId());
+        boolean diagnosticWithoutLesson = "DIAGNOSTIC".equals(review.triggerKind())
+                && "LESSON_FALLBACK".equals(focus.scope());
+        if (diagnosticWithoutLesson) focus = new TheoryFocus.Focus(List.of(), "NO_LESSON", List.of());
         ErrorTrapResult trap = review.status() == ReviewStatus.PENDING
                 ? errorTrap(userId, review.knowledgePointId()) : null;
         Optional<DiagnosticSession> diagnosis = diagnostics.findByRootReview(review.id());
@@ -117,7 +120,7 @@ public class GetReviewUseCase {
         boolean staleOpenSet = false;
         Optional<PracticeSet> next = Optional.empty();
         Set<UUID> revealed = attempts.revealedPackageIds(userId);
-        boolean archivedTheory = review.stage() == ReviewStage.THEORY && lesson == null;
+        boolean archivedTheory = review.stage() == ReviewStage.THEORY && (lesson == null || diagnosticWithoutLesson);
         if (review.status() == ReviewStatus.PENDING && (review.stage() != ReviewStage.THEORY || archivedTheory)) {
             if (review.openSet().isPresent()) {
                 ReviewSet open = review.openSet().orElseThrow();
@@ -194,7 +197,9 @@ public class GetReviewUseCase {
                 diagnosis = Optional.empty();
             }
         }
-        if (prepared.lesson() == null && review.stage() == ReviewStage.THEORY) {
+        // No theory to read: the lesson is gone, or none of the learner's lessons teaches the point.
+        boolean nothingToRead = prepared.lesson() == null || "NO_LESSON".equals(prepared.focus().scope());
+        if (nothingToRead && review.stage() == ReviewStage.THEORY) {
             review.completeTheory();
             reviews.save(review);
         } else if (review.blocking() && review.isFresh() && !"PRACTICE".equals(review.triggerKind())
@@ -268,8 +273,8 @@ public class GetReviewUseCase {
                 review.blocking(), waitingOn, errorTrap, review.triggerKind());
     }
 
-    private static boolean diagnosticsPlaceholder(DiagnosticSession session) {
-        return session.status() == DiagnosticSession.Status.CONCLUDED && session.conclusionKnowledgePointIds().isEmpty();
+    private boolean diagnosticsPlaceholder(DiagnosticSession session) {
+        return session.status() == DiagnosticSession.Status.CONCLUDED && diagnostics.findProbes(session.id()).isEmpty();
     }
 
     private static boolean requiresDiagnosis(ReviewItem review, Optional<DiagnosticSession> diagnosis) {

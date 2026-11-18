@@ -7,6 +7,7 @@ import com.ieltspath.learning.application.result.DiagnosticResult;
 import com.ieltspath.learning.application.usecase.GetDiagnosticProbeUseCase;
 import com.ieltspath.learning.application.usecase.GetDiagnosticUseCase;
 import com.ieltspath.learning.application.usecase.SubmitDiagnosticProbeUseCase;
+import com.ieltspath.learning.application.usecase.SkipDiagnosticUseCase;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,13 +27,16 @@ public class DiagnosticController {
     private final GetDiagnosticUseCase diagnosis;
     private final GetDiagnosticProbeUseCase probe;
     private final SubmitDiagnosticProbeUseCase submit;
+    private final SkipDiagnosticUseCase skip;
 
     public DiagnosticController(CurrentUserProvider currentUser, GetDiagnosticUseCase diagnosis,
-                                GetDiagnosticProbeUseCase probe, SubmitDiagnosticProbeUseCase submit) {
+                                GetDiagnosticProbeUseCase probe, SubmitDiagnosticProbeUseCase submit,
+                                SkipDiagnosticUseCase skip) {
         this.currentUser = currentUser;
         this.diagnosis = diagnosis;
         this.probe = probe;
         this.submit = submit;
+        this.skip = skip;
     }
 
     @GetMapping("/{sessionId}")
@@ -52,5 +56,10 @@ public class DiagnosticController {
                                                      @Valid @RequestBody SubmitExerciseRequest request) {
         return DiagnosticProbeResponse.Submission.from(submit.execute(currentUser.requireUserId(), sessionId,
                 probeId, request.toCommand()));
+    }
+
+    @PostMapping("/{sessionId}/skip")
+    public DiagnosticResult skip(@PathVariable("sessionId") UUID sessionId) {
+        return skip.execute(currentUser.requireUserId(), sessionId);
     }
 }
