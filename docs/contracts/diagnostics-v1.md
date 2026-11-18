@@ -13,9 +13,16 @@ For a **blocking** review of B, at the first of:
 2. **no unseen set left** for B (the review ends `SKIPPED`; Content is told through a content gap signal, even when no
    diagnosis follows).
 
-and only if B has at least one active prerequisite (Content, `POST /internal/learning-content/knowledge-points/prerequisites`).
+and only if B has at least one active prerequisite does it open a probing diagnosis (Content,
+`POST /internal/learning-content/knowledge-points/prerequisites`).
 A review gets at most one diagnosis. A review that itself came from a diagnosis (`trigger_kind = DIAGNOSTIC`) is never
 diagnosed again, which keeps the walk back finite. Optional reviews (review basket) never open one.
+
+After the second failed set, the next review GET opens the diagnosis. If Content returns no active prerequisites,
+Learning Service records a concluded session with no probes and an empty conclusion in the same transaction as the review
+decision; the review response keeps `state = ACTIVE` and `diagnosticSessionId = null`. The empty session prevents repeated
+prerequisite lookups from turning every later GET into another diagnosis attempt. The no-unseen-set path still skips the
+review and records a content gap, whether or not prerequisite probes can be opened.
 
 ## How it runs
 
@@ -46,7 +53,7 @@ diagnosed again, which keeps the walk back finite. Optional reviews (review bask
 | Field | Meaning |
 | --- | --- |
 | `state` | `ACTIVE`; `DIAGNOSING` while the session is `PROBING` (no set is given); `WAITING_ON_PREREQUISITES` while the gap reviews are open (no set is given). |
-| `diagnosticSessionId` | The diagnosis opened for this review, or `null`. Set on a `SKIPPED` review too. |
+| `diagnosticSessionId` | The diagnosis with probes opened for this review, or `null` when no probe was opened. Set on a `SKIPPED` review too. |
 | `waitingOnReviewIds` | The gap reviews still `PENDING` that this review waits for. |
 
 `GET /api/learning/report`: `action.type = DIAGNOSING` (with the review id of B) while B's session is `PROBING`.

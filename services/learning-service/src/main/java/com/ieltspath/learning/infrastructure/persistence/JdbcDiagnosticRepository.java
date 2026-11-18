@@ -37,11 +37,21 @@ public class JdbcDiagnosticRepository implements DiagnosticRepository {
 
     @Override
     public void insertSession(DiagnosticSession session) {
+        Map<String, Object> params = new HashMap<>();
+        params.put("id", session.id());
+        params.put("userId", session.userId());
+        params.put("reviewId", session.rootReviewId());
+        params.put("kpId", session.rootKnowledgePointId());
+        params.put("status", session.status().name());
+        params.put("conclusions", uuidArray(session.conclusionKnowledgePointIds()));
+        params.put("createdAt", Timestamp.from(session.createdAt()));
+        params.put("concludedAt", session.concludedAt() == null ? null : Timestamp.from(session.concludedAt()));
         jdbc.update("""
-                INSERT INTO diagnostic_sessions (id, user_id, root_review_id, root_kp_id, status)
-                VALUES (:id, :userId, :reviewId, :kpId, :status)
-                """, Map.of("id", session.id(), "userId", session.userId(), "reviewId", session.rootReviewId(),
-                "kpId", session.rootKnowledgePointId(), "status", session.status().name()));
+                INSERT INTO diagnostic_sessions (id, user_id, root_review_id, root_kp_id, status,
+                                                conclusion_kp_ids, created_at, concluded_at)
+                VALUES (:id, :userId, :reviewId, :kpId, :status, CAST(:conclusions AS uuid[]),
+                        :createdAt, :concludedAt)
+                """, params);
     }
 
     @Override

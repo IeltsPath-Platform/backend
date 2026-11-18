@@ -26,6 +26,7 @@ import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -101,6 +102,17 @@ class DiagnosticIntegrationTest {
         when(content.searchPracticeSets(any(), anyList(), eq(3), eq(1), any())).thenAnswer(invocation ->
                 unseen(invocation.getArgument(0), invocation.getArgument(1)));
         when(content.searchPracticeSets(any(), anyList(), eq(3), eq(1))).thenAnswer(invocation ->
+                unseen(invocation.getArgument(0), invocation.getArgument(1)));
+        when(content.searchPracticeSets(any(), anyList(), eq(3), eq(6))).thenAnswer(invocation -> {
+            UUID kp = invocation.getArgument(0);
+            List<UUID> excluded = invocation.getArgument(1);
+            return versions.values().stream().filter(version -> kp.equals(versionKnowledgePoint.get(version.packageVersionId())))
+                    .filter(version -> !excluded.contains(version.packageId())).limit(6)
+                    .map(version -> new PracticeSet(version.packageId(), version.packageVersionId(), "PS", 3, 3))
+                    .toList();
+        });
+        // Diagnosis preparation asks for up to the probe budget per point, so duplicate packages can be skipped.
+        when(content.searchPracticeSets(any(), anyList(), eq(3), eq(6))).thenAnswer(invocation ->
                 unseen(invocation.getArgument(0), invocation.getArgument(1)));
     }
 
@@ -219,7 +231,8 @@ class DiagnosticIntegrationTest {
         assertEquals(List.of(kpB), first.conclusionKnowledgePointIds());
         int evidence = jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE user_id = ?", Integer.class, user);
 
-        // The same request again returns the same result and writes nothing.
+        // This checks replay while Content is still available; preserving a probe response after its package is removed
+        // depends on the replay persistence added in the later phase.
         assertEquals(first, submitProbe.execute(user, sessionId, probe, passing));
         assertEquals(evidence, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE user_id = ?",
                 Integer.class, user));
@@ -326,6 +339,192 @@ class DiagnosticIntegrationTest {
                 UUID.class, probe));
     }
 
+    @Test
+    void aProbePackageThatWasUnpublishedIsReplacedWithAnotherSet() {
+        UUID user = UUID.randomUUID();
+        prerequisites.put(kpB, List.of(kpA));
+        PackageVersion b1 = practiceSet(kpB), b2 = practiceSet(kpB);
+        PackageVersion a1 = practiceSet(kpA), a2 = practiceSet(kpA);
+        when(content.searchPracticeSets(eq(kpA), anyList(), eq(3), eq(6))).thenAnswer(invocation -> {
+            List<UUID> excluded = invocation.getArgument(1);
+            return List.of(a1, a2).stream().filter(version -> !excluded.contains(version.packageId())
+                    || version.packageId().equals(a1.packageId()))
+                    .map(version -> new PracticeSet(version.packageId(), version.packageVersionId(), "PS", 3, 3))
+                    .toList();
+        });
+        UUID review = failTwice(user, b1, b2);
+        UUID sessionId = jdbc.queryForObject("SELECT id FROM diagnostic_sessions WHERE root_review_id = ?",
+                UUID.class, review);
+        UUID probe = getDiagnostic.execute(user, sessionId).probes().getFirst().probeId();
+        when(content.getPackageVersion(a1.packageVersionId())).thenThrow(
+                new com.ieltspath.learning.application.exception.LearningRequestException(
+                        404, "NOT_FOUND", "Package version was not found"));
+
+        var reassigned = getProbe.execute(user, sessionId, probe);
+
+        assertEquals("OPEN", reassigned.status());
+        assertEquals(3, reassigned.questions().size());
+        assertEquals(a2.packageId(), jdbc.queryForObject("SELECT package_id FROM diagnostic_probes WHERE id = ?",
+                UUID.class, probe));
+    }
+
+    @Test
+    void aProbeWithNoReplacementForItsUnpublishedPackageBecomesNoSetAndConcludes() {
+        UUID user = UUID.randomUUID();
+        prerequisites.put(kpB, List.of(kpA));
+        PackageVersion b1 = practiceSet(kpB), b2 = practiceSet(kpB);
+        PackageVersion a1 = practiceSet(kpA);
+        UUID review = failTwice(user, b1, b2);
+        UUID sessionId = jdbc.queryForObject("SELECT id FROM diagnostic_sessions WHERE root_review_id = ?",
+                UUID.class, review);
+        UUID probe = getDiagnostic.execute(user, sessionId).probes().getFirst().probeId();
+        when(content.getPackageVersion(a1.packageVersionId())).thenThrow(
+                new com.ieltspath.learning.application.exception.LearningRequestException(
+                        404, "NOT_FOUND", "Package version was not found"));
+
+        var unavailable = getProbe.execute(user, sessionId, probe);
+        DiagnosticResult concluded = getDiagnostic.execute(user, sessionId);
+
+        assertEquals("NO_SET", unavailable.status());
+        assertTrue(unavailable.questions().isEmpty());
+        assertEquals("CONCLUDED", concluded.status());
+        assertEquals("UNKNOWN", concluded.probes().getFirst().result());
+    }
+
+    @Test
+    void twoPrerequisiteProbesReceiveDifferentPackagesFromTheSameCandidates() {
+        UUID user = UUID.randomUUID();
+        prerequisites.put(kpB, List.of(kpA, kpZ));
+        PackageVersion b1 = practiceSet(kpB), b2 = practiceSet(kpB);
+        PackageVersion a1 = practiceSet(kpA), a2 = practiceSet(kpA);
+        when(content.searchPracticeSets(any(), anyList(), eq(3), eq(6))).thenReturn(List.of(
+                new PracticeSet(a1.packageId(), a1.packageVersionId(), "PS", 3, 3),
+                new PracticeSet(a2.packageId(), a2.packageVersionId(), "PS", 3, 3)));
+
+        UUID review = failTwice(user, b1, b2);
+        UUID sessionId = jdbc.queryForObject("SELECT id FROM diagnostic_sessions WHERE root_review_id = ?",
+                UUID.class, review);
+        DiagnosticResult result = getDiagnostic.execute(user, sessionId);
+
+        assertEquals(2, result.probes().size());
+        assertTrue(result.probes().stream().allMatch(probe -> "OPEN".equals(probe.status())));
+        assertEquals(2, result.probes().stream().map(probe -> jdbc.queryForObject(
+                "SELECT package_id FROM diagnostic_probes WHERE id = ?", UUID.class, probe.probeId())).distinct().count());
+    }
+
+    @Test
+    void anotherLearnersReviewOrDiagnosticSessionReturnsNotFoundBeforeContentAccess() {
+        UUID owner = UUID.randomUUID();
+        UUID requester = UUID.randomUUID();
+        UUID reviewId = insertReview(owner);
+        UUID sessionId = UUID.randomUUID();
+        UUID probeId = UUID.randomUUID();
+        jdbc.update("INSERT INTO diagnostic_sessions (id, user_id, root_review_id, root_kp_id, status) "
+                        + "VALUES (?, ?, ?, ?, 'PROBING')", sessionId, owner, reviewId, kpB);
+        jdbc.update("INSERT INTO diagnostic_probes (id, session_id, kp_id, parent_kp_id, depth, package_id, "
+                        + "package_version_id, status) VALUES (?, ?, ?, ?, 1, ?, ?, 'OPEN')",
+                probeId, sessionId, kpA, kpB, UUID.randomUUID(), UUID.randomUUID());
+
+        var reviewNotFound = assertThrows(com.ieltspath.learning.application.exception.LearningRequestException.class,
+                () -> getReview.execute(requester, reviewId));
+        var diagnosticNotFound = assertThrows(com.ieltspath.learning.application.exception.LearningRequestException.class,
+                () -> getDiagnostic.execute(requester, sessionId));
+        var probeNotFound = assertThrows(com.ieltspath.learning.application.exception.LearningRequestException.class,
+                () -> getProbe.execute(requester, sessionId, probeId));
+        var submissionNotFound = assertThrows(com.ieltspath.learning.application.exception.LearningRequestException.class,
+                () -> submitProbe.execute(requester, sessionId, probeId,
+                        new SubmitExerciseCommand(UUID.randomUUID(), List.of())));
+
+        assertEquals(404, reviewNotFound.getStatus());
+        assertEquals(404, diagnosticNotFound.getStatus());
+        assertEquals(404, probeNotFound.getStatus());
+        assertEquals(404, submissionNotFound.getStatus());
+        verifyNoInteractions(content);
+    }
+
+    @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
+
+    /**
+     * The learner lock only exists inside a transaction, so a Content call made while a transaction is active is a call
+     * made under the lock. Every call on the Content mock is observed, whether or not it is stubbed.
+     */
+    @Test
+    void reviewAndDiagnosisUseCasesNeverCallContentInsideATransaction() {
+        UUID user = UUID.randomUUID();
+        prerequisites.put(kpB, List.of(kpA));
+        PackageVersion b1 = practiceSet(kpB), b2 = practiceSet(kpB);
+        PackageVersion a1 = practiceSet(kpA);
+        topics.execute(user);
+        UUID review = insertReview(user);
+
+        java.util.concurrent.atomic.AtomicBoolean watching = new java.util.concurrent.atomic.AtomicBoolean();
+        java.util.concurrent.atomic.AtomicInteger observed = new java.util.concurrent.atomic.AtomicInteger();
+        List<String> insideTransaction = new ArrayList<>();
+        org.mockito.listeners.InvocationListener listener = report -> {
+            if (!watching.get()) return;
+            observed.incrementAndGet();
+            if (org.springframework.transaction.support.TransactionSynchronizationManager
+                    .isActualTransactionActive()) {
+                String caller = java.util.Arrays.stream(new Throwable().getStackTrace())
+                        .filter(frame -> frame.getClassName().startsWith("com.ieltspath.learning.application"))
+                        .limit(3).map(frame -> frame.getClassName().substring(
+                                frame.getClassName().lastIndexOf('.') + 1) + "." + frame.getMethodName())
+                        .collect(java.util.stream.Collectors.joining(" <- "));
+                // The daily-quest listener runs before commit on every submission and reads the topic sequence; it
+                // predates the review flow and belongs to the gamification code, so it is not judged here.
+                if (caller.contains("QuestService")) return;
+                insideTransaction.add(report.getInvocation() + " from " + caller);
+            }
+        };
+        var listeners = org.mockito.Mockito.mockingDetails(content).getMockCreationSettings()
+                .getInvocationListeners();
+        listeners.add(listener);
+        try {
+            // Controls: the listener sees calls, and it flags one made inside a transaction.
+            watching.set(true);
+            content.getTopicSequence();
+            assertEquals(1, observed.get());
+            assertTrue(insideTransaction.isEmpty());
+            new org.springframework.transaction.support.TransactionTemplate(transactionManager)
+                    .executeWithoutResult(status -> content.getTopicSequence());
+            assertEquals(1, insideTransaction.size());
+            insideTransaction.clear();
+            observed.set(0);
+            watching.set(false);
+
+            var firstSet = watched(watching, () -> getReview.execute(user, review));
+            watched(watching, () -> submitReview.execute(user, review, new SubmitReviewCommand(
+                    firstSet.set().reviewSetId(), UUID.randomUUID(), answers(b1, "B", "B", "B").answers())));
+            watched(watching, () -> theoryCheck.execute(user, review, new SubmitExerciseCommand(UUID.randomUUID(),
+                    List.of(new SubmitExerciseCommand.Answer(lessonQuestion, "A")))));
+            var secondSet = watched(watching, () -> getReview.execute(user, review));
+            watched(watching, () -> submitReview.execute(user, review, new SubmitReviewCommand(
+                    secondSet.set().reviewSetId(), UUID.randomUUID(), answers(b2, "B", "B", "B").answers())));
+            var diagnosing = watched(watching, () -> getReview.execute(user, review));
+            assertEquals(ReviewResult.DIAGNOSING, diagnosing.state());
+
+            UUID sessionId = diagnosing.diagnosticSessionId();
+            UUID probeId = getDiagnostic.execute(user, sessionId).probes().getFirst().probeId();
+            watched(watching, () -> getProbe.execute(user, sessionId, probeId));
+            watched(watching, () -> submitProbe.execute(user, sessionId, probeId, answers(a1, "B", "B", "B")));
+        } finally {
+            listeners.remove(listener);
+        }
+
+        assertTrue(observed.get() > 0, "the flow reached Content");
+        assertEquals(List.of(), insideTransaction);
+    }
+
+    private static <T> T watched(java.util.concurrent.atomic.AtomicBoolean watching,
+                                 java.util.function.Supplier<T> call) {
+        watching.set(true);
+        try {
+            return call.get();
+        } finally {
+            watching.set(false);
+        }
+    }
+
     private UUID insertReview(UUID user) {
         UUID review = UUID.randomUUID();
         jdbc.update("INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status, skill, "
@@ -349,6 +548,8 @@ class DiagnosticIntegrationTest {
                 UUID.randomUUID(), answers(second, "B", "B", "B").answers()));
         assertEquals("PENDING", failed.reviewStatus());
         assertEquals(2, failed.failedSets());
+        // The diagnosis opens when the review is next read, not while the second set is submitted.
+        getReview.execute(user, review);
         return review;
     }
 

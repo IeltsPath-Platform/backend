@@ -23,6 +23,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -37,6 +39,8 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
 
 /** The review basket, optional reviews, and the rule that only blocking reviews hold a learner back. */
 @SpringBootTest(properties = {
@@ -66,7 +70,7 @@ class ReviewBasketIntegrationTest {
     @Autowired GetReviewBasketUseCase basket;
     @Autowired GetReviewBasketSummaryUseCase summary;
     @Autowired StartBasketReviewUseCase start;
-    @Autowired GetReviewUseCase getReview;
+    @MockitoSpyBean GetReviewUseCase getReview;
     @Autowired SubmitReviewUseCase submitReview;
     @Autowired GetLessonUseCase getLesson;
     @Autowired CompleteLessonUseCase completeLesson;
@@ -280,6 +284,10 @@ class ReviewBasketIntegrationTest {
     void startingAPointCreatesAnOptionalReviewWithOneSetThatBlocksNothing() {
         UUID user = learner();
         PackageVersion only = practiceSet(kpConsolidate, kpConsolidate);
+        doAnswer(invocation -> {
+            assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
+            return invocation.callRealMethod();
+        }).when(getReview).execute(eq(user), any(UUID.class));
 
         var review = start.execute(user, kpConsolidate);
 
@@ -293,6 +301,7 @@ class ReviewBasketIntegrationTest {
                 String.class, review.reviewId()));
         assertDoesNotThrow(() -> getLesson.execute(user, lesson), "an optional review never locks a lesson");
         assertEquals(review.reviewId(), basket.execute(user).consolidate().getFirst().reviewId());
+        verify(getReview).execute(eq(user), eq(review.reviewId()));
     }
 
     @Test
@@ -300,11 +309,13 @@ class ReviewBasketIntegrationTest {
         UUID user = learner();
         PackageVersion only = practiceSet(kpConsolidate, kpConsolidate);
         var review = start.execute(user, kpConsolidate);
+        org.mockito.Mockito.clearInvocations(content);
 
         var result = submitReview.execute(user, review.reviewId(), new SubmitReviewCommand(review.set().reviewSetId(),
                 UUID.randomUUID(), answers(items(only), "B", "B").answers()));
 
         assertEquals("SKIPPED", result.reviewStatus());
+        org.mockito.Mockito.verify(content).lessonPracticeSets(lesson);
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM review_items WHERE user_id = ? AND status = 'PENDING'",
                 Integer.class, user));
         assertEquals("PRACTICE", result.stage());
@@ -335,9 +346,11 @@ class ReviewBasketIntegrationTest {
                 + "trigger_kind) VALUES (?, ?, ?, ?, 'PENDING', 'READING', 'PRACTICE')", blockingId, user,
                 kpPriority, lesson);
 
+        var opened = getReview.execute(user, blockingId);
         var review = start.execute(user, kpPriority);
 
         assertEquals(blockingId, review.reviewId());
+        assertEquals(opened.set(), review.set());
         assertTrue(review.blocking());
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM review_items WHERE user_id = ?", Integer.class, user));
     }

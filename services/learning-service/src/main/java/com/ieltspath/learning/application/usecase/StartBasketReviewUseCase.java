@@ -17,7 +17,8 @@ import com.ieltspath.learning.domain.vo.PendingReview;
 import com.ieltspath.learning.domain.service.MainErrorRule;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
 import java.util.HashSet;
@@ -41,6 +42,7 @@ public class StartBasketReviewUseCase {
     private final LearningContentClient content;
     private final GetReviewUseCase getReview;
     private final ErrorTrapCatalog errorTraps;
+    private final TransactionTemplate transaction;
     private final Clock clock = Clock.systemUTC();
 
     @Autowired
@@ -48,7 +50,7 @@ public class StartBasketReviewUseCase {
                                     PracticeAttemptRepository attempts, CompletedLessonLocator lessonLocator,
                                     KnowledgeEvidenceRepository evidence,
                                     LearningContentClient content, GetReviewUseCase getReview,
-                                    ErrorTrapCatalog errorTraps) {
+                                    ErrorTrapCatalog errorTraps, PlatformTransactionManager transactionManager) {
         this.lock = lock;
         this.profiles = profiles;
         this.reviews = reviews;
@@ -58,11 +60,10 @@ public class StartBasketReviewUseCase {
         this.content = content;
         this.getReview = getReview;
         this.errorTraps = errorTraps;
+        this.transaction = new TransactionTemplate(transactionManager);
     }
 
-    @Transactional
     public ReviewResult execute(UUID userId, UUID knowledgePointId) {
-        lock.lock(userId);
         ErrorTrapCatalog.ErrorTraps traps = errorTraps == null ? null : errorTraps.load();
         if (traps != null && traps.parentByTrapKp().containsKey(knowledgePointId)) {
             throw new LearningRequestException(409, "NOT_IN_REVIEW_BASKET",
@@ -72,36 +73,69 @@ public class StartBasketReviewUseCase {
                 .filter(review -> review.knowledgePointId().equals(knowledgePointId)).findFirst();
         if (existing.isPresent()) return getReview.execute(userId, existing.get().reviewId());
 
+        String trapErrorCode = traps == null ? null : MainErrorRule.mainErrorCode(knowledgePointId,
+                profiles.findErrorTrapProfiles(userId), traps).orElse(null);
+        for (int preparation = 0; preparation < 2; preparation++) {
+            MasteryProfile profile = eligibleProfile(userId, knowledgePointId);
+            UUID lessonId = lessonLocator.teaching(userId, knowledgePointId).orElseThrow(() ->
+                    new LearningRequestException(409, "NO_LESSON_FOR_KNOWLEDGE_POINT",
+                            "No completed lesson teaches this knowledge point"));
+            Set<UUID> excluded = new HashSet<>(attempts.revealedPackageIds(userId));
+            excluded.addAll(reviews.assignedPackageIds(userId));
+            List<LearningContentClient.PracticeSet> candidates = trapErrorCode == null
+                    ? content.searchPracticeSets(knowledgePointId, excluded.stream().toList(),
+                            GetReviewBasketUseCase.MIN_SET_QUESTIONS, 1, lessonId)
+                    : content.searchPracticeSets(knowledgePointId, excluded.stream().toList(),
+                            GetReviewBasketUseCase.MIN_SET_QUESTIONS, 1, lessonId, trapErrorCode);
+            if (candidates.isEmpty()) throw noUnrevealedSet();
+            LearningContentClient.PracticeSet selected = candidates.getFirst();
+
+            StartOutcome outcome = transaction.execute(status -> {
+                lock.lock(userId);
+                Optional<PendingReview> concurrent = pending(userId, knowledgePointId);
+                if (concurrent.isPresent()) return new StartOutcome(concurrent.get().reviewId(), false);
+                MasteryProfile current = eligibleProfile(userId, knowledgePointId);
+                if (current.tier() != profile.tier()) {
+                    throw new LearningRequestException(409, "NOT_IN_REVIEW_BASKET",
+                            "This knowledge point is not in the review basket");
+                }
+                Set<UUID> assigned = new HashSet<>(attempts.revealedPackageIds(userId));
+                assigned.addAll(reviews.assignedPackageIds(userId));
+                if (assigned.contains(selected.packageId())) return new StartOutcome(null, true);
+                LearningSkill skill = evidence.findMasteryHistories(userId, List.of(knowledgePointId)).stream()
+                        .map(history -> history.skill()).filter(java.util.Objects::nonNull).findFirst().orElse(null);
+                UUID id = UUID.randomUUID();
+                if (reviews.insertOptional(userId, id, knowledgePointId, lessonId, skill, current.tier().name())) {
+                    return new StartOutcome(id, false);
+                }
+                return pending(userId, knowledgePointId).map(review -> new StartOutcome(review.reviewId(), false))
+                        .orElseThrow(() -> noUnrevealedSet());
+            });
+            if (!outcome.candidateBecameUnavailable()) return getReview.execute(userId, outcome.reviewId());
+            if (preparation == 1) throw noUnrevealedSet();
+        }
+        throw noUnrevealedSet();
+    }
+
+    private MasteryProfile eligibleProfile(UUID userId, UUID knowledgePointId) {
         MasteryProfile profile = profiles.find(userId, List.of(knowledgePointId)).get(knowledgePointId);
         if (profile == null || profile.tier() == MasteryTier.PRIORITY || profile.tier() == MasteryTier.INSUFFICIENT
                 || (profile.tier() == MasteryTier.MAINTAIN && !GetReviewBasketUseCase.isDue(profile, clock.instant()))) {
             throw new LearningRequestException(409, "NOT_IN_REVIEW_BASKET",
                     "This knowledge point is not in the review basket");
         }
-        UUID lessonId = lessonLocator.teaching(userId, knowledgePointId).orElseThrow(() -> new LearningRequestException(409,
-                "NO_LESSON_FOR_KNOWLEDGE_POINT", "No completed lesson teaches this knowledge point"));
-        Set<UUID> excluded = new HashSet<>(attempts.revealedPackageIds(userId));
-        excluded.addAll(reviews.assignedPackageIds(userId));
-        String trapErrorCode = traps == null ? null : MainErrorRule.mainErrorCode(knowledgePointId,
-                profiles.findErrorTrapProfiles(userId), traps).orElse(null);
-        List<LearningContentClient.PracticeSet> candidates = trapErrorCode == null
-                ? content.searchPracticeSets(knowledgePointId, excluded.stream().toList(),
-                        GetReviewBasketUseCase.MIN_SET_QUESTIONS, 1, lessonId)
-                : content.searchPracticeSets(knowledgePointId, excluded.stream().toList(),
-                        GetReviewBasketUseCase.MIN_SET_QUESTIONS, 1, lessonId, trapErrorCode);
-        if (candidates.isEmpty()) {
-            throw new LearningRequestException(409, "NO_UNREVEALED_SET",
-                    "No practice set the learner has not seen is left for this knowledge point");
-        }
-        LearningSkill skill = evidence.findMasteryHistories(userId, List.of(knowledgePointId)).stream()
-                .map(history -> history.skill()).filter(java.util.Objects::nonNull).findFirst().orElse(null);
-        UUID reviewId = UUID.randomUUID();
-        if (!reviews.insertOptional(userId, reviewId, knowledgePointId, lessonId, skill, profile.tier().name())) {
-            // A pending review appeared since the check above; open that one.
-            return getReview.execute(userId, reviews.findPending(userId).stream()
-                    .filter(review -> review.knowledgePointId().equals(knowledgePointId)).findFirst().orElseThrow()
-                    .reviewId());
-        }
-        return getReview.execute(userId, reviewId);
+        return profile;
     }
+
+    private Optional<PendingReview> pending(UUID userId, UUID knowledgePointId) {
+        return reviews.findPending(userId).stream()
+                .filter(review -> review.knowledgePointId().equals(knowledgePointId)).findFirst();
+    }
+
+    private static LearningRequestException noUnrevealedSet() {
+        return new LearningRequestException(409, "NO_UNREVEALED_SET",
+                "No practice set the learner has not seen is left for this knowledge point");
+    }
+
+    private record StartOutcome(UUID reviewId, boolean candidateBecameUnavailable) {}
 }

@@ -5,6 +5,7 @@ import com.ieltspath.learning.application.command.SubmitReviewCommand;
 import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.port.LearningContentClient.*;
+import com.ieltspath.learning.application.result.ReviewResult;
 import com.ieltspath.learning.application.usecase.*;
 import com.ieltspath.learning.domain.vo.LearningSkill;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,10 +23,15 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import java.math.BigDecimal;
 import java.security.SecureRandom;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.clearInvocations;
 
 @SpringBootTest(properties = {
         "spring.config.import=", "spring.cloud.config.enabled=false", "eureka.client.enabled=false",
@@ -150,8 +156,10 @@ class RemediationLadderIntegrationTest {
 
         var next = getReview.execute(user, reviewId);
         assertEquals(third.packageId(), next.set().packageId());
+        clearInvocations(content);
         var failedAgain = submitReview.execute(user, reviewId, new SubmitReviewCommand(next.set().reviewSetId(),
                 UUID.randomUUID(), answers(items(third), "B", "B").answers()));
+        verify(content, org.mockito.Mockito.never()).lessonPracticeSets(any());
         assertEquals("PENDING", failedAgain.reviewStatus());
         assertEquals("PRACTICE", failedAgain.stage(), "only the first failed set sends the learner back to theory");
 
@@ -198,11 +206,253 @@ class RemediationLadderIntegrationTest {
         var setThree = getReview.execute(user, reviewId);
         assertEquals(fourth.packageId(), setThree.set().packageId());
         assertNull(setThree.maxFailedSets());
+        clearInvocations(content);
         var passed = submitReview.execute(user, reviewId, new SubmitReviewCommand(setThree.set().reviewSetId(),
                 UUID.randomUUID(), answers(items(fourth), "A", "A").answers()));
+        verify(content, times(1)).lessonPracticeSets(lesson);
         assertEquals("DONE", passed.reviewStatus());
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM review_items WHERE user_id = ? AND status = 'PENDING'",
                 Integer.class, user));
+    }
+
+    @Test
+    void getReviewStartsDiagnosisAfterTheSecondFailedSet() {
+        UUID user = UUID.randomUUID();
+        UUID reviewId = UUID.randomUUID();
+        PackageVersion prerequisiteSet = practiceSet(kpB, kpB, kpB);
+        when(content.prerequisites(List.of(kpA))).thenReturn(Map.of(kpA, List.of(kpB)));
+        when(content.searchPracticeSets(eq(kpB), anyList(), eq(3), eq(6)))
+                .thenReturn(List.of(new PracticeSet(prerequisiteSet.packageId(), prerequisiteSet.packageVersionId(),
+                        "PS", 3, 3)));
+
+        topics.execute(user);
+        insertBlockingReviewWithFailedSets(user, reviewId, 2);
+
+        var opened = getReview.execute(user, reviewId);
+
+        assertEquals(ReviewResult.DIAGNOSING, opened.state());
+        assertNotNull(opened.diagnosticSessionId());
+        assertEquals("PROBING", jdbc.queryForObject("SELECT status FROM diagnostic_sessions WHERE id = ?",
+                String.class, opened.diagnosticSessionId()));
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM diagnostic_probes WHERE session_id = ?",
+                Integer.class, opened.diagnosticSessionId()));
+    }
+
+    /** The failed-set count is derived from answered, failed review sets, so the sets are inserted rather than a count. */
+    private void insertBlockingReviewWithFailedSets(UUID user, UUID reviewId, int failedSets) {
+        jdbc.update("INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status, stage, blocking, "
+                        + "skill, trigger_kind) VALUES (?, ?, ?, ?, 'PENDING', 'PRACTICE', TRUE, 'READING', 'PRACTICE')",
+                reviewId, user, kpA, lesson);
+        for (int index = 0; index < failedSets; index++) {
+            jdbc.update("INSERT INTO review_sets (id, review_item_id, user_id, package_id, package_version_id, "
+                            + "submitted_at, passed, request_id, correct_count, total_count) "
+                            + "VALUES (?, ?, ?, ?, ?, clock_timestamp(), FALSE, ?, 0, 3)",
+                    UUID.randomUUID(), reviewId, user, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+        }
+    }
+
+    @Test
+    void getReviewRecordsAnEmptyConclusionOnceWhenThereAreNoPrerequisites() {
+        UUID user = UUID.randomUUID();
+        UUID reviewId = UUID.randomUUID();
+        PackageVersion nextSet = practiceSet(kpA, kpA, kpA);
+        topics.execute(user);
+        insertBlockingReviewWithFailedSets(user, reviewId, 2);
+
+        var opened = getReview.execute(user, reviewId);
+        var openedAgain = getReview.execute(user, reviewId);
+
+        assertEquals(nextSet.packageId(), opened.set().packageId());
+        assertNull(opened.diagnosticSessionId());
+        assertEquals(opened.set(), openedAgain.set());
+        verify(content, times(1)).prerequisites(List.of(kpA));
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM diagnostic_sessions WHERE root_review_id = ? "
+                + "AND status = 'CONCLUDED' AND cardinality(conclusion_kp_ids) = 0 AND concluded_at IS NOT NULL",
+                Integer.class, reviewId));
+    }
+
+    @Test
+    void getReviewReplacesAnOpenSetWhenItsPackageIsNoLongerPublished() {
+        UUID user = UUID.randomUUID();
+        UUID reviewId = UUID.randomUUID();
+        PackageVersion removed = practiceSet(kpA, kpA, kpA);
+        PackageVersion replacement = practiceSet(kpA, kpA, kpA);
+        topics.execute(user);
+        insertBlockingReviewWithFailedSets(user, reviewId, 0);
+
+        var first = getReview.execute(user, reviewId);
+        assertEquals(removed.packageId(), first.set().packageId());
+        versions.remove(removed.packageVersionId());
+        when(content.getPackageVersion(removed.packageVersionId())).thenThrow(
+                new LearningRequestException(404, "NOT_FOUND", "Package version was not found"));
+
+        var reopened = getReview.execute(user, reviewId);
+
+        assertEquals(replacement.packageId(), reopened.set().packageId());
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM review_sets WHERE review_item_id = ? "
+                + "AND package_id = ? AND submitted_at IS NULL", Integer.class, reviewId, replacement.packageId()));
+    }
+
+    @Test
+    void getReviewSkipsWhenAnOpenSetPackageIsRemovedAndNoReplacementRemains() {
+        UUID user = UUID.randomUUID();
+        UUID reviewId = UUID.randomUUID();
+        PackageVersion removed = practiceSet(kpA, kpA, kpA);
+        topics.execute(user);
+        insertBlockingReviewWithFailedSets(user, reviewId, 0);
+
+        var first = getReview.execute(user, reviewId);
+        assertEquals(removed.packageId(), first.set().packageId());
+        versions.remove(removed.packageVersionId());
+        when(content.getPackageVersion(removed.packageVersionId())).thenThrow(
+                new LearningRequestException(404, "NOT_FOUND", "Package version was not found"));
+
+        var reopened = getReview.execute(user, reviewId);
+
+        assertEquals("SKIPPED", reopened.reviewStatus());
+        assertNull(reopened.set());
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM review_sets WHERE review_item_id = ? "
+                + "AND submitted_at IS NULL", Integer.class, reviewId));
+    }
+
+    @Test
+    void getReviewAndTheoryCheckCompleteAnArchivedTheoryStep() {
+        UUID user = UUID.randomUUID();
+        UUID getReviewId = UUID.randomUUID();
+        UUID theoryCheckReviewId = UUID.randomUUID();
+        PackageVersion nextSet = practiceSet(kpA, kpA, kpA);
+        topics.execute(user);
+        // One pending review per point and learner, so the two paths use two points.
+        insertTheoryReview(user, getReviewId, kpA);
+        insertTheoryReview(user, theoryCheckReviewId, kpB);
+        when(content.getLesson(lesson)).thenThrow(
+                new LearningRequestException(404, "NOT_FOUND", "Lesson was not found"));
+
+        var opened = getReview.execute(user, getReviewId);
+        var checked = theoryCheck.execute(user, theoryCheckReviewId,
+                new SubmitExerciseCommand(UUID.randomUUID(), List.of()));
+
+        assertEquals("PRACTICE", opened.stage());
+        assertEquals(nextSet.packageId(), opened.set().packageId());
+        assertEquals("PRACTICE", checked.stage());
+        assertEquals(0, checked.total());
+    }
+
+    @Test
+    void aSecondFailedSetDoesNotLoadLessonPracticeSetsAndDiagnosisWaitsForContent() {
+        UUID user = UUID.randomUUID();
+        UUID reviewId = UUID.randomUUID();
+        PackageVersion secondSet = practiceSet(kpA, kpA, kpA);
+        PackageVersion nextSet = practiceSet(kpA, kpA, kpA);
+        PackageVersion probeSet = practiceSet(kpB, kpB, kpB);
+        topics.execute(user);
+        insertBlockingReviewWithFailedSets(user, reviewId, 1);
+        var opened = getReview.execute(user, reviewId);
+        assertEquals(secondSet.packageId(), opened.set().packageId());
+
+        when(content.prerequisites(List.of(kpA))).thenThrow(
+                new LearningRequestException(503, "CONTENT_UNAVAILABLE", "Content is unavailable"));
+        clearInvocations(content);
+        var failed = submitReview.execute(user, reviewId, new SubmitReviewCommand(opened.set().reviewSetId(),
+                UUID.randomUUID(), answers(items(secondSet), "B", "B", "B").answers()));
+        int reviewSetCount = jdbc.queryForObject("SELECT count(*) FROM review_sets WHERE review_item_id = ?",
+                Integer.class, reviewId);
+        assertEquals("PENDING", failed.reviewStatus());
+        verify(content, org.mockito.Mockito.never()).lessonPracticeSets(any());
+
+        var unavailable = assertThrows(LearningRequestException.class, () -> getReview.execute(user, reviewId));
+        assertEquals(503, unavailable.getStatus());
+        assertEquals(reviewSetCount, jdbc.queryForObject("SELECT count(*) FROM review_sets WHERE review_item_id = ?",
+                Integer.class, reviewId));
+
+        // doReturn: the throwing stub above would fire again if prerequisites were called inside when(...).
+        org.mockito.Mockito.doReturn(Map.of(kpA, List.of(kpB))).when(content).prerequisites(List.of(kpA));
+        when(content.searchPracticeSets(eq(kpB), anyList(), eq(3), eq(6))).thenReturn(List.of(
+                new PracticeSet(probeSet.packageId(), probeSet.packageVersionId(), "PS", 3, 3)));
+        var recovered = getReview.execute(user, reviewId);
+
+        assertEquals(ReviewResult.DIAGNOSING, recovered.state());
+        assertNull(recovered.set());
+        assertEquals(reviewSetCount, jdbc.queryForObject("SELECT count(*) FROM review_sets WHERE review_item_id = ?",
+                Integer.class, reviewId));
+    }
+
+    @Test
+    void aClosedReviewSetReplayReturnsItsSavedResponseAfterItsPackageIsRemoved() {
+        UUID user = UUID.randomUUID();
+        UUID reviewId = UUID.randomUUID();
+        PackageVersion set = practiceSet(kpA, kpA, kpA);
+        topics.execute(user);
+        insertBlockingReviewWithFailedSets(user, reviewId, 0);
+        var opened = getReview.execute(user, reviewId);
+        UUID requestId = UUID.randomUUID();
+        SubmitReviewCommand command = new SubmitReviewCommand(opened.set().reviewSetId(), requestId,
+                answers(items(set), "B", "B", "B").answers());
+
+        var submitted = submitReview.execute(user, reviewId, command);
+        when(content.getPackageVersion(set.packageVersionId())).thenThrow(
+                new LearningRequestException(404, "NOT_FOUND", "Package version was not found"));
+
+        assertEquals(submitted, submitReview.execute(user, reviewId, command));
+        verify(content, times(2)).getPackageVersion(set.packageVersionId());
+    }
+
+    @Test
+    void aChangedPackageAssignmentRetriesReviewPreparationOnceThenReturnsConflict() {
+        UUID user = UUID.randomUUID();
+        UUID reviewId = UUID.randomUUID();
+        UUID competingReviewId = UUID.randomUUID();
+        PackageVersion candidate = practiceSet(kpA, kpA, kpA);
+        AtomicBoolean assigned = new AtomicBoolean();
+        AtomicInteger searches = new AtomicInteger();
+        topics.execute(user);
+        insertBlockingReviewWithFailedSets(user, reviewId, 0);
+        when(content.searchPracticeSets(eq(kpA), anyList(), eq(3), eq(1), eq(lesson))).thenAnswer(invocation -> {
+            searches.incrementAndGet();
+            if (assigned.compareAndSet(false, true)) {
+                jdbc.update("INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status, skill, "
+                                + "trigger_kind) VALUES (?, ?, ?, ?, 'PENDING', 'READING', 'ASSESSMENT')",
+                        competingReviewId, user, kpB, lesson);
+                jdbc.update("INSERT INTO review_sets (id, review_item_id, user_id, package_id, package_version_id) "
+                                + "VALUES (?, ?, ?, ?, ?)", UUID.randomUUID(), competingReviewId, user,
+                        candidate.packageId(), candidate.packageVersionId());
+            }
+            return List.of(new PracticeSet(candidate.packageId(), candidate.packageVersionId(), "PS", 3, 3));
+        });
+
+        var conflict = assertThrows(LearningRequestException.class, () -> getReview.execute(user, reviewId));
+
+        assertEquals(409, conflict.getStatus());
+        assertEquals("REVIEW_SET_CLOSED", conflict.getCode());
+        assertEquals(2, searches.get());
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM review_sets WHERE review_item_id = ? "
+                + "AND submitted_at IS NULL", Integer.class, reviewId));
+    }
+
+    @Test
+    void aBlockingFailedSetDoesNotRefreshLessonPracticeSets() {
+        UUID user = UUID.randomUUID();
+        UUID reviewId = UUID.randomUUID();
+        PackageVersion set = practiceSet(kpA, kpA, kpA);
+        topics.execute(user);
+        insertBlockingReviewWithFailedSets(user, reviewId, 1);
+        UUID openSetId = UUID.randomUUID();
+        jdbc.update("INSERT INTO review_sets (id, review_item_id, user_id, package_id, package_version_id) "
+                        + "VALUES (?, ?, ?, ?, ?)", openSetId, reviewId, user, set.packageId(), set.packageVersionId());
+        clearInvocations(content);
+
+        var result = submitReview.execute(user, reviewId, new SubmitReviewCommand(openSetId, UUID.randomUUID(),
+                answers(items(set), "B", "B", "B").answers()));
+
+        assertEquals("PENDING", result.reviewStatus());
+        verify(content, org.mockito.Mockito.never()).lessonPracticeSets(any());
+    }
+
+    private void insertTheoryReview(UUID user, UUID reviewId, UUID knowledgePoint) {
+        jdbc.update("INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status, stage, "
+                        + "theory_reason, skill, trigger_kind) VALUES (?, ?, ?, ?, 'PENDING', 'THEORY', "
+                        + "'SECOND_FAIL', 'READING', 'PRACTICE')",
+                reviewId, user, knowledgePoint, lesson);
     }
 
     @Test

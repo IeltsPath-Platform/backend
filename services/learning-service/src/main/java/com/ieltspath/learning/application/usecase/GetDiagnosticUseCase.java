@@ -9,7 +9,6 @@ import com.ieltspath.learning.domain.repository.DiagnosticRepository;
 import com.ieltspath.learning.domain.vo.DiagnosticProbe;
 import com.ieltspath.learning.domain.vo.DiagnosticSession;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -26,7 +25,6 @@ public class GetDiagnosticUseCase {
         this.directory = directory;
     }
 
-    @Transactional(readOnly = true)
     public DiagnosticResult execute(UUID userId, UUID sessionId) {
         DiagnosticSession session = diagnostics.findSession(userId, sessionId)
                 .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Diagnosis was not found"));
