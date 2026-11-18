@@ -13,8 +13,6 @@ public class ContentGenerationException extends RuntimeException {
     /** The model answered with an error status: the code is this prefix and the status, e.g. {@code HTTP_429}. */
     public static final String HTTP_PREFIX = "HTTP_";
     public static final String INVALID_REPLY = "INVALID_REPLY";
-    /** A course request matched no knowledge point, so there is nothing to plan from. */
-    public static final String NO_CANDIDATES = "NO_CANDIDATES";
 
     private final String code;
 

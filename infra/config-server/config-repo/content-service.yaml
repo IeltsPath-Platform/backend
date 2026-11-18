@@ -40,7 +40,6 @@ content:
     stale-after: PT10M
     daily-limit: 20
     max-items-per-request: 20
-    max-course-candidates: 40
     quota-zone: Asia/Ho_Chi_Minh
 
 app:
