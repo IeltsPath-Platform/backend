@@ -6,6 +6,10 @@ Updated: 2026-11-18. This contract covers Learning's pool-based exam assignment 
 
 All routes require a learner bearer token through Gateway and role `CUSTOMER`. The learner identity comes from the verified token. Content's internal placement catalogue is not exposed to learners.
 
+### `GET /api/learning/placement-test` (deprecated)
+
+Kept unchanged for clients that predate the pools (the mobile app); the web app does not use it. A learner without a placement gets `{packageId, packageVersionId}` of a randomly chosen exam of the `BAND_5_9` pool, so a shortened exam is never handed to such a client. A learner who already has a placement gets `409 PLACEMENT_ALREADY_DONE`; with no published exam in the pool the route returns `404 NO_PLACEMENT_TEST`. It records no assignment and has no retake, but Assessment still caps the band at the pool of the exam and applies its own started-attempt limit. Remove it once the mobile app uses the routes below.
+
 ### `GET /api/learning/placement-test/options`
 
 Returns the available exam count for each pool, the Learning assignment limit, the learner's current quota and latest placement state. `nextRetakeAt` is null while an assignment is available; at the limit it is the earliest counted assignment's `assignedAt + 24 hours`.

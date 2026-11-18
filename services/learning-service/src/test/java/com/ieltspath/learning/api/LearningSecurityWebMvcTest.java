@@ -72,6 +72,7 @@ class LearningSecurityWebMvcTest {
     @MockitoBean UnlockCourseUseCase unlockCourse;
     @MockitoBean AssignCourseTestUseCase assignCourseTest;
     @MockitoBean GetPlacementTestOptionsUseCase placementOptions;
+    @MockitoBean com.ieltspath.learning.application.usecase.GetLegacyPlacementTestUseCase legacyPlacement;
     @MockitoBean AssignPlacementTestUseCase assignPlacement;
     @MockitoBean ReleasePlacementAssignmentUseCase releasePlacement;
 
@@ -197,6 +198,34 @@ class LearningSecurityWebMvcTest {
                 .andExpect(jsonPath("$.retakesLeft").value(1))
                 .andExpect(jsonPath("$.hasPlacement").value(true))
                 .andExpect(jsonPath("$.currentBand").value(5.5));
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void theDeprecatedPlacementRouteStillAnswersWithThePackageAndItsVersion() throws Exception {
+        UUID packageId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        when(currentUser.requireUserId()).thenReturn(userId);
+        when(legacyPlacement.execute(userId)).thenReturn(
+                new com.ieltspath.learning.application.result.PlacementTestResult(packageId, versionId));
+
+        mockMvc.perform(get("/api/learning/placement-test"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.packageId").value(packageId.toString()))
+                .andExpect(jsonPath("$.packageVersionId").value(versionId.toString()));
+    }
+
+    @Test
+    void theDeprecatedPlacementRouteRequiresAuthenticationAndTheCustomerRole() throws Exception {
+        mockMvc.perform(get("/api/learning/placement-test")).andExpect(status().isUnauthorized());
+        verifyNoInteractions(legacyPlacement);
+    }
+
+    @Test
+    @WithMockUser(roles = "CONTENT_AUTHOR")
+    void staffCannotUseTheDeprecatedPlacementRoute() throws Exception {
+        mockMvc.perform(get("/api/learning/placement-test")).andExpect(status().isForbidden());
+        verifyNoInteractions(legacyPlacement);
     }
 
     @Test

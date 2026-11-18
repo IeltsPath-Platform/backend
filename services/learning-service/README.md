@@ -46,6 +46,7 @@ show available bands and the optional placement recommendation, then group topic
 
 | Method | Path | Behavior |
 | --- | --- | --- |
+| GET | `/placement-test` | **Deprecated**, kept for clients that predate the pools (the mobile app). CUSTOMER only; a learner without a placement gets `{packageId, packageVersionId}` of an exam of the `BAND_5_9` pool, a learner with one gets `409 PLACEMENT_ALREADY_DONE`, no published exam is `404 NO_PLACEMENT_TEST`. Records no assignment. |
 | GET | `/placement-test/options` | CUSTOMER only; returns available exam counts by pool, the rolling-24-hour limit and remaining assignments, latest placement status/band, and the open assignment if any. |
 | POST | `/placement-test/assignments` | CUSTOMER only; `{ "pool": "BAND_0_3" | "BAND_3_5" | "BAND_5_9" }` returns a pool-matched assignment. Reuses a recent open assignment for 15 minutes; the Learning assignment quota is three per rolling 24 hours. |
 | POST | `/placement-test/assignments/{id}/release` | CUSTOMER only; releases an owned incomplete assignment when it cannot be used (`204`). Released assignments do not count toward the Learning quota. |

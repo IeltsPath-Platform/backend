@@ -4,7 +4,9 @@ import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.learning.api.dto.request.PlacementAssignmentRequest;
 import com.ieltspath.learning.api.dto.response.PlacementAssignmentResponse;
 import com.ieltspath.learning.api.dto.response.PlacementTestOptionsResponse;
+import com.ieltspath.learning.api.dto.response.PlacementTestResponse;
 import com.ieltspath.learning.application.usecase.AssignPlacementTestUseCase;
+import com.ieltspath.learning.application.usecase.GetLegacyPlacementTestUseCase;
 import com.ieltspath.learning.application.usecase.GetPlacementTestOptionsUseCase;
 import com.ieltspath.learning.application.usecase.ReleasePlacementAssignmentUseCase;
 import com.ieltspath.learning.application.exception.LearningRequestException;
@@ -25,6 +27,14 @@ public class PlacementController {
     private final GetPlacementTestOptionsUseCase options;
     private final AssignPlacementTestUseCase assignments;
     private final ReleasePlacementAssignmentUseCase release;
+    private final GetLegacyPlacementTestUseCase legacyPlacementTest;
+
+    /** Deprecated: kept for clients that predate the pools (the mobile app). The web app uses the routes below. */
+    @GetMapping
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public PlacementTestResponse legacyPlacementTest() {
+        return PlacementTestResponse.from(legacyPlacementTest.execute(currentUser.requireUserId()));
+    }
 
     @GetMapping("/options")
     @PreAuthorize("hasRole('CUSTOMER')")
