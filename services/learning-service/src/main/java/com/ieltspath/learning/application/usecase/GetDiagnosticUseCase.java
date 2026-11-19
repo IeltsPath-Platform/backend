@@ -9,7 +9,6 @@ import com.ieltspath.learning.domain.repository.DiagnosticRepository;
 import com.ieltspath.learning.domain.vo.DiagnosticProbe;
 import com.ieltspath.learning.domain.vo.DiagnosticSession;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -26,7 +25,6 @@ public class GetDiagnosticUseCase {
         this.directory = directory;
     }
 
-    @Transactional(readOnly = true)
     public DiagnosticResult execute(UUID userId, UUID sessionId) {
         DiagnosticSession session = diagnostics.findSession(userId, sessionId)
                 .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Diagnosis was not found"));
@@ -38,8 +36,12 @@ public class GetDiagnosticUseCase {
                 .map(kp -> point(described, kp)).toList();
         boolean rootIsGap = session.conclusionKnowledgePointIds().size() == 1
                 && session.conclusionKnowledgePointIds().contains(session.rootKnowledgePointId());
+        if (session.conclusionKind() != null) {
+            rootIsGap = session.conclusionKind() == DiagnosticSession.ConclusionKind.ROOT_IS_GAP;
+        }
         return new DiagnosticResult(session.id(), session.rootReviewId(), session.rootKnowledgePointId(),
-                session.status().name(), rows, conclusion, !session.probing() && rootIsGap,
+                session.status().name(), session.conclusionKind() == null ? null : session.conclusionKind().name(),
+                rows, conclusion, !session.probing() && rootIsGap,
                 diagnostics.pendingWaitingOn(session.rootReviewId()));
     }
 
@@ -52,6 +54,7 @@ public class GetDiagnosticUseCase {
         return switch (probe.status()) {
             case OPEN -> null;
             case NO_SET -> "UNKNOWN";
+            case SKIPPED -> "UNKNOWN";
             case ANSWERED -> Boolean.TRUE.equals(probe.passed()) ? "PASSED" : "FAILED";
         };
     }

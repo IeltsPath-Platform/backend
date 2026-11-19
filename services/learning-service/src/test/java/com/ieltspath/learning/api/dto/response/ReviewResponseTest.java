@@ -13,7 +13,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ReviewResponseTest {
     private static ReviewResult review(boolean blocking, String triggerKind) {
         return new ReviewResult(UUID.randomUUID(), "PENDING", UUID.randomUUID(), List.of(), null, UUID.randomUUID(),
-                LearningSkill.WRITING, "PRACTICE", null, "NONE", 0, null, List.of(), ReviewResult.ACTIVE, null, blocking,
+                LearningSkill.WRITING, "PRACTICE", null, "NONE", 0, blocking ? 4 : null, List.of(),
+                ReviewResult.ACTIVE, null, blocking,
                 List.of(), null, triggerKind);
     }
 
@@ -35,5 +36,11 @@ class ReviewResponseTest {
     @Test
     void aReviewWithNoRecordedTriggerSendsNoTrigger() {
         assertThat(ReviewResponse.from(review(true, null)).triggerKind()).isNull();
+    }
+
+    @Test
+    void aBlockingReviewHasTheFailedSetLimitAndAnOptionalReviewDoesNot() {
+        assertThat(ReviewResponse.from(review(true, "ASSESSMENT")).maxFailedSets()).isEqualTo(4);
+        assertThat(ReviewResponse.from(review(false, "CONSOLIDATE")).maxFailedSets()).isNull();
     }
 }

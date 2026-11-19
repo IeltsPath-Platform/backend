@@ -14,7 +14,7 @@ import java.util.UUID;
  */
 public record MasteryProfile(UUID userId, UUID knowledgePointId, double mastery, MasteryTier tier, int evidenceCount,
                              int successStreak, Instant lastEvidenceAt, Instant nextReviewAt, Long medianDurationMs,
-                             List<String> topErrorCodes, Double confidence) {
+                             List<String> topErrorCodes, Double confidence, MasteryTier decayedFromTier) {
     public MasteryProfile {
         Objects.requireNonNull(userId, "userId");
         Objects.requireNonNull(knowledgePointId, "knowledgePointId");
@@ -25,9 +25,16 @@ public record MasteryProfile(UUID userId, UUID knowledgePointId, double mastery,
 
     public MasteryProfile(UUID userId, UUID knowledgePointId, double mastery, MasteryTier tier, int evidenceCount,
                           int successStreak, Instant lastEvidenceAt, Instant nextReviewAt, Long medianDurationMs,
+                          List<String> topErrorCodes, Double confidence) {
+        this(userId, knowledgePointId, mastery, tier, evidenceCount, successStreak, lastEvidenceAt, nextReviewAt,
+                medianDurationMs, topErrorCodes, confidence, null);
+    }
+
+    public MasteryProfile(UUID userId, UUID knowledgePointId, double mastery, MasteryTier tier, int evidenceCount,
+                          int successStreak, Instant lastEvidenceAt, Instant nextReviewAt, Long medianDurationMs,
                           List<String> topErrorCodes) {
         this(userId, knowledgePointId, mastery, tier, evidenceCount, successStreak, lastEvidenceAt, nextReviewAt,
-                medianDurationMs, topErrorCodes, null);
+                medianDurationMs, topErrorCodes, null, null);
     }
 
     /** The same standing under other rules: only the tier and the review date can change. */
@@ -35,6 +42,6 @@ public record MasteryProfile(UUID userId, UUID knowledgePointId, double mastery,
         MasteryTier newTier = policy.tier(mastery);
         return new MasteryProfile(userId, knowledgePointId, mastery, newTier, evidenceCount, successStreak,
                 lastEvidenceAt, policy.nextReviewAt(newTier, lastEvidenceAt, successStreak), medianDurationMs,
-                topErrorCodes, confidence);
+                topErrorCodes, confidence, newTier == MasteryTier.INSUFFICIENT ? decayedFromTier : null);
     }
 }

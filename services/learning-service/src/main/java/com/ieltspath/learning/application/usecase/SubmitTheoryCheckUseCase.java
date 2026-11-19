@@ -4,6 +4,7 @@ import com.ieltspath.learning.application.command.SubmitExerciseCommand;
 import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.port.LearnerLock;
 import com.ieltspath.learning.application.port.LearningContentClient;
+import com.ieltspath.learning.application.port.LearningContentClient.Lesson;
 import com.ieltspath.learning.application.port.LearningContentClient.Question;
 import com.ieltspath.learning.application.port.ReviewTheoryCheckLog;
 import com.ieltspath.learning.application.result.SubmissionResult;
@@ -16,7 +17,8 @@ import com.ieltspath.learning.domain.service.AnswerSpecGrader;
 import com.ieltspath.learning.domain.vo.ReviewStage;
 import com.ieltspath.learning.domain.vo.ReviewStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,34 +36,51 @@ public class SubmitTheoryCheckUseCase {
     private final LearnerLock lock;
     private final ReviewItemRepository reviews;
     private final ReviewTheoryCheckLog checks;
+    private final TransactionTemplate transaction;
     private final TheoryFocus theory = new TheoryFocus();
     private final AnswerSpecGrader grader = new AnswerSpecGrader();
 
     public SubmitTheoryCheckUseCase(LearningContentClient content, LearnerLock lock, ReviewItemRepository reviews,
-                                    ReviewTheoryCheckLog checks) {
+                                    ReviewTheoryCheckLog checks, PlatformTransactionManager transactionManager) {
         this.content = content;
         this.lock = lock;
         this.reviews = reviews;
         this.checks = checks;
+        this.transaction = new TransactionTemplate(transactionManager);
     }
 
-    @Transactional
     public TheoryCheckResult execute(UUID userId, UUID reviewId, SubmitExerciseCommand command) {
-        lock.lock(userId);
-        var saved = checks.find(command.requestId());
-        if (saved.isPresent()) {
-            if (!saved.get().userId().equals(userId) || !saved.get().reviewId().equals(reviewId)) {
-                throw new LearningRequestException(409, "REQUEST_CONFLICT", "requestId belongs to another submission");
-            }
-            return saved.get().response();
-        }
-        ReviewItem review = reviews.findOwned(userId, reviewId)
+        ReviewItem owned = reviews.findOwned(userId, reviewId)
                 .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Review was not found"));
-        if (review.status() != ReviewStatus.PENDING || review.stage() != ReviewStage.THEORY) {
+        var saved = checks.find(command.requestId());
+        if (saved.isPresent()) return replay(userId, reviewId, saved.get());
+        if (owned.status() != ReviewStatus.PENDING || owned.stage() != ReviewStage.THEORY) {
             throw new LearningRequestException(409, "THEORY_NOT_REQUIRED", "This review is not at the theory stage");
         }
-        List<Question> questions = theory.of(content.getLesson(review.lessonId()), review.knowledgePointId())
-                .quickCheck();
+        List<Question> questions;
+        try {
+            Lesson lesson = content.getLesson(owned.lessonId());
+            questions = theory.of(lesson, owned.knowledgePointId()).quickCheck();
+        } catch (LearningRequestException error) {
+            if (error.getStatus() != 404 || !"NOT_FOUND".equals(error.getCode())) throw error;
+            questions = List.of();
+        }
+        List<Question> preparedQuestions = questions;
+        return transaction.execute(status -> {
+            lock.lock(userId);
+            ReviewItem review = reviews.findOwned(userId, reviewId)
+                    .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Review was not found"));
+            var replay = checks.find(command.requestId());
+            if (replay.isPresent()) return replay(userId, reviewId, replay.get());
+            if (review.status() != ReviewStatus.PENDING || review.stage() != ReviewStage.THEORY) {
+                throw new LearningRequestException(409, "THEORY_NOT_REQUIRED", "This review is not at the theory stage");
+            }
+            return complete(userId, reviewId, review, command, preparedQuestions);
+        });
+    }
+
+    private TheoryCheckResult complete(UUID userId, UUID reviewId, ReviewItem review, SubmitExerciseCommand command,
+                                       List<Question> questions) {
         List<UUID> ids = questions.stream().map(Question::questionVersionId).toList();
         List<SubmissionResult.AnswerResult> results = new ArrayList<>();
         int correct = 0;
@@ -91,5 +110,12 @@ public class SubmitTheoryCheckUseCase {
                 review.stage().name());
         checks.save(userId, reviewId, ids, command, response);
         return response;
+    }
+
+    private static TheoryCheckResult replay(UUID userId, UUID reviewId, ReviewTheoryCheckLog.Stored saved) {
+        if (!saved.userId().equals(userId) || !saved.reviewId().equals(reviewId)) {
+            throw new LearningRequestException(409, "REQUEST_CONFLICT", "requestId belongs to another submission");
+        }
+        return saved.response();
     }
 }

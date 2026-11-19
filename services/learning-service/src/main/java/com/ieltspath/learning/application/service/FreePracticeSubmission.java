@@ -26,8 +26,9 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Grades and records a free-practice attempt. It writes the answers, the question log and mastery evidence, and nothing
- * else: no review is created or promoted, no lesson or course score moves, and the result never blocks anything.
+ * Grades and records a free-practice attempt. It writes the answers, the question log and mastery evidence. The only
+ * review it can add is the optional error-pattern review of a point whose trap child has just reached the priority tier;
+ * no blocking review is created or promoted, no lesson or course score moves, and the result never blocks anything.
  */
 @Component
 public class FreePracticeSubmission {

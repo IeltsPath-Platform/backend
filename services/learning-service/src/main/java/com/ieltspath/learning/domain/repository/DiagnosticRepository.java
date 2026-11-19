@@ -25,10 +25,17 @@ public interface DiagnosticRepository {
 
     void answerProbe(UUID probeId, int correct, int total, boolean passed, UUID requestId);
 
+    void saveProbeResponse(UUID probeId, String responseJson);
+
+    Optional<String> probeResponse(UUID probeId);
+
+    void skipOpenProbes(UUID sessionId);
+
     /** Gives an OPEN probe another set, or none ({@code packageId} null) which turns it into NO_SET. */
     void replaceProbeSet(UUID probeId, UUID packageId, UUID packageVersionId);
 
-    void conclude(UUID sessionId, Collection<UUID> knowledgePointIds);
+    void conclude(UUID sessionId, Collection<UUID> knowledgePointIds,
+                  DiagnosticSession.ConclusionKind conclusionKind);
 
     /** The learner's diagnoses, newest first. */
     List<DiagnosticSession> findSessionsByUser(UUID userId);

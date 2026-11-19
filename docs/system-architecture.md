@@ -1,6 +1,6 @@
 # Kiến trúc hệ thống IELTSPath (backend)
 
-- Cập nhật lần cuối: 2026-11-11 (common-llm); 2026-10-25; thêm KP con theo mã lỗi, bằng chứng `error_trap`, chọn bộ theo bẫy, phản hồi `fixHint` và `ERROR_PATTERN` cho Learning
+- Cập nhật lần cuối: 2026-11-18 (thang bài ôn, chẩn đoán dò ngược, giỏ ôn và mastery); 2026-11-11 (common-llm); 2026-10-25; thêm KP con theo mã lỗi, bằng chứng `error_trap`, chọn bộ theo bẫy, phản hồi `fixHint` và `ERROR_PATTERN` cho Learning
 - Đọc khi cần hiểu toàn hệ thống. Quy tắc bắt buộc nằm ở [`AGENTS.md`](../AGENTS.md); hướng dẫn chạy chi tiết ở
   [`local-development.md`](local-development.md); tổng quan và bảng pattern ở [`README.md`](../README.md).
   Code là nguồn đúng khi tài liệu này lệch.
@@ -255,16 +255,51 @@ POST /api/learning/lessons/{id}/practice-attempts -> nộp -> lời giải; lầ
   practice_set; < 70% tạo bài ôn cho KP < 70% (còn package chưa lộ); lưu lesson_practice_passes khi bài qua Practice
 GET /api/learning/topics/{id}/lessons -> topic LOCKED vẫn trả danh sách bài, mọi bài LOCKED (đọc trước lộ trình);
   mở bài của topic đó vẫn 403 TOPIC_LOCKED
-GET /api/learning/reviews/{id} -> lý thuyết của KP; PRACTICE: một set chưa giao/chưa lộ, có hint (hết -> SKIPPED);
-  THEORY: quick-check <= 3 câu của bài
-POST /api/learning/reviews/{id}/submissions -> mỗi set một lần, luôn có lời giải; >=70% -> DONE; trượt lần đầu -> THEORY;
-  các lần sau set mới đến khi đạt; SKIPPED chỉ khi hết package chưa lộ (bài ôn tùy chọn trượt -> SKIPPED)
-POST /api/learning/reviews/{id}/theory-check -> không ghi bằng chứng -> PRACTICE
+GET /api/learning/reviews/{id} -> có thể giao set, hoàn tất THEORY nếu không còn lý thuyết, hoặc chuyển SKIPPED nếu
+  không còn package chưa xem; GET sau set trượt thứ hai mở phiên chẩn đoán nếu chưa có phiên; session không có probe
+  được kết luận ngay và diagnosticSessionId trả null
+POST /api/learning/reviews/{id}/submissions -> mỗi set một lần, luôn có lời giải; đạt >=70% -> DONE;
+  bài ôn chặn trượt lần 1 hoặc 3 -> THEORY (lần 3: REPEATED_FAIL), lần 2 -> chờ GET kế tiếp để chẩn đoán;
+  tới N set trượt (learning.review.unblock-after-failed-sets, mặc định 4, tối thiểu 4) -> vẫn PENDING nhưng
+  blocking=false và vào giỏ ôn; bài ôn tùy chọn có một set, đạt -> DONE, trượt -> SKIPPED
+POST /api/learning/reviews/{id}/theory-check -> không ghi bằng chứng -> PRACTICE; bài học bị archive được xem như
+  không có lý thuyết để đọc, GET tự hoàn tất THEORY và theory-check vẫn hợp lệ
 POST /api/learning/topics/{id}/test-assignments -> REVIEW_REQUIRED, PRACTICE_REQUIRED (mọi bài phải qua Practice),
   TEST_LOCKED -> một mã đề dùng một lần, xoay vòng theo package
 POST /api/learning/courses/{id}/test-assignments -> cần mọi topic trong course PASSED -> một COURSE_TEST assignment
   -> Assessment attempt COURSE_GATE -> đạt >= 70% thì course_progress PASSED; không chặn topic khác
 ```
+
+Số set trượt được đếm từ các dòng `review_sets` đã nộp trượt sau `review_items.failures_counted_from`; null nghĩa là
+đếm toàn bộ lịch sử. Mỗi lần nâng lại bài ôn thành chặn tạo mốc mới, không xóa hay sửa `review_sets`. Hạ cấp giữ bài ôn
+`PENDING`, nhưng nó không chặn lesson sau, Practice hoặc thi topic; trong cùng transaction nó cũng được gỡ khỏi danh sách
+`waiting_on_review_ids` của bài ôn gốc. Một bài ôn chỉ thành `SKIPPED` do hết gói khi không còn package chưa xem.
+
+Chẩn đoán dò ngược bắt đầu cho bài ôn chặn sau set trượt thứ hai hoặc hết gói, tối đa ba tầng và sáu probe. Lỗi Content
+khi GET phải trả 503 trước khi giao set. Không có KP tiên quyết thì phiên kết luận `NO_PREREQUISITES` mà không tạo probe;
+probe thiếu set ghi `content_gap_signals`, còn `SKIPPED` và `NO_SET` có nghĩa là chưa biết, không phải KP hổng. Chỉ cho
+bỏ qua phiên sau ít nhất một probe `ANSWERED`; probe đang mở được đánh dấu `SKIPPED` và nhả package. Probe submission
+replay đọc response đã lưu trước mọi lời gọi Content. Bài ôn do chẩn đoán sinh ra không mở phiên chẩn đoán khác.
+Nếu KP chẩn đoán không thuộc bài học, theory rỗng, scope `NO_LESSON`, và bỏ qua bước THEORY.
+
+`GET /api/learning/review-basket` đặt bài ôn chặn ở `required`. Nhóm `weak` gồm bài ôn đã hạ cấp (`UNBLOCKED`), KP
+`PRIORITY` không có bài ôn đang mở nhưng có bài học hoàn thành dạy KP và còn package vượt reserve; nhóm `due` gồm KP
+đến hạn và tối đa 10 KP decay có `last_evidence_at` cũ nhất. Decay được đánh dấu ở `kp_mastery_profiles.decayed_from_tier`
+khi job chuyển KP đủ dữ liệu từ `CONSOLIDATE`/`MAINTAIN` sang `INSUFFICIENT`; chỉ ghi từ lúc triển khai, không backfill.
+Badge `due` đếm cùng tập với giỏ ôn. Start mới `PRIORITY`/`DECAYED` kiểm bài học, paywall, lọc package
+`requiredFeatureKey` nếu không Premium, và giữ reserve trước khi tạo bài ôn tùy chọn có trigger tương ứng; start
+`CONSOLIDATE`/`MAINTAIN` giữ luật lọc gói cũ. Start trả `409 NO_UNREVEALED_SET` nếu số package chưa xem không vượt reserve.
+
+`ReviewReevaluation` quyết định bài ôn sau thi bằng điểm lưu trong `kp_mastery_profiles` theo `learning.mastery.policy`;
+`GET /api/learning/mastery` vẫn dùng `MasteryCalculator` (SRS FT-26). Luyện tự do không tạo bài ôn chặn, nhưng có thể
+tạo bài ôn tùy chọn `ERROR_PATTERN` khi KP bẫy làm KP cha thành `PRIORITY`.
+
+Các use case `GetReview`, `SubmitReview`, `SubmitTheoryCheck`, `GetDiagnosticProbe`, `SubmitDiagnosticProbe`,
+`SkipDiagnostic`, `StartBasketReview` và `GetReviewBasket` chuẩn bị Content ngoài transaction/khóa học viên rồi khóa,
+đọc lại và kiểm tra dữ liệu trước khi ghi. Khi triển khai rollback image cũ sau V56/V57, trước tiên phải chạy
+[`rollback-data-fixup.sql`](../plans/261118-1825-adaptive-review-flow-fixes/reports/rollback-data-fixup.sql), vì binary cũ
+không đọc được các enum mới. V56–V58 thêm cột và nới CHECK; V56 cũng gán `NO_PREREQUISITES` cho các phiên đã kết luận
+không có probe. Flyway không rollback các migration này.
 
 Khi nộp `TOPIC_GATE`/`COURSE_GATE`, essay đã gửi qua `/api/assessments/submissions` được xếp thành grading job miễn phí.
 Scheduler claim job trong transaction ngắn, gọi Assessment LLM ngoài transaction rồi ghi band và hoàn tất result/outbox
@@ -465,6 +500,7 @@ hoạt động upload.
 | Bản public cũ của audio `listening/demo/ls1.mp3` còn trong `media` | Lesson dùng chung audio đã chuyển sang `PREMIUM` và phát qua URL ký sau lesson gate; Placement dùng khóa public riêng. Xóa object public cũ còn chờ phê duyệt |
 | Writing trong Practice và gate dùng chính sách phí khác nhau | Practice trừ điểm; essay trong `TOPIC_GATE`/`COURSE_GATE` chấm miễn phí và có quota riêng ở Assessment |
 | Một số ghi Writing chưa theo quy tắc khóa mọi lượt ghi theo user | Bắt đầu/kết thúc chấm có transaction và advisory lock; quota, lưu grade và lỗi trung gian dùng SQL nguyên tử có điều kiện ngoài các transaction này. Dữ kiện hiện tại, không thay quy tắc AGENTS.md §3.8 |
+| Listener nhiệm vụ hằng ngày có thể gọi Content trong transaction | `QuestRecorder` chạy ở `BEFORE_COMMIT`; `QuestService.ensureToday` → `weaknessTarget` đọc `Content.getTopicSequence()`. Đây là ngoại lệ hiện hữu với quy tắc §3.9, cần tách bước lấy dữ liệu nếu sửa luồng này. |
 | Cổng bài học là authority cho luồng học | `LessonAccessGate` giữ tiến trình review/topic/bài; `PaywallGate` mở 3 bài đầu mỗi skill, unlock skill/combo, tiến độ grandfathered, rồi Premium. Access outage chỉ chặn nội dung cần kiểm tra Premium. |
 | Sơ đồ §1 còn cạnh assessment → user từ baseline cũ | Tạo attempt hiện chỉ đọc Content; không gọi User để lấy goal (xem §3 và §6) |
 

@@ -4,8 +4,9 @@ import com.ieltspath.learning.domain.entity.TopicProgress;
 import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
 import com.ieltspath.learning.domain.repository.LearnerCurriculumRepository;
 import com.ieltspath.learning.domain.repository.LessonProgressRepository;
+import com.ieltspath.learning.domain.aggregate.MasteryProfile;
+import com.ieltspath.learning.domain.repository.MasteryProfileRepository;
 import com.ieltspath.learning.domain.repository.ReviewItemRepository;
-import com.ieltspath.learning.domain.service.MasteryCalculator;
 import com.ieltspath.learning.domain.service.ReviewRule;
 import com.ieltspath.learning.domain.vo.LearningSkill;
 import com.ieltspath.learning.domain.vo.PendingReview;
@@ -22,16 +23,17 @@ public class ReviewReevaluation {
     private final LessonProgressRepository lessons;
     private final ReviewItemRepository reviews;
     private final MasteryRulesProvider rules;
-    private final MasteryCalculator masteryCalculator = new MasteryCalculator();
+    private final MasteryProfileRepository profiles;
 
     public ReviewReevaluation(KnowledgeEvidenceRepository evidence, LearnerCurriculumRepository curricula,
                               LessonProgressRepository lessons, ReviewItemRepository reviews,
-                              MasteryRulesProvider rules) {
+                              MasteryRulesProvider rules, MasteryProfileRepository profiles) {
         this.evidence = evidence;
         this.curricula = curricula;
         this.lessons = lessons;
         this.reviews = reviews;
         this.rules = rules;
+        this.profiles = profiles;
     }
 
     /** Reviews from a graded test or Practice: blocking, and an optional review of the same point is upgraded. */
@@ -43,11 +45,15 @@ public class ReviewReevaluation {
                      String triggerKind) {
         // A review is created below the priority threshold, which Admin can change.
         ReviewRule rule = new ReviewRule(rules.current().priorityBelow());
+        // The score is the one tiers and review schedules are built on; callers record evidence (and so the profile)
+        // before asking for a re-evaluation. A point without a profile has no evidence and counts as 0.
         Map<UUID, Double> mastery = new HashMap<>();
+        for (MasteryProfile profile : profiles.findAll(userId)) {
+            mastery.put(profile.knowledgePointId(), profile.mastery());
+        }
         Set<UUID> practiceKps = new HashSet<>();
         Map<UUID, LearningSkill> kpSkills = new HashMap<>();
         for (var history : evidence.findMasteryHistories(userId)) {
-            mastery.put(history.knowledgePointId(), masteryCalculator.compute(history.correctness()));
             if (history.hasPracticeSet()) practiceKps.add(history.knowledgePointId());
             if (history.skill() != null) kpSkills.put(history.knowledgePointId(), history.skill());
         }

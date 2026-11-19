@@ -15,14 +15,15 @@ import java.util.UUID;
 /**
  * A review of one weak knowledge point. While PENDING it is at a stage: PRACTICE gives at most one open set, THEORY
  * asks the learner to read the knowledge point's theory and answer a quick check before the next set. A passed set
- * makes it DONE. A failed set keeps it PENDING and the learner gets a new set until one is passed; only the first failed
- * set sends the learner back to THEORY, later failures go straight to a new set. The review is SKIPPED only when no
+ * makes it DONE. A failed set keeps it PENDING and the learner gets a new set until one is passed; the first and third
+ * failed sets send the learner back to THEORY. After the configured failure limit, a blocking review becomes optional.
+ * The review is SKIPPED only when no
  * unrevealed package is left, so the learner is never stuck. DONE and SKIPPED are final.
  *
  * <p>An optional review ({@code blocking = false}, picked from the review basket or created from a free practice test)
  * never blocks anything and has no theory step: it is one set, DONE when passed and SKIPPED when failed. A suggestion
- * from Practice (optional, trigger {@code PRACTICE}) may start at the theory stage and becomes blocking when it fails
- * a set.
+ * from Practice (optional, trigger {@code PRACTICE}) becomes blocking on its first failure only if it has not failed
+ * before and has not previously been unblocked.
  */
 public final class ReviewItem {
     private final UUID id;
@@ -32,6 +33,8 @@ public final class ReviewItem {
     private final LearningSkill skill;
     private final String triggerKind;
     private boolean blocking;
+    private boolean unblocked;
+    private boolean justUnblocked;
     private static final String PRACTICE_TRIGGER = "PRACTICE";
     private ReviewStatus status;
     private ReviewStage stage;
@@ -44,7 +47,8 @@ public final class ReviewItem {
 
     private ReviewItem(UUID id, UUID userId, UUID knowledgePointId, UUID lessonId, ReviewStatus status,
                        ReviewSet openSet, int failedSets, LearningSkill skill, ReviewStage stage,
-                       TheoryReason theoryReason, int theoryCompletedCount, String triggerKind, boolean blocking) {
+                       TheoryReason theoryReason, int theoryCompletedCount, String triggerKind, boolean blocking,
+                       boolean unblocked) {
         this.id = Objects.requireNonNull(id, "id");
         this.userId = Objects.requireNonNull(userId, "userId");
         this.knowledgePointId = Objects.requireNonNull(knowledgePointId, "knowledgePointId");
@@ -58,6 +62,7 @@ public final class ReviewItem {
         this.theoryCompletedCount = theoryCompletedCount;
         this.triggerKind = triggerKind;
         this.blocking = blocking;
+        this.unblocked = unblocked;
     }
 
     public static ReviewItem restore(UUID id, UUID userId, UUID knowledgePointId, UUID lessonId, ReviewStatus status,
@@ -83,7 +88,15 @@ public final class ReviewItem {
                                      TheoryReason theoryReason, int theoryCompletedCount, String triggerKind,
                                      boolean blocking) {
         return new ReviewItem(id, userId, knowledgePointId, lessonId, status, openSet, failedSets, skill, stage,
-                theoryReason, theoryCompletedCount, triggerKind, blocking);
+                theoryReason, theoryCompletedCount, triggerKind, blocking, false);
+    }
+
+    public static ReviewItem restore(UUID id, UUID userId, UUID knowledgePointId, UUID lessonId, ReviewStatus status,
+                                     ReviewSet openSet, int failedSets, LearningSkill skill, ReviewStage stage,
+                                     TheoryReason theoryReason, int theoryCompletedCount, String triggerKind,
+                                     boolean blocking, boolean unblocked) {
+        return new ReviewItem(id, userId, knowledgePointId, lessonId, status, openSet, failedSets, skill, stage,
+                theoryReason, theoryCompletedCount, triggerKind, blocking, unblocked);
     }
 
     /** Gives the learner a new practice set; only a PENDING review at PRACTICE without an open set takes one. */
@@ -130,9 +143,15 @@ public final class ReviewItem {
         return status == ReviewStatus.PENDING && openSet != null && openSet.id().equals(setId);
     }
 
-    /** Records the answered open set and returns the review's new status. */
+    /** Records the answered set and applies the blocking review's configured failed-set limit. */
     public ReviewStatus recordSetResult(UUID setId, UUID requestId, int correct, int total) {
+        return recordSetResult(setId, requestId, correct, total, 4);
+    }
+
+    public ReviewStatus recordSetResult(UUID setId, UUID requestId, int correct, int total, int unblockAfterFailedSets) {
         if (!acceptsAnswersFor(setId)) throw new IllegalStateException("Review set is closed");
+        // The third failed set sends the learner back to the theory, so the review cannot be released before the fourth.
+        if (unblockAfterFailedSets < 4) throw new IllegalArgumentException("unblockAfterFailedSets must be at least 4");
         boolean passed = PassMark.passes(correct, total);
         openSet.close(requestId, correct, total, passed);
         answeredSet = openSet;
@@ -142,14 +161,24 @@ public final class ReviewItem {
         } else {
             // A suggested review from Practice that fails its set is weak for real: it becomes blocking and reads the
             // theory first, like any blocking review after its first failed set.
-            if (!blocking && PRACTICE_TRIGGER.equals(triggerKind)) blocking = true;
+            if (!blocking && PRACTICE_TRIGGER.equals(triggerKind) && failedSets == 0 && !unblocked) blocking = true;
             if (!blocking) {
                 failedSets++;
                 status = ReviewStatus.SKIPPED;
-            } else if (++failedSets == 1) {
-                stage = ReviewStage.THEORY;
-                theoryReason = (double) correct / total < ReviewRule.LOW_SCORE ? TheoryReason.LOW_SCORE
-                        : TheoryReason.SECOND_FAIL;
+            } else {
+                failedSets++;
+                if (failedSets == 1 || failedSets == 3) {
+                    stage = ReviewStage.THEORY;
+                    theoryReason = failedSets == 3 ? TheoryReason.REPEATED_FAIL
+                            : (double) correct / total < ReviewRule.LOW_SCORE ? TheoryReason.LOW_SCORE
+                            : TheoryReason.SECOND_FAIL;
+                } else if (failedSets >= unblockAfterFailedSets) {
+                    blocking = false;
+                    unblocked = true;
+                    justUnblocked = true;
+                    stage = ReviewStage.PRACTICE;
+                    theoryReason = null;
+                }
             }
         }
         return status;
@@ -179,6 +208,9 @@ public final class ReviewItem {
     public int failedSets() { return failedSets; }
     /** False for an optional review: it never locks a lesson, Practice or topic test. */
     public boolean blocking() { return blocking; }
+    public boolean unblocked() { return unblocked; }
+    /** True only for the transition that the repository must persist in this save. */
+    public boolean justUnblocked() { return justUnblocked; }
     /** {@code PRACTICE}, {@code ASSESSMENT}, or null for reviews created before triggers were recorded. */
     public String triggerKind() { return triggerKind; }
     public Optional<ReviewSet> openSet() { return Optional.ofNullable(openSet); }

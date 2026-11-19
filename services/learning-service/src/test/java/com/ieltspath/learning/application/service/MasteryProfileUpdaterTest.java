@@ -118,6 +118,11 @@ class MasteryProfileUpdaterTest {
         return new MasteryProfile(user, kp, mastery, tier, 5, streak, NOW.minus(Duration.ofDays(1)), null, null, List.of());
     }
 
+    private MasteryProfile decayed(UUID kp, MasteryTier fromTier) {
+        return new MasteryProfile(user, kp, 0.2, MasteryTier.INSUFFICIENT, 5, 0,
+                NOW.minus(Duration.ofDays(1)), null, null, List.of(), 0.2, fromTier);
+    }
+
     @SuppressWarnings("unchecked")
     private Map<UUID, MasteryProfile> upserted() {
         ArgumentCaptor<List<MasteryProfile>> written = ArgumentCaptor.forClass(List.class);
@@ -254,6 +259,39 @@ class MasteryProfileUpdaterTest {
         assertThat(profile.tier()).isEqualTo(MasteryTier.MAINTAIN);
         verify(gamification, never()).recordRises(any(), any());
         verify(badges, never()).onMaintained(any());
+    }
+
+    @Test
+    void decayMarksAPreviouslyMaintainedPointWhenItsEvidenceBecomesInsufficient() {
+        UUID kp = UUID.randomUUID();
+        List<EvidencePoint> oldEvidence = List.of(
+                new EvidencePoint(true, EvidenceSource.ASSESSMENT, NOW.minus(Duration.ofDays(180)), null),
+                new EvidencePoint(true, EvidenceSource.ASSESSMENT, NOW.minus(Duration.ofDays(179)), null),
+                new EvidencePoint(true, EvidenceSource.ASSESSMENT, NOW.minus(Duration.ofDays(178)), null));
+        points.put(kp, oldEvidence);
+        histories.add(new MasteryHistory(kp, UUID.randomUUID(), false, List.of(true, true, true), 3));
+        last.put(kp, NOW.minus(Duration.ofDays(178)));
+        previous.put(kp, stored(kp, 1.0, MasteryTier.MAINTAIN, 3));
+        MasteryFormulaSettings formulas = new MasteryFormulaSettings(configs, new ObjectMapper(), "MP1",
+                8, 3, 30, 3, 2, 1.0, 0.03, 7, 1.0, 1.0, 1.0, 0.6, 0.5, 0.3, 0.75);
+        MasteryProfileUpdater decaying = new MasteryProfileUpdater(evidence, profiles, events, rules, formulas,
+                gamification, badges, Clock.fixed(NOW, ZoneOffset.UTC));
+
+        decaying.decay(user, List.of(kp));
+
+        MasteryProfile result = upserted().get(kp);
+        assertThat(result.tier()).isEqualTo(MasteryTier.INSUFFICIENT);
+        assertThat(result.decayedFromTier()).isEqualTo(MasteryTier.MAINTAIN);
+    }
+
+    @Test
+    void enoughEvidenceClearsTheDecayMarker() {
+        UUID kp = point(eightyPercent());
+        previous.put(kp, decayed(kp, MasteryTier.MAINTAIN));
+
+        updater(true).recordEvidence(user, List.of(practice(kp)));
+
+        assertThat(upserted().get(kp).decayedFromTier()).isNull();
     }
 
     @Test

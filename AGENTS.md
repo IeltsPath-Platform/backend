@@ -1,7 +1,7 @@
 # AGENTS.md - Quy tắc bắt buộc cho AI Agent
 
 - Phiên bản: 2.3
-- Cập nhật lần cuối: 2026-11-18 (placement chia ba kho đề và cho làm lại, bỏ luật "chỉ làm một lần" ở §3.8); 2026-11-14 (bài ôn tiêu chí Writing ôn KP của mã lỗi gặp nhiều nhất); 2026-11-13 (khối `judgments` khi chấm Writing chỉ dùng KP của đề, `kpj3`); 2026-11-12 (ngoại lệ `chartFacts`: học viên nhận phát biểu đúng cho câu số liệu viết sai); 2026-11-11 (ghi chú gamification học từ vựng mobile ở §3.8; thêm common-llm); 2026-11-02 (thêm §3.9 và nhóm điều cấm "Pattern hệ thống" ở §5: resilience, outbox, idempotency, scheduler, storage; bổ sung Redis, Resilience4j, Micrometer/OpenTelemetry, Supabase vào stack và hai module shared mới); 2026-10-30 (Content gọi Library một chiều, Library không gọi Content; Notification đã có DB, listener và API; mặc định DB của config-repo là `localhost:5440`); 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); dữ kiện khác giữ mốc kiểm 2026-10-07 sau course path, placement recommendation và course gate
+- Cập nhật lần cuối: 2026-11-18 (luật thang bài ôn, chẩn đoán dò ngược, giỏ ôn và nguồn điểm `ReviewReevaluation`; placement chia ba kho đề và cho làm lại, bỏ luật "chỉ làm một lần" ở §3.8); 2026-11-14 (bài ôn tiêu chí Writing ôn KP của mã lỗi gặp nhiều nhất); 2026-11-13 (khối `judgments` khi chấm Writing chỉ dùng KP của đề, `kpj3`); 2026-11-12 (ngoại lệ `chartFacts`: học viên nhận phát biểu đúng cho câu số liệu viết sai); 2026-11-11 (ghi chú gamification học từ vựng mobile ở §3.8; thêm common-llm); 2026-11-02 (thêm §3.9 và nhóm điều cấm "Pattern hệ thống" ở §5: resilience, outbox, idempotency, scheduler, storage; bổ sung Redis, Resilience4j, Micrometer/OpenTelemetry, Supabase vào stack và hai module shared mới); 2026-10-30 (Content gọi Library một chiều, Library không gọi Content; Notification đã có DB, listener và API; mặc định DB của config-repo là `localhost:5440`); 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); dữ kiện khác giữ mốc kiểm 2026-10-07 sau course path, placement recommendation và course gate
 - Dự án: `IELTSPath` (Maven coordinates: `com.ieltspath:code-base:1.0-SNAPSHOT`)
 - Kiến trúc chi tiết (sơ đồ, flow, data ownership, quyết định): [`docs/system-architecture.md`](docs/system-architecture.md)
 
@@ -236,10 +236,23 @@ src/main/java/com/ieltspath/<service>
   lập giới hạn 3 lượt placement đã bắt đầu trong mỗi 24 giờ trượt (vượt thì `429 PLACEMENT_LIMIT_REACHED`); kết quả mới
   nhất thay band cũ (`docs/contracts/placement-retake-v1.md`). Lesson sau chỉ mở khi mọi lesson trước đã hoàn thành **và** Practice của chúng đã đạt
   (`403 PRACTICE_REQUIRED` + `lessonIds`); bài ôn còn chờ của lesson trước chặn lesson sau bất kể skill
-  (`403 REVIEW_REQUIRED`). Bài ôn lặp set mới đến khi đạt (chỉ lần trượt đầu quay lại theory), chỉ `SKIPPED` khi hết
-  package chưa lộ. Bài ôn **chặn** (`blocking = true`) vẫn chặn Practice và thi topic của cùng skill; bài ôn **tùy chọn**
-  (giỏ ôn) không bao giờ chặn. Practice test tự do (kho luyện tập 4 kỹ năng, không thuộc mốc course) không ghi bằng chứng,
-  không đổi mastery và không tạo bài ôn; chỉ practice test là mốc của course mới ghi bằng chứng. Thi cuối course không chặn tiến độ topic hay course khác.
+  (`403 REVIEW_REQUIRED`). Bài ôn chặn quay lại lý thuyết sau set trượt thứ nhất và thứ ba; set thứ ba dùng lý do
+  `REPEATED_FAIL`. Trượt set thứ hai mở chẩn đoán dò ngược ở lần GET bài ôn kế tiếp, không mở trong lúc nộp. Mỗi bài ôn gốc
+  chỉ có một phiên chẩn đoán; bài ôn sinh từ chẩn đoán không bị chẩn đoán lại. GET bài ôn có thể giao set, tự hoàn tất bước
+  lý thuyết không còn nội dung, đánh dấu `SKIPPED` khi không còn gói chưa xem, hoặc mở phiên chẩn đoán. `diagnosticSessionId`
+  là null khi phiên kết thúc mà không có probe. Phiên chẩn đoán chỉ được bỏ qua sau khi đã có ít nhất một probe `ANSWERED`;
+  probe `SKIPPED` hoặc `NO_SET` là chưa biết, không được tính là KP hổng; probe không có set ghi `content_gap_signals`.
+  Khi mở chẩn đoán, lỗi Content trả 503 và không giao set; không có KP tiên quyết thì phiên kết luận `NO_PREREQUISITES`
+  không có probe. Bài ôn `DIAGNOSTIC` cho KP không thuộc bài học trả lý thuyết rỗng (`NO_LESSON`) và bỏ qua bước đó.
+  Số set trượt được đếm từ `review_sets` sau mốc `review_items.failures_counted_from` (mốc null nghĩa là đếm toàn bộ);
+  nâng bài ôn lên chặn lại đặt mốc mới, không xóa lịch sử. Sau N set trượt (`learning.review.unblock-after-failed-sets`,
+  mặc định 4 và tối thiểu 4), bài ôn chuyển thành không chặn nhưng vẫn `PENDING`, vào giỏ ôn với lý do `UNBLOCKED`;
+  lesson sau, Practice và thi topic được mở. Nếu không chặn, bài ôn chỉ có một set: đạt thì `DONE`, trượt thì `SKIPPED`.
+  Bài ôn chỉ `SKIPPED` do hết gói khi không còn package chưa xem. Bài ôn **chặn** (`blocking = true`) vẫn chặn Practice
+  và thi topic của cùng skill; bài ôn **tùy chọn** không chặn.
+  Practice tự do không tạo bài ôn chặn; bằng chứng lỗi bẫy có thể tạo bài ôn tùy chọn `ERROR_PATTERN` khi KP cha thành
+  `PRIORITY`. Practice test tự do không ghi bằng chứng; bài luyện Practice thuộc lesson/course thì ghi bằng chứng như luật
+  trên. Thi cuối course không chặn tiến độ topic hay course khác.
   `LessonAccessGate` và use case trong `services/learning-service/src/main/java/com/ieltspath/learning/` quyết định cổng
   bài; trạng thái topic suy ra khi đọc. `GET /topics/{id}/lessons` của topic `LOCKED` vẫn trả danh sách bài, mọi bài
   `LOCKED` (để xem trước lộ trình); mở bài của topic đó vẫn `403 TOPIC_LOCKED`.
@@ -247,12 +260,18 @@ src/main/java/com/ieltspath/<service>
   từ 70%) và mở topic sau; course test mở khi mọi topic đã thi. Đạt khóa theo điểm tổng có trọng số (Process, giữa khóa,
   cuối khóa; Admin chỉnh ở `course_score_configs`), không theo course test riêng lẻ: dưới ngưỡng thì `REMEDIATION`, làm
   xong bài ôn thì thi lại (`CourseScoreCalculator`, `CourseOutcomeService`; contract `docs/contracts/course-score-v1.md`).
-- Chẩn đoán dò ngược: bài ôn chặn trượt set thứ hai hoặc hết gói thì thăm dò KP tiên quyết (tối đa 3 tầng, 6 lần), KP
-  gốc nhận bài ôn chặn `DIAGNOSTIC` và bài ôn gốc chờ chúng (`PrerequisiteDiagnosis`, `DiagnosticFlow`; contract
-  `diagnostics-v1.md`). Bài ôn sinh từ chẩn đoán không chẩn đoán lại.
+- Chẩn đoán dò ngược: sau set trượt thứ hai hoặc khi hết package, GET bài ôn kế tiếp chuẩn bị và mở phiên cho KP tiên
+  quyết (tối đa 3 tầng, 6 probe). Phiên chỉ được chẩn đoán một lần trên mỗi bài ôn gốc; KP gốc chỉ nhận bài ôn chặn
+  `DIAGNOSTIC` khi có kết luận tìm thấy KP hổng, và bài ôn gốc chờ các bài đó (`PrerequisiteDiagnosis`, `DiagnosticFlow`).
+  Bỏ qua cần ít nhất một probe đã trả lời; `SKIPPED`/`NO_SET` là kết quả chưa biết. Không có KP tiên quyết thì lưu phiên
+  `NO_PREREQUISITES` không probe và không đưa `diagnosticSessionId` vào response bài ôn. Probe không có gói ghi content gap;
+  replay probe trả response đã lưu trước khi gọi Content.
 - Mastery theo KP: `kp_mastery_profiles` ghi cùng transaction với bằng chứng (`MasteryProfileUpdater`), ba mức
-  `PRIORITY`/`CONSOLIDATE`/`MAINTAIN` và hạn ôn; Admin đổi ngưỡng ở `learning_rule_configs` và chạy lại nền. Mọi câu trả
-  lời ghi một dòng vào `question_attempt_events` (thời gian, mã lỗi). Báo cáo `GET /api/learning/report`.
+  `PRIORITY`/`CONSOLIDATE`/`MAINTAIN` và hạn ôn; Admin đổi ngưỡng ở `learning_rule_configs` và chạy lại nền.
+  `ReviewReevaluation` dùng điểm mastery lưu trong hồ sơ này theo `learning.mastery.policy`; `GET /api/learning/mastery`
+  tiếp tục dùng `MasteryCalculator` (SRS FT-26). `MasteryDecayJob` đánh dấu KP từng đủ dữ liệu nhưng decay xuống
+  `INSUFFICIENT` bằng `decayed_from_tier`; chỉ ghi từ lúc triển khai, không backfill. Giỏ ôn có tối đa 10 KP decay cũ nhất.
+  Mọi câu trả lời ghi một dòng vào `question_attempt_events` (thời gian, mã lỗi). Báo cáo `GET /api/learning/report`.
 - Khu quản trị: cờ bất thường (`learner_flags`, `FlagDetector` chạy sau commit, transaction riêng), hàng việc theo vai
   trò (`work_items`, `WorkItemSync` đồng bộ khi mở danh sách và mỗi 3 giờ qua `WorkItemSyncJob`, khóa advisory để chỉ một instance chạy), thống kê câu và chất lượng cây (`learning-staff-area-v1.md`).
 - Essay: sửa và nộp lại essay lesson tối đa 3 lần, chỉ từ bản mới nhất (`essay-revision-v1.md`); học viên có tín dụng

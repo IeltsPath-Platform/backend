@@ -7,16 +7,17 @@ import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.port.LearningContentClient.Item;
 import com.ieltspath.learning.application.port.LearningContentClient.PackageVersion;
 import com.ieltspath.learning.application.port.LearningContentClient.Section;
+import com.ieltspath.learning.application.port.LearningContentClient.LessonPracticeSet;
 import com.ieltspath.learning.application.port.ReviewSubmissionLog;
 import com.ieltspath.learning.application.result.ReviewSubmissionResult;
 import com.ieltspath.learning.application.result.SubmissionResult;
 import com.ieltspath.learning.application.service.AnswerSheet;
-import com.ieltspath.learning.application.service.DiagnosticFlow;
 import com.ieltspath.learning.application.service.GamificationRecorder;
 import com.ieltspath.learning.domain.vo.GamificationSummary;
 import com.ieltspath.learning.application.service.LessonEvidenceReference;
 import com.ieltspath.learning.application.service.ItemGrading;
 import com.ieltspath.learning.application.service.PracticeProgress;
+import com.ieltspath.learning.application.service.ReviewSettings;
 import com.ieltspath.learning.domain.aggregate.ReviewItem;
 import com.ieltspath.learning.domain.entity.ReviewSet;
 import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
@@ -36,7 +37,8 @@ import com.ieltspath.learning.domain.vo.KnowledgeEvidence;
 import com.ieltspath.learning.domain.vo.ReviewStage;
 import com.ieltspath.learning.domain.vo.ReviewStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -52,9 +54,6 @@ import java.util.UUID;
  */
 @Service
 public class SubmitReviewUseCase {
-    private static final int SECOND_FAILED_SET = 2;
-
-    private final DiagnosticFlow diagnosticFlow;
     private final LearningContentClient content;
     private final LearnerLock lock;
     private final KnowledgeEvidenceRepository evidence;
@@ -66,17 +65,21 @@ public class SubmitReviewUseCase {
     private final MasteryProfileUpdater masteryProfiles;
     private final GamificationRecorder gamificationRecorder;
     private final ErrorTrapEvidence errorTrapEvidence;
+    private final ReviewSettings reviewSettings;
+    private final TransactionTemplate transaction;
     private final ItemGrading grading = new ItemGrading();
 
     public SubmitReviewUseCase(LearningContentClient content, LearnerLock lock, KnowledgeEvidenceRepository evidence,
                                ReviewItemRepository reviews, PracticeAttemptRepository attempts,
                                ReviewSubmissionLog submissions,
                                PracticeProgress practice, QuestionEventLog questionEvents,
-                               MasteryProfileUpdater masteryProfiles, DiagnosticFlow diagnosticFlow,
-                               GamificationRecorder gamificationRecorder, ErrorTrapEvidence errorTrapEvidence) {
+                               MasteryProfileUpdater masteryProfiles,
+                               GamificationRecorder gamificationRecorder, ErrorTrapEvidence errorTrapEvidence,
+                               ReviewSettings reviewSettings,
+                               PlatformTransactionManager transactionManager) {
+        this.reviewSettings = reviewSettings;
         this.gamificationRecorder = gamificationRecorder;
         this.errorTrapEvidence = errorTrapEvidence;
-        this.diagnosticFlow = diagnosticFlow;
         this.questionEvents = questionEvents;
         this.masteryProfiles = masteryProfiles;
         this.content = content;
@@ -86,10 +89,58 @@ public class SubmitReviewUseCase {
         this.attempts = attempts;
         this.submissions = submissions;
         this.practice = practice;
+        this.transaction = new TransactionTemplate(transactionManager);
     }
 
-    @Transactional
     public ReviewSubmissionResult execute(UUID userId, UUID reviewId, SubmitReviewCommand command) {
+        ReviewItem owned = ownedReview(userId, reviewId);
+        var saved = submissions.find(command.requestId());
+        if (saved.isPresent()) {
+            var submission = saved.get();
+            if (!submission.userId().equals(userId) || !submission.reviewId().equals(reviewId)
+                    || !submission.reviewSetId().equals(command.reviewSetId())) {
+                throw new LearningRequestException(409, "REQUEST_CONFLICT", "requestId belongs to another submission");
+            }
+            return submission.response();
+        }
+        if (owned.status() == ReviewStatus.PENDING && owned.stage() == ReviewStage.THEORY) {
+            throw new LearningRequestException(409, "THEORY_REQUIRED", "Read the theory before the next set");
+        }
+        if (!owned.acceptsAnswersFor(command.reviewSetId())) {
+            throw new LearningRequestException(409, "REVIEW_SET_CLOSED", "Review set is closed");
+        }
+        ReviewSet set = owned.openSet().orElseThrow();
+        if (attempts.revealedPackageIds(userId).contains(set.packageId())) {
+            throw new LearningRequestException(409, "REVIEW_SET_CLOSED", "Review set is closed");
+        }
+        PackageVersion version;
+        try {
+            version = content.getPackageVersion(set.packageVersionId());
+        } catch (LearningRequestException error) {
+            if (error.getStatus() != 404 || !"NOT_FOUND".equals(error.getCode())) throw error;
+            throw new LearningRequestException(409, "REVIEW_SET_CLOSED", "Review set is no longer available");
+        }
+        var graded = grading.grade(version, command.answers(), "Review set");
+        ErrorTrapCatalog.ErrorTraps trapCatalog = errorTrapEvidence.loadIfNeeded(
+                graded.items().stream().anyMatch(item -> item.answerSpec().get("distractors") instanceof Map<?, ?>));
+        Map<String, com.ieltspath.learning.application.service.ErrorTypeTexts.Text> errorTexts =
+                errorTrapEvidence.errorTexts(graded.errorCodes());
+        List<LessonPracticeSet> practiceSets = null;
+        if (graded.passed() || !owned.blocking()) {
+            practiceSets = content.lessonPracticeSets(owned.lessonId());
+            if (practiceSets == null) practiceSets = List.of();
+        }
+        List<LessonPracticeSet> preparedPracticeSets = practiceSets;
+        return transaction.execute(status -> submitWithinTransaction(userId, reviewId, command, set, graded,
+                version, trapCatalog, errorTexts, preparedPracticeSets));
+    }
+
+    private ReviewSubmissionResult submitWithinTransaction(UUID userId, UUID reviewId, SubmitReviewCommand command,
+                                                            ReviewSet preparedSet, ItemGrading.Graded graded,
+                                                            PackageVersion version,
+                                                            ErrorTrapCatalog.ErrorTraps trapCatalog,
+                                                            Map<String, com.ieltspath.learning.application.service.ErrorTypeTexts.Text> errorTexts,
+                                                            List<LessonPracticeSet> practiceSets) {
         lock.lock(userId);
         var saved = submissions.find(command.requestId());
         if (saved.isPresent()) {
@@ -104,15 +155,15 @@ public class SubmitReviewUseCase {
         if (review.status() == ReviewStatus.PENDING && review.stage() == ReviewStage.THEORY) {
             throw new LearningRequestException(409, "THEORY_REQUIRED", "Read the theory before the next set");
         }
-        if (!review.acceptsAnswersFor(command.reviewSetId())) {
+        ReviewSet currentSet = review.openSet().orElse(null);
+        if (!review.acceptsAnswersFor(command.reviewSetId()) || currentSet == null
+                || !currentSet.id().equals(preparedSet.id())
+                || !currentSet.packageVersionId().equals(preparedSet.packageVersionId())) {
             throw new LearningRequestException(409, "REVIEW_SET_CLOSED", "Review set is closed");
         }
-        ReviewSet set = review.openSet().orElseThrow();
-        if (attempts.revealedPackageIds(userId).contains(set.packageId())) {
+        if (attempts.revealedPackageIds(userId).contains(preparedSet.packageId())) {
             throw new LearningRequestException(409, "REVIEW_SET_CLOSED", "Review set is closed");
         }
-        PackageVersion version = content.getPackageVersion(set.packageVersionId());
-        var graded = grading.grade(version, command.answers(), "Review set");
         List<Item> items = graded.items();
         var grades = graded.grades();
         boolean passed = graded.passed();
@@ -122,10 +173,6 @@ public class SubmitReviewUseCase {
         List<QuestionAttemptEvent> setEvents = new ArrayList<>();
         Map<UUID, Long> durations = AnswerDurations.of(command.answers());
         List<SubmissionResult.AnswerResult> results = new ArrayList<>();
-        ErrorTrapCatalog.ErrorTraps trapCatalog = errorTrapEvidence.loadIfNeeded(
-                items.stream().anyMatch(item -> item.answerSpec().get("distractors") instanceof Map<?, ?>));
-        Map<String, com.ieltspath.learning.application.service.ErrorTypeTexts.Text> errorTexts =
-                errorTrapEvidence.errorTexts(graded.errorCodes());
         Set<UUID> withoutMilestone = new java.util.HashSet<>();
         for (int index = 0; index < items.size(); index++) {
             Item item = items.get(index);
@@ -154,19 +201,19 @@ public class SubmitReviewUseCase {
         masteryProfiles.recordEvidence(userId, setAnswers, withoutMilestone);
         errorTrapEvidence.createReviews(userId, review.lessonId(), setAnswers);
 
-        ReviewStatus status = review.recordSetResult(set.id(), command.requestId(), graded.correct(), graded.total());
+        ReviewStatus status = review.recordSetResult(preparedSet.id(), command.requestId(), graded.correct(),
+                graded.total(), reviewSettings.unblockAfterFailedSets());
         Section first = ItemGrading.orderedSections(version).stream().findFirst().orElse(null);
         String transcript = first != null && first.audio() != null ? first.audio().transcript() : null;
         // Every set is answered once, so each set's correct answers earn XP.
         GamificationSummary gamification = gamificationRecorder.recordCorrectAnswers(userId, command.requestId(),
                 graded.correctQuestionIds());
         ReviewSubmissionResult response = new ReviewSubmissionResult(status.name(), passed, List.copyOf(results),
-                transcript, review.stage().name(), review.failedSets(), gamification);
+                transcript, review.stage().name(), review.failedSets(), review.blocking(), gamification);
         reviews.save(review);
-        submissions.save(set.id(), response);
-        if (status != ReviewStatus.PENDING) practice.refreshPassForLesson(userId, review.lessonId());
-        else if (review.blocking() && review.failedSets() == SECOND_FAILED_SET) {
-            diagnosticFlow.startAfterSecondFailure(review);
+        submissions.save(preparedSet.id(), response);
+        if (status != ReviewStatus.PENDING && practiceSets != null) {
+            practice.refreshPassForLesson(userId, review.lessonId(), practiceSets);
         }
         return response;
     }
