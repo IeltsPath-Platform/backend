@@ -17,6 +17,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -24,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -107,6 +109,41 @@ class CourseDraftUseCasesTest {
             assertThrows(InvalidContentStateException.class, () -> useCases.analyze(author, draft.getId()),
                     status.name());
         }
+    }
+
+    @Test
+    void deletesOwnDraftThatIsReadyFailedOrRejected() {
+        for (DraftStatus status : new DraftStatus[]{DraftStatus.READY, DraftStatus.FAILED, DraftStatus.REJECTED}) {
+            AiDraft draft = stored(author, DraftKind.COURSE, status);
+            when(store.deleteIfStatusIn(eq(draft.getId()), any())).thenReturn(1);
+
+            useCases.delete(author, draft.getId());
+
+            verify(store).deleteIfStatusIn(draft.getId(), Set.of(DraftStatus.READY, DraftStatus.FAILED, DraftStatus.REJECTED));
+        }
+    }
+
+    @Test
+    void keepsADraftThatIsApprovedQueuedOrGenerating() {
+        for (DraftStatus status : new DraftStatus[]{DraftStatus.APPROVED, DraftStatus.QUEUED, DraftStatus.GENERATING}) {
+            AiDraft draft = stored(author, DraftKind.COURSE, status);
+
+            assertThrows(InvalidContentStateException.class, () -> useCases.delete(author, draft.getId()), status.name());
+            verify(store, never()).deleteIfStatusIn(eq(draft.getId()), any());
+        }
+    }
+
+    @Test
+    void deleteIsRefusedWhenTheStatusChangedBeforeTheRowWentAndOtherDraftsAreNotFound() {
+        AiDraft raced = stored(author, DraftKind.COURSE, DraftStatus.READY);
+        when(store.deleteIfStatusIn(eq(raced.getId()), any())).thenReturn(0);
+        AiDraft others = stored(UUID.randomUUID(), DraftKind.COURSE, DraftStatus.READY);
+        AiDraft questions = stored(author, DraftKind.QUESTIONS, DraftStatus.READY);
+
+        assertThrows(InvalidContentStateException.class, () -> useCases.delete(author, raced.getId()));
+        assertThrows(AiDraftNotFoundException.class, () -> useCases.delete(author, others.getId()));
+        assertThrows(AiDraftNotFoundException.class, () -> useCases.delete(author, questions.getId()));
+        assertThrows(AiDraftNotFoundException.class, () -> useCases.delete(author, UUID.randomUUID()));
     }
 
     @Test

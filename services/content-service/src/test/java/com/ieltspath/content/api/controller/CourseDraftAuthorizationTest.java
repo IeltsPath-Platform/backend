@@ -20,6 +20,7 @@ import java.util.Base64;
 import java.util.UUID;
 
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -58,6 +59,7 @@ class CourseDraftAuthorizationTest {
                 .andExpect(status().isForbidden());
         mockMvc.perform(put(base + "/{id}", id).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"structure\":{}}")).andExpect(status().isForbidden());
+        mockMvc.perform(delete(base + "/{id}", id)).andExpect(status().isForbidden());
         mockMvc.perform(get(base + "/{id}/analysis", id)).andExpect(status().isForbidden());
         mockMvc.perform(post(base + "/{id}/approve", id)).andExpect(status().isForbidden());
         mockMvc.perform(get(base + "/practice-sets").param("knowledgePointIds", id.toString()))

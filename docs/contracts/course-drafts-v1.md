@@ -59,6 +59,7 @@ All routes require `CONTENT_AUTHOR`. An author sees and changes only their own d
 | --- | --- | --- |
 | POST | `/api/content/admin/course-drafts` | Body `{ "structure": { … } }`, or empty for an empty draft. Syntax is checked. `201`, returns the draft. |
 | PUT | `/api/content/admin/course-drafts/{id}` | Body `{ "structure": { … } }`. Replaces the structure. Only a `READY` draft. Syntax is checked, coverage is not. Returns the draft. |
+| DELETE | `/api/content/admin/course-drafts/{id}` | Deletes the author's own draft for good. Only a `READY`, `FAILED` or `REJECTED` draft; an `APPROVED` one (the record of the course made from it) and a `QUEUED` or `GENERATING` one return `400`. Another author's draft, or one of another kind, is `404`. `204`, no body. |
 | GET | `/api/content/admin/course-drafts/{id}/analysis` | The check against the knowledge tree (below). |
 | POST | `/api/content/admin/course-drafts/{id}/approve` | Creates the content. Returns what it created. |
 

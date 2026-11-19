@@ -7,6 +7,7 @@ import com.ieltspath.content.application.usecase.ApproveCourseDraftUseCase;
 import com.ieltspath.content.application.usecase.CourseDraftUseCases;
 import com.ieltspath.content.application.usecase.FindPracticeSetsForPointsUseCase;
 import com.ieltspath.content.domain.aggregate.AiDraft;
+import com.ieltspath.content.domain.exception.AiDraftNotFoundException;
 import com.ieltspath.content.domain.exception.CourseDraftErrorsException;
 import com.ieltspath.content.domain.exception.InvalidContentStateException;
 import com.ieltspath.content.domain.exception.InvalidCourseDraftException;
@@ -24,9 +25,11 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -130,6 +133,18 @@ class CourseDraftControllerTest {
         mockMvc.perform(put("/api/content/admin/course-drafts/{id}", id).contentType("application/json")
                         .content("{\"structure\":{\"topics\":[]}}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void deleteAnswersNoContentAndRefusesADraftThatCannotGo() throws Exception {
+        mockMvc.perform(delete("/api/content/admin/course-drafts/{id}", id)).andExpect(status().isNoContent());
+        verify(drafts).delete(author, id);
+
+        doThrow(new InvalidContentStateException("Draft is APPROVED, it cannot be deleted")).when(drafts).delete(author, id);
+        mockMvc.perform(delete("/api/content/admin/course-drafts/{id}", id)).andExpect(status().isBadRequest());
+
+        doThrow(new AiDraftNotFoundException(id)).when(drafts).delete(author, id);
+        mockMvc.perform(delete("/api/content/admin/course-drafts/{id}", id)).andExpect(status().isNotFound());
     }
 
     @Test

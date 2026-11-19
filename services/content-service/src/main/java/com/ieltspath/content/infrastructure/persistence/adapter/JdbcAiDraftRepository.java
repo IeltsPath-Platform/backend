@@ -13,6 +13,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -70,6 +71,16 @@ public class JdbcAiDraftRepository implements AiDraftRepository {
         return jdbc.query("SELECT " + COLUMNS + " FROM ai_drafts WHERE id = :id",
                         new MapSqlParameterSource("id", id), JdbcAiDraftRepository::map)
                 .stream().findFirst();
+    }
+
+    @Override
+    public int deleteIfStatusIn(UUID id, Collection<DraftStatus> statuses) {
+        if (statuses.isEmpty()) {
+            return 0;
+        }
+        return jdbc.update("DELETE FROM ai_drafts WHERE id = :id AND status IN (:statuses)",
+                new MapSqlParameterSource("id", id)
+                        .addValue("statuses", statuses.stream().map(DraftStatus::name).toList()));
     }
 
     @Override
