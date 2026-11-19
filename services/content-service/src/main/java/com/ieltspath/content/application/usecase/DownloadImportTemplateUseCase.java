@@ -18,7 +18,7 @@ public class DownloadImportTemplateUseCase {
         try (InputStream in = new ClassPathResource(RESOURCE).getInputStream()) {
             return in.readAllBytes();
         } catch (IOException missing) {
-            throw new UncheckedIOException("The import template is not part of this build", missing);
+            throw new UncheckedIOException("Không tìm thấy tệp mẫu nhập khóa học", missing);
         }
     }
 }

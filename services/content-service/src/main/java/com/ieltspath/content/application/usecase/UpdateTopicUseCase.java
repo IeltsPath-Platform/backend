@@ -44,7 +44,7 @@ public class UpdateTopicUseCase {
         if (command.courseId() != null || topic.getCourseId() != null) {
             var effectiveSkill = command.skill() == null ? topic.getSkill() : command.skill();
             if (effectiveSkill == null || effectiveSkill == com.ieltspath.content.domain.vo.Skill.ALL) {
-                throw new IllegalArgumentException("A course topic must have exactly one skill");
+                throw new IllegalArgumentException("Chủ đề thuộc khóa học phải có đúng một kỹ năng");
             }
         }
 

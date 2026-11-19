@@ -160,39 +160,39 @@ public class Course {
 
     private static void requireNoPricesWhenFree(boolean free, Map<Skill, Integer> prices, Integer combo) {
         if (free && (!prices.isEmpty() || combo != null)) {
-            throw new IllegalArgumentException("a free course has no unlock prices");
+            throw new IllegalArgumentException("Khóa học miễn phí không có giá mở khóa");
         }
     }
 
     private static Map<Skill, Integer> validatePrices(Map<Skill, Integer> prices, Integer combo) {
         EnumMap<Skill, Integer> normalized = new EnumMap<>(Skill.class);
         if (prices != null) prices.forEach((skill, price) -> {
-            if (skill == null || skill == Skill.ALL) throw new IllegalArgumentException("unknown skill price");
+            if (skill == null || skill == Skill.ALL) throw new IllegalArgumentException("Giá của kỹ năng không hợp lệ");
             if (price == null) return;
-            if (price <= 0) throw new IllegalArgumentException("skill unlock prices must be positive integers");
+            if (price <= 0) throw new IllegalArgumentException("Giá mở khóa kỹ năng phải là số nguyên dương");
             normalized.put(skill, price);
         });
-        if (combo != null && combo <= 0) throw new IllegalArgumentException("combo unlock price must be a positive integer");
+        if (combo != null && combo <= 0) throw new IllegalArgumentException("Giá gói kết hợp phải là số nguyên dương");
         if (combo != null && !normalized.isEmpty()) {
             int highest = normalized.values().stream().mapToInt(Integer::intValue).max().orElse(0);
-            if (combo < highest) throw new IllegalArgumentException("combo unlock price must be at least the highest skill price");
+            if (combo < highest) throw new IllegalArgumentException("Giá gói kết hợp không được thấp hơn giá kỹ năng cao nhất");
             if (normalized.size() >= 2) {
                 long sum = normalized.values().stream().mapToLong(Integer::longValue).sum();
-                if (combo > sum) throw new IllegalArgumentException("combo unlock price must not exceed the sum of skill prices");
+                if (combo > sum) throw new IllegalArgumentException("Giá gói kết hợp không được cao hơn tổng giá các kỹ năng");
             }
         }
         return Map.copyOf(normalized);
     }
 
     private static BigDecimal validateBand(BigDecimal bandLevel) {
-        if (bandLevel == null) throw new IllegalArgumentException("bandLevel is required");
+        if (bandLevel == null) throw new IllegalArgumentException("Cần nhập band của khóa học");
         return BandRange.of(bandLevel, bandLevel).min();
     }
 
     private static String requireText(String value, String field, int maxLength) {
-        if (value == null || value.isBlank()) throw new IllegalArgumentException(field + " must not be blank");
+        if (value == null || value.isBlank()) throw new IllegalArgumentException(field + " không được để trống");
         String trimmed = value.trim();
-        if (trimmed.length() > maxLength) throw new IllegalArgumentException(field + " exceeds " + maxLength + " characters");
+        if (trimmed.length() > maxLength) throw new IllegalArgumentException(field + " dài quá " + maxLength + " ký tự");
         return trimmed;
     }
 
@@ -200,12 +200,12 @@ public class Course {
         String normalized = normalizeOptionalText(value, "coverImageUrl", 500);
         if (normalized != null && normalized.startsWith("content-image/")) {
             if (normalized.contains("..") || !normalized.matches("^content-image/[A-Za-z0-9._/-]+$")) {
-                throw new IllegalArgumentException("coverImageUrl must be a safe content image key");
+                throw new IllegalArgumentException("Ảnh bìa phải là khóa ảnh nội dung hợp lệ");
             }
             return normalized;
         }
         if (normalized != null && !normalized.matches("(?i)^https?://.*")) {
-            throw new IllegalArgumentException("coverImageUrl must be an http(s) URL or content image key");
+            throw new IllegalArgumentException("Ảnh bìa phải là đường dẫn http(s) hoặc khóa ảnh nội dung");
         }
         return normalized;
     }
@@ -214,7 +214,7 @@ public class Course {
         if (value == null || value.isBlank()) return null;
         String trimmed = value.trim();
         if (trimmed.length() > maxLength) {
-            throw new IllegalArgumentException(field + " exceeds " + maxLength + " characters");
+            throw new IllegalArgumentException(field + " dài quá " + maxLength + " ký tự");
         }
         return trimmed;
     }

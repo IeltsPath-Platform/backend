@@ -68,7 +68,7 @@ public class Lesson {
     }
 
     public void addBlock(LessonBlock block) {
-        if (!id.equals(block.getLessonId())) throw new IllegalArgumentException("Block belongs to a different lesson");
+        if (!id.equals(block.getLessonId())) throw new IllegalArgumentException("Khối thuộc một bài học khác");
         blocks.add(block);
         updatedAt = Instant.now();
     }
@@ -109,17 +109,17 @@ public class Lesson {
 
 
     private static String requireTitle(String value) {
-        if (value == null || value.isBlank() || value.length() > 255) throw new IllegalArgumentException("Invalid lesson title");
+        if (value == null || value.isBlank() || value.length() > 255) throw new IllegalArgumentException("Tiêu đề bài học không hợp lệ");
         return value.strip();
     }
 
     private static Integer requireMinutes(Integer value) {
-        if (value != null && value <= 0) throw new IllegalArgumentException("estimatedMinutes must be positive");
+        if (value != null && value <= 0) throw new IllegalArgumentException("Thời lượng ước tính phải lớn hơn 0");
         return value;
     }
 
     private static int requireOrder(int value) {
-        if (value < 0) throw new IllegalArgumentException("sortOrder must be non-negative");
+        if (value < 0) throw new IllegalArgumentException("Thứ tự không được âm");
         return value;
     }
 

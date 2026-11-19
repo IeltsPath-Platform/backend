@@ -42,7 +42,7 @@ class CancelPackagePublicationScheduleUseCaseTest {
         version.publish(UUID.randomUUID());
         assertThatThrownBy(() -> useCase.execute(pkg.getId(), version.getId()))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Only DRAFT versions can have a publication schedule");
+                .hasMessage("Chỉ phiên bản nháp mới có lịch xuất bản");
         verify(packages, never()).save(any());
     }
 }

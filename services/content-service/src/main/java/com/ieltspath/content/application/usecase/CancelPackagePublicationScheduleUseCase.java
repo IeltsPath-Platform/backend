@@ -24,7 +24,7 @@ public class CancelPackagePublicationScheduleUseCase {
                 .orElseThrow(() -> new ContentPackageNotFoundException(packageId));
         ContentPackageVersion version = SchedulePackagePublicationUseCase.findVersion(pkg, versionId);
         if (version.getStatus() != PublicationStatus.DRAFT) {
-            throw new IllegalArgumentException("Only DRAFT versions can have a publication schedule");
+            throw new IllegalArgumentException("Chỉ phiên bản nháp mới có lịch xuất bản");
         }
         version.cancelScheduledPublication();
         packages.save(pkg);

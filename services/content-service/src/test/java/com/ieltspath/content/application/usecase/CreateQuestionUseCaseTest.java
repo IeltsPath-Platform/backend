@@ -31,7 +31,7 @@ class CreateQuestionUseCaseTest {
         assertThatThrownBy(() -> useCase.execute(new CreateQuestionCommand(QuestionType.MULTIPLE_CHOICE, Skill.READING, null,
                 QuestionPurpose.LEARNING, "bad ref!")))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("importRef may use letters, digits, dot, underscore and dash, up to 100 characters");
+                .hasMessage("Mã tham chiếu (importRef) chỉ gồm chữ, số, dấu chấm, gạch dưới, gạch ngang và dài tối đa 100 ký tự");
         verify(questions, never()).save(any());
     }
 }

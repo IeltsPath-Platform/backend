@@ -37,9 +37,9 @@ class CreateTopicCourseUseCaseTest {
         when(courses.findById(course.getId())).thenReturn(Optional.of(course));
 
         assertThatThrownBy(() -> useCase.execute(command(course.getId(), null)))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("exactly one skill");
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("đúng một kỹ năng");
         assertThatThrownBy(() -> useCase.execute(command(course.getId(), Skill.ALL)))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("exactly one skill");
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("đúng một kỹ năng");
         verify(topics, never()).save(any());
     }
 

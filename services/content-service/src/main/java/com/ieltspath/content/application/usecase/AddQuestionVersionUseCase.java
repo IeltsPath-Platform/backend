@@ -54,7 +54,7 @@ public class AddQuestionVersionUseCase {
                     .filter(java.util.Objects::nonNull)
                     .collect(Collectors.toSet());
             if (errorTypeRepository.containsTrapKnowledgePoints(mappedPointIds)) {
-                throw new InvalidErrorTypeException("TRAP_KNOWLEDGE_POINT_NOT_ASSIGNABLE");
+                throw InvalidErrorTypeException.trapKnowledgePointNotAssignable();
             }
         }
 
@@ -124,17 +124,17 @@ public class AddQuestionVersionUseCase {
             return;
         }
         if (!distractors.isObject()) {
-            throw new InvalidErrorTypeException("distractors must be an object of option key to error code");
+            throw new InvalidErrorTypeException("Bẫy lỗi phải là một đối tượng ghép khóa đáp án với mã lỗi");
         }
         Set<String> optionKeys = options == null ? Set.of()
                 : options.stream().map(QuestionOptionPayload::optionKey).collect(Collectors.toSet());
         Set<String> codes = new LinkedHashSet<>();
         for (Map.Entry<String, JsonNode> entry : distractors.properties()) {
             if (!optionKeys.contains(entry.getKey())) {
-                throw new InvalidErrorTypeException("distractor key " + entry.getKey() + " is not an option of this question");
+                throw new InvalidErrorTypeException("Khóa bẫy lỗi " + entry.getKey() + " không phải là đáp án của câu hỏi này");
             }
             if (!entry.getValue().isTextual()) {
-                throw new InvalidErrorTypeException("distractor for option " + entry.getKey() + " must be an error code");
+                throw new InvalidErrorTypeException("Bẫy lỗi của đáp án " + entry.getKey() + " phải là một mã lỗi");
             }
             codes.add(entry.getValue().asText());
         }

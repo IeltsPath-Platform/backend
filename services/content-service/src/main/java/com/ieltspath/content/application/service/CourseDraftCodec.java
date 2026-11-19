@@ -92,7 +92,7 @@ public class CourseDraftCodec {
         try {
             return stored == null ? CourseDraftStructure.empty() : json.readValue(stored, CourseDraftStructure.class);
         } catch (JsonProcessingException unreadable) {
-            throw new InvalidContentStateException("Stored course draft is unreadable");
+            throw new InvalidContentStateException("Không đọc được bản nháp khóa học đã lưu");
         }
     }
 
@@ -100,7 +100,7 @@ public class CourseDraftCodec {
         try {
             return json.writeValueAsString(structure);
         } catch (JsonProcessingException failure) {
-            throw new IllegalStateException("Course draft could not be written", failure);
+            throw new IllegalStateException("Không ghi được bản nháp khóa học", failure);
         }
     }
 

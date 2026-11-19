@@ -4,6 +4,6 @@ import java.util.UUID;
 
 public class LessonResourceNotFoundException extends ContentDomainException {
     public LessonResourceNotFoundException(UUID lessonId, UUID resourceId) {
-        super("Lesson resource '" + resourceId + "' not found in lesson '" + lessonId + "'");
+        super("Không tìm thấy tài nguyên của bài học");
     }
 }

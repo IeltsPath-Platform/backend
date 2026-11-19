@@ -62,7 +62,7 @@ public class LessonAuthoringRepositoryAdapter implements LessonAuthoringReposito
         Integer topicOrder = jdbc.queryForObject("SELECT COALESCE(MAX(sort_order), -1) FROM lessons WHERE topic_id = ?",
                 Integer.class, topicId);
         int position = sortOrder == null ? topicOrder + 1 : sortOrder;
-        if (position < 0) throw new IllegalArgumentException("sortOrder must not be negative");
+        if (position < 0) throw new IllegalArgumentException("Thứ tự không được âm");
         UUID lessonId = UUID.randomUUID();
         try {
             jdbc.update("""
@@ -225,7 +225,7 @@ public class LessonAuthoringRepositoryAdapter implements LessonAuthoringReposito
                     SELECT COUNT(*) FROM knowledge_points WHERE id IN (:ids) AND status = 'ACTIVE'
                     """, new MapSqlParameterSource("ids", pointIds), Integer.class);
             if (activeCount == null || activeCount != pointIds.size()) {
-                throw new LessonBlockInvalidException("All knowledge points must be active");
+                throw new LessonBlockInvalidException("Mọi điểm kiến thức phải đang được dùng");
             }
         }
         jdbc.update("DELETE FROM lesson_knowledge_points WHERE lesson_id = ?", lesson.getId());
@@ -279,20 +279,20 @@ public class LessonAuthoringRepositoryAdapter implements LessonAuthoringReposito
         ensureUnique(block.getQuestionVersionIds(), "Question version IDs must be unique");
         ensureUnique(block.getKnowledgePointIds(), "Knowledge point IDs must be unique");
         if (block.getAssetId() != null && !exists("SELECT EXISTS(SELECT 1 FROM content_assets WHERE id = ?)", block.getAssetId())) {
-            throw new LessonBlockInvalidException("Referenced asset does not exist");
+            throw new LessonBlockInvalidException("Tài nguyên được tham chiếu không tồn tại");
         }
         if (!block.getQuestionVersionIds().isEmpty()) {
             Integer count = namedJdbc.queryForObject("SELECT COUNT(*) FROM question_versions WHERE id IN (:ids)",
                     new MapSqlParameterSource("ids", block.getQuestionVersionIds()), Integer.class);
             if (count == null || count != block.getQuestionVersionIds().size()) {
-                throw new LessonBlockInvalidException("One or more question versions do not exist");
+                throw new LessonBlockInvalidException("Có phiên bản câu hỏi không tồn tại");
             }
         }
         if (!block.getKnowledgePointIds().isEmpty()) {
             Integer count = namedJdbc.queryForObject("SELECT COUNT(*) FROM knowledge_points WHERE id IN (:ids) AND status='ACTIVE'",
                     new MapSqlParameterSource("ids", block.getKnowledgePointIds()), Integer.class);
             if (count == null || count != block.getKnowledgePointIds().size()) {
-                throw new LessonBlockInvalidException("All block knowledge points must be active");
+                throw new LessonBlockInvalidException("Mọi điểm kiến thức của khối phải đang được dùng");
             }
         }
     }

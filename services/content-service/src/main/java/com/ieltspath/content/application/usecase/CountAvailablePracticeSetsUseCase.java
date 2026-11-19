@@ -24,12 +24,12 @@ public class CountAvailablePracticeSetsUseCase {
     public Map<UUID, Integer> execute(CountPracticeSetsCommand command) {
         List<UUID> knowledgePoints = command.knowledgePointIds();
         if (knowledgePoints == null || knowledgePoints.isEmpty() || knowledgePoints.size() > MAX_KNOWLEDGE_POINTS) {
-            throw new IllegalArgumentException("knowledgePointIds must hold 1 to " + MAX_KNOWLEDGE_POINTS + " ids");
+            throw new IllegalArgumentException("Cần chọn từ 1 đến " + MAX_KNOWLEDGE_POINTS + " điểm kiến thức");
         }
         int minQuestions = command.minQuestions() == null
                 ? SearchPracticeSetsUseCase.DEFAULT_MIN_QUESTIONS : command.minQuestions();
         if (minQuestions < 1) {
-            throw new IllegalArgumentException("minQuestions must be at least 1");
+            throw new IllegalArgumentException("Số câu tối thiểu phải từ 1");
         }
         List<UUID> exclude = command.excludePackageIds() == null ? List.of() : command.excludePackageIds();
         return reader.countEligiblePracticeSets(knowledgePoints.stream().distinct().toList(), exclude, minQuestions);

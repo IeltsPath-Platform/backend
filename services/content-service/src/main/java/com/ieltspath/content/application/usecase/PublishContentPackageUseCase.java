@@ -72,20 +72,20 @@ public class PublishContentPackageUseCase {
                 .filter(v -> v.getId().equals(versionId))
                 .findFirst()
                 .orElseThrow(() -> new InvalidContentStateException(
-                        "Version " + versionId + " does not belong to package " + pkg.getId()));
+                        "Phiên bản " + versionId + " không thuộc gói " + pkg.getId()));
     }
 
     private void validate(ContentPackage pkg, ContentPackageVersion targetVersion) {
 
         if (pkg.getPackageType() == PackageType.PLACEMENT_TEST && pkg.getPlacementPool() == null) {
-            throw new InvalidContentStateException("PLACEMENT_POOL_REQUIRED");
+            throw InvalidContentStateException.placementPoolRequired();
         }
 
         // A lesson's Practice measures only skills taught by that lesson.
         if (pkg.getLessonId() != null
                 && lessons.packageVersionLeavesLessonSkills(targetVersion.getId(), pkg.getLessonId())) {
-            throw new InvalidPackageLessonException("Every question of a lesson's practice set must belong to the "
-                    + "lesson's taught skills");
+            throw new InvalidPackageLessonException("Mọi câu hỏi trong bộ luyện tập của bài học phải thuộc "
+                    + "các kỹ năng mà bài học dạy");
         }
 
         if (pkg.getPackageType() == PackageType.PRACTICE_TEST) {
@@ -94,7 +94,7 @@ public class PublishContentPackageUseCase {
                 try {
                     TestSource.valueOf(pkg.getSourceCode());
                 } catch (RuntimeException invalidSource) {
-                    throw new InvalidContentStateException("Practice tests require a supported test source");
+                    throw new InvalidContentStateException("Bài kiểm tra luyện tập cần nguồn đề được hỗ trợ");
                 }
             }
             List<String> issues = lessons.practiceTestPublishIssues(targetVersion.getId());
@@ -128,19 +128,19 @@ public class PublishContentPackageUseCase {
                 JsonNode spec = parseSpec(question.answerSpecJson());
                 if ((question.questionType() == QuestionType.ESSAY
                         || LessonBlockKind.ESSAY_SPEC_TYPE.equals(spec.path("type").asText())) && !validEssay(question, spec)) {
-                    throw new InvalidContentStateException("Writing essays require passBand from 0 to 9 in steps of 0.5");
+                    throw new InvalidContentStateException("Bài viết cần band đạt từ 0 đến 9, bước 0.5");
                 }
             }
             if (pkg.getPackageType() == PackageType.COURSE_TEST
                     && (questions.isEmpty() || questions.stream().anyMatch(question -> !gradableQuestion(question)))) {
-                throw new InvalidContentStateException("COURSE_TEST requires gradable Reading or Listening questions, or Writing essays with passBand");
+                throw new InvalidContentStateException("Đề cuối khóa cần câu hỏi Reading hoặc Listening chấm tự động được, hoặc bài viết có band đạt");
             }
         }
         if (pkg.getPackageType() == PackageType.PRACTICE_TEST) {
             var questions = lessons.packageQuestionSpecs(targetVersion.getId());
             if (questions.isEmpty() || questions.stream().anyMatch(question -> !gradableQuestion(question))) {
                 throw new InvalidContentStateException(
-                        "Practice tests require auto-gradable Reading or Listening questions, or Writing essays with passBand");
+                        "Bài kiểm tra luyện tập cần câu hỏi Reading hoặc Listening chấm tự động được, hoặc bài viết có band đạt");
             }
         }
 

@@ -50,7 +50,7 @@ class ContentPackageTest {
 
         assertThatThrownBy(() -> pkg.publishVersion(randomVersionId))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Version does not belong to package");
+                .hasMessageContaining("Phiên bản không thuộc gói");
     }
 
     @Test
@@ -59,7 +59,7 @@ class ContentPackageTest {
         UUID lessonId = UUID.randomUUID();
         assertThatThrownBy(() -> ContentPackage.create("MOCK", "Mock", PackageType.MOCK_TEST, null, lessonId))
                 .isInstanceOf(InvalidPackageLessonException.class)
-                .hasMessage("Only a PRACTICE_SET package can belong to a lesson");
+                .hasMessage("Chỉ gói luyện tập (PRACTICE_SET) mới gắn vào bài học được");
         assertThat(ContentPackage.create("PS", "Practice", PackageType.PRACTICE_SET, null, lessonId).getLessonId())
                 .isEqualTo(lessonId);
     }

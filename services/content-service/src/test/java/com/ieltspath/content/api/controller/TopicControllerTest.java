@@ -242,6 +242,6 @@ class TopicControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Topic with code 'DUPLICATE' already exists"));
+                .andExpect(jsonPath("$.message").value("Mã \"DUPLICATE\" đã được dùng"));
     }
 }

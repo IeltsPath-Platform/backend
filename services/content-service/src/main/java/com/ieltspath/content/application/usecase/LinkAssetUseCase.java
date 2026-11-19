@@ -27,7 +27,7 @@ public class LinkAssetUseCase {
         } else if (command.questionVersionId() != null) {
             link = ContentAssetLink.forQuestionVersion(command.assetId(), command.questionVersionId(), command.sortOrder());
         } else {
-            throw new IllegalArgumentException("Either sectionId or questionVersionId must be provided");
+            throw new IllegalArgumentException("Cần chọn phần của gói hoặc phiên bản câu hỏi");
         }
 
         contentAssetRepository.saveLink(link);

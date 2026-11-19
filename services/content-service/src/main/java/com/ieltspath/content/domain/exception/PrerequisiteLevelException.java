@@ -8,7 +8,7 @@ public class PrerequisiteLevelException extends ContentDomainException {
     private final List<UUID> invalidIds;
 
     public PrerequisiteLevelException(List<UUID> invalidIds) {
-        super("Prerequisites must not have a higher CEFR level than the point that depends on them: " + invalidIds);
+        super("Điểm kiến thức tiên quyết không được có cấp CEFR cao hơn điểm phụ thuộc vào nó");
         this.invalidIds = List.copyOf(invalidIds);
     }
 

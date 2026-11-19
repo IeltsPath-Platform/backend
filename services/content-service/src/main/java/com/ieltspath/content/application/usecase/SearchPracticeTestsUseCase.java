@@ -25,21 +25,21 @@ public class SearchPracticeTestsUseCase {
     @Transactional(readOnly = true)
     public PracticeTestCatalogReader.Page execute(SearchPracticeTestsCommand command) {
         if (!"PART".equals(command.scope()) && !"FULL".equals(command.scope()))
-            throw new IllegalArgumentException("scope must be FULL or PART");
+            throw new IllegalArgumentException("Phạm vi phải là FULL hoặc PART");
         if ("FULL".equals(command.scope()) && command.partNo() != null)
-            throw new IllegalArgumentException("partNo is only valid for PART scope");
+            throw new IllegalArgumentException("Số phần chỉ dùng với phạm vi PART");
         if (command.only() != null && !command.only().isEmpty()
                 && command.exclude() != null && !command.exclude().isEmpty())
-            throw new IllegalArgumentException("only and exclude cannot be used together");
+            throw new IllegalArgumentException("Không dùng đồng thời điều kiện chỉ lấy và loại trừ");
         if (command.page() < 0 || command.size() < 1 || command.size() > 50)
-            throw new IllegalArgumentException("Invalid page or size");
+            throw new IllegalArgumentException("Trang hoặc kích thước trang không hợp lệ");
         if (command.query() != null && command.query().length() > 100)
-            throw new IllegalArgumentException("query must be at most 100 characters");
+            throw new IllegalArgumentException("Từ khóa tìm kiếm dài tối đa 100 ký tự");
         List<String> sources = command.sources() == null ? List.of() : command.sources();
         for (String source : sources) TestSource.valueOf(source);
         if (command.skill() == Skill.ALL) return new PracticeTestCatalogReader.Page(0, List.of());
         List<String> formats = command.formats() == null ? List.of() : command.formats();
-        if (formats.size() > 10) throw new IllegalArgumentException("At most 10 formats");
+        if (formats.size() > 10) throw new IllegalArgumentException("Chọn tối đa 10 định dạng");
         return reader.search(new PracticeTestCatalogReader.Search(command.skill(), command.scope(), command.partNo(),
                 sources, command.query() == null ? null : command.query().strip(), command.only(), command.exclude(),
                 command.page(), command.size(), formats));

@@ -137,7 +137,7 @@ class ContentMediaControllerTest {
         mockMvc.perform(multipart("/api/content/admin/media/audio").file(file()))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.details.code").value("STORAGE_UNAVAILABLE"))
-                .andExpect(jsonPath("$.message").value("File storage is unavailable"));
+                .andExpect(jsonPath("$.message").value("Kho lưu trữ tệp tạm thời chưa khả dụng, vui lòng thử lại sau"));
     }
 
     @Test

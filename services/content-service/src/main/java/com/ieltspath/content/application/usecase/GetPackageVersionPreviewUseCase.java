@@ -36,11 +36,11 @@ public class GetPackageVersionPreviewUseCase {
                 .orElseThrow(() -> new ContentPackageNotFoundException(packageId));
         ContentPackageVersion target = pkg.getVersions().stream().filter(v -> v.getId().equals(versionId))
                 .findFirst().orElseThrow(() -> new InvalidContentStateException(
-                        "Version " + versionId + " does not belong to package " + packageId));
+                        "Phiên bản " + versionId + " không thuộc gói " + packageId));
         PackageVersionContentResult source = contentReader.packageVersionContent(versionId)
                 .orElseThrow(() -> new PackageVersionNotFoundException(versionId));
         if (!packageId.equals(source.packageId())) {
-            throw new InvalidContentStateException("Version does not belong to requested package");
+            throw new InvalidContentStateException("Phiên bản không thuộc gói được yêu cầu");
         }
 
         List<PackageVersionPreviewResult.Section> sections = source.sections().stream().map(section ->

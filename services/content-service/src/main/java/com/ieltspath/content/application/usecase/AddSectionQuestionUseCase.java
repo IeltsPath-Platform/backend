@@ -31,14 +31,14 @@ public class AddSectionQuestionUseCase {
         pkg.requireVersion(versionId).requireDraft();
         ContentSection section = pkg.requireSectionInVersion(versionId, sectionId);
         if (questionVersionId == null) {
-            throw new IllegalArgumentException("questionVersionId is required");
+            throw new IllegalArgumentException("Cần chọn phiên bản câu hỏi");
         }
         if (!contentPackageRepository.questionVersionExists(questionVersionId)) {
             throw new QuestionVersionNotFoundException(questionVersionId);
         }
         BigDecimal score = maxScore == null ? BigDecimal.ONE : maxScore;
         if (score.signum() <= 0) {
-            throw new IllegalArgumentException("maxScore must be positive");
+            throw new IllegalArgumentException("Điểm tối đa phải lớn hơn 0");
         }
         pkg.requireVersion(versionId).requireQuestionNotInVersion(questionVersionId);
 

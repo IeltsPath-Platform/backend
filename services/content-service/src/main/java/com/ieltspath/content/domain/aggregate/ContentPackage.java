@@ -70,7 +70,7 @@ public class ContentPackage {
                           List<ContentPackageVersion> versions, UUID lessonId, UUID courseId, String sourceCode,
                           UUID topicId, PlacementPool placementPool) {
         if (placementPool != null && packageType != PackageType.PLACEMENT_TEST) {
-            throw new IllegalArgumentException("placementPool is only valid for PLACEMENT_TEST");
+            throw new IllegalArgumentException("Nhóm đề xếp lớp chỉ dùng cho đề xếp lớp (PLACEMENT_TEST)");
         }
         this.placementPool = placementPool;
         this.id = Objects.requireNonNull(id, "id must not be null");
@@ -85,11 +85,11 @@ public class ContentPackage {
         this.updatedAt = updatedAt != null ? updatedAt : this.createdAt;
         this.versions = versions != null ? new ArrayList<>(versions) : new ArrayList<>();
         if (lessonId != null && packageType != PackageType.PRACTICE_SET) {
-            throw new InvalidPackageLessonException("Only a PRACTICE_SET package can belong to a lesson");
+            throw new InvalidPackageLessonException("Chỉ gói luyện tập (PRACTICE_SET) mới gắn vào bài học được");
         }
         this.lessonId = lessonId;
         if (packageType == PackageType.COURSE_TEST && courseId == null) {
-            throw new IllegalArgumentException("A COURSE_TEST package must belong to a course");
+            throw new IllegalArgumentException("Đề cuối khóa (COURSE_TEST) phải thuộc một khóa học");
         }
         this.courseId = courseId;
         this.topicId = topicId;
@@ -120,7 +120,7 @@ public class ContentPackage {
     public static ContentPackage createFinalTest(String code, String title, PackageType packageType,
                                                  String requiredFeatureKey, UUID topicId, UUID courseId) {
         if (packageType == PackageType.TOPIC_TEST && topicId == null) {
-            throw new IllegalArgumentException("A TOPIC_TEST package must belong to a topic");
+            throw new IllegalArgumentException("Đề cuối chủ đề (TOPIC_TEST) phải thuộc một chủ đề");
         }
         Instant now = Instant.now();
         return new ContentPackage(UUID.randomUUID(), code, title, packageType, requiredFeatureKey,
@@ -131,7 +131,7 @@ public class ContentPackage {
         Objects.requireNonNull(versionId, "versionId must not be null");
         boolean exists = versions.stream().anyMatch(v -> v.getId().equals(versionId));
         if (!exists) {
-            throw new IllegalArgumentException("Version does not belong to package: " + versionId);
+            throw new IllegalArgumentException("Phiên bản không thuộc gói: " + versionId);
         }
         this.currentPublishedVersionId = versionId;
         this.status = PublicationStatus.PUBLISHED;
@@ -166,7 +166,7 @@ public class ContentPackage {
         boolean elsewhere = versions.stream()
                 .anyMatch(v -> v.getSections().stream().anyMatch(s -> s.getId().equals(sectionId)));
         if (elsewhere) {
-            throw new IllegalArgumentException("section " + sectionId + " does not belong to version " + versionId);
+            throw new IllegalArgumentException("Phần " + sectionId + " không thuộc phiên bản " + versionId);
         }
         throw new ContentSectionNotFoundException(sectionId);
     }

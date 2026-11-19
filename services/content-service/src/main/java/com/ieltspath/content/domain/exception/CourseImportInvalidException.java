@@ -11,7 +11,7 @@ public class CourseImportInvalidException extends ContentDomainException {
     private final List<Issue> warnings;
 
     public CourseImportInvalidException(List<Issue> errors, List<Issue> warnings) {
-        super("The workbook has errors");
+        super("Tệp Excel có lỗi");
         this.errors = List.copyOf(errors);
         this.warnings = List.copyOf(warnings);
     }

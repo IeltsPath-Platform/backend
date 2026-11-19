@@ -4,11 +4,11 @@ import java.util.UUID;
 
 public class TopicNotFoundException extends ContentDomainException {
     public TopicNotFoundException(UUID id) {
-        super("Topic not found with id: " + id);
+        super("Không tìm thấy chủ đề");
     }
 
     public TopicNotFoundException(String code) {
-        super("Topic not found with code: " + code);
+        super("Không tìm thấy chủ đề");
     }
 }
 

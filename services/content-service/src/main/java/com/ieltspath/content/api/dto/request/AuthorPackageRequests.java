@@ -30,7 +30,7 @@ public final class AuthorPackageRequests {
             UUID topicId,
             UUID courseId,
             PlacementPool placementPool) {
-        @AssertTrue(message = "placementPool is required exactly for PLACEMENT_TEST")
+        @AssertTrue(message = "Nhóm đề xếp lớp (placementPool) chỉ bắt buộc và chỉ dùng cho đề xếp lớp")
         public boolean isPlacementPoolValid() {
             return packageType == null || (packageType == PackageType.PLACEMENT_TEST) == (placementPool != null);
         }

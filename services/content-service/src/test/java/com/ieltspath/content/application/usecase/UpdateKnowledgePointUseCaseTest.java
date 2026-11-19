@@ -97,7 +97,7 @@ class UpdateKnowledgePointUseCaseTest {
         when(topics.findById(writing.getId())).thenReturn(Optional.of(writing));
         assertThatThrownBy(() -> useCase.execute(point.getId(), command(writing.getId(), "W60_TASK_RESPONSE", Skill.READING, CefrLevel.B1)))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("A knowledge point in a course topic must match its skill");
+                .hasMessage("Điểm kiến thức trong chủ đề của khóa học phải cùng kỹ năng với chủ đề");
         verify(points, never()).save(any());
     }
 }

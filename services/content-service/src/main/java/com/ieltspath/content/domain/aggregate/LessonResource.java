@@ -34,15 +34,15 @@ public class LessonResource {
                           String fileKey, int sortOrder, Instant createdAt, Instant updatedAt) {
         this.id = Objects.requireNonNull(id, "id must not be null");
         this.lessonId = Objects.requireNonNull(lessonId, "lessonId must not be null");
-        if (resourceType == null) throw new IllegalArgumentException("resourceType is required");
+        if (resourceType == null) throw new IllegalArgumentException("Cần chọn loại tài nguyên");
         this.resourceType = resourceType;
         this.title = requireTitle(title);
         boolean hasFile = fileKey != null && !fileKey.isBlank();
         if (hasFile == (url != null && !url.isBlank())) {
-            throw new IllegalArgumentException("a resource needs either a url or a file, not both");
+            throw new IllegalArgumentException("Tài nguyên cần một đường dẫn hoặc một tệp, không được cả hai");
         }
         if (hasFile && resourceType != LessonResourceType.DOCUMENT) {
-            throw new IllegalArgumentException("only a document can be an uploaded file");
+            throw new IllegalArgumentException("Chỉ tài liệu mới là tệp tải lên được");
         }
         this.url = hasFile ? null : requireUrl(url);
         this.fileKey = hasFile ? requireFileKey(fileKey) : null;
@@ -74,7 +74,7 @@ public class LessonResource {
     public void update(String title, String url, int sortOrder) {
         String checkedTitle = requireTitle(title);
         if (fileKey != null && url != null && !url.isBlank()) {
-            throw new IllegalArgumentException("an uploaded file cannot be replaced by a link");
+            throw new IllegalArgumentException("Không thay tệp đã tải lên bằng đường dẫn được");
         }
         String checkedUrl = fileKey != null ? null : requireUrl(url);
         int checkedOrder = requireSortOrder(sortOrder);
@@ -85,27 +85,27 @@ public class LessonResource {
     }
 
     private static String requireTitle(String title) {
-        if (title == null || title.isBlank()) throw new IllegalArgumentException("title must not be blank");
+        if (title == null || title.isBlank()) throw new IllegalArgumentException("Tiêu đề không được để trống");
         String trimmed = title.trim();
-        if (trimmed.length() > 255) throw new IllegalArgumentException("title exceeds 255 characters");
+        if (trimmed.length() > 255) throw new IllegalArgumentException("Tiêu đề dài quá 255 ký tự");
         return trimmed;
     }
 
     /** Only absolute http(s) links with a host: no javascript:, data: or relative links reach a learner's browser. */
     private static String requireUrl(String url) {
-        if (url == null || url.isBlank()) throw new IllegalArgumentException("url must not be blank");
+        if (url == null || url.isBlank()) throw new IllegalArgumentException("Đường dẫn không được để trống");
         String trimmed = url.trim();
         if (trimmed.length() > MAX_URL_LENGTH) {
-            throw new IllegalArgumentException("url exceeds " + MAX_URL_LENGTH + " characters");
+            throw new IllegalArgumentException("Đường dẫn dài quá " + MAX_URL_LENGTH + " ký tự");
         }
         try {
             URI uri = new URI(trimmed);
             String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
             if (!(scheme.equals("http") || scheme.equals("https")) || uri.getHost() == null) {
-                throw new IllegalArgumentException("url must be an absolute http or https link");
+                throw new IllegalArgumentException("Đường dẫn phải là liên kết http hoặc https đầy đủ");
             }
         } catch (URISyntaxException ex) {
-            throw new IllegalArgumentException("url must be an absolute http or https link");
+            throw new IllegalArgumentException("Đường dẫn phải là liên kết http hoặc https đầy đủ");
         }
         return trimmed;
     }
@@ -113,13 +113,13 @@ public class LessonResource {
     private static String requireFileKey(String fileKey) {
         String trimmed = fileKey.trim();
         if (trimmed.length() > MAX_FILE_KEY_LENGTH || !trimmed.startsWith(FILE_KEY_PREFIX + "/")) {
-            throw new IllegalArgumentException("fileKey is not a lesson document key");
+            throw new IllegalArgumentException("Tệp không phải là tài liệu của bài học");
         }
         return trimmed;
     }
 
     private static int requireSortOrder(int sortOrder) {
-        if (sortOrder < 0) throw new IllegalArgumentException("sortOrder must not be negative");
+        if (sortOrder < 0) throw new IllegalArgumentException("Thứ tự không được âm");
         return sortOrder;
     }
 

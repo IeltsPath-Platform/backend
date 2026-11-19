@@ -31,7 +31,7 @@ public class ArchiveQuestionVersionUseCase {
         var version = question.getVersions().stream().filter(v -> v.getId().equals(versionId)).findFirst()
                 .orElseThrow(() -> new QuestionVersionNotFoundException(versionId));
         if (version.getStatus() != PublicationStatus.PUBLISHED) {
-            throw new QuestionVersionStateException("Only published question versions can be archived");
+            throw new QuestionVersionStateException("Chỉ lưu trữ được phiên bản câu hỏi đã xuất bản");
         }
         if (usageLookup.isUsedByPublishedContent(versionId)) throw new QuestionVersionInUseException(versionId);
         question.archiveVersion(versionId);

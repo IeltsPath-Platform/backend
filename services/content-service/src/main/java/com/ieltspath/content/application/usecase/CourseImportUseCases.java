@@ -388,7 +388,7 @@ public class CourseImportUseCases {
         try {
             return json.writeValueAsString(spec);
         } catch (JsonProcessingException failure) {
-            throw new IllegalStateException("Answer spec could not be written", failure);
+            throw new IllegalStateException("Không ghi được đáp án của câu hỏi", failure);
         }
     }
 
@@ -408,9 +408,9 @@ public class CourseImportUseCases {
     private QuestionVersion latestVersion(String importRef) {
         // The lookup by reference returns a summary without versions, so the question is read again in full.
         Question question = questions.findByImportRef(importRef).flatMap(found -> questions.findById(found.getId()))
-                .orElseThrow(() -> new IllegalStateException("A question of the import cannot be found again"));
+                .orElseThrow(() -> new IllegalStateException("Không tìm lại được một câu hỏi của tệp nhập"));
         return question.getVersions().stream().max(Comparator.comparingInt(QuestionVersion::getVersionNumber))
-                .orElseThrow(() -> new IllegalStateException("A question of the import has no version"));
+                .orElseThrow(() -> new IllegalStateException("Một câu hỏi của tệp nhập chưa có phiên bản"));
     }
 
     private UUID createPackageFrom(PackagePlan pack, CourseMaterializer.Created created, CourseImportPlan plan,

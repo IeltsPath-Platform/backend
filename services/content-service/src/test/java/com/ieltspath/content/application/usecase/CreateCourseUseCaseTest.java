@@ -30,9 +30,9 @@ class CreateCourseUseCaseTest {
         when(courses.findByBandLevel(new BigDecimal("5.5"))).thenReturn(Optional.of(existing));
 
         assertThatThrownBy(() -> useCase.execute(new CreateCourseCommand("IELTS_5_5", "Again", new BigDecimal("6.0"))))
-                .isInstanceOf(DuplicateCourseException.class).hasMessageContaining("code");
+                .isInstanceOf(DuplicateCourseException.class).hasMessageContaining("Mã khóa học");
         assertThatThrownBy(() -> useCase.execute(new CreateCourseCommand("NEW", "New", new BigDecimal("5.5"))))
-                .isInstanceOf(DuplicateCourseException.class).hasMessageContaining("bandLevel");
+                .isInstanceOf(DuplicateCourseException.class).hasMessageContaining("Band 5.5");
         verify(courses, never()).save(any());
     }
 

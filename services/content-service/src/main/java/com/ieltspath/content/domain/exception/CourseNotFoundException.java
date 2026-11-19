@@ -4,6 +4,6 @@ import java.util.UUID;
 
 public class CourseNotFoundException extends ContentDomainException {
     public CourseNotFoundException(UUID id) {
-        super("Course with id '" + id + "' not found");
+        super("Không tìm thấy khóa học");
     }
 }

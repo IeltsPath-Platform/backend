@@ -52,7 +52,7 @@ public class ManageRubricsUseCase {
     @Transactional(readOnly = true)
     public List<RubricVersionRef> versions(String code) {
         if (code == null || code.isBlank()) {
-            throw new IllegalArgumentException("code is required");
+            throw new IllegalArgumentException("Cần có mã rubric");
         }
         return rubrics.findVersions(code.trim());
     }
@@ -61,18 +61,18 @@ public class ManageRubricsUseCase {
     public Rubric byVersion(String code, int version) {
         return rubrics.findByCodeAndVersion(code, version)
                 .filter(r -> !"DRAFT".equals(r.status()))
-                .orElseThrow(() -> new RubricNotFoundException("Published rubric not found: " + code + "@" + version));
+                .orElseThrow(() -> new RubricNotFoundException("Không tìm thấy rubric đã xuất bản: " + code + "@" + version));
     }
 
     @Transactional(readOnly = true)
     public Rubric activeRubric(String task) {
         return active(task).stream().findFirst()
-                .orElseThrow(() -> new RubricNotFoundException("No active rubric for task: " + task));
+                .orElseThrow(() -> new RubricNotFoundException("Chưa có rubric đang dùng cho loại bài: " + task));
     }
 
     private static String requireTask(String task) {
         if (!List.of("TASK_1", "TASK_2", "SPEAKING").contains(task)) {
-            throw new IllegalArgumentException("task must be TASK_1, TASK_2 or SPEAKING");
+            throw new IllegalArgumentException("Loại bài phải là TASK_1, TASK_2 hoặc SPEAKING");
         }
         return task;
     }

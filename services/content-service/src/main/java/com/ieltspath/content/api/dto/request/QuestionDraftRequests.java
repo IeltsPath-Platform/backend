@@ -23,7 +23,7 @@ public final class QuestionDraftRequests {
             @NotNull QuestionType questionType,
             @Min(1) int count,
             @NotNull QuestionDifficulty difficulty,
-            @Size(max = 500, message = "instructions must not exceed 500 characters") String instructions
+            @Size(max = 500, message = "Hướng dẫn thêm không được dài quá 500 ký tự") String instructions
     ) {
     }
 

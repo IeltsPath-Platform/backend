@@ -7,7 +7,7 @@ public class PrerequisiteCycleException extends ContentDomainException {
     private final List<UUID> cycle;
 
     public PrerequisiteCycleException(List<UUID> cycle) {
-        super("Knowledge point prerequisites create a cycle: " + cycle);
+        super("Điểm kiến thức tiên quyết tạo thành vòng lặp");
         this.cycle = List.copyOf(cycle);
     }
 

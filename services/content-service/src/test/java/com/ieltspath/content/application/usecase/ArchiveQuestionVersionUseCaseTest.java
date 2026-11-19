@@ -70,7 +70,7 @@ class ArchiveQuestionVersionUseCaseTest {
 
         assertThatThrownBy(() -> useCase.execute(question.getId(), draft.getId()))
                 .isInstanceOf(QuestionVersionStateException.class)
-                .hasMessage("Only published question versions can be archived");
+                .hasMessage("Chỉ lưu trữ được phiên bản câu hỏi đã xuất bản");
         assertThat(draft.getStatus()).isEqualTo(PublicationStatus.DRAFT);
         org.mockito.Mockito.verifyNoInteractions(usage);
     }

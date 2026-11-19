@@ -9,7 +9,7 @@ public class ImportFileRejectedException extends ContentDomainException {
     private final String code;
 
     public ImportFileRejectedException(String code) {
-        super(NOT_XLSX.equals(code) ? "The file is not an .xlsx workbook" : "The file is larger than the limit");
+        super(NOT_XLSX.equals(code) ? "Tệp không phải là sổ làm việc .xlsx" : "Tệp lớn hơn giới hạn cho phép");
         this.code = code;
     }
 

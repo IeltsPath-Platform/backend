@@ -39,9 +39,9 @@ public class JdbcRubricRepository implements RubricRepository {
             status = jdbc.queryForObject("SELECT status FROM rubrics WHERE code=:code AND rubric_version=:version FOR UPDATE",
                     key, String.class);
         } catch (EmptyResultDataAccessException ex) {
-            throw new RubricNotFoundException("Rubric not found: " + code + "@" + version);
+            throw new RubricNotFoundException("Không tìm thấy rubric: " + code + "@" + version);
         }
-        if (!"DRAFT".equals(status)) throw new RubricNotEditableException("Only draft rubrics can be edited");
+        if (!"DRAFT".equals(status)) throw new RubricNotEditableException("Chỉ sửa được rubric ở trạng thái nháp");
         jdbc.update("UPDATE rubrics SET task=:task, source_note=:sourceNote, system_prompt=:systemPrompt, updated_at=CURRENT_TIMESTAMP "
                 + "WHERE code=:code AND rubric_version=:version", params(rubric));
         UUID id = jdbc.queryForObject("SELECT id FROM rubrics WHERE code=:code AND rubric_version=:version", key, UUID.class);
@@ -61,7 +61,7 @@ public class JdbcRubricRepository implements RubricRepository {
             rubricId = (UUID) row.get("id");
             task = (String) row.get("task");
         } catch (EmptyResultDataAccessException ex) {
-            throw new RubricNotFoundException("Rubric not found: " + code + "@" + version);
+            throw new RubricNotFoundException("Không tìm thấy rubric: " + code + "@" + version);
         }
         validateForActivation(load(rubricId));
         jdbc.query("SELECT pg_advisory_xact_lock(hashtext(:task))", new MapSqlParameterSource("task", task), rs -> null);
@@ -158,13 +158,13 @@ public class JdbcRubricRepository implements RubricRepository {
             case "TASK_1" -> Set.of("TA", "CC", "LR", "GRA");
             case "TASK_2" -> Set.of("TR", "CC", "LR", "GRA");
             case "SPEAKING" -> Set.of("FC", "LR", "GRA");
-            default -> throw new IllegalArgumentException("Unsupported rubric task: " + rubric.task());
+            default -> throw new IllegalArgumentException("Loại bài của rubric không được hỗ trợ: " + rubric.task());
         };
         boolean validSpeakingCriteria = "SPEAKING".equals(rubric.task())
                 && actualCriteria.containsAll(expectedCriteria)
                 && Set.of("FC", "LR", "GRA", "PR").containsAll(actualCriteria);
         if (!(expectedCriteria.equals(actualCriteria) || validSpeakingCriteria)) {
-            throw new IllegalArgumentException("Rubric " + rubric.task() + " requires criteria " + expectedCriteria);
+            throw new IllegalArgumentException("Rubric " + rubric.task() + " cần các tiêu chí " + expectedCriteria);
         }
         double lowestBand = "SPEAKING".equals(rubric.task()) ? 0.0 : 4.0;
         List<Double> expectedBands = java.util.stream.IntStream.rangeClosed(0,
@@ -174,8 +174,8 @@ public class JdbcRubricRepository implements RubricRepository {
             List<Double> actualBands = criterion.bandDescriptors().stream().map(Rubric.BandDescriptor::band)
                     .sorted().toList();
             if (!expectedBands.equals(actualBands)) {
-                throw new IllegalArgumentException("Rubric criterion " + criterion.code()
-                        + " must have one descriptor for every band from 4.0 to 9.0 in 0.5 steps");
+                throw new IllegalArgumentException("Tiêu chí " + criterion.code()
+                        + " phải có một mô tả cho mỗi mức band từ 4.0 đến 9.0, bước 0.5");
             }
         }
     }

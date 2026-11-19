@@ -114,6 +114,12 @@ src/main/java/com/ieltspath/<service>
 - Mở rộng `GlobalExceptionHandler` → `ErrorResponse` của service thay vì trả error body tự phát.
 - Giữ và forward `X-Correlation-Id`. Không log credential, token, password, nội dung hội thoại, prompt hay API key.
 - Lấy danh tính bằng `CurrentUserProvider` (`common-security`); không tin header `X-User-*` do client gửi.
+- **Mọi thông báo lỗi trả về client MUST là tiếng Việt có dấu.** Frontend chỉ hiện nguyên `message` của backend lên toast, nên một câu tiếng Anh ở đây là người dùng đọc thấy tiếng Anh. Áp dụng cho: tham số của `super(...)` trong exception nghiệp vụ, `IllegalArgumentException`/`IllegalStateException` mà handler chuyển thành 400/409, chuỗi cố định trong `GlobalExceptionHandler` ("Dữ liệu gửi lên không hợp lệ", không phải "Validation failed"), và `message = "…"` của Bean Validation. Viết câu cho người dùng hành động được: nói ô hay thao tác nào sai và cách sửa, không nhét UUID, tên lớp hay tên trường kỹ thuật vào câu; dữ liệu máy đọc (id, danh sách) để trong `details`.
+  - Lỗi gắn với một trường hợp nghiệp vụ cần frontend xử lý riêng thì thêm `details.code` ổn định (chữ in hoa, gạch dưới); **không dùng chính mã làm `message`** (ví dụ `super("PLACEMENT_POOL_REQUIRED")`), và handler không so sánh `ex.getMessage()` để nhận ra loại lỗi.
+  - Lớp chốt chặn: `buildResponse` của mọi `GlobalExceptionHandler` MUST gọi `VietnameseErrorMessages.userFacing(status, message)` (`common-security`). Câu không có chữ cái tiếng Việt bị thay bằng câu chung theo mã trạng thái và bản gốc được ghi log; đây là lưới đỡ, không phải lý do để bỏ dịch tại nguồn, vì câu chung mất nội dung cụ thể.
+  - Bean Validation không đặt `message` thì lấy câu mặc định tiếng Việt từ `ValidationMessages.properties` (`common-security`); chỉ đặt `message` riêng khi câu cần nêu tên ô ("Mã kích hoạt không được để trống").
+  - Test dùng `hasMessageContaining`/`jsonPath("$.message")` MUST so khớp với câu tiếng Việt. Message log nội bộ (`log.warn`, `log.error`) không thuộc quy tắc này.
+  - Service mới có `GlobalExceptionHandler` mà chưa nối `VietnameseErrorMessages` là chưa xong.
 
 ### 3.4 Ranh giới bảo mật
 
@@ -420,6 +426,7 @@ Khi không có convention cụ thể, theo code lân cận trong cùng module.
 
 - TUYỆT ĐỐI KHÔNG sửa, xóa hoặc rewrite migration đã áp dụng; thay đổi schema bằng migration mới.
 - TUYỆT ĐỐI KHÔNG destructive schema/data change khi chưa được phê duyệt rõ ràng.
+- TUYỆT ĐỐI KHÔNG trả thông báo lỗi tiếng Anh hoặc không dấu cho client (xem 3.3), và không dùng mã lỗi làm `message`.
 - TUYỆT ĐỐI KHÔNG expose JPA entity làm request/response DTO.
 - TUYỆT ĐỐI KHÔNG âm thầm đổi HTTP status, response schema, HTTP method hoặc inter-service/event contract.
 - TUYỆT ĐỐI KHÔNG filter, sort, phân trang tập không giới hạn trong bộ nhớ sau `findAll()`; không tạo N+1.

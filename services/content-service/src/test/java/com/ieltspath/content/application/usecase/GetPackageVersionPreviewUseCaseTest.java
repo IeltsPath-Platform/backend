@@ -48,7 +48,7 @@ class GetPackageVersionPreviewUseCaseTest {
         when(reader.packageVersionContent(draft.getId())).thenReturn(Optional.of(content(UUID.randomUUID())));
         assertThatThrownBy(() -> useCase.execute(pkg.getId(), draft.getId()))
                 .isInstanceOf(InvalidContentStateException.class)
-                .hasMessage("Version does not belong to requested package");
+                .hasMessage("Phiên bản không thuộc gói được yêu cầu");
     }
 
     @Test

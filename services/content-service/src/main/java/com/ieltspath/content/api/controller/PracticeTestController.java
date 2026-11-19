@@ -36,7 +36,7 @@ public class PracticeTestController {
     public PracticeTestPageResponse search(@Valid @RequestBody SearchPracticeTestsRequest request) {
         Skill skill;
         try { skill = Skill.valueOf(request.skill()); }
-        catch (RuntimeException invalid) { throw new IllegalArgumentException("Unknown skill"); }
+        catch (RuntimeException invalid) { throw new IllegalArgumentException("Kỹ năng không hợp lệ"); }
         var command = new SearchPracticeTestsCommand(skill, request.scope(), request.partNo(), request.sources(),
                 request.query(), map(request.only()), map(request.exclude()), request.page() == null ? 0 : request.page(),
                 request.size() == null ? 12 : request.size(),
@@ -55,7 +55,7 @@ public class PracticeTestController {
     public List<PracticeTestCatalogReader.FormatCount> formats(@RequestParam("skill") String skill) {
         Skill parsed;
         try { parsed = Skill.valueOf(skill); }
-        catch (RuntimeException invalid) { throw new IllegalArgumentException("Unknown skill"); }
+        catch (RuntimeException invalid) { throw new IllegalArgumentException("Kỹ năng không hợp lệ"); }
         return formats.execute(parsed);
     }
 

@@ -40,7 +40,7 @@ class ReplaceKnowledgePointPrerequisitesUseCaseTest {
 
         assertThatThrownBy(() -> useCase().execute(id, List.of()))
                 .isInstanceOf(InvalidErrorTypeException.class)
-                .hasMessage("TRAP_KNOWLEDGE_POINT_NOT_ASSIGNABLE");
+                .hasFieldOrPropertyWithValue("code", "TRAP_KNOWLEDGE_POINT_NOT_ASSIGNABLE");
         verify(prerequisites).lockTree();
     }
 
@@ -54,7 +54,7 @@ class ReplaceKnowledgePointPrerequisitesUseCaseTest {
 
         assertThatThrownBy(() -> useCase().execute(dependent.getId(), List.of(trapId)))
                 .isInstanceOf(InvalidErrorTypeException.class)
-                .hasMessage("TRAP_KNOWLEDGE_POINT_NOT_ASSIGNABLE");
+                .hasFieldOrPropertyWithValue("code", "TRAP_KNOWLEDGE_POINT_NOT_ASSIGNABLE");
     }
 
     private ReplaceKnowledgePointPrerequisitesUseCase useCase() {

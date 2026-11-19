@@ -4,6 +4,6 @@ import java.util.UUID;
 
 public class ErrorTypeNotFoundException extends ContentDomainException {
     public ErrorTypeNotFoundException(UUID id) {
-        super("Error type not found: " + id);
+        super("Không tìm thấy loại lỗi");
     }
 }

@@ -167,7 +167,7 @@ class KnowledgePointControllerTest {
                                  "learningType":"PROCEDURE","skill":"READING","cefrLevel":"B1"}
                                 """.formatted(UUID.randomUUID())))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.details.canDo").value("canDo is required"));
+                .andExpect(jsonPath("$.details.canDo").value("Cần nhập mô tả can-do"));
 
         verify(createKnowledgePointUseCase, never()).execute(any());
     }
@@ -312,7 +312,7 @@ class KnowledgePointControllerTest {
                 .andExpect(jsonPath("$.status").value("ACTIVE"));
 
         when(activateKnowledgePointUseCase.execute(id)).thenThrow(
-                new IllegalArgumentException("learningType is required for an active knowledge point"));
+                new IllegalArgumentException("Điểm kiến thức đang dùng cần có loại học (learningType)"));
         mockMvc.perform(post("/api/content/knowledge-points/{id}/activate", id))
                 .andExpect(status().isBadRequest());
     }

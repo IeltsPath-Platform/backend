@@ -31,20 +31,20 @@ public class GetGameContentSnapshotUseCase {
 
     public GameContentSnapshotResult execute(GetGameContentSnapshotCommand command) {
         if (new HashSet<>(command.contentIds()).size() != command.contentIds().size()) {
-            throw new IllegalArgumentException("contentIds must not contain duplicates");
+            throw new IllegalArgumentException("Danh sách nội dung không được trùng nhau");
         }
         return switch (command.learningDomain()) {
             case "GRAMMAR" -> grammarSnapshot(command.gameType(), command.contentIds());
-            default -> throw new IllegalArgumentException("content-service supports GRAMMAR snapshots only");
+            default -> throw new IllegalArgumentException("Chỉ hỗ trợ nội dung ngữ pháp (GRAMMAR)");
         };
     }
 
     private GameContentSnapshotResult grammarSnapshot(String gameType, List<UUID> ids) {
         if (!List.of("SENTENCE_COMPLETION", "ERROR_CORRECTION", "WORD_ORDER").contains(gameType)) {
-            throw new IllegalArgumentException("gameType is unsupported for grammar");
+            throw new IllegalArgumentException("Loại trò chơi này không hỗ trợ nội dung ngữ pháp");
         }
         List<Question> questions = questionRepository.findByIds(ids);
-        if (questions.size() != ids.size()) throw new IllegalArgumentException("One or more questions do not exist");
+        if (questions.size() != ids.size()) throw new IllegalArgumentException("Có câu hỏi không tồn tại");
         List<GameContentSnapshotResult.GameContentItem> snapshots = new ArrayList<>(questions.size());
         for (Question question : questions) {
             UUID versionId = question.getCurrentPublishedVersionId();
@@ -61,7 +61,7 @@ public class GetGameContentSnapshotUseCase {
                 .collect(Collectors.toSet());
         if (!learningContentReader.questionVersionsReservedForLearning(versionIds).isEmpty()) {
             throw new IllegalArgumentException(
-                    "Questions used by lessons, practice sets or topic tests cannot be used in games");
+                    "Câu hỏi đang dùng trong bài học, bộ luyện tập hoặc đề cuối chủ đề thì không dùng cho trò chơi được");
         }
         return new GameContentSnapshotResult(snapshots);
     }

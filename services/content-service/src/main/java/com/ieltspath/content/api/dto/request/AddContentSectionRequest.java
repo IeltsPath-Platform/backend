@@ -8,8 +8,8 @@ import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
 public record AddContentSectionRequest(
-        @NotBlank(message = "title is required")
-        @Size(max = 255, message = "title must not exceed 255 characters")
+        @NotBlank(message = "Tiêu đề không được để trống")
+        @Size(max = 255, message = "Tiêu đề không được dài quá 255 ký tự")
         String title,
 
         Skill skill,

@@ -178,8 +178,8 @@ public class CourseMaterializer {
             }
             for (UUID practiceSet : lessonPlan.practiceSetPackageIds()) {
                 if (!packages.attachPracticeSetToLesson(practiceSet, lesson.id())) {
-                    throw new InvalidPackageLessonException("Package " + practiceSet
-                            + " is not a practice set that is free to join a lesson");
+                    throw new InvalidPackageLessonException("Gói " + practiceSet
+                            + " không phải là bộ luyện tập còn trống để gắn vào bài học");
                 }
             }
         }
@@ -202,7 +202,7 @@ public class CourseMaterializer {
         for (NewWord word : lessonPlan.newVocabulary()) {
             UUID sense = senseByLemma.get(word.normalizedLemma());
             if (sense == null) {
-                throw new IllegalStateException("No library sense was resolved for the word " + word.lemma());
+                throw new IllegalStateException("Không xác định được nghĩa trong thư viện cho từ " + word.lemma());
             }
             if (!senses.contains(sense)) senses.add(sense);
         }

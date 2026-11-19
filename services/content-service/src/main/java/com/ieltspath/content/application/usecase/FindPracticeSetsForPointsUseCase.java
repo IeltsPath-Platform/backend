@@ -28,7 +28,7 @@ public class FindPracticeSetsForPointsUseCase {
     public Set<UUID> execute(Collection<UUID> pointIds) {
         if (pointIds.isEmpty()) return Set.of();
         if (pointIds.size() > MAX_POINTS) {
-            throw new IllegalArgumentException("knowledgePointIds must contain at most " + MAX_POINTS + " ids");
+            throw new IllegalArgumentException("Chỉ chọn tối đa " + MAX_POINTS + " điểm kiến thức");
         }
         Set<UUID> packageIds = new LinkedHashSet<>();
         practiceSets.practiceSets(pointIds, Integer.MAX_VALUE).values()

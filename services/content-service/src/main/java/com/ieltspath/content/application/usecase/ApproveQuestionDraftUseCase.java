@@ -53,18 +53,18 @@ public class ApproveQuestionDraftUseCase {
                 .filter(found -> found.getRequestedBy().equals(reviewer))
                 .orElseThrow(() -> new AiDraftNotFoundException(draftId));
         if (draft.getKind() != DraftKind.QUESTIONS) {
-            throw new InvalidContentStateException("Draft is not a question draft");
+            throw new InvalidContentStateException("Bản nháp này không phải bản nháp câu hỏi");
         }
         if (draft.getStatus() != DraftStatus.READY) {
-            throw new InvalidContentStateException("Draft is " + draft.getStatus() + ", expected READY");
+            throw new InvalidContentStateException("Bản nháp đang ở trạng thái " + draft.getStatus() + ", cần ở trạng thái READY");
         }
         if (itemIndexes == null || itemIndexes.isEmpty()) {
-            throw new IllegalArgumentException("itemIndexes must name at least one item");
+            throw new IllegalArgumentException("Cần chọn ít nhất một câu");
         }
         JsonNode items = read(draft.getResultJson()).path("items");
         TreeSet<Integer> chosen = new TreeSet<>(itemIndexes);
         if (chosen.first() < 0 || chosen.last() >= items.size()) {
-            throw new IllegalArgumentException("itemIndexes refer to an item that does not exist");
+            throw new IllegalArgumentException("Có câu được chọn không tồn tại trong bản nháp");
         }
         QuestionDraftRequest request = readRequest(draft);
 
@@ -98,7 +98,7 @@ public class ApproveQuestionDraftUseCase {
         try {
             return text == null ? json.createObjectNode() : json.readTree(text);
         } catch (JsonProcessingException invalid) {
-            throw new InvalidContentStateException("Stored draft result is unreadable");
+            throw new InvalidContentStateException("Không đọc được kết quả bản nháp đã lưu");
         }
     }
 
@@ -106,7 +106,7 @@ public class ApproveQuestionDraftUseCase {
         try {
             return json.readValue(draft.getRequestJson(), QuestionDraftRequest.class);
         } catch (JsonProcessingException invalid) {
-            throw new InvalidContentStateException("Stored draft request is unreadable");
+            throw new InvalidContentStateException("Không đọc được yêu cầu bản nháp đã lưu");
         }
     }
 }

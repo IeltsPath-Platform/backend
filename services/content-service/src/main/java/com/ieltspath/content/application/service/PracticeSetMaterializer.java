@@ -90,7 +90,7 @@ public class PracticeSetMaterializer {
             addSectionQuestion.execute(pkg.id(), version.id(), section.id(), questionVersion, BigDecimal.ONE);
         }
         if (!packages.attachPracticeSetToLesson(pkg.id(), lessonId)) {
-            throw new InvalidPackageLessonException("Package " + pkg.id() + " is not a practice set that is free to join a lesson");
+            throw new InvalidPackageLessonException("Gói " + pkg.id() + " không phải là bộ luyện tập còn trống để gắn vào bài học");
         }
         return pkg.id();
     }

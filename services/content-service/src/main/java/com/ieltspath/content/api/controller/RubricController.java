@@ -58,7 +58,7 @@ public class RubricController {
     public RubricResponse update(@PathVariable("code") String code, @PathVariable("version") int version,
                                  @Valid @RequestBody RubricRequest request) {
         if (!code.equals(request.code()) || version != request.version()) {
-            throw new IllegalArgumentException("Rubric code and version in the body must match the path");
+            throw new IllegalArgumentException("Mã và phiên bản rubric trong nội dung phải khớp với đường dẫn");
         }
         return RubricResponse.from(rubrics.updateDraft(code, version, request.task(), request.sourceNote(),
                 request.systemPrompt(),

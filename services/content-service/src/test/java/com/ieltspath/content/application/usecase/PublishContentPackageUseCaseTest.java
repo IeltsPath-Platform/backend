@@ -77,7 +77,7 @@ class PublishContentPackageUseCaseTest {
         when(contentPackageRepository.findById(pkg.getId())).thenReturn(Optional.of(pkg));
         assertThatThrownBy(() -> publishContentPackageUseCase.execute(
                 new PublishContentPackageCommand(pkg.getId(), draft.getId(), UUID.randomUUID())))
-                .hasMessageContaining("PLACEMENT_POOL_REQUIRED");
+                .hasFieldOrPropertyWithValue("code", "PLACEMENT_POOL_REQUIRED");
         verify(contentPackageRepository, never()).save(any());
     }
 
@@ -209,7 +209,7 @@ class PublishContentPackageUseCaseTest {
         assertThatThrownBy(() -> publishContentPackageUseCase.execute(new PublishContentPackageCommand(
                 practice.getId(), practice.getVersions().getFirst().getId(), userId)))
                 .isInstanceOf(InvalidContentStateException.class)
-                .hasMessageContaining("supported test source");
+                .hasMessageContaining("nguồn đề được hỗ trợ");
         verify(contentPackageRepository, never()).save(any());
     }
 
@@ -284,7 +284,7 @@ class PublishContentPackageUseCaseTest {
         assertThatThrownBy(() -> publishContentPackageUseCase.execute(
                 new PublishContentPackageCommand(practice.getId(), draft.getId(), userId)))
                 .isInstanceOf(InvalidContentStateException.class)
-                .hasMessageContaining("auto-gradable");
+                .hasMessageContaining("chấm tự động được");
         verify(contentPackageRepository, never()).save(any());
     }
 
@@ -322,7 +322,7 @@ class PublishContentPackageUseCaseTest {
         assertThatThrownBy(() -> publishContentPackageUseCase.execute(
                 new PublishContentPackageCommand(practice.getId(), draft.getId(), userId)))
                 .isInstanceOf(InvalidContentStateException.class)
-                .hasMessageContaining("Writing essays");
+                .hasMessageContaining("bài viết có band đạt");
         verify(contentPackageRepository, never()).save(any());
     }
 
@@ -344,7 +344,7 @@ class PublishContentPackageUseCaseTest {
         assertThatThrownBy(() -> publishContentPackageUseCase.execute(
                 new PublishContentPackageCommand(practice.getId(), draft.getId(), userId)))
                 .isInstanceOf(InvalidContentStateException.class)
-                .hasMessageContaining("auto-gradable");
+                .hasMessageContaining("chấm tự động được");
         verify(contentPackageRepository, never()).save(any());
     }
 

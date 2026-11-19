@@ -9,13 +9,13 @@ public record Rubric(String code, String task, int version, String sourceNote, S
     public Rubric {
         if (code == null || code.isBlank() || task == null || !List.of("TASK_1", "TASK_2", "SPEAKING").contains(task)
                 || version < 1 || sourceNote == null || sourceNote.isBlank()) {
-            throw new IllegalArgumentException("Rubric code, task, positive version and source note are required");
+            throw new IllegalArgumentException("Cần có mã rubric, loại bài, phiên bản lớn hơn 0 và ghi chú nguồn");
         }
         if (systemPrompt != null && systemPrompt.length() > 4000) {
-            throw new IllegalArgumentException("Rubric system prompt cannot exceed 4000 characters");
+            throw new IllegalArgumentException("Lời nhắc hệ thống của rubric không được dài quá 4000 ký tự");
         }
         if (status == null || !List.of("DRAFT", "ACTIVE", "RETIRED").contains(status)) {
-            throw new IllegalArgumentException("Rubric status must be DRAFT, ACTIVE or RETIRED");
+            throw new IllegalArgumentException("Trạng thái rubric phải là DRAFT, ACTIVE hoặc RETIRED");
         }
         criteria = criteria == null ? List.of() : List.copyOf(criteria);
         examples = examples == null ? List.of() : List.copyOf(examples);
@@ -31,7 +31,7 @@ public record Rubric(String code, String task, int version, String sourceNote, S
                             List<SubKnowledgePoint> subKnowledgePoints) {
         public Criterion {
             if (code == null || code.isBlank() || name == null || name.isBlank() || description == null
-                    || description.isBlank() || sortOrder < 1) throw new IllegalArgumentException("Invalid rubric criterion");
+                    || description.isBlank() || sortOrder < 1) throw new IllegalArgumentException("Tiêu chí của rubric không hợp lệ");
             bandDescriptors = bandDescriptors == null ? List.of() : List.copyOf(bandDescriptors);
             subKnowledgePoints = subKnowledgePoints == null ? List.of() : List.copyOf(subKnowledgePoints);
         }
@@ -52,7 +52,7 @@ public record Rubric(String code, String task, int version, String sourceNote, S
     public record BandDescriptor(double band, String descriptor) {
         public BandDescriptor {
             if (band < 0 || band > 9 || band * 2 != Math.rint(band * 2)
-                    || descriptor == null || descriptor.isBlank()) throw new IllegalArgumentException("Invalid band descriptor");
+                    || descriptor == null || descriptor.isBlank()) throw new IllegalArgumentException("Mô tả mức band không hợp lệ");
         }
     }
 
@@ -60,7 +60,7 @@ public record Rubric(String code, String task, int version, String sourceNote, S
         public Example {
             if (band < 0 || band > 9 || band * 2 != Math.rint(band * 2) || prompt == null || prompt.isBlank()
                     || essay == null || essay.isBlank() || commentary == null || commentary.isBlank()) {
-                throw new IllegalArgumentException("Invalid rubric example");
+                throw new IllegalArgumentException("Ví dụ của rubric không hợp lệ");
             }
         }
     }

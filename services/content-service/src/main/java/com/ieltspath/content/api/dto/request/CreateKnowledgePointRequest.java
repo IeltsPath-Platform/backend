@@ -12,30 +12,30 @@ import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
 public record CreateKnowledgePointRequest(
-        @NotNull(message = "topicId is required")
+        @NotNull(message = "Cần chọn chủ đề")
         UUID topicId,
 
-        @NotBlank(message = "code is required")
-        @Size(max = 100, message = "code must not exceed 100 characters")
+        @NotBlank(message = "Mã không được để trống")
+        @Size(max = 100, message = "Mã không được dài quá 100 ký tự")
         @Pattern(regexp = "^[RLWGVS](55|60|65|70)_[A-Z0-9_]{2,60}$",
-                message = "code must use the format R55_EXAMPLE, G55_EXAMPLE, V60_EXAMPLE, or S60_EXAMPLE")
+                message = "Mã phải theo dạng R55_EXAMPLE, G55_EXAMPLE, V60_EXAMPLE hoặc S60_EXAMPLE")
         String code,
 
-        @NotBlank(message = "name is required")
-        @Size(max = 255, message = "name must not exceed 255 characters")
+        @NotBlank(message = "Tên không được để trống")
+        @Size(max = 255, message = "Tên không được dài quá 255 ký tự")
         String name,
 
-        @NotNull(message = "kind is required")
+        @NotNull(message = "Cần chọn loại")
         KnowledgePointKind kind,
 
-        @NotNull(message = "learningType is required")
+        @NotNull(message = "Cần chọn loại học (learningType)")
         LearningType learningType,
 
         Skill skill,
         String description,
         CefrLevel cefrLevel,
 
-        @NotBlank(message = "canDo is required")
+        @NotBlank(message = "Cần nhập mô tả can-do")
         String canDo,
         String scopeIn,
         String scopeOut

@@ -34,10 +34,10 @@ public class ReorderTopicsUseCase {
 
     public void execute(UUID parentTopicId, List<UUID> orderedTopicIds) {
         if (orderedTopicIds == null || orderedTopicIds.isEmpty()) {
-            throw new IllegalArgumentException("topicIds must name at least one topic");
+            throw new IllegalArgumentException("Cần chọn ít nhất một chủ đề");
         }
         if (new HashSet<>(orderedTopicIds).size() != orderedTopicIds.size()) {
-            throw new IllegalArgumentException("topicIds must not repeat a topic");
+            throw new IllegalArgumentException("Danh sách chủ đề không được lặp lại");
         }
         if (parentTopicId != null) {
             topics.findById(parentTopicId).orElseThrow(() -> new TopicNotFoundException(parentTopicId));
@@ -47,7 +47,7 @@ public class ReorderTopicsUseCase {
         Map<UUID, Topic> byId = siblings.stream().collect(Collectors.toMap(Topic::getId, Function.identity()));
         Set<UUID> requested = new HashSet<>(orderedTopicIds);
         if (!requested.equals(byId.keySet())) {
-            throw new IllegalArgumentException("topicIds must name every topic of the parent, and only those");
+            throw new IllegalArgumentException("Danh sách phải gồm mọi chủ đề cùng cấp, và chỉ những chủ đề đó");
         }
 
         List<Integer> positions = positions(siblings);

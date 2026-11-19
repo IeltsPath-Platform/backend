@@ -6,6 +6,7 @@ import com.ieltspath.content.application.result.AuthorPackageResult;
 import com.ieltspath.content.application.result.ContentPackageResult;
 import com.ieltspath.content.domain.aggregate.ContentPackage;
 import com.ieltspath.content.domain.exception.DuplicateCodeException;
+import com.ieltspath.content.domain.exception.InvalidContentStateException;
 import com.ieltspath.content.domain.exception.InvalidPackageCourseException;
 import com.ieltspath.content.domain.exception.InvalidPackageLessonException;
 import com.ieltspath.content.domain.exception.InvalidPackageTopicException;
@@ -35,7 +36,7 @@ public class CreateContentPackageUseCase {
     public ContentPackageResult execute(CreateContentPackageCommand command) {
         if (command.packageType() == PackageType.TOPIC_TEST || command.packageType() == PackageType.COURSE_TEST) {
             // Final tests belong to the seeded curriculum.
-            throw new IllegalArgumentException(command.packageType() + " packages cannot be created through this API");
+            throw new IllegalArgumentException(command.packageType() + " gói không tạo được qua chức năng này");
         }
         return ContentPackageResult.of(create(command));
     }
@@ -46,11 +47,11 @@ public class CreateContentPackageUseCase {
 
     private ContentPackage create(CreateContentPackageCommand command) {
         if ((command.packageType() == PackageType.PLACEMENT_TEST) != (command.placementPool() != null)) {
-            throw new IllegalArgumentException(command.packageType() == PackageType.PLACEMENT_TEST
-                    ? "PLACEMENT_POOL_REQUIRED" : "placementPool is only valid for PLACEMENT_TEST");
+            if (command.packageType() == PackageType.PLACEMENT_TEST) throw InvalidContentStateException.placementPoolRequired();
+            throw new IllegalArgumentException("Nhóm đề xếp lớp chỉ dùng cho đề xếp lớp (PLACEMENT_TEST)");
         }
         if (command.packageType() == PackageType.LESSON) {
-            throw new IllegalArgumentException("LESSON packages cannot be created through this API");
+            throw new IllegalArgumentException("Gói bài học (LESSON) không tạo được qua chức năng này");
         }
         if (contentPackageRepository.existsByCode(command.code())) {
             throw new DuplicateCodeException("ContentPackage", command.code());
@@ -58,15 +59,15 @@ public class CreateContentPackageUseCase {
         requireBinding(command);
 
         if (command.lessonId() != null && !lessons.lessonExists(command.lessonId())) {
-            throw new InvalidPackageLessonException("Lesson " + command.lessonId() + " does not exist");
+            throw new InvalidPackageLessonException("Bài học không tồn tại");
         }
         // A practice test without a source is internal (a course checkpoint) and is not listed in the library.
         if (command.packageType() != PackageType.PRACTICE_TEST && command.sourceCode() != null) {
-            throw new IllegalArgumentException("sourceCode is only valid for PRACTICE_TEST");
+            throw new IllegalArgumentException("Nguồn đề (sourceCode) chỉ dùng cho bài kiểm tra luyện tập (PRACTICE_TEST)");
         }
         if (command.sourceCode() != null) {
             try { com.ieltspath.content.domain.vo.TestSource.valueOf(command.sourceCode()); }
-            catch (RuntimeException invalidSource) { throw new IllegalArgumentException("sourceCode is not a supported test source"); }
+            catch (RuntimeException invalidSource) { throw new IllegalArgumentException("Nguồn đề không được hỗ trợ"); }
         }
 
         ContentPackage pkg = command.packageType() == PackageType.TOPIC_TEST
@@ -85,25 +86,25 @@ public class CreateContentPackageUseCase {
                 if (command.topicId() == null || command.lessonId() != null || command.courseId() != null
                         || command.sourceCode() != null) {
                     throw new InvalidPackageTopicException(
-                            "A TOPIC_TEST needs a topicId and no lessonId, courseId or sourceCode");
+                            "Đề cuối chủ đề cần một chủ đề và không được gắn bài học, khóa học hay nguồn đề");
                 }
                 if (!lessons.topicExists(command.topicId())) {
-                    throw new InvalidPackageTopicException("Topic " + command.topicId() + " does not exist");
+                    throw new InvalidPackageTopicException("Chủ đề không tồn tại");
                 }
             }
             case COURSE_TEST -> {
                 if (command.courseId() == null || command.lessonId() != null || command.topicId() != null
                         || command.sourceCode() != null) {
                     throw new InvalidPackageCourseException(
-                            "A COURSE_TEST needs a courseId and no lessonId, topicId or sourceCode");
+                            "Đề cuối khóa cần một khóa học và không được gắn bài học, chủ đề hay nguồn đề");
                 }
                 if (!lessons.courseExists(command.courseId())) {
-                    throw new InvalidPackageCourseException("Course " + command.courseId() + " does not exist");
+                    throw new InvalidPackageCourseException("Khóa học không tồn tại");
                 }
             }
             default -> {
                 if (command.topicId() != null || command.courseId() != null) {
-                    throw new IllegalArgumentException("topicId and courseId are only valid for final tests");
+                    throw new IllegalArgumentException("Chủ đề và khóa học chỉ dùng cho đề cuối chủ đề và đề cuối khóa");
                 }
             }
         }

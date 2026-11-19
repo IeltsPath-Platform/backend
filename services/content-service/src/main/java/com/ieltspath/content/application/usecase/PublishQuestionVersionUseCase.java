@@ -36,7 +36,7 @@ public class PublishQuestionVersionUseCase {
         QuestionVersion version = question.getVersions().stream().filter(v -> v.getId().equals(versionId))
                 .findFirst().orElseThrow(() -> new QuestionVersionNotFoundException(versionId));
         if (version.getStatus() != PublicationStatus.DRAFT) {
-            throw new QuestionVersionStateException("Only draft question versions can be published");
+            throw new QuestionVersionStateException("Chỉ xuất bản được phiên bản câu hỏi nháp");
         }
         if (version.getDifficulty() == null) throw new QuestionDifficultyRequiredForPublicationException();
         validate(question.getQuestionType(), version);

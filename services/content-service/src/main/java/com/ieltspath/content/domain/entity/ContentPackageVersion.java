@@ -111,7 +111,7 @@ public class ContentPackageVersion {
         boolean taken = sections.stream()
                 .anyMatch(s -> s.getSortOrder() == sortOrder && !s.getId().equals(exceptSectionId));
         if (taken) {
-            throw new IllegalArgumentException("sortOrder " + sortOrder + " is already used in this version");
+            throw new IllegalArgumentException("Thứ tự " + sortOrder + " đã được dùng trong phiên bản này");
         }
     }
 
@@ -154,7 +154,7 @@ public class ContentPackageVersion {
         requireDraft();
         Set<UUID> current = sections.stream().map(ContentSection::getId).collect(Collectors.toSet());
         if (orderedIds == null || orderedIds.size() != current.size() || !current.equals(new HashSet<>(orderedIds))) {
-            throw new IllegalArgumentException("sectionIds must list every section of the version exactly once");
+            throw new IllegalArgumentException("Danh sách phần phải gồm mỗi phần của phiên bản đúng một lần");
         }
         int order = 1;
         for (UUID id : orderedIds) {

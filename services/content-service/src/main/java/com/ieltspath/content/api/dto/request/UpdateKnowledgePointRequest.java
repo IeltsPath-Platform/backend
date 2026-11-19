@@ -11,12 +11,12 @@ import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
 public record UpdateKnowledgePointRequest(
-        @NotNull(message = "topicId is required") UUID topicId,
-        @NotBlank(message = "code is required") @Size(max = 100, message = "code must not exceed 100 characters")
+        @NotNull(message = "Cần chọn chủ đề") UUID topicId,
+        @NotBlank(message = "Mã không được để trống") @Size(max = 100, message = "Mã không được dài quá 100 ký tự")
         String code,
-        @NotBlank(message = "name is required") @Size(max = 255, message = "name must not exceed 255 characters")
+        @NotBlank(message = "Tên không được để trống") @Size(max = 255, message = "Tên không được dài quá 255 ký tự")
         String name,
-        @NotNull(message = "kind is required") KnowledgePointKind kind,
+        @NotNull(message = "Cần chọn loại") KnowledgePointKind kind,
         LearningType learningType,
         Skill skill,
         String description,

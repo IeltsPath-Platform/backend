@@ -53,7 +53,7 @@ public class KnowledgePoint {
         this.scopeOut = scopeOut;
         this.status = status != null ? status : ContentStatus.ACTIVE;
         if (this.status == ContentStatus.ACTIVE && this.learningType == null) {
-            throw new IllegalArgumentException("learningType is required for an active knowledge point");
+            throw new IllegalArgumentException("Điểm kiến thức đang dùng cần có loại học (learningType)");
         }
         this.createdAt = createdAt != null ? createdAt : Instant.now();
         this.updatedAt = updatedAt != null ? updatedAt : this.createdAt;
@@ -77,7 +77,7 @@ public class KnowledgePoint {
         Objects.requireNonNull(name, "name must not be null");
         Objects.requireNonNull(kind, "kind must not be null");
         if (this.status == ContentStatus.ACTIVE && learningType == null) {
-            throw new IllegalArgumentException("learningType is required for an active knowledge point");
+            throw new IllegalArgumentException("Điểm kiến thức đang dùng cần có loại học (learningType)");
         }
         if (this.status == ContentStatus.ACTIVE) {
             requireCefrAndCanDo(cefrLevel, canDo);
@@ -105,7 +105,7 @@ public class KnowledgePoint {
 
     public void activate() {
         if (this.learningType == null) {
-            throw new IllegalArgumentException("learningType is required for an active knowledge point");
+            throw new IllegalArgumentException("Điểm kiến thức đang dùng cần có loại học (learningType)");
         }
         requireCefrAndCanDo(this.cefrLevel, this.canDo);
         if (this.status != ContentStatus.ACTIVE) {
@@ -117,7 +117,7 @@ public class KnowledgePoint {
     /** An active point is placed on the graph by its CEFR level and described by a can-do statement. */
     private static void requireCefrAndCanDo(CefrLevel cefrLevel, String canDo) {
         if (cefrLevel == null || canDo == null || canDo.isBlank()) {
-            throw new IllegalArgumentException("cefrLevel and canDo are required for an active knowledge point");
+            throw new IllegalArgumentException("Điểm kiến thức đang dùng cần có cấp CEFR và mô tả can-do");
         }
     }
 
