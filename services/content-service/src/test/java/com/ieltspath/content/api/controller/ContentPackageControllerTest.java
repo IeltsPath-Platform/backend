@@ -45,6 +45,29 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ExtendWith(MockitoExtension.class)
 class ContentPackageControllerTest {
     @Test
+    void placementRequiresPoolAndOtherTypesRejectPool() throws Exception {
+        for (String body : List.of(
+                "{\"code\":\"P\",\"title\":\"Placement\",\"packageType\":\"PLACEMENT_TEST\"}",
+                "{\"code\":\"P\",\"title\":\"Practice\",\"packageType\":\"PRACTICE_SET\",\"placementPool\":\"BAND_0_3\"}")) {
+            mockMvc.perform(post("/api/content/packages").contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isBadRequest());
+        }
+        org.mockito.Mockito.verifyNoInteractions(createContentPackageUseCase);
+    }
+
+    @Test
+    void placementPoolIsForwardedAndReturned() throws Exception {
+        when(createContentPackageUseCase.execute(any())).thenAnswer(call -> {
+            var command = call.getArgument(0, CreateContentPackageCommand.class);
+            return ContentPackageResult.of(com.ieltspath.content.domain.aggregate.ContentPackage.create(
+                    command.code(), command.title(), command.packageType(), null, null, null, command.placementPool()));
+        });
+        mockMvc.perform(post("/api/content/packages").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"P\",\"title\":\"Placement\",\"packageType\":\"PLACEMENT_TEST\",\"placementPool\":\"BAND_0_3\"}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.placementPool").value("BAND_0_3"));
+    }
+
+    @Test
     void creatingACourseTestThroughTheAuthorApiReturns400() throws Exception {
         when(createContentPackageUseCase.execute(any())).thenThrow(
                 new IllegalArgumentException("COURSE_TEST packages cannot be created through this API"));

@@ -94,6 +94,11 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.CONFLICT, e.getMessage(), r.getRequestURI(), null, "ATTEMPT_EXPIRED");
     }
 
+    @ExceptionHandler(PlacementLimitReachedException.class)
+    public ResponseEntity<ErrorResponse> placementLimitReached(PlacementLimitReachedException e, HttpServletRequest r) {
+        return build(HttpStatus.TOO_MANY_REQUESTS, e.getMessage(), r.getRequestURI(), null, "PLACEMENT_LIMIT_REACHED");
+    }
+
     @ExceptionHandler(PackageNotAttemptableException.class)
     public ResponseEntity<ErrorResponse> notAttemptable(PackageNotAttemptableException e, HttpServletRequest r) {
         return build(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage(), r.getRequestURI(), null,

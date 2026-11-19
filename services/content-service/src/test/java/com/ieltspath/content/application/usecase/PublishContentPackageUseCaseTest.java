@@ -70,6 +70,18 @@ class PublishContentPackageUseCaseTest {
     }
 
     @Test
+    void placementWithoutPoolCannotPublish() {
+        var pkg = ContentPackage.create("OLD", "Legacy placement", PackageType.PLACEMENT_TEST, null);
+        var draft = ContentPackageVersion.create(pkg.getId(), 1, "{}");
+        pkg.addVersion(draft);
+        when(contentPackageRepository.findById(pkg.getId())).thenReturn(Optional.of(pkg));
+        assertThatThrownBy(() -> publishContentPackageUseCase.execute(
+                new PublishContentPackageCommand(pkg.getId(), draft.getId(), UUID.randomUUID())))
+                .hasMessageContaining("PLACEMENT_POOL_REQUIRED");
+        verify(contentPackageRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("Should publish content package version successfully")
     void shouldPublishPackageVersionSuccessfully() {
         when(contentPackageRepository.findById(contentPackage.getId())).thenReturn(Optional.of(contentPackage));
@@ -143,7 +155,8 @@ class PublishContentPackageUseCaseTest {
     @ParameterizedTest
     @CsvSource({"PRACTICE_SET,LEARNING", "TOPIC_TEST,LEARNING", "MOCK_TEST,EXAM", "PLACEMENT_TEST,PLACEMENT"})
     void questionsMustMatchThePackagesPurposeBeforePublishing(PackageType type, QuestionPurpose requiredPurpose) {
-        ContentPackage pkg = ContentPackage.create("PURPOSE-CHECK", "Purpose", type, null);
+        ContentPackage pkg = ContentPackage.create("PURPOSE-CHECK", "Purpose", type, null, null, null,
+                type == PackageType.PLACEMENT_TEST ? com.ieltspath.content.domain.vo.PlacementPool.BAND_5_9 : null);
         ContentPackageVersion draft = ContentPackageVersion.create(pkg.getId(), 1, "{}");
         pkg.addVersion(draft);
         UUID questionId = UUID.randomUUID();

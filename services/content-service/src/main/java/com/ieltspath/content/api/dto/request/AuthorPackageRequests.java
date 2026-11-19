@@ -2,6 +2,8 @@ package com.ieltspath.content.api.dto.request;
 
 import com.ieltspath.content.api.dto.AccessLevel;
 import com.ieltspath.content.domain.vo.PackageType;
+import com.ieltspath.content.domain.vo.PlacementPool;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -26,7 +28,12 @@ public final class AuthorPackageRequests {
             UUID lessonId,
             @Size(max = 40) String sourceCode,
             UUID topicId,
-            UUID courseId) {
+            UUID courseId,
+            PlacementPool placementPool) {
+        @AssertTrue(message = "placementPool is required exactly for PLACEMENT_TEST")
+        public boolean isPlacementPoolValid() {
+            return packageType == null || (packageType == PackageType.PLACEMENT_TEST) == (placementPool != null);
+        }
     }
 
     /** {@code rulesJson} defaults to {@code "{}"} when omitted; a non-JSON value is refused by the use case. */

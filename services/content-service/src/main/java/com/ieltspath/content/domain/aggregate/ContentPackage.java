@@ -7,6 +7,7 @@ import com.ieltspath.content.domain.exception.DraftVersionExistsException;
 import com.ieltspath.content.domain.exception.InvalidPackageLessonException;
 import com.ieltspath.content.domain.exception.PackageVersionNotFoundException;
 import com.ieltspath.content.domain.vo.PackageType;
+import com.ieltspath.content.domain.vo.PlacementPool;
 import com.ieltspath.content.domain.vo.PublicationStatus;
 
 import java.time.Instant;
@@ -27,6 +28,7 @@ public class ContentPackage {
     private final UUID lessonId;
     private final UUID courseId;
     private final UUID topicId;
+    private final PlacementPool placementPool;
 
     /** {@code lessonId} makes a practice set part of that lesson's Practice; other package types have none. */
     public ContentPackage(UUID id, String code, String title, PackageType packageType,
@@ -58,6 +60,19 @@ public class ContentPackage {
                           UUID currentPublishedVersionId, Instant createdAt, Instant updatedAt,
                           List<ContentPackageVersion> versions, UUID lessonId, UUID courseId, String sourceCode,
                           UUID topicId) {
+        this(id, code, title, packageType, requiredFeatureKey, status, currentPublishedVersionId, createdAt, updatedAt,
+                versions, lessonId, courseId, sourceCode, topicId, null);
+    }
+
+    public ContentPackage(UUID id, String code, String title, PackageType packageType,
+                          String requiredFeatureKey, PublicationStatus status,
+                          UUID currentPublishedVersionId, Instant createdAt, Instant updatedAt,
+                          List<ContentPackageVersion> versions, UUID lessonId, UUID courseId, String sourceCode,
+                          UUID topicId, PlacementPool placementPool) {
+        if (placementPool != null && packageType != PackageType.PLACEMENT_TEST) {
+            throw new IllegalArgumentException("placementPool is only valid for PLACEMENT_TEST");
+        }
+        this.placementPool = placementPool;
         this.id = Objects.requireNonNull(id, "id must not be null");
         this.code = Objects.requireNonNull(code, "code must not be null");
         this.title = Objects.requireNonNull(title, "title must not be null");
@@ -91,9 +106,14 @@ public class ContentPackage {
 
     public static ContentPackage create(String code, String title, PackageType packageType, String requiredFeatureKey,
                                         UUID lessonId, String sourceCode) {
+        return create(code, title, packageType, requiredFeatureKey, lessonId, sourceCode, null);
+    }
+
+    public static ContentPackage create(String code, String title, PackageType packageType, String requiredFeatureKey,
+                                        UUID lessonId, String sourceCode, PlacementPool placementPool) {
         Instant now = Instant.now();
         return new ContentPackage(UUID.randomUUID(), code, title, packageType, requiredFeatureKey,
-                PublicationStatus.DRAFT, null, now, now, new ArrayList<>(), lessonId, null, sourceCode);
+                PublicationStatus.DRAFT, null, now, now, new ArrayList<>(), lessonId, null, sourceCode, null, placementPool);
     }
 
     /** A final test is bound to its topic or course when created and stays bound. */
@@ -162,6 +182,7 @@ public class ContentPackage {
     public UUID getLessonId() { return lessonId; }
     public UUID getCourseId() { return courseId; }
     public UUID getTopicId() { return topicId; }
+    public PlacementPool getPlacementPool() { return placementPool; }
     public String getCode() { return code; }
     public String getTitle() { return title; }
     public PackageType getPackageType() { return packageType; }

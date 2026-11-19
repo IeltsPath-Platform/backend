@@ -28,7 +28,8 @@ class KeyBatchesMigrationTest {
     private static Flyway flyway(PostgreSQLContainer<?> postgres, MigrationVersion target, boolean demoData) {
         return Flyway.configure().dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
                 .locations("classpath:db/migration", "classpath:db/callback")
-                .placeholders(java.util.Map.of("demoData", String.valueOf(demoData)))
+                .placeholders(java.util.Map.of("demoData", String.valueOf(demoData),
+                        "demoUserId", "00000000-0000-0000-0000-000000000003"))
                 .target(target).load();
     }
 

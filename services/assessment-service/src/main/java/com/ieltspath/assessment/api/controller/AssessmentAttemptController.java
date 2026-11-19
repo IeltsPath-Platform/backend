@@ -11,6 +11,7 @@ import com.ieltspath.assessment.application.command.SaveAttemptResponseCommand;
 import com.ieltspath.assessment.application.command.StartAssessmentAttemptCommand;
 import com.ieltspath.assessment.application.command.SubmitAssessmentAttemptCommand;
 import com.ieltspath.assessment.application.usecase.CompleteAttemptSectionUseCase;
+import com.ieltspath.assessment.application.usecase.CancelPlacementAttemptUseCase;
 import com.ieltspath.assessment.application.usecase.StartAttemptSectionUseCase;
 import com.ieltspath.assessment.application.usecase.ExpireAssessmentAttemptUseCase;
 import com.ieltspath.assessment.application.usecase.GetAssessmentAttemptUseCase;
@@ -54,6 +55,7 @@ public class AssessmentAttemptController {
     private final ListAttemptResponsesUseCase listAttemptResponsesUseCase;
     private final StartAttemptSectionUseCase startAttemptSectionUseCase;
     private final CompleteAttemptSectionUseCase completeAttemptSectionUseCase;
+    private final CancelPlacementAttemptUseCase cancelPlacementAttemptUseCase;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -122,6 +124,11 @@ public class AssessmentAttemptController {
     @PostMapping("/{id}/expire")
     public AssessmentAttemptResponse expire(@PathVariable("id") UUID id) {
         return AssessmentAttemptResponse.from(expireAssessmentAttemptUseCase.execute(currentUser.requireUserId(), id));
+    }
+
+    @PostMapping("/{id}/cancel")
+    public AssessmentAttemptResponse cancel(@PathVariable("id") UUID id) {
+        return AssessmentAttemptResponse.from(cancelPlacementAttemptUseCase.execute(currentUser.requireUserId(), id));
     }
 
     @PutMapping("/{id}/items/{itemId}/response")

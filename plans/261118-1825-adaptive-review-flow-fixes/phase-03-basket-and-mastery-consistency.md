@@ -32,7 +32,7 @@ items: [8, 9, 10, 11]
 ## Migration
 
 `V57__mastery_decayed_from_tier.sql`: cột `kp_mastery_profiles.decayed_from_tier VARCHAR(20)` null, và chỉ mục phục vụ đếm
-`due`. (CHECK `trigger_kind` thêm `PRIORITY`, `DECAYED` nằm ở V56, phase 2.)
+`due`. (CHECK `trigger_kind` thêm `PRIORITY`, `DECAYED` nằm ở V57, phase 2.)
 
 ## Mục 8: KP `PRIORITY` không còn bài ôn
 

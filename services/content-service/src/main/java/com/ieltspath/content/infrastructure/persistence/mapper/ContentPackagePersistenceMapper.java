@@ -38,7 +38,8 @@ public class ContentPackagePersistenceMapper {
                 entity.getLessonId(),
                 entity.getCourseId(),
                 entity.getSourceCode(),
-                entity.getTopicId()
+                entity.getTopicId(),
+                entity.getPlacementPool()
         );
     }
 
@@ -55,6 +56,7 @@ public class ContentPackagePersistenceMapper {
                 .code(domain.getCode())
                 .title(domain.getTitle())
                 .packageType(domain.getPackageType())
+                .placementPool(domain.getPlacementPool())
                 .requiredFeatureKey(domain.getRequiredFeatureKey())
                 .sourceCode(domain.getSourceCode())
                 .status(domain.getStatus())

@@ -51,6 +51,10 @@ learning:
   review:
     # After this many failed sets a blocking review remains available as optional practice.
     unblock-after-failed-sets: 4
+  placement:
+    limit-per-24h: ${LEARNING_PLACEMENT_LIMIT_PER_24H:3}
+    reuse-window-minutes: ${LEARNING_PLACEMENT_REUSE_WINDOW_MINUTES:15}
+    catalog-cache-seconds: ${LEARNING_PLACEMENT_CATALOG_CACHE_SECONDS:30}
   assessment:
     base-url: ${ASSESSMENT_SERVICE_URL:http://localhost:8083}
   content:

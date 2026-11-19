@@ -5,6 +5,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import com.ieltspath.assessment.application.exception.ContentUnavailableException;
 import com.ieltspath.assessment.application.port.ContentPackageProvider;
+import com.ieltspath.assessment.domain.vo.PlacementPool;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -100,6 +101,18 @@ class ContentPackageClientTest {
         ContentPackageProvider.Item fill = section.items().get(1);
         assertNull(fill.options());
         assertEquals(List.of("critics"), fill.answerSpec().get("accepted"));
+    }
+
+    @Test
+    void readsThePoolCapturedByContentForAPlacementVersion() {
+        body.set("""
+                {"packageVersionId":"%s","packageId":"20000000-0000-4000-8000-000000000301",
+                 "packageType":"PLACEMENT_TEST","placementPool":"BAND_0_3",
+                 "sections":[{"sectionId":"20000000-0000-4000-8000-000000000701","title":"Placement",
+                   "skill":"READING","sortOrder":1,"items":[{"questionVersionId":"20000000-0000-4000-8000-000000000002",
+                   "sortOrder":1,"stem":"Question","answerSpec":{"type":"CHOICE","correct":"A"},"maxScore":1.0}]}]}
+                """.formatted(VERSION));
+        assertEquals(PlacementPool.BAND_0_3, client().findPackageVersion(VERSION).orElseThrow().placementPool());
     }
 
     @ParameterizedTest

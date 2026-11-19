@@ -1,5 +1,6 @@
 package com.ieltspath.content.application.result;
 
+import com.ieltspath.content.domain.vo.PlacementPool;
 import com.ieltspath.content.domain.aggregate.ContentPackage;
 import com.ieltspath.content.domain.vo.PackageType;
 import com.ieltspath.content.domain.vo.PublicationStatus;
@@ -18,8 +19,17 @@ public record ContentPackageResult(
         Instant createdAt,
         Instant updatedAt,
         UUID lessonId,
-        String sourceCode
+        String sourceCode,
+        PlacementPool placementPool
 ) {
+    public ContentPackageResult(UUID id, String code, String title, PackageType packageType,
+                                String requiredFeatureKey, PublicationStatus status,
+                                UUID currentPublishedVersionId, Instant createdAt, Instant updatedAt,
+                                UUID lessonId, String sourceCode) {
+        this(id, code, title, packageType, requiredFeatureKey, status, currentPublishedVersionId, createdAt,
+                updatedAt, lessonId, sourceCode, null);
+    }
+
     public ContentPackageResult(UUID id, String code, String title, PackageType packageType, String requiredFeatureKey,
                                 PublicationStatus status, UUID currentPublishedVersionId, Instant createdAt,
                                 Instant updatedAt, UUID lessonId) {
@@ -29,6 +39,6 @@ public record ContentPackageResult(
     public static ContentPackageResult of(ContentPackage pkg) {
         return new ContentPackageResult(pkg.getId(), pkg.getCode(), pkg.getTitle(), pkg.getPackageType(),
                 pkg.getRequiredFeatureKey(), pkg.getStatus(), pkg.getCurrentPublishedVersionId(), pkg.getCreatedAt(),
-                pkg.getUpdatedAt(), pkg.getLessonId(), pkg.getSourceCode());
+                pkg.getUpdatedAt(), pkg.getLessonId(), pkg.getSourceCode(), pkg.getPlacementPool());
     }
 }

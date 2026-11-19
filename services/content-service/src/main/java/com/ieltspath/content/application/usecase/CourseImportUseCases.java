@@ -419,7 +419,7 @@ public class CourseImportUseCases {
         UUID topicId = pack.topicCode() == null ? null : created.topicIdsByCode().get(pack.topicCode());
         UUID courseId = pack.type() == PackageType.COURSE_TEST ? created.courseId() : null;
         var author = createPackage.executeAsAuthor(new CreateContentPackageCommand(pack.code(), pack.title(),
-                pack.type(), null, lessonId, null, topicId, courseId));
+                pack.type(), null, lessonId, null, topicId, courseId, null));
         UUID versionId = createDraftVersion.execute(author.id(), null).id();
         Skill skill = skillOf(pack, plan);
         UUID sectionId = createSection.execute(new SaveContentSectionCommand(author.id(), versionId, null,

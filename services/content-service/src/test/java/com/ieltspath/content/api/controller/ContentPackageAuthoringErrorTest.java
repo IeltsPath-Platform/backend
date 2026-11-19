@@ -39,6 +39,7 @@ class ContentPackageAuthoringErrorTest {
     private final ReorderContentSectionsUseCase reorderSections = mock(ReorderContentSectionsUseCase.class);
     private final CreateContentPackageUseCase createPackage = mock(CreateContentPackageUseCase.class);
 
+    private final ListAuthorPackagesUseCase listPackages = mock(ListAuthorPackagesUseCase.class);
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -47,8 +48,58 @@ class ContentPackageAuthoringErrorTest {
                         mock(GetAuthorPackageUseCase.class), createDraft, mock(CreateContentSectionUseCase.class),
                         updateSection, mock(DeleteContentSectionUseCase.class), reorderSections,
                         mock(AddSectionQuestionUseCase.class), mock(RemoveAndReorderSectionQuestionsUseCase.class),
-                        mock(ListAuthorPackagesUseCase.class), createPackage))
+                        listPackages, createPackage))
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
+    }
+
+    @Test
+    void authorListSerializesPoolInEachSummary() throws Exception {
+        var summary = new com.ieltspath.content.application.result.AuthorPackageSummary(UUID.randomUUID(),
+                "POOL", "Placement", com.ieltspath.content.domain.vo.PackageType.PLACEMENT_TEST, null,
+                com.ieltspath.content.domain.vo.PublicationStatus.DRAFT, null, null, null, null, null,
+                java.time.Instant.now(), java.time.Instant.now(), null, false,
+                com.ieltspath.content.domain.vo.PlacementPool.BAND_3_5);
+        when(listPackages.execute(any())).thenReturn(java.util.List.of(summary));
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/content/admin/packages"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].placementPool").value("BAND_3_5"));
+    }
+
+    @Test
+    void placementRequiresPoolAndOtherTypesRejectPool() throws Exception {
+        for (String body : java.util.List.of(
+                "{\"code\":\"P\",\"title\":\"Placement\",\"packageType\":\"PLACEMENT_TEST\"}",
+                "{\"code\":\"P\",\"title\":\"Practice\",\"packageType\":\"PRACTICE_SET\",\"placementPool\":\"BAND_0_3\"}")) {
+            mockMvc.perform(post("/api/content/admin/packages").contentType("application/json").content(body))
+                    .andExpect(status().isBadRequest());
+        }
+        org.mockito.Mockito.verifyNoInteractions(createPackage);
+    }
+
+    @Test
+    void placementPoolIsStoredAndReturned() throws Exception {
+        var repository = mock(com.ieltspath.content.domain.repository.ContentPackageRepository.class);
+        when(repository.save(any())).thenAnswer(call -> call.getArgument(0));
+        var useCase = new CreateContentPackageUseCase(repository,
+                mock(com.ieltspath.content.application.port.LearningContentReader.class));
+        when(createPackage.executeAsAuthor(any())).thenAnswer(call -> useCase.executeAsAuthor(call.getArgument(0)));
+        mockMvc.perform(post("/api/content/admin/packages").contentType("application/json")
+                        .content("{\"code\":\"P\",\"title\":\"Placement\",\"packageType\":\"PLACEMENT_TEST\",\"placementPool\":\"BAND_3_5\"}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.placementPool").value("BAND_3_5"));
+        var saved = org.mockito.ArgumentCaptor.forClass(com.ieltspath.content.domain.aggregate.ContentPackage.class);
+        org.mockito.Mockito.verify(repository).save(saved.capture());
+        org.assertj.core.api.Assertions.assertThat(saved.getValue().getPlacementPool().name()).isEqualTo("BAND_3_5");
+    }
+
+    @Test
+    void authorListForwardsPoolAndRejectsUnknownPool() throws Exception {
+        when(listPackages.execute(any())).thenReturn(java.util.List.of());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/content/admin/packages")
+                        .param("placementPool", "BAND_5_9")).andExpect(status().isOk());
+        var filter = org.mockito.ArgumentCaptor.forClass(com.ieltspath.content.application.port.AuthorPackageReader.Filter.class);
+        org.mockito.Mockito.verify(listPackages).execute(filter.capture());
+        org.assertj.core.api.Assertions.assertThat(filter.getValue().placementPool().name()).isEqualTo("BAND_5_9");
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/content/admin/packages")
+                        .param("placementPool", "UNKNOWN")).andExpect(status().isBadRequest());
     }
 
     @Test

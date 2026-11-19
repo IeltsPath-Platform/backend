@@ -144,8 +144,9 @@ public class RestLearningContentClient implements LearningContentClient {
     }
 
     @Override
-    public List<TestPackage> getPlacementTestPackages() {
-        return get("/placement-packages", new ParameterizedTypeReference<>() { });
+    public List<PlacementPackage> getPlacementPackages() {
+        // Without a pool Content answers for the full-length pool only (for older callers); ALL asks for every pool.
+        return get("/placement-packages?pool=ALL", new ParameterizedTypeReference<>() { });
     }
 
     @Override

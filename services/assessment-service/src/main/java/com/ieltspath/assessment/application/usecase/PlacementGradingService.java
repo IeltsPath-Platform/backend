@@ -16,6 +16,11 @@ import com.ieltspath.assessment.domain.repository.AttemptItemRepository;
 import com.ieltspath.assessment.domain.repository.AttemptResponseRepository;
 import com.ieltspath.assessment.domain.repository.AttemptSectionRepository;
 import com.ieltspath.assessment.domain.repository.ItemResultRepository;
+import com.ieltspath.assessment.domain.repository.SkillScoreRepository;
+import com.ieltspath.assessment.domain.entity.SkillScore;
+import com.ieltspath.assessment.domain.vo.GradingSource;
+import com.ieltspath.assessment.domain.vo.PlacementPool;
+import com.ieltspath.assessment.domain.service.PlacementBandCeiling;
 import com.ieltspath.assessment.domain.service.PlacementBandCalculator;
 import com.ieltspath.assessment.domain.vo.AttemptType;
 import com.ieltspath.assessment.domain.vo.GradingJobStatus;
@@ -31,17 +36,13 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Grades a placement attempt and writes its overall band on the result. Listening and Reading are converted from the
- * number of correct answers, Writing is the LLM band of each essay the learner sent (zero when none was sent; Task 2
- * weighs twice Task 1) and Speaking is a configured band that defaults to 0 until recordings can be assessed. A skill
- * may span several sections, such as the four Listening parts. The skill bands are averaged into the result's
- * {@code overallBand}; Learning only stores it. An essay the LLM could not grade takes the default Writing band
- * instead of waiting for an examiner.
+ * Grades the skills that were actually assessed, persists those bands, and caps the overall band at the selected pool.
  */
 @Service
 public class PlacementGradingService {
@@ -53,19 +54,21 @@ public class PlacementGradingService {
     private final AttemptResponseRepository responses;
     private final AssessmentResultRepository results;
     private final ItemResultRepository itemResults;
+    private final SkillScoreRepository skillScores;
     private final AssessmentResultCompleter completer;
     private final GateEssayJobStore jobs;
     private final AutoGradeAttemptService autoGrader;
     private final ObjectMapper json;
-    private final double speakingBand;
+    private final Double speakingBand;
     private final BigDecimal defaultWritingBand;
+    private final PlacementBandCeiling ceiling = new PlacementBandCeiling();
 
     public PlacementGradingService(AssessmentAttemptRepository attempts, AttemptSectionRepository sections,
                                    AttemptItemRepository attemptItems, AttemptResponseRepository responses,
                                    AssessmentResultRepository results, ItemResultRepository itemResults,
                                    AssessmentResultCompleter completer, GateEssayJobStore jobs,
-                                   AutoGradeAttemptService autoGrader, ObjectMapper json,
-                                   @Value("${assessment.placement.speaking-band:0.0}") double speakingBand,
+                                   AutoGradeAttemptService autoGrader, ObjectMapper json, SkillScoreRepository skillScores,
+                                   @Value("${assessment.placement.speaking-band:#{null}}") Double speakingBand,
                                    @Value("${assessment.placement.default-writing-band:5.5}") double defaultWritingBand) {
         this.attempts = attempts;
         this.sections = sections;
@@ -73,6 +76,7 @@ public class PlacementGradingService {
         this.responses = responses;
         this.results = results;
         this.itemResults = itemResults;
+        this.skillScores = skillScores;
         this.completer = completer;
         this.jobs = jobs;
         this.autoGrader = autoGrader;
@@ -99,7 +103,7 @@ public class PlacementGradingService {
                 .map(AttemptItem::id).toList();
         Map<UUID, UUID> submitted = jobs.submittedEssays(essayItems);
         if (submitted.isEmpty()) {
-            finish(attempt, items, Map.of());
+            finish(attempt, items, Map.of(), Set.of());
             return;
         }
         jobs.enqueueAi(submitted, attempt.getUserId());
@@ -116,13 +120,20 @@ public class PlacementGradingService {
             return false;
         }
         Map<UUID, BigDecimal> bands = new HashMap<>();
-        states.forEach(state -> bands.put(state.attemptItemId(),
-                state.band() != null ? state.band() : defaultWritingBand));
-        finish(attempt, attemptItems.findByAttemptId(attemptId), bands);
+        states.stream().filter(state -> state.band() != null)
+                .forEach(state -> bands.put(state.attemptItemId(), state.band()));
+        Set<UUID> sentEssays = states.stream().map(GateEssayJobStore.JobState::attemptItemId)
+                .collect(Collectors.toSet());
+        finish(attempt, attemptItems.findByAttemptId(attemptId), bands, sentEssays);
         return true;
     }
 
-    private void finish(AssessmentAttempt attempt, List<AttemptItem> items, Map<UUID, BigDecimal> essayBands) {
+    /**
+     * @param essayBands  LLM band of each essay that was graded
+     * @param sentEssays  every essay the learner sent; one of these without a band could not be graded
+     */
+    private void finish(AssessmentAttempt attempt, List<AttemptItem> items, Map<UUID, BigDecimal> essayBands,
+                        Set<UUID> sentEssays) {
         Map<UUID, Skill> skillBySection = sections.findByAttemptId(attempt.getId()).stream()
                 .collect(Collectors.toMap(AttemptSection::id, this::skillOf));
         Map<UUID, AttemptResponse> responseByItem = responses.findByAttemptItemIds(
@@ -132,6 +143,7 @@ public class PlacementGradingService {
         UUID resultId = UUID.randomUUID();
         Map<Skill, int[]> objective = new EnumMap<>(Skill.class);
         Map<Skill, double[]> banded = new EnumMap<>(Skill.class);
+        boolean writingUngraded = false;
         List<ItemResult> graded = new ArrayList<>(items.size());
         for (AttemptItem item : items) {
             AnswerSnapshot answer = AnswerSnapshot.parse(json, item.answerSnapshot())
@@ -139,36 +151,67 @@ public class PlacementGradingService {
                     .orElseThrow(() -> new InvalidAssessmentStateException("Placement item has no answer snapshot"));
             Skill skill = skillBySection.get(item.attemptSectionId());
             boolean correct;
+            Boolean judged;
             if (skill == Skill.WRITING) {
-                double band = essayBands.getOrDefault(item.id(), BigDecimal.ZERO).doubleValue();
-                addBand(banded, skill, band, writingWeight(answer));
-                correct = answer.passBand() != null && band >= answer.passBand().doubleValue();
+                BigDecimal essayBand = essayBands.get(item.id());
+                if (essayBand == null) {
+                    boolean sent = sentEssays.contains(item.id());
+                    if (sent) writingUngraded = true;
+                    else addBand(banded, skill, 0.0, writingWeight(answer));
+                    correct = false;
+                    judged = sent ? null : false;
+                } else {
+                    double band = essayBand.doubleValue();
+                    addBand(banded, skill, band, writingWeight(answer));
+                    correct = answer.passBand() != null && band >= answer.passBand().doubleValue();
+                    judged = correct;
+                }
             } else if (skill == Skill.SPEAKING) {
-                addBand(banded, skill, speakingBand, 1.0);
-                correct = true;
+                if (speakingBand == null) {
+                    correct = false;
+                    judged = null;
+                } else {
+                    addBand(banded, skill, speakingBand, 1.0);
+                    correct = true;
+                    judged = true;
+                }
             } else {
                 correct = autoGrader.isCorrect(answer, responseByItem.get(item.id()));
+                judged = correct;
                 int[] counts = objective.computeIfAbsent(skill, key -> new int[2]);
                 counts[0] += correct ? 1 : 0;
                 counts[1]++;
             }
             graded.add(new ItemResult(UUID.randomUUID(), resultId, item.id(), correct ? answer.maxScore() : 0.0,
-                    answer.maxScore(), correct, null, NO_FEEDBACK));
+                    answer.maxScore(), judged, null, NO_FEEDBACK));
         }
+        // One essay the LLM could not grade leaves Writing unknown: the graded part alone must not stand in for it.
+        boolean partial = writingUngraded;
+        if (writingUngraded) banded.remove(Skill.WRITING);
+        Map<Skill, Double> skillBands = bandsBySkill(objective, banded);
+        double uncapped = PlacementBandCalculator.overallBand(skillBands.values());
+        PlacementPool pool = attempt.getPlacementPool();
+        PlacementBandCeiling.CeilingResult capped = ceiling.apply(uncapped, pool);
         AssessmentResult draft = results.save(new AssessmentResult(resultId, attempt.getId(), 1,
-                AssessmentResult.DRAFT, PlacementBandCalculator.overallBand(bandsBySkill(objective, banded).values()),
-                null));
+                AssessmentResult.DRAFT, capped.band(), null, pool, uncapped, partial));
+        skillScores.saveAll(skillBands.entrySet().stream().map(entry -> new SkillScore(UUID.randomUUID(), resultId,
+                entry.getKey(), null, entry.getValue(), sourceOf(entry.getKey(), essayBands),
+                null)).toList());
         itemResults.saveAll(graded);
         completer.complete(attempt, draft, items, graded);
     }
 
     /**
-     * The skill bands behind a completed placement result, recomputed the way {@link #finish} computed them: objective
-     * skills from the stored item correctness, Writing from the essay jobs (zero when no essay was sent) and Speaking
-     * from the fixed band.
+     * Returns the bands saved at grading time. Old results without score rows retain the former read behavior.
      */
     @Transactional(readOnly = true)
     public Map<Skill, Double> skillBands(UUID attemptId, UUID resultId) {
+        List<SkillScore> stored = skillScores.findByResultId(resultId);
+        if (!stored.isEmpty()) {
+            Map<Skill, Double> saved = new EnumMap<>(Skill.class);
+            stored.forEach(score -> saved.put(score.skill(), score.band()));
+            return saved;
+        }
         Map<UUID, Skill> skillBySection = sections.findByAttemptId(attemptId).stream()
                 .collect(Collectors.toMap(AttemptSection::id, this::skillOf));
         Map<UUID, ItemResult> gradedByItem = itemResults.findByResultId(resultId).stream()
@@ -185,7 +228,7 @@ public class PlacementGradingService {
                 double weight = AnswerSnapshot.parse(json, item.answerSnapshot()).map(this::writingWeight).orElse(1.0);
                 addBand(banded, skill, essayBands.getOrDefault(item.id(), BigDecimal.ZERO).doubleValue(), weight);
             } else if (skill == Skill.SPEAKING) {
-                addBand(banded, skill, speakingBand, 1.0);
+                addBand(banded, skill, speakingBand == null ? 0.0 : speakingBand, 1.0);
             } else {
                 ItemResult graded = gradedByItem.get(item.id());
                 int[] counts = objective.computeIfAbsent(skill, key -> new int[2]);
@@ -194,6 +237,14 @@ public class PlacementGradingService {
             }
         }
         return bandsBySkill(objective, banded);
+    }
+
+    /**
+     * AI only for a Writing band that comes from an essay the LLM graded. Every other band is computed: Listening and
+     * Reading from the correct answers, Writing from essays that were not sent (zero), Speaking from its configured band.
+     */
+    private static GradingSource sourceOf(Skill skill, Map<UUID, BigDecimal> essayBands) {
+        return skill == Skill.WRITING && !essayBands.isEmpty() ? GradingSource.AI : GradingSource.AUTO;
     }
 
     private double writingWeight(AnswerSnapshot answer) {

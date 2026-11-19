@@ -1,11 +1,11 @@
--- Data fix-up to run BEFORE rolling learning-service back to an image older than V55/V56 (Flyway does not roll back).
+-- Data fix-up to run BEFORE rolling learning-service back to an image older than V56/V57 (Flyway does not roll back).
 --
 -- Why: the new code writes values the previous binary cannot read. It maps theory_reason and the probe status with
 -- Enum.valueOf, so one review with theory_reason = 'REPEATED_FAIL', or one probe with status = 'SKIPPED', makes every
 -- read of that review or diagnosis return 500, and those are blocking reviews.
 --
 -- Safe to run more than once, and safe to leave in place if the rollback is cancelled: the new code reads the old
--- values too. The columns and CHECK constraints added by V55/V56 stay; the previous binary ignores them.
+-- values too. The columns and CHECK constraints added by V56/V57 stay; the previous binary ignores them.
 --
 -- What is lost by rolling back:
 --   * a review that was moved to the basket after repeated misses (blocking = FALSE, unblocked_at set) stays optional;

@@ -118,6 +118,7 @@ class GetLearnerReportUseCaseTest {
         assertThat(report.placementBand()).isEqualByComparingTo("5.5");
         assertThat(report.knowledgePoints()).isEmpty();
         assertThat(report.estimatedBand().value()).isNull();
+        assertThat(report.estimatedBand().speakingIncluded()).isFalse();
         verify(placements, times(1)).find(user);
     }
 

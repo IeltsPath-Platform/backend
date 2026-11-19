@@ -20,7 +20,7 @@ Errors use the existing Content `ErrorResponse` envelope (`timestamp`, `status`,
 ## Implementation status (2026-10-23)
 
 Everything in sections 1 to 7 below is implemented. The detail response has the shape `{id, code, title,
-packageType, accessLevel, status, currentPublishedVersionId, lessonId, topicId, courseId, sourceCode, createdAt,
+packageType, accessLevel, status, currentPublishedVersionId, lessonId, topicId, courseId, sourceCode, placementPool, createdAt,
 updatedAt, versions[]}`. Each version has `id, versionNumber, status, rulesJson, publishedAt, publishAt,
 lastPublishError, sections[]`, and each section has `id, title, skill, sortOrder, timeLimitSeconds, partNo,
 coverAssetId, instructions, passage, audio, questions[]`. Each question has `id, questionVersionId, questionId,
@@ -47,7 +47,7 @@ a published version returns `400 VERSION_NOT_DRAFT` regardless of section IDs.
   "id": "<uuid>", "code": "READING-PRACTICE-1", "title": "Reading practice",
   "packageType": "PRACTICE_SET", "accessLevel": "FREE", "status": "PUBLISHED",
   "currentPublishedVersionId": "<uuid>", "lessonId": "<uuid or null>",
-  "topicId": null, "courseId": null,
+  "topicId": null, "courseId": null, "placementPool": null,
   "sourceCode": null, "createdAt": "2026-10-23T00:00:00Z", "updatedAt": "2026-10-23T00:00:00Z",
   "versions": [{
     "id": "<uuid>", "versionNumber": 2, "status": "DRAFT", "rulesJson": "{}",
@@ -78,12 +78,12 @@ Audio URLs use the same `MediaReferencePolicy` as preview; raw audio keys and op
 remain author-only. Asset selection uses the first link by `sort_order` and ID for each asset type.
 The reader loads relations in bounded bulk queries, never one query per version/section/question.
 
-`GET /api/content/admin/packages?type=&status=&lessonId=&topicId=&courseId=&q=` returns an array of the
+`GET /api/content/admin/packages?type=&status=&lessonId=&topicId=&courseId=&q=&placementPool=` returns an array of the
 `ContentPackageResponse` fields plus `topicId`, `courseId`, `latestVersionNumber` (null if no version) and
-`hasDraft` (boolean). Optional `type` is a `PackageType`; `status` is a publication status; `lessonId`,
+`hasDraft` (boolean) and `placementPool` (the pool enum for placement packages, null for others). Optional `placementPool` filters by `BAND_0_3`, `BAND_3_5` or `BAND_5_9` (added 2026-11-17). Optional `type` is a `PackageType`; `status` is a publication status; `lessonId`,
 `topicId` and `courseId` are UUIDs. `q` matches code or title case-insensitively as a literal substring (`%`
 and `_` are not wildcards). Results are limited to 500, ordered by decreasing `updatedAt` then ID. There is no
-pagination in v1. An unknown `type` or `status` value returns `400`.
+pagination in v1. An unknown `type`, `status` or `placementPool` value returns `400`.
 
 ## 2. Create a draft version
 
@@ -212,6 +212,12 @@ version; call `POST /versions` next. `code` (up to 100 characters) and `title` (
   (`422 INVALID_PACKAGE_LESSON` when the lesson does not exist). `sourceCode` is only for `PRACTICE_TEST`, is
   optional (none means an internal course checkpoint, not listed in the library) and must be a supported test
   source.
+- `PLACEMENT_TEST`: `placementPool` is required and must be `BAND_0_3`, `BAND_3_5` or `BAND_5_9`.
+  Any other package type requires a null/omitted pool. Missing, unknown or inapplicable pools return `400`.
+  The same validation applies to the legacy `POST /api/content/packages`. Create, list and detail responses
+  carry `placementPool`; the stored pool cannot be changed. A mistake requires creating a new package.
+- Publishing a placement package without a pool returns `400` with `details.code = PLACEMENT_POOL_REQUIRED`.
+  This also applies to scheduled publishing and validation before scheduling.
 - A duplicate `code` returns `400` like the original route.
 - The topic or course of a final test cannot be changed after creation.
 - A `DRAFT` final test is invisible to learners: learning reads only `PUBLISHED` packages with a published

@@ -138,12 +138,14 @@ thêm `DEMO_DATA_ENABLED=true` vào `.env`. Ghi một lần, khởi động lạ
 | `admin@ielts.demo`   | `00000000-0000-0000-0000-000000000002` | `Demo@123` | ADMIN, nạp point qua `POST /api/access/admin/points/adjust` |
 
 Content seed các bài Reading, Listening, Writing, topic nhiều skill và đề placement `PLACEMENT-4SKILLS` qua các Flyway
-migration (V9–V25). Placement test (`GET /api/learning/placement-test`) không bắt buộc: học viên học được mọi course khi chưa làm,
-placement chỉ dùng để gợi ý course và chỉ làm được một lần. Band placement lấy từ
-Listening/Reading quy đổi theo số câu đúng trên 40 (bảng IELTS, không đúng câu nào là band 0), Writing do LLM chấm
-(Task 2 nặng gấp đôi Task 1; band mặc định `assessment.placement.default-writing-band` = 5.5 khi LLM không chấm được)
-và Speaking cố định `assessment.placement.speaking-band` (mặc định 0 cho tới khi chấm được ghi âm). Learning tự
-tạo lộ trình khi học viên gọi `GET /api/learning/topics` lần đầu, nên không cần seed thêm. Không bật cờ demo trên
+migration (V9–V25). Placement không bắt buộc: học viên học được mọi course khi chưa làm; kết quả chỉ dùng để gợi ý course.
+Học viên chọn pool qua `GET /api/learning/placement-test/options` và tạo assignment bằng
+`POST /api/learning/placement-test/assignments`; Learning giới hạn ba assignment/24 giờ và Assessment giới hạn độc lập
+ba lượt đã bắt đầu/24 giờ. Listening/Reading quy đổi theo số câu đúng trên 40. Writing dùng bài luận đã chấm (Task 2
+nặng gấp đôi Task 1); bài nộp chưa có band để kết quả partial sẽ không có Writing band. Speaking chỉ được tính khi
+`assessment.placement.speaking-band` được cấu hình; mặc định không có band Speaking. Kết quả bị giới hạn theo pool:
+3.0, 5.0 hoặc 9.0. Learning tự tạo lộ trình khi học viên gọi `GET /api/learning/topics` lần đầu, nên không cần seed thêm.
+Không bật cờ demo trên
 database dùng chung hoặc production.
 
 **Tài khoản có quyền (chỉ dev, chỉ trên DB local):**

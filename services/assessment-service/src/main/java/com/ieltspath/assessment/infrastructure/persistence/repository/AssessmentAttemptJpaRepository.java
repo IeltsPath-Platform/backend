@@ -6,9 +6,13 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.Instant;
 
 @Repository
 public interface AssessmentAttemptJpaRepository extends JpaRepository<AssessmentAttemptJpaEntity, UUID> {
     Optional<AssessmentAttemptJpaEntity> findByIdAndUserId(UUID id, UUID userId);
     List<AssessmentAttemptJpaEntity> findByUserIdOrderByCreatedAtDesc(UUID userId);
+    long countByUserIdAndAttemptTypeAndCreatedAtGreaterThanEqualAndStatusNot(UUID userId,
+            com.ieltspath.assessment.domain.vo.AttemptType attemptType, Instant since,
+            com.ieltspath.assessment.domain.vo.AttemptStatus status);
 }

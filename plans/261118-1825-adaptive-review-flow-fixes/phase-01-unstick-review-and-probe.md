@@ -52,9 +52,9 @@ hàm này gọi Content. Content lỗi → rollback cả lần nộp.
 - **Content lỗi khi cần mở phiên:** GET trả `503`, **không** giao set. Không được bắt lỗi rồi giao set 3 (sẽ mất chẩn đoán).
 - Không có KP nền nào để dò: ghi phiên `CONCLUDED`, **không probe, kết luận rỗng** (trạng thái `CONCLUDED` đã có từ V18,
   không cần cột mới), trong **cùng** `TransactionTemplate` với quyết định giao set. GET bài ôn trả
-  `diagnosticSessionId = null` cho phiên không có probe, để FE không hiện chẩn đoán chưa từng diễn ra. Phase 2 (V55) thêm
+  `diagnosticSessionId = null` cho phiên không có probe, để FE không hiện chẩn đoán chưa từng diễn ra. Phase 2 (V56) thêm
   cột `conclusion_kind` và điền `NO_PREREQUISITES` cho các phiên này.
-  <!-- Updated: Implementation review - bỏ phụ thuộc phase 1 vào V55 -->
+  <!-- Updated: Implementation review - bỏ phụ thuộc phase 1 vào V56 -->
 - Đường "hết set" (`startWhenOutOfSets`) giữ trong GET như hiện tại.
 
 ## Mục 3: gọi Content ngoài transaction và khóa

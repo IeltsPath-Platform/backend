@@ -68,11 +68,14 @@ Requires role `CUSTOMER`, body `{"target":"LISTENING"}` (or `READING`, `WRITING`
 
 Lesson summaries include `paywall` and `freePreview`; `LOCKED` remains the progress status (previous lessons/reviews), so a paywall lock is represented separately. Access is granted in this order: the first three published lessons of each course skill, active skill/combo unlock, grandfathered progress that predates V39, then active Premium. A failed Premium lookup returns `503` only when none of those earlier rules grants access. `GET /lessons/{id}`, resources, practice-set listing, lesson submissions/completion, and free practice use this gate. Free practice refuses a paywalled knowledge point with `403 PAYWALL` before creating an attempt or charging hearts; knowledge tree points carry `locked` and disable free practice while gated. Topics without a course are not paywalled.
 
-### `GET /placement-test`
+### Placement assignment and retakes
 
-Available only to role `CUSTOMER`. Returns `{packageId, packageVersionId}` of the published `PLACEMENT_TEST` package. The learner then starts an Assessment attempt with that `packageVersionId` (`POST /api/assessments/attempts`, type `PLACEMENT`), sends the Writing essay and the Speaking recording through `POST /api/assessments/submissions`, and submits the attempt. A learner can sit the test once: when a placement exists the call returns `409 PLACEMENT_ALREADY_DONE`; without a published package it returns `404 NO_PLACEMENT_TEST`.
-
-No learning route requires a placement. The placement is stored when Assessment completes the attempt; poll `GET /api/assessments/attempts/{id}/placement-result` until it stops returning `404`, then `GET /courses` marks the recommended course.
+The placement assignment, attempt and retake contract is maintained in
+[placement-retake-v1](placement-retake-v1.md). The learner options route is
+`GET /api/learning/placement-test/options`; assignment and release use
+`POST /api/learning/placement-test/assignments` and
+`POST /api/learning/placement-test/assignments/{id}/release`. No learning route requires a placement. A completed
+Assessment result stores the latest diagnostic placement band and updates the optional course recommendation.
 
 ### `POST /courses/{id}/test-assignments`
 
@@ -391,8 +394,10 @@ New learning-gate errors use `{ "detail": string, "code": string, "reviews"?: ar
 | HTTP | Code | JSON example |
 | --- | --- | --- |
 | 403 | `REVIEW_REQUIRED` | `{"detail":"Complete the pending review first","code":"REVIEW_REQUIRED","reviews":[{"reviewId":"20000000-0000-4000-8000-000000000901","lessonId":"20000000-0000-4000-8000-000000000102","knowledgePointId":"10000000-0000-4000-8000-000000000002"}]}` |
-| 409 | `PLACEMENT_ALREADY_DONE` | `{"detail":"The placement test was already taken","code":"PLACEMENT_ALREADY_DONE"}` |
-| 404 | `NO_PLACEMENT_TEST` | `{"detail":"No placement test is published","code":"NO_PLACEMENT_TEST"}` |
+| 400 | `INVALID_PLACEMENT_POOL` | `{"detail":"Placement pool is invalid","code":"INVALID_PLACEMENT_POOL"}` |
+| 404 | `NO_PLACEMENT_TEST` | `{"detail":"No published placement test is available","code":"NO_PLACEMENT_TEST"}` |
+| 404 | `PLACEMENT_ASSIGNMENT_NOT_FOUND` | Assignment is not open, not owned by the caller, or already completed. |
+| 429 | `PLACEMENT_LIMIT_REACHED` | Three Learning assignments or three started Assessment placement attempts remain in the rolling 24-hour window. |
 | 403 | `TOPIC_LOCKED` | `{"detail":"Topic is locked","code":"TOPIC_LOCKED"}` (opening, submitting or completing a lesson of a locked topic; listing its lessons is allowed) |
 | 403 | `LESSON_LOCKED` | `{"detail":"Complete L1 before L2","code":"LESSON_LOCKED"}` |
 | 403 | `PRACTICE_REQUIRED` | `{"detail":"Complete practice of the earlier lessons first.","code":"PRACTICE_REQUIRED","lessonIds":["20000000-0000-4000-8000-000000000101"]}` (lesson gate; the same code is `409` when asking for a topic test, below) |

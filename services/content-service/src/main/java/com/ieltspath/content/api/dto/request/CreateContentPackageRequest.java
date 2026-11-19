@@ -1,8 +1,10 @@
 package com.ieltspath.content.api.dto.request;
 
+import com.ieltspath.content.domain.vo.PlacementPool;
 import com.ieltspath.content.api.dto.AccessLevel;
 import com.ieltspath.content.domain.vo.PackageType;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
@@ -23,10 +25,21 @@ public record CreateContentPackageRequest(
         AccessLevel accessLevel,
         // Only for PRACTICE_SET: the lesson whose Practice the set belongs to.
         UUID lessonId,
-        String sourceCode
+        String sourceCode,
+        PlacementPool placementPool
 ) {
     public CreateContentPackageRequest(String code, String title, PackageType packageType,
-                                      AccessLevel accessLevel, UUID lessonId) {
-        this(code, title, packageType, accessLevel, lessonId, null);
+                                      AccessLevel accessLevel, UUID lessonId, String sourceCode) {
+        this(code, title, packageType, accessLevel, lessonId, sourceCode, null);
     }
+
+    public CreateContentPackageRequest(String code, String title, PackageType packageType,
+                                      AccessLevel accessLevel, UUID lessonId) {
+        this(code, title, packageType, accessLevel, lessonId, null, null);
+    }
+    @AssertTrue(message = "placementPool is required exactly for PLACEMENT_TEST")
+    public boolean isPlacementPoolValid() {
+        return packageType == null || (packageType == PackageType.PLACEMENT_TEST) == (placementPool != null);
+    }
+
 }

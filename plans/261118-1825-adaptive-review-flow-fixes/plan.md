@@ -80,7 +80,7 @@ SKIPPED/DONE mà KP vẫn yếu → không hiện ở đâu      KP vẫn yếu 
 
 Thứ tự: 1 → 2 → 3 → 4 → 5.
 - Phase 1 và 2 cùng sửa `GetReviewUseCase`, `SubmitReviewUseCase`, `DiagnosticFlow`, nên làm nối tiếp, không song song.
-- Phase 3 dùng CHECK `trigger_kind` của V56 (phase 2).
+- Phase 3 dùng CHECK `trigger_kind` của V57 (phase 2).
 - Phase 4 cần endpoint skip (phase 2) và lý do mới của giỏ ôn (phase 3).
 
 ## Tiêu chí nghiệm thu
@@ -112,9 +112,9 @@ Thứ tự: 1 → 2 → 3 → 4 → 5.
 - Không plan dở nào sửa `ReviewItem`, `DiagnosticFlow`, `GetReviewBasketUseCase` (đã rà `plans/*/plan.md` theo tên lớp).
 - `261117-0829-suggestions-hide-unowned-course-lessons` đã xong, chỉ chạm gợi ý bài học.
 - Ba migration mới, chỉ nới CHECK và thêm cột, không sửa dữ liệu cũ:
-  - **V55** (phase 2): probe `SKIPPED`, `conclusion_kind`, phản hồi probe;
-  - **V56** (phase 2): `failures_counted_from`, `unblocked_at`, `REPEATED_FAIL`, `trigger_kind` `PRIORITY`/`DECAYED`;
-  - **V57** (phase 3): `decayed_from_tier`.
+  - **V56** (phase 2): probe `SKIPPED`, `conclusion_kind`, phản hồi probe;
+  - **V57** (phase 2): `failures_counted_from`, `unblocked_at`, `REPEATED_FAIL`, `trigger_kind` `PRIORITY`/`DECAYED`;
+  - **V58** (phase 3): `decayed_from_tier`.
 - Rollback image cần chạy script dữ liệu (phase 5).
 
 ## Câu hỏi còn mở
@@ -147,18 +147,18 @@ Thứ tự: 1 → 2 → 3 → 4 → 5.
 
 | # | Phát hiện | Mức | Kết quả | Áp vào |
 |---|-----------|-----|---------|--------|
-| 1 | Số set trượt là số đếm từ `review_sets`, không reset được bằng UPDATE; xóa set cũ làm gói đã lộ bị giao lại | Critical | Nhận | Phase 2 (V56, cột mốc) |
-| 2 | Start `PRIORITY`/`DECAYED` vi phạm CHECK `trigger_kind` → 500 | Critical | Nhận | Phase 2 (V56), 3 |
+| 1 | Số set trượt là số đếm từ `review_sets`, không reset được bằng UPDATE; xóa set cũ làm gói đã lộ bị giao lại | Critical | Nhận | Phase 2 (V57, cột mốc) |
+| 2 | Start `PRIORITY`/`DECAYED` vi phạm CHECK `trigger_kind` → 500 | Critical | Nhận | Phase 2 (V57), 3 |
 | 3 | Bài học archive → `SubmitTheoryCheckUseCase` 404 → kẹt ở lý thuyết | Critical | Nhận | Phase 1 |
 | 4 | Bài ôn đã hạ cấp vẫn chặn Practice (`PracticeClearance` tính mọi `PENDING`); `refreshPassForLesson` thêm vào không tác dụng | High | Nhận | Phase 2 |
 | 5 | Sót lời gọi Content trong khóa: `describe`, `activeErrorTypes`, `lessonPracticeSets`; skip cũng gọi HTTP | High | Nhận | Phase 1, 2 |
 | 6 | `StartBasketReview` gọi `GetReview` lồng trong transaction và khóa | High | Nhận | Phase 1 |
-| 7 | Thứ tự replay `requestId` khi tách hai bước; probe không lưu phản hồi | High | Nhận | Phase 1, 2 (V55) |
+| 7 | Thứ tự replay `requestId` khi tách hai bước; probe không lưu phản hồi | High | Nhận | Phase 1, 2 (V56) |
 | 8 | Lấy set probe trước khóa bị trùng gói | High | Nhận | Phase 1 |
-| 9 | Định nghĩa `DECAYED` sai; NPE khi sắp `dueAt` null; badge không như plan nói | High | Nhận | Phase 3 (V57) |
+| 9 | Định nghĩa `DECAYED` sai; NPE khi sắp `dueAt` null; badge không như plan nói | High | Nhận | Phase 3 (V58) |
 | 10 | Phản hồi nộp không có `blocking` → FE không biết bài ôn vừa hạ cấp | High | Nhận | Phase 2, 4 |
 | 11 | Start `PRIORITY` lặp làm cạn gói; mục hiện nhưng không bắt đầu được; chưa kiểm premium | High | Nhận | Phase 3 |
-| 12 | Thiếu `GetDiagnosticUseCase`; kết luận "chưa xác định" không có chỗ lưu; probe bỏ qua vẫn giữ gói | Medium | Nhận | Phase 2 (V55) |
+| 12 | Thiếu `GetDiagnosticUseCase`; kết luận "chưa xác định" không có chỗ lưu; probe bỏ qua vẫn giữ gói | Medium | Nhận | Phase 2 (V56) |
 | 13 | `maxFailedSets = 4` làm vỡ test tích hợp, `attemptNumber` FE và mock | Medium | Nhận | Phase 2, 4 |
 | 14 | Rollback image sau migration → `valueOf` lỗi 500 | Medium | Nhận | Phase 2, 5 |
 | 15 | Sửa nhỏ: GET 503 khi cần mở chẩn đoán; danh sách chờ đổi trạng thái; chỉ bắt 404 quanh lời gọi Content; kiểm quyền sở hữu trước; nơi gọi `ReviewReevaluation`; nhãn `UNBLOCKED` | Medium | Nhận | Phase 1, 2, 3, 4 |

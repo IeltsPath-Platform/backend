@@ -3,6 +3,7 @@ package com.ieltspath.learning.infrastructure.client;
 import com.ieltspath.commonsecurity.header.SecurityHeaders;
 import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.domain.vo.LearningSkill;
+import com.ieltspath.learning.domain.vo.PlacementPool;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,6 +37,20 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.*;
 
 class RestLearningContentClientTest {
+
+    @Test
+    void requestsEveryPlacementPackageInOneCallAndMapsThePoolField() {
+        server.expect(requestTo(INTERNAL_PATH + "/placement-packages?pool=ALL"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("[{\"packageId\":\"" + PACKAGE_ID + "\",\"packageVersionId\":\""
+                        + VERSION_ID + "\",\"code\":\"P35\",\"pool\":\"BAND_3_5\"}]", MediaType.APPLICATION_JSON));
+
+        var result = client.getPlacementPackages();
+
+        assertEquals(1, result.size());
+        assertEquals(PlacementPool.BAND_3_5, result.getFirst().pool());
+        assertEquals(VERSION_ID, result.getFirst().packageVersionId());
+    }
 
     @Test
     void readsPracticeTestMilestonesWithVerifiedBearerAndCorrelation() {

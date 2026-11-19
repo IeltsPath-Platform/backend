@@ -380,9 +380,25 @@ Learning uses these to apply the course paywall to suggestions. The fields are a
 behaves as before. A Content that omits them makes Learning treat the lesson as open when `courseId` is null, and
 grant no skill otherwise.
 
+## `GET /placement-packages?pool=` (2026-11-17)
+
+Returns published placement packages with their current published version. Optional `pool` is one of
+`BAND_0_3`, `BAND_3_5`, `BAND_5_9` or `ALL`; an unknown value returns `400`. **Omitting it returns the
+`BAND_5_9` pool only**: a Learning instance from before the pools existed takes the first exam of the list, and during
+a release or a rollback it must never be handed a shortened exam. `pool=ALL` returns every pool, which is what the
+current Learning uses to read the catalogue in one call.
+Each item is `{packageId, packageVersionId, code, pool}` and rows are ordered by package ID. Both the
+package and its current version must be `PUBLISHED`; draft and archived packages are excluded. Learning treats a
+missing pool in a response as unavailable and groups the items by pool itself.
+An empty pool returns `200 []`. Topic and course test listings retain their existing response shape.
+
+The original `PLACEMENT-4SKILLS` package is backfilled to `BAND_5_9`, preserving its 9.0 ceiling.
+A placement pool is immutable after creation. Content reports the pool; Assessment applies its ceiling
+(3.0, 5.0 or 9.0).
+
 ## `GET /package-versions/{id}`
 
-Returns one PUBLISHED version with `{packageVersionId, packageId, packageType, topicId, rules, sections}`. `topicId` is required for `TOPIC_TEST` and nullable for other types. `rules` is the parsed version rules object; the V9 seed versions use `{}`. MVP final tests have no time limit: when `rules` has no time key, Assessment sets `expiresAt=null`. Defining a timed package rule is deferred beyond MVP. Sections have `{sectionId, title, skill, instructions, sortOrder, passage, audio?, items}`; `passage` is the full text of the attached `PASSAGE` asset or `null`. `audio` (added 2026-10-01, absent when the section has no `AUDIO` asset) is `{assetId, mediaUrl, durationSeconds, transcript}`, resolved like a lesson audio block; the transcript must not reach a learner before the result allows it. Items have `{questionVersionId, sortOrder, stem, options, answerSpec, explanation, maxScore, knowledgePointMappings}`. Each mapping has `{knowledgePointId, weight}`; weight does not affect grading or mastery.
+Returns one PUBLISHED version with `{packageVersionId, packageId, packageType, topicId, rules, sections, placementPool}`. `placementPool` (added 2026-11-17) is the placement package's pool, or null for other types; it is retained when resolving media. `topicId` is required for `TOPIC_TEST` and nullable for other types. `rules` is the parsed version rules object; the V9 seed versions use `{}`. MVP final tests have no time limit: when `rules` has no time key, Assessment sets `expiresAt=null`. Defining a timed package rule is deferred beyond MVP. Sections have `{sectionId, title, skill, instructions, sortOrder, passage, audio?, items}`; `passage` is the full text of the attached `PASSAGE` asset or `null`. `audio` (added 2026-10-01, absent when the section has no `AUDIO` asset) is `{assetId, mediaUrl, durationSeconds, transcript}`, resolved like a lesson audio block; the transcript must not reach a learner before the result allows it. Items have `{questionVersionId, sortOrder, stem, options, answerSpec, explanation, maxScore, knowledgePointMappings}`. Each mapping has `{knowledgePointId, weight}`; weight does not affect grading or mastery.
 
 Essay package items additionally carry `guide` (learner-facing Markdown or null) and
 `images: [{mediaUrl, altText}]` (added 2026-10-20). Images come from validated `IMAGE` assets linked to the question or

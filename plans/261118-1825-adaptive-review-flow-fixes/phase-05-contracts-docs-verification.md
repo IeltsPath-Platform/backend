@@ -72,7 +72,7 @@ Chạy ngày 19/11/2026 trên stack local (gateway, user, content, access, asses
 - `mvn -o test -pl services/learning-service -am`: 1934 test, 1 lỗi `EssayKnowledgeJudgeTest` (file này nhánh không sửa; lỗi có từ trước).
 - Frontend: `tsc -b` sạch; test các màn bài ôn, chẩn đoán, giỏ ôn xanh khi chạy riêng. Chạy cả bộ lúc máy đang tải nặng thì vài test
   timeout ngẫu nhiên, chạy lại khi máy rảnh.
-- Migration V55–V57 áp dụng thành công trên database cũ của máy dev.
+- Migration V56–V58 áp dụng thành công trên database cũ của máy dev.
 - Đã chạy thật qua gateway: trượt set 1 → lý thuyết; qua quick-check; trượt set 2 → nộp bài không mở phiên, lần GET kế tiếp mới mở;
   `skip` khi chưa có probe trả `409 DIAGNOSIS_PROBE_REQUIRED`; nộp probe hai lần cùng `requestId` trả cùng kết quả; `skip` sau 1 probe
   đóng probe còn lại thành `SKIPPED`, kết luận `GAPS_FOUND`; KP không có prerequisite ghi phiên `CONCLUDED` /
@@ -91,5 +91,5 @@ Chạy ngày 19/11/2026 trên stack local (gateway, user, content, access, asses
 
 - Pattern §3.9 đã áp dụng: HTTP ngoài khóa và transaction; consumer không đổi.
 - Thay đổi hành vi sản phẩm: luật trượt, giỏ ôn, công thức trong `ReviewReevaluation`, cổng Practice với bài ôn đã hạ cấp.
-- Ba migration (V55, V56, V57): nới CHECK constraint và thêm cột; không xóa hay sửa dữ liệu cũ.
+- Ba migration (V56, V57, V58): nới CHECK constraint và thêm cột; không xóa hay sửa dữ liệu cũ.
 - Route mới `POST /api/learning/diagnostics/{id}/skip` thuộc tier rate limit `default`.

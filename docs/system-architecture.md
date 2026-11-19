@@ -236,9 +236,10 @@ connect/read timeouts and does not replace the application's normal external `Jw
 ### Học topic và bài (Learning Service)
 
 ```text
-GET /api/learning/placement-test -> Content internal placement-packages -> {packageId, packageVersionId};
-  409 PLACEMENT_ALREADY_DONE khi learner_placements đã có dòng của user
-(placement không bắt buộc: không route học nào đòi learner_placements)
+GET /api/learning/placement-test/options -> Learning assignments + Content internal placement-packages?pool=...
+  -> số đề theo pool, quota 3 assignment/24h, band placement mới nhất, assignment đang mở
+POST /api/learning/placement-test/assignments -> gán đề theo pool; POST .../assignments/{id}/release -> bỏ assignment chưa làm
+(placement không bắt buộc: không route học nào đòi learner_placements; Assessment độc lập giới hạn 3 lượt bắt đầu/24h)
 GET /api/learning/courses -> refresh từ Content topic-sequence + course_progress + learner_placements
   -> danh sách course theo band, recommended lấy từ placement (chỉ gợi ý; mọi course luôn mở)
 GET /api/learning/topics -> một lần gọi Content topic-sequence -> knowledge_point_catalog + topic_progress (course_id,
@@ -295,9 +296,9 @@ tạo bài ôn tùy chọn `ERROR_PATTERN` khi KP bẫy làm KP cha thành `PRIO
 
 Các use case `GetReview`, `SubmitReview`, `SubmitTheoryCheck`, `GetDiagnosticProbe`, `SubmitDiagnosticProbe`,
 `SkipDiagnostic`, `StartBasketReview` và `GetReviewBasket` chuẩn bị Content ngoài transaction/khóa học viên rồi khóa,
-đọc lại và kiểm tra dữ liệu trước khi ghi. Khi triển khai rollback image cũ sau V55/V56, trước tiên phải chạy
+đọc lại và kiểm tra dữ liệu trước khi ghi. Khi triển khai rollback image cũ sau V56/V57, trước tiên phải chạy
 [`rollback-data-fixup.sql`](../plans/261118-1825-adaptive-review-flow-fixes/reports/rollback-data-fixup.sql), vì binary cũ
-không đọc được các enum mới. V55–V57 thêm cột và nới CHECK; V55 cũng gán `NO_PREREQUISITES` cho các phiên đã kết luận
+không đọc được các enum mới. V56–V58 thêm cột và nới CHECK; V56 cũng gán `NO_PREREQUISITES` cho các phiên đã kết luận
 không có probe. Flyway không rollback các migration này.
 
 Khi nộp `TOPIC_GATE`/`COURSE_GATE`, essay đã gửi qua `/api/assessments/submissions` được xếp thành grading job miễn phí.
@@ -339,9 +340,9 @@ Học viên lấy mã đề từ learning (`POST /api/learning/topics/{id}/test-
 
 Assessment không gọi User lấy goal; attempt mới và event có `learning_goal_id` null. Consumer Learning không gọi
 HTTP và không cần path hoặc trạng thái học có sẵn. Trong một transaction khóa theo user, version bằng/cũ bị bỏ qua;
-version cao hơn thay evidence của attempt. `PLACEMENT` lưu `overall_band` mới nhất (Assessment tự chấm đề placement 4 kỹ năng và tính band: Listening/Reading theo
-% đúng, Writing theo band LLM hoặc band mặc định khi LLM không chấm được, Speaking theo band cố định cấu hình; band tổng là
-trung bình làm tròn 0.5), không ghi mastery hay đổi trạng thái topic;
+version cao hơn thay evidence của attempt. `PLACEMENT` lưu `overall_band` mới nhất (Assessment tự chấm: Listening/Reading theo
+% đúng, Writing theo bài luận đã chấm, Speaking chỉ khi có cấu hình; kỹ năng chưa chấm được bị bỏ khỏi kết quả. Band tổng là
+trung bình các kỹ năng có band, làm tròn 0.5 rồi giới hạn theo pool 3.0/5.0/9.0), không ghi mastery hay đổi trạng thái topic;
 band chỉ dùng để đánh dấu course được gợi ý. `TOPIC_GATE` tìm assignment cùng user/package version, còn mở và đã giao
 trước khi attempt hoàn tất; lần giao được consume cả khi trượt; đạt ≥70% ghi `passed_at` một chiều. `COURSE_GATE` dùng
 quy tắc tương tự cho `course_test_assignments`; đạt ≥70% ghi `course_progress.passed_at`. ACK sau commit; topic kế trong
