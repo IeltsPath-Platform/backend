@@ -1,0 +1,218 @@
+{
+  "code": "PLACEMENT-B59-B",
+  "pool": "BAND_5_9",
+  "title": "IELTS placement test, band 5-9 (B)",
+  "lists": {
+    "headings": {
+      "keys": ["i", "ii", "iii", "iv", "v", "vi", "vii", "viii"],
+      "options": [
+        "A product with an uncertain price",
+        "Where the money goes",
+        "Selling directly to the customer",
+        "A drink with a worldwide market",
+        "Disagreement about a labelling system",
+        "A threat from the weather in the future",
+        "The effects of a new tax",
+        "How coffee is roasted"
+      ]
+    },
+    "paragraphs": {
+      "keys": ["A", "B", "C", "D", "E", "F"],
+      "options": ["Paragraph A", "Paragraph B", "Paragraph C", "Paragraph D", "Paragraph E", "Paragraph F"]
+    },
+    "who": {
+      "keys": ["A", "B", "C"],
+      "options": ["Priya", "Jack", "Both of them"]
+    }
+  },
+  "listening": [
+    {
+      "title": "Listening Part 1: booking a cooking course",
+      "instructions": "Questions 1–10. Complete the form below. Write ONE WORD AND/OR A NUMBER for each answer. For question 6, choose A, B or C.",
+      "voices": "Assistant (woman) and Caller (man); a telephone enquiry at a natural pace",
+      "transcript": "Assistant: Good morning, Oakwood Cookery School. How can I help?\nCaller: Hello. I saw your advertisement for the Italian cooking course and I'd like to find out more.\nAssistant: Certainly. It's a six-week course, and the classes are on Thursday evenings.\nCaller: What time do they start?\nAssistant: Seven o'clock, and they finish at half past nine. The next course begins on the twenty-second of January.\nCaller: Good. And what will we learn?\nAssistant: In the first week we make fresh pasta, and in the second week, sauces. After that we cover bread, then desserts, and in week five it's a whole menu for dinner guests. In the final week you cook a three-course meal for the other students.\nCaller: That sounds like a lot of fun. Do I have to bring anything?\nAssistant: Just an apron. Everything else, including the ingredients, is provided.\nCaller: How much is the course?\nAssistant: It's two hundred and ten pounds for the six weeks, but if you book before the end of December there's a discount of fifteen per cent.\nCaller: Excellent. How many people are in each class?\nAssistant: We limit it to twelve, so that everyone gets attention from the chef.\nCaller: Are there any places left?\nAssistant: Only three, I'm afraid, so I'd book soon. Could I take your details?\nCaller: Of course. My name is Marcus Reyes, that's R, E, Y, E, S, and I live at 14 Mill Lane.\nAssistant: Thank you, Mr Reyes. I'll send a confirmation today. The school is just opposite the library, ten minutes from the station.",
+      "questions": [
+        { "q": "Type of course: ______ cooking", "fill": ["italian"], "why": "He asks about the Italian cooking course." },
+        { "q": "Length of course: ______ weeks", "fill": ["6", "six"], "why": "It's a six-week course." },
+        { "q": "Day of the class: ______ evenings", "fill": ["thursday", "thursdays"], "why": "Classes are on Thursday evenings." },
+        { "q": "Finishing time: ______ p.m.", "fill": ["9.30", "9:30", "half past nine", "21:30", "21.30"], "why": "The classes finish at half past nine." },
+        { "q": "Date the next course starts: ______ January", "fill": ["22", "22nd", "twenty-second", "twenty second", "the 22nd", "the twenty-second"], "why": "The next course begins on the twenty-second of January." },
+        { "q": "What do the students cook in the final week?", "options": ["A pasta dish for the chef", "A three-course meal for the other students", "A dinner party at home"], "answer": "B", "why": "In the final week you cook a three-course meal for the other students." },
+        { "q": "Students must bring an ______.", "fill": ["apron"], "why": "Just an apron; everything else is provided." },
+        { "q": "Cost of the course: £______", "fill": ["210", "two hundred and ten", "two hundred ten"], "why": "It's two hundred and ten pounds." },
+        { "q": "Discount for booking before the end of December: ______ per cent", "fill": ["15", "fifteen"], "why": "There is a discount of fifteen per cent." },
+        { "q": "Number of places left: ______", "fill": ["3", "three"], "why": "Only three places are left." }
+      ]
+    },
+    {
+      "title": "Listening Part 2: the opening of a community arts centre",
+      "instructions": "Questions 11–20. Choose the correct letter, A, B or C, or write ONE WORD AND/OR A NUMBER where you see a line.",
+      "voices": "Speaker (woman), one speaker; a welcome speech at an opening event, natural pace",
+      "transcript": "Speaker: Good evening, everyone, and thank you for coming to the opening of the Millbrook Arts Centre. I'd like to take a few minutes to tell you how the centre came about and what you can do here.\nSpeaker: The building was a primary school until 2009, when the number of children in the area fell and the school closed. For several years it stood empty, and the council planned to sell it to a property developer. However, a group of local residents formed a committee, raised money, and persuaded the council to lease it to them for a very low rent instead.\nSpeaker: It took us three years and a great deal of volunteer work to convert the building. Fortunately, we kept most of the original features. The old hall is now a theatre which seats a hundred and fifty, and the classrooms have become studios for painting, pottery and photography. The playground was turned into a garden, which will be used for outdoor concerts in summer.\nSpeaker: The centre will be open from ten in the morning until ten at night, Tuesday to Sunday, and closed on Mondays for cleaning and repairs. Most of our evening courses cost between eight and twelve pounds a session, but anyone under eighteen can attend free of charge, thanks to a grant from a local company.\nSpeaker: We're always looking for volunteers. At present we particularly need people to help in the café and to look after the box office on theatre nights. You don't need any experience; we'll give you training. If you're interested, please speak to Jenny at the desk by the entrance, or leave your name on the form.\nSpeaker: Finally, I'd like to thank everyone who gave money, time or both. The centre belongs to the community, and we hope you'll all make it your own.",
+      "questions": [
+        { "q": "Why did the school close?", "options": ["The building was unsafe", "Fewer children lived in the area", "It moved to a new site"], "answer": "B", "why": "The number of children in the area fell and the school closed." },
+        { "q": "What did the council originally plan to do with the building?", "options": ["Sell it to a property developer", "Pull it down", "Turn it into offices"], "answer": "A", "why": "The council planned to sell it to a property developer." },
+        { "q": "How did the residents get the building?", "options": ["They bought it", "They leased it at a very low rent", "They were given it"], "answer": "B", "why": "They persuaded the council to lease it to them for a very low rent." },
+        { "q": "It took ______ years to convert the building.", "fill": ["3", "three"], "why": "It took three years and a great deal of volunteer work." },
+        { "q": "What is the old hall used for now?", "options": ["A theatre", "A café", "A painting studio"], "answer": "A", "why": "The old hall is now a theatre." },
+        { "q": "The theatre seats ______ people.", "fill": ["150", "a hundred and fifty", "one hundred and fifty"], "why": "The theatre seats a hundred and fifty." },
+        { "q": "The centre is closed on ______ for cleaning and repairs.", "fill": ["monday", "mondays"], "why": "It is closed on Mondays." },
+        { "q": "Who can attend courses free of charge?", "options": ["People over sixty", "Anyone under eighteen", "Local residents"], "answer": "B", "why": "Anyone under eighteen can attend free of charge." },
+        { "q": "Volunteers are needed in the café and at the ______ office on theatre nights.", "fill": ["box"], "why": "They need people to look after the box office." },
+        { "q": "What should someone interested in volunteering do?", "options": ["Phone the council", "Speak to Jenny at the desk", "Send an email"], "answer": "B", "why": "Please speak to Jenny at the desk by the entrance." }
+      ]
+    },
+    {
+      "title": "Listening Part 3: a project on sleep and memory",
+      "instructions": "Questions 21–26: Choose the correct letter, A, B or C. Questions 27–30: Who will do each task? Choose A (Priya), B (Jack) or C (both of them).",
+      "voices": "Tutor (man), Priya (young woman), Jack (young man); a supervision meeting in three distinct voices, natural academic pace",
+      "transcript": "Tutor: Come in, Priya and Jack. Let's talk about your research project on sleep and memory. How far have you got?\nPriya: We've finished the experiment. We asked forty students to learn a list of sixty word pairs in the evening. Half of them then slept normally, and the other half stayed awake all night.\nJack: We tested all of them again two days later, so that tiredness wouldn't affect the results.\nTutor: That was sensible. What did you find?\nPriya: The students who slept remembered about twenty per cent more word pairs. We expected a difference, but not as big as that.\nJack: What surprised me was that the effect was larger for the harder pairs, the ones with no obvious connection. For easy pairs like salt and pepper, both groups did well.\nTutor: That fits with other research. Did you check whether the students who stayed awake were less motivated?\nPriya: We thought about it, but all the participants were paid, so we assumed that motivation was the same.\nTutor: Hmm. Payment doesn't guarantee that. You could mention it as a limitation. What about the sample? Forty is a small group.\nJack: Yes, and they were all university students, so we can't say that the results apply to older people. We'll say that in the discussion section.\nTutor: Good. How are you planning to present the results?\nPriya: I'd like to use a bar chart comparing the two groups, because it's clear and simple.\nJack: I think we should include a table with the exact figures too, in an appendix.\nTutor: Both are fine. Now, who's writing the literature review?\nPriya: I'll do that, because I've already read most of the papers.\nJack: And I'll do the statistics. I'm more confident with that program.\nPriya: We'll write the introduction together, and Jack will draft the conclusion.\nTutor: What about the abstract? Remember it needs to be under two hundred words.\nPriya: I'll write that last.\nTutor: Excellent. The deadline is the fifteenth of May, so you have three weeks. Come and see me again after you've written a first draft.",
+      "questions": [
+        { "q": "How many students took part in the experiment?", "options": ["20", "40", "60"], "answer": "B", "why": "They asked forty students; sixty is the number of word pairs." },
+        { "q": "When were the students tested again?", "options": ["The next morning", "Two days later", "A week later"], "answer": "B", "why": "They tested everyone two days later so that tiredness would not affect the results." },
+        { "q": "How much more did the students who slept remember?", "options": ["About 10 per cent", "About 20 per cent", "About 40 per cent"], "answer": "B", "why": "They remembered about twenty per cent more word pairs." },
+        { "q": "What surprised Jack?", "options": ["Both groups did well on easy pairs", "The effect was larger for harder pairs", "Nobody forgot any pairs"], "answer": "B", "why": "He was surprised that the effect was larger for the harder pairs." },
+        { "q": "What does the tutor suggest they mention as a limitation?", "options": ["Payment does not guarantee equal motivation", "The word list was too long", "The test was too easy"], "answer": "A", "why": "Payment doesn't guarantee that motivation was the same, so it could be mentioned as a limitation." },
+        { "q": "Why does Jack say the results may not apply to older people?", "options": ["The sample was small", "All the participants were university students", "The test was too short"], "answer": "B", "why": "They were all university students." },
+        { "q": "Write the literature review", "list": "who", "answer": "A", "why": "Priya says she will do the literature review." },
+        { "q": "Do the statistics", "list": "who", "answer": "B", "why": "Jack says he will do the statistics." },
+        { "q": "Write the introduction", "list": "who", "answer": "C", "why": "They will write the introduction together." },
+        { "q": "Draft the conclusion", "list": "who", "answer": "B", "why": "Jack will draft the conclusion." }
+      ]
+    },
+    {
+      "title": "Listening Part 4: the history of paper",
+      "instructions": "Questions 31–40. Complete the notes below. Write ONE WORD AND/OR A NUMBER for each answer.",
+      "voices": "Lecturer (woman), one speaker; a university lecture at a natural pace",
+      "transcript": "Lecturer: Today I want to look at the history of paper, a material so common that we rarely think about it.\nLecturer: Before paper, people wrote on a variety of materials. In Egypt they used papyrus, made from a reed that grew along the River Nile. Strips of the plant were pressed together to make a flat sheet. In Europe, parchment, made from animal skin, was the main material, but it was expensive, because a single book might need the skins of dozens of sheep.\nLecturer: Paper as we know it was developed in China. Traditionally, the invention is credited to an official named Cai Lun, who presented the process to the emperor in the year 105. Early Chinese paper was made from old rags, tree bark and fishing nets, which were beaten into a pulp, spread on a screen and left to dry.\nLecturer: For several centuries the method stayed a secret. It reached the Arab world in the eighth century, and the first paper mills in Europe were built in Spain in the twelfth century. After that, paper production spread slowly across the continent.\nLecturer: The turning point came in the fifteenth century, when Johannes Gutenberg developed printing with movable metal type. Suddenly there was a huge demand for cheap paper, and for the first time a shortage of rags became a serious problem.\nLecturer: The solution arrived in the 1840s, when a German inventor, Friedrich Keller, found a way to make paper from wood pulp. Wood was far cheaper and more plentiful than rags, and paper became cheap enough for newspapers and inexpensive books to reach ordinary readers. However, early wood paper had a disadvantage: it contained acid, so it turned yellow and fell apart after a few decades.\nLecturer: Today most paper is still made from wood, but recycling has become important, and a great deal of paper is now made from used paper, which saves both trees and energy.",
+      "questions": [
+        { "q": "Papyrus was made from a ______ that grew along the Nile.", "fill": ["reed"], "why": "Papyrus was made from a reed that grew along the River Nile." },
+        { "q": "In Europe, parchment was made from animal ______.", "fill": ["skin"], "why": "Parchment was made from animal skin." },
+        { "q": "A single book might need the skins of dozens of ______.", "fill": ["sheep"], "why": "A single book might need the skins of dozens of sheep." },
+        { "q": "Cai Lun presented the process to the emperor in the year ______.", "fill": ["105"], "why": "He presented the process in the year 105." },
+        { "q": "Early Chinese paper was made from old rags, tree bark and fishing ______.", "fill": ["nets"], "why": "Early paper was made from rags, tree bark and fishing nets." },
+        { "q": "The method reached the Arab world in the ______ century.", "fill": ["8th", "eighth"], "why": "It reached the Arab world in the eighth century." },
+        { "q": "The first paper mills in Europe were built in ______.", "fill": ["spain"], "why": "The first mills in Europe were built in Spain." },
+        { "q": "Gutenberg developed printing with movable metal ______.", "fill": ["type"], "why": "He developed printing with movable metal type." },
+        { "q": "In the 1840s, Keller found a way to make paper from wood ______.", "fill": ["pulp"], "why": "He found a way to make paper from wood pulp." },
+        { "q": "Early wood paper turned yellow because it contained ______.", "fill": ["acid"], "why": "It contained acid, so it turned yellow." }
+      ]
+    }
+  ],
+  "reading": [
+    {
+      "title": "Reading Passage 1: the return of the beaver",
+      "instructions": "Questions 1–6: Do the statements agree with the information in the passage? Choose TRUE, FALSE or NOT GIVEN. Questions 7–13: Complete the sentences. Choose NO MORE THAN TWO WORDS from the passage for each answer. You should spend about 20 minutes on this passage.",
+      "minutes": 20,
+      "passage": "The Return of the Beaver\n\nFor about four hundred years there were no wild beavers in Britain. Hunted for their fur and for a substance used in perfume and medicine, the animals had disappeared from the island by the sixteenth century. In recent years, however, they have returned. A few families were released in carefully controlled trials, and conservationists have since watched with great interest as the animals have gone about the work for which they are famous: building dams.\n\nA beaver dam is made of sticks, branches and mud. Its purpose is to create a pond deep enough for the animal to build a safe home, called a lodge, with an entrance below the water. The ponds that result have effects far beyond the beavers' own needs. Water that would otherwise run quickly down a slope is held back and released slowly, so that the stream below is less likely to flood after heavy rain. In dry weather the pond works in the opposite way, because it keeps a supply of water in the landscape for much longer.\n\nThe changes do not stop there. The ponds trap mud that would otherwise be carried downstream, which makes the water cleaner for the fish and insects that live further along. Trees that beavers cut down often grow back in a new shape, with many thin stems, and this gives shelter to small birds. Wetland plants arrive, then frogs, dragonflies and water voles. Ecologists describe the beaver as a 'keystone' species, meaning that one animal has an effect on the whole environment far greater than its size would suggest.\n\nNot everyone is delighted, however. Farmers whose fields lie beside a stream worry that a new dam may flood their crops, and some anglers fear that dams will block the movement of fish such as salmon and trout. Research so far suggests that these fears are partly justified: in a few places land has been flooded and the owners have had to be compensated. On the other hand, studies of fish have usually found that dams slow, but do not stop, the movement of the larger species.\n\nThe practical response has been to manage rather than to prevent. In some places engineers fit a pipe through a dam so that the water level stays below a set height, which keeps the pond but protects the field. In others, fences are built around valuable trees. These measures are cheap compared with the cost of repairing flood damage elsewhere, and where they have been used, many landowners have become more positive.\n\nSupporters point out that the beaver does for free what humans would otherwise pay a great deal to do. Building artificial wetlands to slow rivers can cost millions, whereas a family of beavers will build several in a few seasons. Whether the country is ready to live with such an energetic neighbour is a question that politicians, farmers and ordinary residents are still debating.",
+      "questions": [
+        { "q": "Beavers lived in the wild in Britain without a break until the twentieth century.", "tfng": "FALSE", "why": "They had disappeared by the sixteenth century." },
+        { "q": "Beavers were hunted for their fur.", "tfng": "TRUE", "why": "They were hunted for their fur and for a substance used in perfume and medicine." },
+        { "q": "The entrance to a beaver's lodge is above the water.", "tfng": "FALSE", "why": "The entrance is below the water." },
+        { "q": "All farmers have welcomed the return of the beaver.", "tfng": "FALSE", "why": "Not everyone is delighted; farmers worry about flooding." },
+        { "q": "Studies show that dams completely block the movement of large fish.", "tfng": "FALSE", "why": "Dams slow, but do not stop, the movement of the larger species." },
+        { "q": "Beavers have now been released in every part of Britain.", "tfng": "NOT_GIVEN", "why": "The passage mentions only a few controlled trials." },
+        { "q": "A dam creates a pond deep enough for the beaver to build a safe ______.", "fill": ["lodge"], "why": "The pond lets the animal build a safe home, called a lodge." },
+        { "q": "Because ponds hold water back, the stream below is less likely to ______ after heavy rain.", "fill": ["flood"], "why": "The stream below is less likely to flood." },
+        { "q": "In dry weather, a pond keeps a ______ of water in the landscape.", "fill": ["supply"], "why": "It keeps a supply of water in the landscape." },
+        { "q": "The ponds trap ______ that would otherwise be carried downstream.", "fill": ["mud"], "why": "The ponds trap mud." },
+        { "q": "Trees that grow back with many thin stems give shelter to small ______.", "fill": ["birds"], "why": "This gives shelter to small birds." },
+        { "q": "Ecologists call the beaver a ______ species.", "fill": ["keystone"], "why": "Ecologists describe the beaver as a 'keystone' species." },
+        { "q": "Engineers fit a ______ through a dam to control the water level.", "fill": ["pipe"], "why": "Engineers fit a pipe through a dam." }
+      ]
+    },
+    {
+      "title": "Reading Passage 2: the economics of coffee",
+      "instructions": "Questions 14–19: Choose the correct heading for each paragraph from the list of headings i–viii. Questions 20–23: Which paragraph, A–F, contains the following information? Questions 24–26: Complete the sentences. Choose ONE WORD ONLY from the passage. You should spend about 20 minutes on this passage.",
+      "minutes": 20,
+      "passage": "The Economics of Coffee\n\nA. Coffee is one of the most widely traded agricultural products in the world. Every day, people drink billions of cups, yet most of them never think about the long journey the beans have made. They are grown in about seventy tropical countries, often by farmers who own only a few hectares, and then roasted and sold thousands of kilometres away.\n\nB. The price of coffee is set on international markets and changes constantly. When a frost or a drought damages the harvest in a major producing country, the price can double within months; when there is a very large harvest, it can fall just as quickly. For farmers, this makes planning almost impossible. A family may earn a good living one year and barely cover its costs the next.\n\nC. Most of the money in the coffee chain is made far from the farm. Of the price a customer pays in a cafe in Europe or North America, only a small share goes to the farmer. Much of the rest pays for transport, roasting, packaging, rent and wages, and for the profits of the large companies that buy the beans. As a result, many growers cannot afford to improve their land or to send their children to school.\n\nD. In response, some shoppers have turned to products with 'fair trade' labels, which guarantee a minimum price to producers. Supporters argue that the system gives farmers security and encourages good environmental practice. Critics reply that the extra money paid by consumers often does not reach the poorest workers, who are employed by farmers rather than owning land, and that certification costs can be too high for the smallest growers.\n\nE. Another approach is to remove the middle steps. Some cooperatives of farmers now roast and pack their own coffee and sell it directly to cafes abroad. This brings in a much higher price per kilo, but it demands skills and equipment that many small producers lack. Training programmes, often paid for by charities and governments, have helped some groups to succeed, though they remain a minority.\n\nF. Climate change may soon make all of these questions more urgent. Coffee plants grow well only within a narrow range of temperatures, and researchers expect a large part of today's growing areas to become unsuitable over the coming decades. Farmers could move to higher ground, where it is cooler, but there is limited land there, and much of it is protected forest. The future of the world's favourite drink may therefore depend on finding plants that tolerate heat.",
+      "questions": [
+        { "q": "Paragraph A", "list": "headings", "answer": "iv", "why": "Paragraph A describes how widely coffee is traded and drunk: a drink with a worldwide market." },
+        { "q": "Paragraph B", "list": "headings", "answer": "i", "why": "Paragraph B explains how the price changes with harvests: a product with an uncertain price." },
+        { "q": "Paragraph C", "list": "headings", "answer": "ii", "why": "Paragraph C shows how little of the price reaches the farmer and where the rest goes." },
+        { "q": "Paragraph D", "list": "headings", "answer": "v", "why": "Paragraph D gives supporters' and critics' views of fair trade labels." },
+        { "q": "Paragraph E", "list": "headings", "answer": "iii", "why": "Paragraph E describes cooperatives that sell directly to cafes." },
+        { "q": "Paragraph F", "list": "headings", "answer": "vi", "why": "Paragraph F warns about the effect of climate change on growing areas." },
+        { "q": "A reason why a farmer's income can change greatly from one year to the next", "list": "paragraphs", "answer": "B", "why": "Paragraph B: a family may earn a good living one year and barely cover its costs the next." },
+        { "q": "A mention of the organisations that pay for training for producers", "list": "paragraphs", "answer": "E", "why": "Paragraph E: training programmes are often paid for by charities and governments." },
+        { "q": "A warning that many growing areas will become unsuitable", "list": "paragraphs", "answer": "F", "why": "Paragraph F: a large part of today's growing areas may become unsuitable." },
+        { "q": "A criticism that extra money may not reach the poorest workers", "list": "paragraphs", "answer": "D", "why": "Paragraph D: critics say the extra money often does not reach the poorest workers." },
+        { "q": "Of the price a customer pays, only a small ______ goes to the farmer.", "fill": ["share"], "why": "Paragraph C: only a small share goes to the farmer." },
+        { "q": "Some cooperatives now ______ and pack their own coffee.", "fill": ["roast"], "why": "Paragraph E: cooperatives roast and pack their own coffee." },
+        { "q": "Coffee plants grow well only within a narrow range of ______.", "fill": ["temperatures"], "why": "Paragraph F: a narrow range of temperatures." }
+      ]
+    },
+    {
+      "title": "Reading Passage 3: does money buy happiness?",
+      "instructions": "Questions 27–31: Choose the correct letter, A, B, C or D. Questions 32–36: Do the statements agree with the views of the writer? Choose YES, NO or NOT GIVEN. Questions 37–40: Complete the sentences. Choose ONE WORD ONLY from the passage. You should spend about 20 minutes on this passage.",
+      "minutes": 20,
+      "passage": "Does Money Buy Happiness?\n\nA. For decades, newspapers have reported that money cannot buy happiness. The claim is repeated so often that it seems obvious, yet researchers who have tried to test it have reached conclusions that are neither simple nor consistent. The most famous early study, published in 2010, analysed the answers of hundreds of thousands of people and reported that happiness in daily life rose with income only up to a certain level, after which more money made little difference. The finding was quoted by writers, politicians and advertisers alike.\n\nB. More recent work has questioned it. When a team of economists examined larger and more recent sets of data, they found that, on average, happiness continued to rise at every level of income they measured, with no sign of a limit. Other researchers then re-examined the same figures and suggested that both views were partly correct. Most people did seem to become happier as they earned more, but for a minority who were already unhappy, extra money made no difference at all. It was the average that hid the difference.\n\nC. An important question is what 'happiness' means. Psychologists distinguish between emotional wellbeing, the day-to-day feelings of joy or worry, and life evaluation, a person's overall judgement of how well their life is going. Income appears to have a stronger link with the second than with the first. A higher salary may not make a person smile more on an ordinary Tuesday, but it often makes them more satisfied when they think about their life as a whole, since it brings security and choice.\n\nD. Why should this be? One explanation is that money buys freedom from particular worries: rent, medical bills, an unreliable car. For people on low incomes, a small rise can remove a real source of stress, and its effect is large. For those who are already comfortable, extra money tends to be spent on things they will quickly get used to, so the effect is small. Economists call this 'diminishing returns'. Another explanation lies in comparison. People often judge their income not in isolation but against that of others, and a pay rise matters less if colleagues have received the same.\n\nE. It would be wrong, however, to conclude that wealth is the main route to a good life. Studies of what people say makes them happiest usually put relationships first, followed by health and a sense of purpose. Those who spend money on shared experiences, or on other people, are generally happier than those who buy things for themselves. In one experiment, volunteers were given a small sum and told to spend it either on themselves or on someone else; those who gave it away reported feeling better at the end of the day.\n\nF. The practical lesson for governments is therefore double-edged. Policies that raise the incomes of the poorest, such as a higher minimum wage, seem likely to produce real gains in wellbeing. At the same time, there is little evidence that making already wealthy societies richer will, on its own, make them happier. Whether a country should aim for faster growth or a better balance of work and leisure is not a question that the data alone can answer.",
+      "questions": [
+        { "q": "What does the writer say about the claim that money cannot buy happiness?", "options": ["Research has proved that it is true", "It is repeated often, but research has not given a simple, consistent answer", "It is only ever quoted by advertisers", "It was first made in 2010"], "answer": "B", "why": "Paragraph A: the claim is repeated so often that it seems obvious, but the research is neither simple nor consistent." },
+        { "q": "According to the study published in 2010, happiness in daily life ...", "options": ["rose with income without any limit", "rose with income only up to a certain level", "had no link with income", "fell as income rose"], "answer": "B", "why": "Paragraph A: it rose with income only up to a certain level." },
+        { "q": "What did the researchers who re-examined the figures suggest?", "options": ["The 2010 study was completely wrong", "Extra money made no difference for a minority who were already unhappy", "Rich people are always unhappier", "The data sets were too small"], "answer": "B", "why": "Paragraph B: for a minority who were already unhappy, extra money made no difference." },
+        { "q": "According to paragraph C, income has a stronger link with ...", "options": ["emotional wellbeing", "life evaluation", "relationships", "leisure time"], "answer": "B", "why": "Paragraph C: income has a stronger link with life evaluation than with emotional wellbeing." },
+        { "q": "What is meant by 'diminishing returns' in paragraph D?", "options": ["People spend less money", "The benefit of extra money becomes smaller for people who are already comfortable", "Prices go up", "Companies make less profit"], "answer": "B", "why": "Paragraph D: for those already comfortable, extra money has a small effect." },
+        { "q": "Researchers agree that happiness stops rising at a certain level of income.", "yn": "NO", "why": "Paragraph B: more recent work found no sign of a limit." },
+        { "q": "A pay rise matters less to a person if colleagues receive the same rise.", "yn": "YES", "why": "Paragraph D: a pay rise matters less if colleagues have received the same." },
+        { "q": "Spending money on other people generally makes people happier than buying things for themselves.", "yn": "YES", "why": "Paragraph E: those who spend money on other people are generally happier." },
+        { "q": "Governments should stop trying to raise the incomes of the poorest.", "yn": "NO", "why": "Paragraph F: raising the incomes of the poorest seems likely to produce real gains." },
+        { "q": "Wealthy societies become less happy as they grow richer.", "yn": "NOT_GIVEN", "why": "Paragraph F says there is little evidence they become happier, not that they become less happy." },
+        { "q": "Psychologists distinguish emotional wellbeing from life ______.", "fill": ["evaluation"], "why": "Paragraph C: emotional wellbeing and life evaluation." },
+        { "q": "For people with low incomes, a small rise can remove a real source of ______.", "fill": ["stress"], "why": "Paragraph D: a small rise can remove a real source of stress." },
+        { "q": "Studies usually put relationships first, followed by health and a sense of ______.", "fill": ["purpose"], "why": "Paragraph E: relationships, then health and a sense of purpose." },
+        { "q": "Whether to aim for faster growth or a better ______ of work and leisure cannot be answered by data alone.", "fill": ["balance"], "why": "Paragraph F: a better balance of work and leisure." }
+      ]
+    }
+  ],
+  "writing": [
+    {
+      "title": "Writing Task 1: household waste recycling",
+      "instructions": "Spend about 20 minutes on this task. Write at least 150 words.",
+      "minutes": 20,
+      "table": "Country | 2000 | 2010 | 2020\nCountry A | 12 | 28 | 46\nCountry B | 35 | 41 | 44\nCountry C | 5 | 14 | 31\nCountry D | 22 | 19 | 24",
+      "task": "TASK_1",
+      "minWords": 150,
+      "passBand": 5.5,
+      "stem": "The table below shows the percentage of household waste that was recycled in four countries in 2000, 2010 and 2020. Summarise the information by selecting and reporting the main features, and make comparisons where relevant. Write at least 150 words.",
+      "chartFacts": "Percentage of household waste recycled in four countries (A to D) in 2000, 2010 and 2020. Country A: 12, 28, 46. Country B: 35, 41, 44. Country C: 5, 14, 31. Country D: 22, 19, 24. Key features: Country A showed the biggest rise (12% to 46%, nearly four times) and had the highest rate in 2020; Country B started highest in 2000 (35%) but grew slowly to 44%; Country C started lowest (5%) and rose more than six times to 31%; Country D was the only country with a fall (22% to 19% between 2000 and 2010) and had the lowest rate in 2020 (24%)."
+    },
+    {
+      "title": "Writing Task 2: free public transport",
+      "instructions": "Spend about 40 minutes on this task. Write at least 250 words.",
+      "minutes": 40,
+      "task": "TASK_2",
+      "minWords": 250,
+      "passBand": 5.5,
+      "stem": "Some people believe that the best way to reduce traffic in cities is to make public transport free. Others think that there are better ways to solve the problem. Discuss both views and give your own opinion. Give reasons for your answer and include any relevant examples from your own knowledge or experience. Write at least 250 words."
+    }
+  ],
+  "speaking": [
+    {
+      "title": "Speaking Part 1: hometown and reading",
+      "instructions": "The examiner asks general questions about yourself and familiar topics. Answer each question in a few sentences.",
+      "questions": [
+        { "q": "Let's talk about your hometown. Where is your hometown, and what do you like about it?", "seconds": 45 },
+        { "q": "Do you think you will still be living there in ten years? Why or why not?", "seconds": 45 },
+        { "q": "Let's talk about reading. What kinds of things do you like to read?", "seconds": 45 },
+        { "q": "Do you prefer reading on paper or on a screen? Why?", "seconds": 45 }
+      ]
+    },
+    {
+      "title": "Speaking Part 2: a skill you would like to learn",
+      "instructions": "You have one minute to prepare, then speak for one to two minutes.",
+      "questions": [
+        { "q": "Describe a skill you would like to learn. You should say what the skill is, why you want to learn it, how you would learn it, and explain how it would help you. Speak for one to two minutes.", "seconds": 120 }
+      ]
+    },
+    {
+      "title": "Speaking Part 3: discussion",
+      "instructions": "The examiner asks broader questions linked to the Part 2 topic. Give full answers with reasons and examples.",
+      "questions": [
+        { "q": "Why do some people find it easy to learn new skills while others find it difficult?", "seconds": 90 },
+        { "q": "Do you think schools should spend more time teaching practical skills such as cooking or managing money? Why or why not?", "seconds": 90 },
+        { "q": "How might technology change the way people learn new skills in the future?", "seconds": 90 }
+      ]
+    }
+  ]
+}

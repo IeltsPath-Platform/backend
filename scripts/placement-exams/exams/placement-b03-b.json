@@ -1,0 +1,110 @@
+{
+  "code": "PLACEMENT-B03-B",
+  "pool": "BAND_0_3",
+  "title": "IELTS placement test, band 0-3 (B)",
+  "listening": [
+    {
+      "title": "Listening Part 1: buying a jacket",
+      "instructions": "Questions 1–10. Choose the correct letter, A, B or C, or write ONE WORD AND/OR A NUMBER where you see a line.",
+      "voices": "Assistant (woman) and Customer (man); slow, clear shop conversation",
+      "transcript": "Assistant: Good morning. Can I help you?\nCustomer: Yes, please. I want to buy a jacket for my brother.\nAssistant: What size is he?\nCustomer: He is size medium.\nAssistant: And what colour does he like?\nCustomer: He likes blue.\nAssistant: This blue jacket is very nice. It has two big pockets and it is warm.\nCustomer: How much is it?\nAssistant: It is sixty pounds, but this week there is a sale. You pay forty pounds.\nCustomer: That is good. I will take it. Do you have a bag for it?\nAssistant: Yes. A paper bag is free.\nCustomer: Can I pay with cash?\nAssistant: Yes, of course. Is it a birthday present?\nCustomer: Yes. His birthday is on Friday.\nAssistant: Then you can change it if it is too small. You must come back in fourteen days. When you come back, please bring this paper.\nCustomer: Thank you. When does the shop close today?\nAssistant: We close at seven o'clock.",
+      "questions": [
+        { "q": "The customer wants to buy a ______ for his brother.", "fill": ["jacket"], "why": "He says he wants to buy a jacket for his brother." },
+        { "q": "Size of the jacket: ______", "fill": ["medium"], "why": "He is size medium." },
+        { "q": "Colour: ______", "fill": ["blue"], "why": "He likes blue." },
+        { "q": "How many pockets does the jacket have?", "options": ["One", "Two", "Three"], "answer": "B", "why": "It has two big pockets." },
+        { "q": "Usual price: £______", "fill": ["60", "sixty"], "why": "It is usually sixty pounds." },
+        { "q": "Sale price: £______", "fill": ["40", "forty"], "why": "In the sale you pay forty pounds." },
+        { "q": "How much is a paper bag?", "options": ["Nothing", "One pound", "Two pounds"], "answer": "A", "why": "A paper bag is free." },
+        { "q": "The customer will pay with ______.", "fill": ["cash"], "why": "He asks to pay with cash and the answer is yes." },
+        { "q": "The brother's birthday is on ______.", "fill": ["friday"], "why": "His birthday is on Friday." },
+        { "q": "The shop closes at ...", "options": ["five o'clock", "six o'clock", "seven o'clock"], "answer": "C", "why": "We close at seven o'clock." }
+      ]
+    },
+    {
+      "title": "Listening Part 2: the weekend news on the radio",
+      "instructions": "Questions 11–20. Choose the correct letter, A, B or C, or write ONE WORD AND/OR A NUMBER where you see a line.",
+      "voices": "Presenter (woman), one speaker; clear radio voice, slow",
+      "transcript": "Presenter: Good morning, this is Seaview Radio with your weekend news.\nPresenter: First, the weather. On Saturday it will be sunny and warm, about twenty-two degrees. On Sunday there will be rain in the morning, and it will be colder, about fifteen degrees.\nPresenter: Now, things to do. On Saturday there is a book fair in the town hall. It starts at ten and finishes at four. Entry is free. In the evening there is a concert in the park. A ticket costs eight pounds.\nPresenter: On Sunday, because of the rain, the football match will be in the sports hall, not on the field. It starts at two o'clock.\nPresenter: One more thing. The number twelve bus will not run on Sunday. Please use the train. That is all for now. Have a good weekend!",
+      "questions": [
+        { "q": "What will the weather be on Saturday?", "options": ["Sunny", "Rainy", "Cold"], "answer": "A", "why": "On Saturday it will be sunny and warm." },
+        { "q": "The temperature on Saturday will be about ______ degrees.", "fill": ["22", "twenty-two", "twenty two"], "why": "About twenty-two degrees." },
+        { "q": "When will it rain?", "options": ["On Saturday morning", "On Sunday morning", "On Sunday evening"], "answer": "B", "why": "On Sunday there will be rain in the morning." },
+        { "q": "On Sunday it will be about ______ degrees.", "fill": ["15", "fifteen"], "why": "It will be colder, about fifteen degrees." },
+        { "q": "The book fair is in the town ______.", "fill": ["hall"], "why": "There is a book fair in the town hall." },
+        { "q": "How much does it cost to enter the book fair?", "options": ["Nothing", "Four pounds", "Eight pounds"], "answer": "A", "why": "Entry is free." },
+        { "q": "The book fair finishes at ______ o'clock.", "fill": ["4", "four", "4.00", "4:00"], "why": "It starts at ten and finishes at four." },
+        { "q": "A ticket for the concert costs £______.", "fill": ["8", "eight"], "why": "A ticket costs eight pounds." },
+        { "q": "Where will the football match be on Sunday?", "options": ["On the field", "In the sports hall", "In the park"], "answer": "B", "why": "Because of the rain, it will be in the sports hall." },
+        { "q": "Which bus will not run on Sunday?", "options": ["Number twelve", "Number fifteen", "Number twenty"], "answer": "A", "why": "The number twelve bus will not run on Sunday." }
+      ]
+    }
+  ],
+  "reading": [
+    {
+      "title": "Reading Passage 1: a trip to the zoo",
+      "instructions": "Questions 21–24: Do the statements agree with the information in the passage? Choose TRUE, FALSE or NOT GIVEN. Questions 25–27: Choose the correct letter, A, B or C. Questions 28–30: Complete the sentences. Write ONE WORD OR A NUMBER from the passage.",
+      "minutes": 10,
+      "passage": "An email from Leo\n\nHi Sara,\n\nHow are you? Last Friday my class went to the city zoo. We went by bus and the trip took one hour. We left school at nine o'clock and we came back at four.\n\nMy favourite animals were the penguins. There are twelve penguins at the zoo, and they eat fish three times a day. We watched the feeding at two o'clock. The zoo also has a new baby elephant. Her name is Lulu and she was born in January. She is very small, but she drinks twenty litres of milk every day!\n\nWe had lunch in a park near the zoo. My teacher, Mr Ford, bought an ice cream for everyone. It was a hot day, so it was very nice.\n\nThe tickets were cheap for students. We paid only five pounds each. Adults pay ten pounds.\n\nYou must come with us next time!\n\nLove,\nLeo",
+      "questions": [
+        { "q": "Leo's class went to the zoo on Friday.", "tfng": "TRUE", "why": "Last Friday my class went to the city zoo." },
+        { "q": "The class travelled to the zoo by train.", "tfng": "FALSE", "why": "They went by bus." },
+        { "q": "Leo's teacher took photos of the penguins.", "tfng": "NOT_GIVEN", "why": "The email does not mention photos." },
+        { "q": "The weather was hot on the day of the trip.", "tfng": "TRUE", "why": "It was a hot day." },
+        { "q": "How long was the bus trip?", "options": ["One hour", "Two hours", "Three hours"], "answer": "A", "why": "The trip took one hour." },
+        { "q": "What time did the class come back to school?", "options": ["Two o'clock", "Four o'clock", "Nine o'clock"], "answer": "B", "why": "They came back at four." },
+        { "q": "What is Lulu?", "options": ["A penguin", "A baby elephant", "A teacher"], "answer": "B", "why": "Lulu is the new baby elephant." },
+        { "q": "The penguins eat fish ______ times a day.", "fill": ["3", "three"], "why": "They eat fish three times a day." },
+        { "q": "Lulu drinks ______ litres of milk every day.", "fill": ["20", "twenty"], "why": "She drinks twenty litres of milk every day." },
+        { "q": "Students paid £______ each for a ticket.", "fill": ["5", "five"], "why": "They paid only five pounds each." }
+      ]
+    },
+    {
+      "title": "Reading Passage 2: Sunnyside Swimming Pool",
+      "instructions": "Questions 31–34: Do the statements agree with the information in the passage? Choose TRUE, FALSE or NOT GIVEN. Questions 35–37: Choose the correct letter, A, B or C. Questions 38–40: Complete the sentences. Write ONE WORD OR A NUMBER from the passage.",
+      "minutes": 10,
+      "passage": "Sunnyside Swimming Pool\n\nOpening times: The pool is open every day. In summer it opens at seven in the morning and closes at nine in the evening. In winter it closes at eight.\n\nPrices: A ticket for an adult is four pounds. Children under twelve pay two pounds, and children under three swim for free. You can also buy a monthly card for thirty pounds. With this card you can swim as often as you like.\n\nRules: You must take a shower before you go into the pool. Children under eight must always be with an adult. You cannot run near the pool, and you cannot take food or drinks into the swimming area. Please put your bag in a locker. The locker costs one pound, but you get the money back when you leave.\n\nLessons: We have swimming lessons for children every Tuesday and Thursday after school, at half past four. Each lesson is forty minutes. Please ask at the front desk if you want to join.\n\nThe pool has a small café where you can buy sandwiches, hot drinks and fruit.",
+      "questions": [
+        { "q": "The pool is open every day.", "tfng": "TRUE", "why": "The pool is open every day." },
+        { "q": "Children under three pay two pounds.", "tfng": "FALSE", "why": "Children under three swim for free." },
+        { "q": "There is a diving board at the pool.", "tfng": "NOT_GIVEN", "why": "A diving board is not mentioned." },
+        { "q": "Visitors can take drinks into the swimming area.", "tfng": "FALSE", "why": "You cannot take food or drinks into the swimming area." },
+        { "q": "In winter the pool closes at ...", "options": ["seven o'clock", "eight o'clock", "nine o'clock"], "answer": "B", "why": "In winter it closes at eight." },
+        { "q": "How much is a monthly card?", "options": ["Four pounds", "Twenty pounds", "Thirty pounds"], "answer": "C", "why": "A monthly card costs thirty pounds." },
+        { "q": "Who must always be with an adult?", "options": ["Children under eight", "Children under twelve", "All children"], "answer": "A", "why": "Children under eight must always be with an adult." },
+        { "q": "You must take a ______ before you go into the pool.", "fill": ["shower"], "why": "You must take a shower before you go into the pool." },
+        { "q": "A locker costs ______ pound, but you get it back.", "fill": ["1", "one"], "why": "The locker costs one pound." },
+        { "q": "Swimming lessons for children are on Tuesday and ______.", "fill": ["thursday"], "why": "Lessons are every Tuesday and Thursday." }
+      ]
+    }
+  ],
+  "writing": [
+    {
+      "title": "Writing: books read by four students",
+      "instructions": "Spend about 20 minutes on this task. Write at least 60 words. Use simple sentences.",
+      "minutes": 20,
+      "table": "Student | 2022 | 2023\nAnna | 8 | 12\nBen | 5 | 5\nCarla | 10 | 7\nDan | 3 | 9",
+      "task": "TASK_1",
+      "minWords": 60,
+      "passBand": 3.0,
+      "stem": "The table below shows how many books four students read in 2022 and in 2023. Write about the information in the table. Say who read the most books, and who read more books in 2023 than in 2022. Write at least 60 words.",
+      "chartFacts": "Number of books read by four students in 2022 and 2023. Anna: 8 in 2022, 12 in 2023. Ben: 5 in 2022, 5 in 2023. Carla: 10 in 2022, 7 in 2023. Dan: 3 in 2022, 9 in 2023. Key features: Carla read the most books in 2022 (10) and Anna read the most in 2023 (12); Anna (8 to 12) and Dan (3 to 9) read more books in 2023; Carla read fewer (10 to 7); Ben read the same number in both years (5)."
+    }
+  ],
+  "speaking": [
+    {
+      "title": "Speaking Part 1: your home",
+      "instructions": "Answer the questions in a few short sentences.",
+      "questions": [
+        { "q": "Let's talk about your home. Do you live in a house or a flat? What is your favourite room, and why?", "seconds": 45 }
+      ]
+    },
+    {
+      "title": "Speaking Part 2: a friend",
+      "instructions": "You have one minute to prepare, then speak for about one minute.",
+      "questions": [
+        { "q": "Describe a friend. You should say who the friend is, how you met, what you do together, and why you like this person. Speak for about one minute.", "seconds": 60 }
+      ]
+    }
+  ]
+}
