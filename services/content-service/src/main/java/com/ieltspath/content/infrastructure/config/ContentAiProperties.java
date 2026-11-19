@@ -23,8 +23,6 @@ public class ContentAiProperties {
         private int dailyLimit = 20;
         /** Upper bound for items in one request, for example questions per draft. */
         private int maxItemsPerRequest = 20;
-        /** Knowledge points a course request may put in the prompt, so the prompt stays short. */
-        private int maxCourseCandidates = 40;
         /** The day boundary for allowances. */
         private String quotaZone = "Asia/Ho_Chi_Minh";
 
@@ -36,8 +34,6 @@ public class ContentAiProperties {
         public void setDailyLimit(int dailyLimit) { this.dailyLimit = dailyLimit; }
         public int getMaxItemsPerRequest() { return maxItemsPerRequest; }
         public void setMaxItemsPerRequest(int maxItemsPerRequest) { this.maxItemsPerRequest = maxItemsPerRequest; }
-        public int getMaxCourseCandidates() { return maxCourseCandidates; }
-        public void setMaxCourseCandidates(int maxCourseCandidates) { this.maxCourseCandidates = maxCourseCandidates; }
         public String getQuotaZone() { return quotaZone; }
         public void setQuotaZone(String quotaZone) { this.quotaZone = quotaZone; }
     }
@@ -49,7 +45,7 @@ public class ContentAiProperties {
         private String model = "";
         private String reasoningEffort = "";
         private int maxTokens = 8192;
-        /** How long to wait for the model's answer. A course plan with vocabulary is a long reply from a reasoning model. */
+        /** How long to wait for the model's answer. A long reply from a reasoning model can take minutes. */
         private Duration timeout = Duration.ofSeconds(180);
 
         public String getBaseUrl() { return baseUrl; }

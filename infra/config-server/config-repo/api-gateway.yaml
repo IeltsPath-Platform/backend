@@ -157,7 +157,7 @@ spring:
                 connect-timeout: 2000
                 response-timeout: 210000
               predicates:
-                - Path=/api/content/admin/ai-drafts/courses,/api/content/admin/ai-drafts/practice-sets
+                - Path=/api/content/admin/ai-drafts/practice-sets
               filters:
                 - name: ClientRateLimit
                   args:

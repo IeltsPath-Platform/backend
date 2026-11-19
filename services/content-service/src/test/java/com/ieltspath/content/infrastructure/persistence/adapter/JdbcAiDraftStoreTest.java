@@ -3,6 +3,7 @@ package com.ieltspath.content.infrastructure.persistence.adapter;
 import com.ieltspath.content.domain.aggregate.AiDraft;
 import com.ieltspath.content.domain.vo.AiUsageKind;
 import com.ieltspath.content.domain.vo.DraftKind;
+import com.ieltspath.content.domain.vo.DraftStatus;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -17,6 +18,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -63,6 +65,23 @@ class JdbcAiDraftStoreTest {
                 Instant.parse("2026-10-28T10:00:00Z"))).getId();
 
         assertEquals(DraftKind.PRACTICE_SET, drafts.findById(id).orElseThrow().getKind());
+    }
+
+    @Test
+    void deleteRemovesTheRowOnlyWhileItsStatusIsAllowed() {
+        JdbcAiDraftRepository drafts = new JdbcAiDraftRepository(jdbc);
+        Instant now = Instant.parse("2026-10-23T10:00:00Z");
+        UUID author = UUID.randomUUID();
+        UUID ready = drafts.save(AiDraft.manual(DraftKind.COURSE, author, "{\"topics\":[]}", now)).getId();
+        UUID queued = drafts.save(AiDraft.request(DraftKind.COURSE, author, "{}", now)).getId();
+
+        assertEquals(0, drafts.deleteIfStatusIn(queued, Set.of(DraftStatus.READY, DraftStatus.FAILED)));
+        assertTrue(drafts.findById(queued).isPresent());
+
+        assertEquals(1, drafts.deleteIfStatusIn(ready, Set.of(DraftStatus.READY, DraftStatus.FAILED)));
+        assertTrue(drafts.findById(ready).isEmpty());
+        assertEquals(0, drafts.deleteIfStatusIn(ready, Set.of(DraftStatus.READY)));
+        assertEquals(0, drafts.deleteIfStatusIn(queued, Set.of()));
     }
 
     @Test

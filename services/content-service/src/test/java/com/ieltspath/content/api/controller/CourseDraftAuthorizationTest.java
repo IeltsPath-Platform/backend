@@ -20,12 +20,13 @@ import java.util.Base64;
 import java.util.UUID;
 
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = {CourseDraftController.class, AiCourseDraftController.class}, properties = {
+@WebMvcTest(controllers = CourseDraftController.class, properties = {
         "spring.cloud.config.enabled=false",
         "app.auth.internal-jwt-issuer=urn:code-base:api-gateway"
 })
@@ -45,7 +46,6 @@ class CourseDraftAuthorizationTest {
     @Autowired MockMvc mockMvc;
     @MockitoBean CourseDraftUseCases drafts;
     @MockitoBean ApproveCourseDraftUseCase approve;
-    @MockitoBean com.ieltspath.content.application.usecase.RequestCourseDraftUseCase requestCourse;
     @MockitoBean com.ieltspath.content.application.usecase.FindPracticeSetsForPointsUseCase practiceSets;
     @MockitoBean CurrentUserProvider currentUser;
 
@@ -59,14 +59,12 @@ class CourseDraftAuthorizationTest {
                 .andExpect(status().isForbidden());
         mockMvc.perform(put(base + "/{id}", id).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"structure\":{}}")).andExpect(status().isForbidden());
+        mockMvc.perform(delete(base + "/{id}", id)).andExpect(status().isForbidden());
         mockMvc.perform(get(base + "/{id}/analysis", id)).andExpect(status().isForbidden());
         mockMvc.perform(post(base + "/{id}/approve", id)).andExpect(status().isForbidden());
         mockMvc.perform(get(base + "/practice-sets").param("knowledgePointIds", id.toString()))
                 .andExpect(status().isForbidden());
-        mockMvc.perform(post("/api/content/admin/ai-drafts/courses").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"bandLevel\":6.5,\"skills\":[\"READING\"],\"topics\":[\"a\"]}"))
-                .andExpect(status().isForbidden());
 
-        verifyNoInteractions(drafts, approve, requestCourse, practiceSets);
+        verifyNoInteractions(drafts, approve, practiceSets);
     }
 }

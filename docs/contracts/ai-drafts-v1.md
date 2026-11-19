@@ -29,6 +29,11 @@ A draft response has: `id`, `kind` (`QUESTIONS` or `COURSE`), `status`, `request
 Creating a request and approving a draft are added with the kind-specific features (question drafts and course
 drafts). This version provides only the queue, the job and the review routes above.
 
+The model no longer writes `COURSE` drafts: authors write them by hand ([course-drafts-v1](course-drafts-v1.md)) or
+import them from Excel. `COURSE` drafts that the model made earlier stay in the table and are read, edited and
+approved as before. A `COURSE` draft that was still `QUEUED` when the generator was removed ends in `FAILED` with
+`UNSUPPORTED_KIND`, and its use is given back.
+
 ## Allowances
 
 Each request takes one use from the author's daily allowance (`content.ai.daily-limit`, default 20). The day is
@@ -47,8 +52,8 @@ Stored in `errorCode`, safe to show. They never include the prompt or the model'
 | `TIMEOUT` | The model did not answer within `content.llm.timeout` (default 180 seconds). |
 | `HTTP_<status>` | The model endpoint answered with an error status, for example `HTTP_429` (rate limit) or `HTTP_503` (overloaded). Only the status is kept, never the body. A busy answer (`429`, `502`, `503`, `504`) is tried again twice, after 5 and 15 seconds, before the draft fails with the last status. |
 | `FAILED` | The model call failed in another way, such as the endpoint not being reachable. |
-| `INVALID_REPLY` | The model answered without usable text: none, not JSON, or (for a course plan, after a second try) nothing that fits the candidate set. |
-| `NO_CANDIDATES` | A course request matched no knowledge point, so there was nothing to plan from. |
+| `INVALID_REPLY` | The model answered without usable text: none, or not JSON. |
+| `NO_CANDIDATES` | Only on `COURSE` drafts the model made before it stopped writing them: the request matched no knowledge point. |
 | `UNSUPPORTED_KIND` | No generator is registered for the draft's kind. |
 | `INTERNAL` | An unexpected error in the job. |
 

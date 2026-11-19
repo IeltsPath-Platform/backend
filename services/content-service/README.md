@@ -185,7 +185,6 @@ its topics); publishing goes through the usual checks.
 | Section media | passage and audio of a section; `POST /api/content/admin/media/audio` uploads an mp3 (25 MB) to the object store | same contract |
 | AI question drafts | `POST /api/content/admin/ai-drafts/questions`, `PATCH`/`DELETE …/{id}/items/{index}`, `POST …/{id}/approve` | [ai-drafts-v1](../../docs/contracts/ai-drafts-v1.md), [question-drafts-v1](../../docs/contracts/question-drafts-v1.md) |
 | Course drafts | `POST`/`PUT /api/content/admin/course-drafts`, `GET …/{id}/analysis`, `POST …/{id}/approve` (build a course from the knowledge tree) | [course-drafts-v1](../../docs/contracts/course-drafts-v1.md) |
-| AI course drafts | `POST /api/content/admin/ai-drafts/courses` (rule-based candidates from the catalogue; the model only groups them) | [ai-drafts-v1](../../docs/contracts/ai-drafts-v1.md) |
 | Topic order | `PUT /api/content/admin/topics/order` reorders all topics of one parent in one transaction (`204`) | [lesson-authoring-v1](../../docs/contracts/lesson-authoring-v1.md#reordering-topics) |
 | Excel import | `GET …/course-import/template`, `POST …/course-import/validate`, `POST …/course-import` | [course-import-v1](../../docs/contracts/course-import-v1.md) |
 
@@ -195,7 +194,7 @@ Configuration (`infra/config-server/config-repo/content-service.yaml`, keys in t
   matching `LEARNING_LLM_*` value is used, so the model the learning service already uses also serves drafts. Blank on
   both sides means a draft fails with `NOT_CONFIGURED`; the service still starts and everything else works.
 - `content.ai.*`: `batch-size`, `stale-after`, `daily-limit` (shared by AI requests and imports, counted separately per
-  author and day in `ai_usage_daily`), `max-items-per-request`, `max-course-candidates`, `quota-zone`.
+  author and day in `ai_usage_daily`), `max-items-per-request`, `quota-zone`.
 - `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `CONTENT_MEDIA_BUCKET`, `CONTENT_PREMIUM_MEDIA_BUCKET`: author audio upload;
   without storage configuration the upload answers `503`. Uploaded keys live under `content-audio/`; PUBLIC keys resolve
   through `CONTENT_MEDIA_BASE_URL`, while PREMIUM lesson audio is signed from the private premium bucket after access

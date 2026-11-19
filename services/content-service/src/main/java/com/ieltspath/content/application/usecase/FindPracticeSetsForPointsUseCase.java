@@ -1,6 +1,6 @@
 package com.ieltspath.content.application.usecase;
 
-import com.ieltspath.content.application.port.CourseCandidateReader;
+import com.ieltspath.content.application.port.UnlinkedPracticeSetReader;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -11,7 +11,7 @@ import java.util.UUID;
 
 /**
  * The published practice sets that belong to no lesson and measure at least one of the given knowledge points, which is
- * what the course generator may offer for a lesson. An author choosing sets by hand sees the same ones marked.
+ * what an author may attach to a lesson. The picker marks these.
  */
 @Service
 @Transactional(readOnly = true)
@@ -19,10 +19,10 @@ public class FindPracticeSetsForPointsUseCase {
 
     static final int MAX_POINTS = 100;
 
-    private final CourseCandidateReader candidates;
+    private final UnlinkedPracticeSetReader practiceSets;
 
-    public FindPracticeSetsForPointsUseCase(CourseCandidateReader candidates) {
-        this.candidates = candidates;
+    public FindPracticeSetsForPointsUseCase(UnlinkedPracticeSetReader practiceSets) {
+        this.practiceSets = practiceSets;
     }
 
     public Set<UUID> execute(Collection<UUID> pointIds) {
@@ -31,7 +31,7 @@ public class FindPracticeSetsForPointsUseCase {
             throw new IllegalArgumentException("knowledgePointIds must contain at most " + MAX_POINTS + " ids");
         }
         Set<UUID> packageIds = new LinkedHashSet<>();
-        candidates.practiceSets(pointIds, Integer.MAX_VALUE).values()
+        practiceSets.practiceSets(pointIds, Integer.MAX_VALUE).values()
                 .forEach(sets -> sets.forEach(set -> packageIds.add(set.packageId())));
         return packageIds;
     }

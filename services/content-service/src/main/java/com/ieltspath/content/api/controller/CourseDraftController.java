@@ -11,6 +11,7 @@ import com.ieltspath.content.application.usecase.FindPracticeSetsForPointsUseCas
 import jakarta.validation.constraints.NotNull;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.UUID;
 
-/** Write, check and approve a course draft. Listing and rejecting use the AI draft routes. */
+/** Write, check, approve and delete a course draft. Listing and rejecting use the AI draft routes. */
 @RestController
 @RequestMapping("/api/content/admin/course-drafts")
 @PreAuthorize("hasRole('CONTENT_AUTHOR')")
@@ -65,6 +66,12 @@ public class CourseDraftController {
             throw new IllegalArgumentException("structure is required");
         }
         return AiDraftResponse.from(drafts.save(currentUser.requireUserId(), id, body.structure()), json);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable("id") UUID id) {
+        drafts.delete(currentUser.requireUserId(), id);
     }
 
     @GetMapping("/{id}/analysis")

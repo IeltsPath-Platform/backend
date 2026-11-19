@@ -25,7 +25,7 @@ suy diễn khả năng nghiệp vụ ngoài các module dưới đây.
 | `shared/common-llm` | Client OpenAI-compatible dùng chung cho Learning, Assessment và Content; luật model, lỗi an toàn, metric thời gian/token; không chứa prompt hay parser nghiệp vụ. |
 | `shared/common-observability` | Thư viện `correlationId` (MDC, header HTTP, header AMQP), metric outbox và DLQ, trace context cho outbox; không deploy độc lập. |
 | `services/user-service` | Tài khoản, role, auth token, hồ sơ học viên (có múi giờ). Mục tiêu học, activity và thời gian học do learning-service giữ; streak cũng vậy. |
-| `services/content-service` | Curriculum: topic, knowledge point, câu hỏi, gói nội dung, asset. Khu author: soạn gói và đề cuối, tải audio, bản nháp AI (câu hỏi, course), dựng course từ cây tri thức, import Excel. Nội dung AI luôn qua bản nháp (`ai_drafts`) và người duyệt; sinh course chỉ chọn từ kho. |
+| `services/content-service` | Curriculum: topic, knowledge point, câu hỏi, gói nội dung, asset. Khu author: soạn gói và đề cuối, tải audio, bản nháp AI (câu hỏi, bộ luyện tập), soạn course tay từ cây tri thức, import Excel. Nội dung AI luôn qua bản nháp (`ai_drafts`) và người duyệt; AI không dựng course. |
 | `services/library-service` | Cổng 8081, `library_db` (Compose PostgreSQL host 5440): catalog từ vựng/video và thư viện cá nhân; Gateway chuyển `/api/content/{videos,vocabulary}`, `/api/content/admin/vocabulary` và năm nhóm `/api/learning-support` tương ứng tới đây. |
 | `services/assessment-service` | Làm bài, chấm objective/LLM cho essay gate và EXAMINER, kết quả; phát `AssessmentCompleted.v2`. |
 | `services/access-service` | Gói, subscription, activation key, điểm. |
@@ -177,10 +177,10 @@ src/main/java/com/ieltspath/<service>
   `CONTENT_LLM_MODEL` (khóa chỉ ở `.env` không commit; biến nào không đặt thì dùng giá trị `LEARNING_LLM_*` tương ứng,
   nên một cấu hình mô hình đủ cho cả hai service). Thiếu cấu hình thì bản nháp `FAILED` với `NOT_CONFIGURED`, service
   vẫn chạy. Nhóm `content.ai.*` (số bản nháp mỗi lượt, thời gian coi là treo, `daily-limit`, `max-items-per-request`,
-  `max-course-candidates`, `quota-zone`); import Excel dùng chung `daily-limit` nhưng đếm riêng (`kind = IMPORT`). Tải
+  `quota-zone`); import Excel dùng chung `daily-limit` nhưng đếm riêng (`kind = IMPORT`). Tải
   audio của author cần `SUPABASE_URL`/`SUPABASE_SECRET_KEY` và `CONTENT_MEDIA_BUCKET`, thiếu thì trả 503. Assessment đọc
   tên giám khảo từ user-service qua `assessment.user.base-url` (`USER_SERVICE_URL`).
-- Mọi nội dung AI sinh ra (câu hỏi, course) chỉ là bản nháp: người duyệt chọn rồi mới tạo nội dung `DRAFT` thường, còn phải
+- Mọi nội dung AI sinh ra (câu hỏi, bộ luyện tập) chỉ là bản nháp: người duyệt chọn rồi mới tạo nội dung `DRAFT` thường, còn phải
   xuất bản như mọi nội dung khác; không có đường nào từ bản nháp tới học viên. Nội dung nhập từ Excel đi qua cùng luật.
 - Chạy local bằng container: `docker compose up -d --build` khởi chạy PostgreSQL, RabbitMQ, Config Server, Eureka,
   Gateway và các service đã triển khai; Flyway của từng service tạo schema/seed trong database riêng. Để chạy Java từ
