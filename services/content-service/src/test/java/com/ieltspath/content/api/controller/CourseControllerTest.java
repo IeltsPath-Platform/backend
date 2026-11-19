@@ -28,7 +28,8 @@ class CourseControllerTest {
     @BeforeEach
     void setup() {
         mvc = MockMvcBuilders.standaloneSetup(new CourseController(new CreateCourseUseCase(repository),
-                        new UpdateCourseUseCase(repository), new ListCoursesUseCase(repository),
+                        new UpdateCourseUseCase(repository), new DeleteCourseUseCase(repository),
+                        new ListCoursesUseCase(repository),
                         new MediaReferencePolicy("https://media.example.test/storage/v1/object/public/media")))
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
     }
@@ -40,6 +41,17 @@ class CourseControllerTest {
                         .content("{\"code\":\"IELTS_5_5\",\"name\":\"IELTS 5.5\",\"bandLevel\":5.5}"))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.code").value("IELTS_5_5"))
                 .andExpect(jsonPath("$.bandLevel").value(5.5)).andExpect(jsonPath("$.status").value("ACTIVE"));
+    }
+
+    @Test
+    void createsAnInactiveCourseWhenAskedAndRefusesAnUnknownStatus() throws Exception {
+        when(repository.save(any())).thenAnswer(call -> call.getArgument(0));
+        mvc.perform(post("/api/content/admin/courses").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"IELTS_6_0\",\"name\":\"IELTS 6.0\",\"bandLevel\":6.0,\"status\":\"INACTIVE\"}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("INACTIVE"));
+        mvc.perform(post("/api/content/admin/courses").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"IELTS_6_5\",\"name\":\"IELTS 6.5\",\"bandLevel\":6.5,\"status\":\"DRAFT\"}"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -199,5 +211,25 @@ class CourseControllerTest {
                         .content("{\"name\":\"Updated\",\"bandLevel\":5.5}"))
                 .andExpect(status().isNotFound());
         verify(repository, never()).save(any());
+    }
+
+    @Test
+    void deletesAnEmptyCourse() throws Exception {
+        Course course = Course.create("IELTS", "Empty", new BigDecimal("5.5"));
+        when(repository.findById(course.getId())).thenReturn(Optional.of(course));
+        when(repository.hasContent(course.getId())).thenReturn(false);
+        mvc.perform(delete("/api/content/admin/courses/{id}", course.getId())).andExpect(status().isNoContent());
+        verify(repository).deleteById(course.getId());
+    }
+
+    @Test
+    void refusesToDeleteACourseWithContentOrAnUnknownCourse() throws Exception {
+        Course course = Course.create("IELTS", "Busy", new BigDecimal("5.5"));
+        when(repository.findById(course.getId())).thenReturn(Optional.of(course));
+        when(repository.hasContent(course.getId())).thenReturn(true);
+        mvc.perform(delete("/api/content/admin/courses/{id}", course.getId()))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.details.code").value("COURSE_NOT_EMPTY"));
+        mvc.perform(delete("/api/content/admin/courses/{id}", UUID.randomUUID())).andExpect(status().isNotFound());
+        verify(repository, never()).deleteById(any());
     }
 }

@@ -1,12 +1,20 @@
 package com.ieltspath.content.application.command;
 
 import java.math.BigDecimal;
+import com.ieltspath.content.domain.vo.ContentStatus;
 import com.ieltspath.content.domain.vo.Skill;
 import java.util.Map;
 
+/** A null {@code status} creates the course active. */
 public record CreateCourseCommand(String code, String name, BigDecimal bandLevel, String coverImageUrl,
                                    String description, Map<Skill, Integer> skillUnlockPoints,
-                                   Integer comboUnlockPoints, boolean free, String bannerImageUrl) {
+                                   Integer comboUnlockPoints, boolean free, String bannerImageUrl,
+                                   ContentStatus status) {
+    public CreateCourseCommand(String code, String name, BigDecimal bandLevel, String coverImageUrl,
+                               String description, Map<Skill, Integer> skillUnlockPoints, Integer comboUnlockPoints,
+                               boolean free, String bannerImageUrl) {
+        this(code, name, bandLevel, coverImageUrl, description, skillUnlockPoints, comboUnlockPoints, free, bannerImageUrl, null);
+    }
     public CreateCourseCommand(String code, String name, BigDecimal bandLevel, String coverImageUrl,
                                String description, Map<Skill, Integer> skillUnlockPoints, Integer comboUnlockPoints,
                                boolean free) {

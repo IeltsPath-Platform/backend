@@ -6,6 +6,7 @@ import com.ieltspath.content.api.dto.response.CourseResponse;
 import com.ieltspath.content.application.command.CreateCourseCommand;
 import com.ieltspath.content.application.command.UpdateCourseCommand;
 import com.ieltspath.content.application.usecase.CreateCourseUseCase;
+import com.ieltspath.content.application.usecase.DeleteCourseUseCase;
 import com.ieltspath.content.application.usecase.UpdateCourseUseCase;
 import com.ieltspath.content.application.usecase.ListCoursesUseCase;
 import com.ieltspath.content.domain.vo.MediaReferencePolicy;
@@ -22,6 +23,7 @@ import java.util.UUID;
 public class CourseController {
     private final CreateCourseUseCase createCourse;
     private final UpdateCourseUseCase updateCourse;
+    private final DeleteCourseUseCase deleteCourse;
     private final ListCoursesUseCase listCourses;
     private final MediaReferencePolicy mediaPolicy;
 
@@ -37,7 +39,7 @@ public class CourseController {
     public CourseResponse create(@Valid @RequestBody CreateCourseRequest request) {
         return CourseResponse.from(createCourse.execute(new CreateCourseCommand(request.code(), request.name(),
                 request.bandLevel(), request.coverImageUrl(), request.description(), request.skillUnlockPoints(),
-                request.comboUnlockPoints(), Boolean.TRUE.equals(request.free()), request.bannerImageUrl())), mediaPolicy);
+                request.comboUnlockPoints(), Boolean.TRUE.equals(request.free()), request.bannerImageUrl(), request.status())), mediaPolicy);
     }
 
     @PutMapping("/api/content/admin/courses/{id}")
@@ -46,5 +48,12 @@ public class CourseController {
         return CourseResponse.from(updateCourse.execute(new UpdateCourseCommand(id, request.name(),
                 request.bandLevel(), request.status(), request.coverImageUrl(), request.description(),
                 request.skillUnlockPoints(), request.comboUnlockPoints(), request.free(), request.bannerImageUrl())), mediaPolicy);
+    }
+
+    @DeleteMapping("/api/content/admin/courses/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
+    public void delete(@PathVariable("id") UUID id) {
+        deleteCourse.execute(id);
     }
 }
