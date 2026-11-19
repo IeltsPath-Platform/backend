@@ -1,7 +1,7 @@
 ---
 phase: 5
 title: "Contract, tài liệu, kiểm chứng"
-status: pending
+status: completed
 items: [12, docs, rollback]
 ---
 
@@ -31,7 +31,7 @@ cùng `setId`, cùng `state`, chỉ mở một phiên chẩn đoán.
 | `docs/contracts/free-practice-v1.md` | (đúng sẵn: không tạo bài ôn) | Kiểm lại; không đổi nếu đúng |
 | `docs/system-architecture.md` | Mô tả luồng bài ôn và chẩn đoán | Cập nhật theo luật mới; ghi phạm vi đã sửa "HTTP ngoài khóa" |
 | `infra/config-server/config-repo/learning-service.yaml` | Không có nhóm `learning.review` | `learning.review.unblock-after-failed-sets: 4` (có comment) |
-| Figma `adaptive-learning-follow` frame 07, 08, 10 | Luồng cũ | Vẽ lại theo bảng trước/sau trong `plan.md` (làm sau khi merge) |
+| Figma `adaptive-learning-follow` frame 00, 07, 08, 10 | Luồng cũ | Đã vẽ lại theo bảng trước/sau trong `plan.md` (frame 07 thêm lane D cho lần trượt 3 và lần N) |
 
 ## Script rollback
 
@@ -64,6 +64,28 @@ Kịch bản tay trên stack local (`docker compose up -d --build`):
 3. Trượt set 3 → lý thuyết lại. Trượt set 4 → thông báo chuyển vào giỏ ôn; bài học sau và Practice mở; bài ôn ở giỏ ôn
    với nhãn "Bài ôn chưa đạt".
 4. Giỏ ôn có mục `PRIORITY`; bắt đầu được; học viên miễn phí không nhận set premium.
+
+## Kết quả kiểm chứng
+
+Chạy ngày 19/11/2026 trên stack local (gateway, user, content, access, assessment, learning) với frontend Vite.
+
+- `mvn -o test -pl services/learning-service -am`: 1934 test, 1 lỗi `EssayKnowledgeJudgeTest` (file này nhánh không sửa; lỗi có từ trước).
+- Frontend: `tsc -b` sạch; test các màn bài ôn, chẩn đoán, giỏ ôn xanh khi chạy riêng. Chạy cả bộ lúc máy đang tải nặng thì vài test
+  timeout ngẫu nhiên, chạy lại khi máy rảnh.
+- Migration V55–V57 áp dụng thành công trên database cũ của máy dev.
+- Đã chạy thật qua gateway: trượt set 1 → lý thuyết; qua quick-check; trượt set 2 → nộp bài không mở phiên, lần GET kế tiếp mới mở;
+  `skip` khi chưa có probe trả `409 DIAGNOSIS_PROBE_REQUIRED`; nộp probe hai lần cùng `requestId` trả cùng kết quả; `skip` sau 1 probe
+  đóng probe còn lại thành `SKIPPED`, kết luận `GAPS_FOUND`; KP không có prerequisite ghi phiên `CONCLUDED` /
+  `NO_PREREQUISITES`; bài ôn sinh từ chẩn đoán không bị chẩn đoán lại.
+- Trên giao diện thật: panel chẩn đoán hiện probe, làm probe, nút bỏ qua bật sau 1 probe, hộp xác nhận, bỏ qua thành công.
+- **Lỗi tìm thấy nhờ chạy thật và đã sửa:** nhánh hết set (bài ôn `SKIPPED` kèm phiên `PROBING`) không có đường vào probe trên giao
+  diện; panel nay hiện cho bài ôn `SKIPPED` còn phiên mở và biến mất khi phiên đóng.
+- **Chưa chạy thật:** lần trượt 3 và lần N (thôi chặn, chuyển vào giỏ ôn), giỏ ôn với `PRIORITY` / `DECAYED`, học viên miễn phí không
+  nhận set premium. Các luồng này chỉ có test tích hợp. Nguyên nhân: dữ liệu demo chỉ có một gói cho mỗi KP nên bài ôn hết set sau
+  lần trượt đầu.
+- Vấn đề môi trường dev, không thuộc nhánh này: dữ liệu demo `lesson_exercise_submissions.response = '{}'` làm
+  `FirstAttemptMistakes` ném NPE (500 khi mở bài ôn của học viên demo); database content cũ không khớp checksum migration 113/114
+  nên phải dùng database mới.
 
 ## Mô tả PR
 
