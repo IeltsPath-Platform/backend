@@ -4,11 +4,14 @@ import com.ieltspath.content.application.command.CreateCourseCommand;
 import com.ieltspath.content.domain.aggregate.Course;
 import com.ieltspath.content.domain.exception.DuplicateCourseException;
 import com.ieltspath.content.domain.repository.CourseRepository;
+import com.ieltspath.content.domain.vo.ContentStatus;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.util.Map;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -31,5 +34,15 @@ class CreateCourseUseCaseTest {
         assertThatThrownBy(() -> useCase.execute(new CreateCourseCommand("NEW", "New", new BigDecimal("5.5"))))
                 .isInstanceOf(DuplicateCourseException.class).hasMessageContaining("bandLevel");
         verify(courses, never()).save(any());
+    }
+
+    @Test
+    void aCourseIsCreatedActiveUnlessTheCommandSaysInactive() {
+        when(courses.save(any())).thenAnswer(call -> call.getArgument(0));
+
+        assertThat(useCase.execute(new CreateCourseCommand("A", "A", new BigDecimal("5.0"))).status())
+                .isEqualTo(ContentStatus.ACTIVE);
+        assertThat(useCase.execute(new CreateCourseCommand("B", "B", new BigDecimal("5.5"), null, null, Map.of(), null,
+                false, null, ContentStatus.INACTIVE)).status()).isEqualTo(ContentStatus.INACTIVE);
     }
 }

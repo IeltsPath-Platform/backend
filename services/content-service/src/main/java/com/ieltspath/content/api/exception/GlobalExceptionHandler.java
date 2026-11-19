@@ -225,6 +225,13 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(), null);
     }
 
+    @ExceptionHandler(CourseNotEmptyException.class)
+    public ResponseEntity<ErrorResponse> handleCourseNotEmpty(CourseNotEmptyException ex, HttpServletRequest request) {
+        log.warn("Course delete refused: {}", ex.getMessage());
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "COURSE_NOT_EMPTY"));
+    }
+
     @ExceptionHandler(DuplicateLessonResourceOrderException.class)
     public ResponseEntity<ErrorResponse> handleDuplicateLessonResourceOrder(DuplicateLessonResourceOrderException ex,
                                                                            HttpServletRequest request) {

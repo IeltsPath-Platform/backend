@@ -53,6 +53,12 @@ public class CourseRepositoryAdapter implements CourseRepository {
     public boolean existsByCode(String code) { return repository.existsByCode(code); }
 
     @Override
+    public boolean hasContent(UUID id) { return repository.hasContent(id); }
+
+    @Override
+    public void deleteById(UUID id) { repository.deleteById(id); repository.flush(); }
+
+    @Override
     public List<Course> findAllOrderByBandLevel() {
         return repository.findAllByOrderByBandLevelAsc().stream().map(mapper::toDomain).toList();
     }

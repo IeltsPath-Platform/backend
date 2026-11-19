@@ -96,8 +96,16 @@ public class Course {
     public static Course create(String code, String name, BigDecimal bandLevel, String coverImageUrl,
                                 String description, Map<Skill, Integer> skillUnlockPoints,
                                 Integer comboUnlockPoints, boolean free, String bannerImageUrl) {
+        return create(code, name, bandLevel, coverImageUrl, description, skillUnlockPoints, comboUnlockPoints, free,
+                bannerImageUrl, null);
+    }
+
+    /** A null {@code status} makes the course active. */
+    public static Course create(String code, String name, BigDecimal bandLevel, String coverImageUrl,
+                                String description, Map<Skill, Integer> skillUnlockPoints,
+                                Integer comboUnlockPoints, boolean free, String bannerImageUrl, ContentStatus status) {
         Instant now = Instant.now();
-        return new Course(UUID.randomUUID(), code, name, bandLevel, ContentStatus.ACTIVE, now, now,
+        return new Course(UUID.randomUUID(), code, name, bandLevel, status, now, now,
                 coverImageUrl, description, skillUnlockPoints, comboUnlockPoints, free, bannerImageUrl);
     }
 

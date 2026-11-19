@@ -12,4 +12,7 @@ public interface CourseRepository {
     Optional<Course> findByBandLevel(BigDecimal bandLevel);
     boolean existsByCode(String code);
     List<Course> findAllOrderByBandLevel();
+    /** True when any topic, content package or practice-test checkpoint points at the course. */
+    boolean hasContent(UUID id);
+    void deleteById(UUID id);
 }
