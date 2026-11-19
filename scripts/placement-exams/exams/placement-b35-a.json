@@ -1,0 +1,108 @@
+{
+  "code": "PLACEMENT-B35-A",
+  "pool": "BAND_3_5",
+  "title": "IELTS placement test, band 3-5 (A)",
+  "listening": [
+    {
+      "title": "Listening Part 1: booking a hotel room",
+      "instructions": "Questions 1–10. Complete the booking form. Write ONE WORD AND/OR A NUMBER for each answer. For questions 4 and 6, choose A, B or C.",
+      "voices": "Receptionist (man) and Guest (woman); telephone call at a calm, clear pace",
+      "transcript": "Receptionist: Good afternoon, Lakeside Hotel. How can I help you?\nGuest: Hello. I'd like to book a room for a weekend in October, please.\nReceptionist: Certainly. Which dates would you like?\nGuest: We'd like to arrive on Friday the eleventh and leave on Sunday the thirteenth.\nReceptionist: That's two nights. How many people is the room for?\nGuest: There will be three of us: me, my husband and our daughter, who is seven.\nReceptionist: Then I'd suggest a family room. It has one double bed and a small bed for your daughter. It costs ninety-five pounds a night, and breakfast is included.\nGuest: That sounds good. Does the room have a view of the lake?\nReceptionist: I'm afraid not. The rooms with a lake view are all full that weekend, but this one looks onto the garden.\nGuest: That's fine. Is there a place to park the car?\nReceptionist: Yes, there's a free car park behind the hotel.\nGuest: Wonderful. Also, my husband can't eat nuts. Is that a problem at breakfast?\nReceptionist: Not at all. Just tell the kitchen when you arrive. Could I take your name, please?\nGuest: Yes, it's Helen Walker, W, A, L, K, E, R.\nReceptionist: Thank you, Mrs Walker. You'll need to pay a deposit of twenty pounds when you book, and the rest when you arrive.\nGuest: I'll pay by card now, then.",
+      "questions": [
+        { "q": "Date of arrival: Friday ______ October", "fill": ["11", "11th", "eleventh", "the eleventh", "the 11th"], "why": "They arrive on Friday the eleventh." },
+        { "q": "Number of nights: ______", "fill": ["2", "two"], "why": "Friday to Sunday is two nights." },
+        { "q": "Guests: two adults and one ______", "fill": ["daughter", "child", "girl"], "why": "The third person is their seven-year-old daughter." },
+        { "q": "Type of room:", "options": ["Single room", "Family room", "Twin room"], "answer": "B", "why": "The receptionist suggests a family room." },
+        { "q": "Price per night: £______", "fill": ["95", "ninety-five", "ninety five"], "why": "It costs ninety-five pounds a night." },
+        { "q": "Which meal is included in the price?", "options": ["Breakfast", "Lunch", "Dinner"], "answer": "A", "why": "Breakfast is included." },
+        { "q": "The room looks onto the ______.", "fill": ["garden"], "why": "The lake-view rooms are full; this one looks onto the garden." },
+        { "q": "Special diet: the husband cannot eat ______.", "fill": ["nuts"], "why": "She says her husband can't eat nuts." },
+        { "q": "Name: Helen ______", "fill": ["walker"], "why": "She spells W, A, L, K, E, R." },
+        { "q": "Deposit to pay now: £______", "fill": ["20", "twenty"], "why": "A deposit of twenty pounds is needed when booking." }
+      ]
+    },
+    {
+      "title": "Listening Part 2: a tour of the Harbour Museum",
+      "instructions": "Questions 11–20. Choose the correct letter, A, B or C, or write ONE WORD AND/OR A NUMBER where you see a line.",
+      "voices": "Guide (woman), one speaker; welcoming, steady pace like a real museum tour",
+      "transcript": "Guide: Good morning, everyone. Welcome to the Harbour Museum. Before we begin the tour, I'd like to explain a few things.\nGuide: The museum is in an old warehouse that was built in 1890. For almost a hundred years it was used to store tea and spices, which arrived by ship from Asia. When the harbour became too small for large ships, the warehouse was empty for twenty years. It became a museum in 1995.\nGuide: There are three floors. On the ground floor you'll find the model ships. The most popular is a model of the Eagle, a ship that sailed to India in 1840. On the first floor there is an exhibition about the lives of sailors, with real uniforms and tools. And on the top floor there's a cinema, where you can watch a short film about the harbour. It lasts twenty minutes and starts every hour.\nGuide: Our tour will take about ninety minutes. First we'll visit the model ships, then the sailors' exhibition. After that, you'll have free time, and you can have lunch in the café, which is on the top floor, next to the cinema. The café has a lovely view of the harbour.\nGuide: Please don't touch the objects in the glass cases. You may take photographs, as long as you don't use a flash. Bags must be left in the lockers near the entrance. The lockers need a one-pound coin, which you get back later.\nGuide: Now, shall we start?",
+      "questions": [
+        { "q": "For almost a hundred years the building was used to store ...", "options": ["coal", "tea and spices", "fish"], "answer": "B", "why": "It was used to store tea and spices." },
+        { "q": "The warehouse was built in ______.", "fill": ["1890"], "why": "It was built in 1890." },
+        { "q": "What happened when the harbour became too small for large ships?", "options": ["The warehouse was empty", "It became a hotel", "It was knocked down"], "answer": "A", "why": "The warehouse was empty for twenty years." },
+        { "q": "The building became a museum in ______.", "fill": ["1995"], "why": "It became a museum in 1995." },
+        { "q": "What can visitors see on the ground floor?", "options": ["Real uniforms", "Model ships", "A film"], "answer": "B", "why": "On the ground floor you'll find the model ships." },
+        { "q": "The film about the harbour lasts ______ minutes.", "fill": ["20", "twenty"], "why": "It lasts twenty minutes." },
+        { "q": "How long will the tour take?", "options": ["About 45 minutes", "About 90 minutes", "About two hours"], "answer": "B", "why": "The tour will take about ninety minutes." },
+        { "q": "Where is the café?", "options": ["On the top floor", "On the ground floor", "Near the entrance"], "answer": "A", "why": "The café is on the top floor, next to the cinema." },
+        { "q": "What are visitors not allowed to do?", "options": ["Take photographs", "Use a flash", "Use the lockers"], "answer": "B", "why": "Photographs are allowed as long as you don't use a flash." },
+        { "q": "The lockers need a ______ coin.", "fill": ["one-pound", "one pound", "1 pound", "£1"], "why": "The lockers need a one-pound coin, which you get back later." }
+      ]
+    }
+  ],
+  "reading": [
+    {
+      "title": "Reading Passage 1: gardens on the roof",
+      "instructions": "Questions 21–24: Do the statements agree with the information in the passage? Choose TRUE, FALSE or NOT GIVEN. Questions 25–27: Choose the correct letter, A, B or C. Questions 28–30: Complete the sentences. Choose NO MORE THAN TWO WORDS from the passage.",
+      "minutes": 10,
+      "passage": "Gardens on the Roof\n\nIn many big cities there is very little space for gardens. Buildings take up most of the land, and what is left is often used for roads and car parks. However, in recent years more and more people have started to grow plants and vegetables in an unusual place: on the roofs of buildings.\n\nOne example is a school in a large city. The school's roof used to be empty and unused. Three years ago, a teacher asked the headteacher if students could use it to grow food. After some discussion, the school agreed to pay for soil and boxes. Today, about sixty students look after the garden, and they grow tomatoes, beans and herbs. The food is used in the school kitchen, and some is sold to parents at the end of each term.\n\nRoof gardens have other advantages as well. In summer, a building with plants on its roof stays cooler, so it needs less air conditioning. The plants also catch rainwater, which reduces the risk of floods in the streets below. Insects such as bees and butterflies visit the flowers, which helps to improve the environment of the city.\n\nHowever, roof gardens are not simple to build. The roof must be strong enough to carry the weight of the soil, and an engineer must check this first. Water is also a problem, because plants on a roof dry out quickly in hot weather. Some schools use old rain barrels to collect water for this reason.\n\nIn spite of these difficulties, many students say the gardens are worth the effort. 'Before, I never ate vegetables,' said one fourteen-year-old. 'Now I eat tomatoes every day.'",
+      "questions": [
+        { "q": "Most of the land in big cities is used for gardens.", "tfng": "FALSE", "why": "Buildings, roads and car parks take up most of the land." },
+        { "q": "A teacher suggested using the school roof to grow food.", "tfng": "TRUE", "why": "A teacher asked the headteacher if students could use the roof." },
+        { "q": "The school paid for the soil and the boxes.", "tfng": "TRUE", "why": "The school agreed to pay for soil and boxes." },
+        { "q": "The school has won a prize for its garden.", "tfng": "NOT_GIVEN", "why": "No prize is mentioned." },
+        { "q": "How long ago did the school garden begin?", "options": ["One year ago", "Three years ago", "Ten years ago"], "answer": "B", "why": "Three years ago a teacher asked to use the roof." },
+        { "q": "What happens to some of the food from the garden?", "options": ["It is given to the students to take home", "It is sold to parents", "It is sent to restaurants"], "answer": "B", "why": "Some is sold to parents at the end of each term." },
+        { "q": "Why must an engineer check the roof?", "options": ["To see if it is strong enough", "To choose the plants", "To measure the rain"], "answer": "A", "why": "The roof must be strong enough to carry the weight of the soil." },
+        { "q": "A building with plants on its roof needs less ______ in summer.", "fill": ["air conditioning"], "why": "It stays cooler, so it needs less air conditioning." },
+        { "q": "The plants catch ______, which reduces the risk of floods.", "fill": ["rainwater"], "why": "The plants catch rainwater." },
+        { "q": "Some schools use old ______ to collect water.", "fill": ["rain barrels", "barrels"], "why": "Some schools use old rain barrels to collect water." }
+      ]
+    },
+    {
+      "title": "Reading Passage 2: the story of the umbrella",
+      "instructions": "Questions 31–34: Do the statements agree with the information in the passage? Choose TRUE, FALSE or NOT GIVEN. Questions 35–37: Choose the correct letter, A, B or C. Questions 38–40: Complete the sentences. Choose ONE WORD ONLY from the passage.",
+      "minutes": 10,
+      "passage": "The Story of the Umbrella\n\nMost people think of the umbrella as something British, but the idea is much older. The first umbrellas were used about four thousand years ago in Egypt and China, but they were not for rain. They were made to give shade from the sun, and in many countries only important people, such as kings, were allowed to use them.\n\nThe Chinese were probably the first to cover paper umbrellas with wax, which made them waterproof. By the sixteenth century, umbrellas for rain had reached Europe, but at first they were used mainly by women. Men who carried one were often laughed at in the street.\n\nThis changed because of a London man, Jonas Hanway, who started using an umbrella in the 1750s. He carried one every day, even when the weather was fine, and he quickly became well known for it. At first, coach drivers were not pleased, because people with umbrellas did not need to take a coach when it rained. In time, however, more men began to follow his example.\n\nThe early umbrellas were heavy. They had a wooden frame and a cover made of oiled cloth, and they were difficult to open. In 1852, a British inventor named Samuel Fox made a lighter frame from thin steel, which made umbrellas cheaper and easier to carry.\n\nToday, umbrellas are made in many shapes and sizes, and some are designed to survive strong wind. Yet a great many are lost or thrown away every year, and few can be recycled easily.",
+      "questions": [
+        { "q": "The first umbrellas were designed to keep off the rain.", "tfng": "FALSE", "why": "They were made to give shade from the sun." },
+        { "q": "In some countries only important people could use umbrellas.", "tfng": "TRUE", "why": "Only important people, such as kings, were allowed to use them." },
+        { "q": "Jonas Hanway sold umbrellas in his own shop.", "tfng": "NOT_GIVEN", "why": "The passage does not say what he did for a living." },
+        { "q": "Coach drivers were pleased when umbrellas became popular.", "tfng": "FALSE", "why": "At first, coach drivers were not pleased." },
+        { "q": "What was special about the Chinese umbrellas?", "options": ["They were made of silk", "They were covered with wax", "They were very large"], "answer": "B", "why": "They covered paper umbrellas with wax, which made them waterproof." },
+        { "q": "In sixteenth-century Europe, umbrellas for rain were used mainly by ...", "options": ["kings", "women", "coach drivers"], "answer": "B", "why": "At first they were used mainly by women." },
+        { "q": "What did Samuel Fox do?", "options": ["He made a lighter frame", "He invented waterproof cloth", "He opened the first umbrella shop"], "answer": "A", "why": "He made a lighter frame from thin steel." },
+        { "q": "The first umbrellas gave ______ from the sun.", "fill": ["shade"], "why": "They were made to give shade from the sun." },
+        { "q": "Early umbrellas had a wooden frame and a cover made of ______ cloth.", "fill": ["oiled"], "why": "The cover was made of oiled cloth." },
+        { "q": "Samuel Fox made a frame from thin ______.", "fill": ["steel"], "why": "He made a lighter frame from thin steel." }
+      ]
+    }
+  ],
+  "writing": [
+    {
+      "title": "Writing: cooking at school",
+      "instructions": "Spend about 25 minutes on this task. Write at least 120 words.",
+      "minutes": 25,
+      "task": "TASK_2",
+      "minWords": 120,
+      "passBand": 4.5,
+      "stem": "Some people think that all children should learn to cook at school. Do you agree or disagree? Give reasons for your answer and include any relevant examples from your own knowledge or experience. Write at least 120 words."
+    }
+  ],
+  "speaking": [
+    {
+      "title": "Speaking Part 1: daily life",
+      "instructions": "Answer the questions in a few sentences.",
+      "questions": [
+        { "q": "Let's talk about your daily life. What do you usually do in the evening? Has this changed in the last few years?", "seconds": 45 }
+      ]
+    },
+    {
+      "title": "Speaking Part 2: a journey you remember",
+      "instructions": "You have one minute to prepare, then speak for one to two minutes.",
+      "questions": [
+        { "q": "Describe a journey you remember well. You should say where you went, who you went with, how you travelled, and why you remember it. Speak for one to two minutes.", "seconds": 90 }
+      ]
+    }
+  ]
+}
