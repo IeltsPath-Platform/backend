@@ -63,6 +63,7 @@ class ContentAuthorizationWebMvcTest {
     @MockitoBean ListCoursesUseCase listCourses;
     @MockitoBean CreateCourseUseCase createCourse;
     @MockitoBean UpdateCourseUseCase updateCourse;
+    @MockitoBean DeleteCourseUseCase deleteCourse;
     @MockitoBean MediaReferencePolicy mediaReferencePolicy;
     @MockitoBean com.ieltspath.content.application.usecase.MediaUrlResolver mediaUrlResolver;
 
@@ -78,7 +79,9 @@ class ContentAuthorizationWebMvcTest {
                         "/api/content/admin/courses/{id}", UUID.randomUUID()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"IELTS\",\"bandLevel\":5.5}"))
                 .andExpect(status().isForbidden());
-        verifyNoInteractions(createCourse, updateCourse);
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(
+                "/api/content/admin/courses/{id}", UUID.randomUUID())).andExpect(status().isForbidden());
+        verifyNoInteractions(createCourse, updateCourse, deleteCourse);
     }
 
     @Test
@@ -102,6 +105,10 @@ class ContentAuthorizationWebMvcTest {
                         "/api/content/admin/courses/{id}", UUID.randomUUID()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"IELTS\",\"bandLevel\":5.5}"))
                 .andExpect(status().isOk());
+        var courseId = UUID.randomUUID();
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(
+                "/api/content/admin/courses/{id}", courseId)).andExpect(status().isNoContent());
+        verify(deleteCourse).execute(courseId);
     }
     @MockitoBean ListQuestionsUseCase listQuestions;
     @MockitoBean GetQuestionDetailUseCase getQuestionDetail;
