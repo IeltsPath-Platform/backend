@@ -26,13 +26,13 @@ public class SchedulePackagePublicationUseCase {
 
     public ScheduledPackagePublicationResult execute(UUID packageId, UUID versionId, Instant publishAt) {
         if (publishAt == null || !publishAt.isAfter(Instant.now())) {
-            throw new IllegalArgumentException("publishAt must be in the future");
+            throw new IllegalArgumentException("Thời điểm xuất bản phải ở trong tương lai");
         }
         ContentPackage pkg = packages.findById(packageId)
                 .orElseThrow(() -> new ContentPackageNotFoundException(packageId));
         ContentPackageVersion version = findVersion(pkg, versionId);
         if (version.getStatus() != PublicationStatus.DRAFT) {
-            throw new InvalidContentStateException("Only DRAFT versions can be scheduled");
+            throw new InvalidContentStateException("Chỉ phiên bản nháp mới đặt lịch xuất bản được");
         }
         publish.validateForPublish(packageId, versionId);
         version.schedulePublication(publishAt);
@@ -44,6 +44,6 @@ public class SchedulePackagePublicationUseCase {
     static ContentPackageVersion findVersion(ContentPackage pkg, UUID versionId) {
         return pkg.getVersions().stream().filter(v -> v.getId().equals(versionId)).findFirst()
                 .orElseThrow(() -> new InvalidContentStateException(
-                        "Version " + versionId + " does not belong to package " + pkg.getId()));
+                        "Phiên bản " + versionId + " không thuộc gói " + pkg.getId()));
     }
 }

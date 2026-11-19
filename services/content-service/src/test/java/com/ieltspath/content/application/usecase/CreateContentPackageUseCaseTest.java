@@ -47,10 +47,10 @@ class CreateContentPackageUseCaseTest {
                 null, null, null, null, null, null);
         var invalid = new CreateContentPackageCommand("INVALID", "Practice", PackageType.PRACTICE_SET,
                 null, null, null, null, null, PlacementPool.BAND_0_3);
-        assertThatThrownBy(() -> useCase.execute(missing)).hasMessage("PLACEMENT_POOL_REQUIRED");
-        assertThatThrownBy(() -> useCase.executeAsAuthor(missing)).hasMessage("PLACEMENT_POOL_REQUIRED");
-        assertThatThrownBy(() -> useCase.execute(invalid)).hasMessageContaining("only valid for PLACEMENT_TEST");
-        assertThatThrownBy(() -> useCase.executeAsAuthor(invalid)).hasMessageContaining("only valid for PLACEMENT_TEST");
+        assertThatThrownBy(() -> useCase.execute(missing)).hasFieldOrPropertyWithValue("code", "PLACEMENT_POOL_REQUIRED");
+        assertThatThrownBy(() -> useCase.executeAsAuthor(missing)).hasFieldOrPropertyWithValue("code", "PLACEMENT_POOL_REQUIRED");
+        assertThatThrownBy(() -> useCase.execute(invalid)).hasMessageContaining("chỉ dùng cho đề xếp lớp");
+        assertThatThrownBy(() -> useCase.executeAsAuthor(invalid)).hasMessageContaining("chỉ dùng cho đề xếp lớp");
         verify(packages, never()).save(any());
     }
 
@@ -79,7 +79,7 @@ class CreateContentPackageUseCaseTest {
     void anUnknownSourceIsRefused() {
         assertThatThrownBy(() -> useCase.execute(new CreateContentPackageCommand("BAD-SOURCE", "Bad",
                 PackageType.PRACTICE_TEST, null, null, "NOT_A_SOURCE")))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("sourceCode");
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Nguồn đề");
         verify(packages, never()).save(any());
     }
 
@@ -89,7 +89,7 @@ class CreateContentPackageUseCaseTest {
         assertThatThrownBy(() -> useCase.execute(new CreateContentPackageCommand("OTHER-" + type, "Other", type, null,
                 null, "IELTS_SPACE_PRO", null, null,
                 type == PackageType.PLACEMENT_TEST ? PlacementPool.BAND_5_9 : null)))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("only valid for PRACTICE_TEST");
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("chỉ dùng cho bài kiểm tra luyện tập");
         verify(packages, never()).save(any());
     }
 
@@ -98,7 +98,7 @@ class CreateContentPackageUseCaseTest {
     void theOriginalRouteStillRefusesFinalTests(PackageType type) {
         assertThatThrownBy(() -> useCase.execute(new CreateContentPackageCommand("FINAL-" + type, "Final", type, null,
                 null, null, UUID.randomUUID(), UUID.randomUUID())))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("cannot be created");
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("không tạo được");
         verify(packages, never()).save(any());
     }
 
@@ -166,9 +166,9 @@ class CreateContentPackageUseCaseTest {
             "PRACTICE_TEST"})
     void otherTypesRefuseATopicOrCourse(PackageType type) {
         assertThatThrownBy(() -> useCase.executeAsAuthor(command("T-" + type, type, UUID.randomUUID(), null)))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("final tests");
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("đề cuối chủ đề và đề cuối khóa");
         assertThatThrownBy(() -> useCase.executeAsAuthor(command("C-" + type, type, null, UUID.randomUUID())))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("final tests");
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("đề cuối chủ đề và đề cuối khóa");
         verify(packages, never()).save(any());
     }
 

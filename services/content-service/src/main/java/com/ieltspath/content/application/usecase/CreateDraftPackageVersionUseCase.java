@@ -40,7 +40,7 @@ public class CreateDraftPackageVersionUseCase {
         try {
             JSON.readTree(rules);
         } catch (JsonProcessingException invalid) {
-            throw new IllegalArgumentException("rulesJson must be valid JSON");
+            throw new IllegalArgumentException("Quy tắc của phiên bản phải là JSON hợp lệ");
         }
     }
 }

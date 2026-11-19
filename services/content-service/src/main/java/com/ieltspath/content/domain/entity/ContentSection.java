@@ -113,7 +113,7 @@ public class ContentSection {
     public void reorderQuestions(List<UUID> orderedIds) {
         Set<UUID> current = questions.stream().map(SectionQuestion::getId).collect(Collectors.toSet());
         if (orderedIds == null || orderedIds.size() != current.size() || !current.equals(new HashSet<>(orderedIds))) {
-            throw new IllegalArgumentException("sectionQuestionIds must list every question of the section exactly once");
+            throw new IllegalArgumentException("Danh sách câu hỏi phải gồm mỗi câu hỏi của phần đúng một lần");
         }
         int order = 1;
         for (UUID id : orderedIds) {

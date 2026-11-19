@@ -70,11 +70,11 @@ public class PracticeSetDraftGenerator implements AiDraftGenerator {
         JsonNode root = parse(reply.text());
         String passage = root.path("passage").asText("").trim();
         if (passage.isEmpty() || passage.length() > MAX_PASSAGE) {
-            throw new ContentGenerationException(ContentGenerationException.INVALID_REPLY, "Reply has no usable passage");
+            throw new ContentGenerationException(ContentGenerationException.INVALID_REPLY, "Phản hồi của AI không có đoạn văn dùng được");
         }
         JsonNode candidates = root.path("items");
         if (!candidates.isArray()) {
-            throw new ContentGenerationException(ContentGenerationException.INVALID_REPLY, "Reply has no items");
+            throw new ContentGenerationException(ContentGenerationException.INVALID_REPLY, "Phản hồi của AI không có câu hỏi nào");
         }
 
         Set<String> knownStems = new HashSet<>();
@@ -98,7 +98,7 @@ public class PracticeSetDraftGenerator implements AiDraftGenerator {
         }
         if (accepted.size() < MIN_ITEMS) {
             throw new ContentGenerationException(ContentGenerationException.INVALID_REPLY,
-                    "Fewer than " + MIN_ITEMS + " usable questions in the reply");
+                    "Có ít hơn " + MIN_ITEMS + " câu hỏi dùng được trong phản hồi của AI");
         }
 
         ObjectNode result = json.createObjectNode();
@@ -118,7 +118,7 @@ public class PracticeSetDraftGenerator implements AiDraftGenerator {
         for (UUID id : ids) {
             points.add(knowledgePoints.findById(id).filter(found -> found.getStatus() == ContentStatus.ACTIVE)
                     .orElseThrow(() -> new ContentGenerationException(ContentGenerationException.FAILED,
-                            "Knowledge point is not available")));
+                            "Điểm kiến thức không còn khả dụng")));
         }
         return points;
     }
@@ -174,12 +174,12 @@ public class PracticeSetDraftGenerator implements AiDraftGenerator {
         int start = body.indexOf('{');
         int end = body.lastIndexOf('}');
         if (start < 0 || end <= start) {
-            throw new ContentGenerationException(ContentGenerationException.INVALID_REPLY, "Reply is not JSON");
+            throw new ContentGenerationException(ContentGenerationException.INVALID_REPLY, "Phản hồi của AI không phải JSON hợp lệ");
         }
         try {
             return json.readTree(body.substring(start, end + 1));
         } catch (JsonProcessingException invalid) {
-            throw new ContentGenerationException(ContentGenerationException.INVALID_REPLY, "Reply is not JSON");
+            throw new ContentGenerationException(ContentGenerationException.INVALID_REPLY, "Phản hồi của AI không phải JSON hợp lệ");
         }
     }
 
@@ -187,7 +187,7 @@ public class PracticeSetDraftGenerator implements AiDraftGenerator {
         try {
             return json.readValue(text, PracticeSetDraftRequest.class);
         } catch (JsonProcessingException invalid) {
-            throw new ContentGenerationException(ContentGenerationException.FAILED, "Stored request is unreadable");
+            throw new ContentGenerationException(ContentGenerationException.FAILED, "Không đọc được yêu cầu đã lưu");
         }
     }
 
@@ -195,7 +195,7 @@ public class PracticeSetDraftGenerator implements AiDraftGenerator {
         try {
             return json.writeValueAsString(node);
         } catch (JsonProcessingException invalid) {
-            throw new ContentGenerationException(ContentGenerationException.FAILED, "Result could not be stored");
+            throw new ContentGenerationException(ContentGenerationException.FAILED, "Không lưu được kết quả");
         }
     }
 }

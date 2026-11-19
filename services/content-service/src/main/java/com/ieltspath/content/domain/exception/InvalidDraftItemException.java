@@ -6,7 +6,7 @@ public class InvalidDraftItemException extends ContentDomainException {
     private final String reason;
 
     public InvalidDraftItemException(String reason) {
-        super("The edited question is not usable: " + reason);
+        super("Câu hỏi đã chỉnh sửa chưa dùng được (" + reason + ")");
         this.reason = reason;
     }
 

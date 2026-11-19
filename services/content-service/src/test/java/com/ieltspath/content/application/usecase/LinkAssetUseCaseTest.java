@@ -27,7 +27,7 @@ class LinkAssetUseCaseTest {
         when(assets.findById(asset.getId())).thenReturn(Optional.of(asset));
         assertThatThrownBy(() -> useCase.execute(new LinkAssetCommand(asset.getId(), null, null, 1)))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Either sectionId or questionVersionId must be provided");
+                .hasMessage("Cần chọn phần của gói hoặc phiên bản câu hỏi");
         UUID unknown = UUID.randomUUID();
         when(assets.findById(unknown)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> useCase.execute(new LinkAssetCommand(unknown, UUID.randomUUID(), null, 1)))

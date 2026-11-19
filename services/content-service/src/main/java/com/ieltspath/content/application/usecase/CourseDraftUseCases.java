@@ -69,7 +69,7 @@ public class CourseDraftUseCases {
     public void delete(UUID author, UUID draftId) {
         AiDraft draft = ownDraft(author, draftId);
         if (!DELETABLE.contains(draft.getStatus()) || drafts.deleteIfStatusIn(draftId, DELETABLE) == 0) {
-            throw new InvalidContentStateException("Draft is " + draft.getStatus() + ", it cannot be deleted");
+            throw new InvalidContentStateException("Bản nháp đang ở trạng thái " + draft.getStatus() + ", không xóa được");
         }
     }
 
@@ -83,7 +83,7 @@ public class CourseDraftUseCases {
     AiDraft ownReadyDraft(UUID author, UUID draftId) {
         AiDraft draft = ownDraft(author, draftId);
         if (draft.getStatus() != DraftStatus.READY) {
-            throw new InvalidContentStateException("Draft is " + draft.getStatus() + ", expected READY");
+            throw new InvalidContentStateException("Bản nháp đang ở trạng thái " + draft.getStatus() + ", cần ở trạng thái READY");
         }
         return draft;
     }

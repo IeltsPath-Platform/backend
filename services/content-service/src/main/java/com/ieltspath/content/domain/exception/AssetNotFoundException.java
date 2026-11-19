@@ -4,7 +4,7 @@ import java.util.UUID;
 
 public class AssetNotFoundException extends ContentDomainException {
     public AssetNotFoundException(UUID id) {
-        super("Content asset not found with id: " + id);
+        super("Không tìm thấy tài nguyên nội dung");
     }
 }
 

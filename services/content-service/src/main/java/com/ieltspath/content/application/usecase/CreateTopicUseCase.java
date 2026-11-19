@@ -69,7 +69,7 @@ public class CreateTopicUseCase {
 
     private void requireCourseSkill(com.ieltspath.content.domain.vo.Skill skill) {
         if (skill == null || skill == com.ieltspath.content.domain.vo.Skill.ALL) {
-            throw new IllegalArgumentException("A course topic must have exactly one skill");
+            throw new IllegalArgumentException("Chủ đề thuộc khóa học phải có đúng một kỹ năng");
         }
     }
 }

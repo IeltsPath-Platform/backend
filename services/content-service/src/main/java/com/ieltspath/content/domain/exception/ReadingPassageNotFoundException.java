@@ -8,6 +8,6 @@ import java.util.UUID;
  */
 public class ReadingPassageNotFoundException extends ContentDomainException {
     public ReadingPassageNotFoundException(UUID sectionId) {
-        super("Reading passage not found");
+        super("Không tìm thấy bài đọc");
     }
 }

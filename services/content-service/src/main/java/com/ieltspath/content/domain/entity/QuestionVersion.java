@@ -80,7 +80,7 @@ public class QuestionVersion {
 
     public void archive() {
         if (status != PublicationStatus.PUBLISHED) {
-            throw new QuestionVersionStateException("Only published question versions can be archived");
+            throw new QuestionVersionStateException("Chỉ lưu trữ được phiên bản câu hỏi đã xuất bản");
         }
         this.status = PublicationStatus.ARCHIVED;
         this.updatedAt = Instant.now();

@@ -103,7 +103,7 @@ public class LessonAuthoringUseCase {
         Lesson lesson = requireLocked(lessonId);
         LessonBlock block = lesson.requireBlock(blockId);
         if (block.getType() != blockType) {
-            throw new LessonBlockInvalidException("Block type cannot be changed");
+            throw new LessonBlockInvalidException("Không đổi được loại khối");
         }
         requireCourseSkill(lessonId, knowledgePointIds);
         List<UUID> requestedQuestions = questionVersionIds == null ? List.of() : questionVersionIds;
@@ -176,7 +176,7 @@ public class LessonAuthoringUseCase {
         if (!skills.keySet().containsAll(knowledgePointIds)
                 || skills.values().stream().anyMatch(skill -> skill != topicSkill.get()
                         && skill != com.ieltspath.content.domain.vo.Skill.ALL)) {
-            throw new LessonBlockInvalidException("Lesson knowledge points must match the course topic skill");
+            throw new LessonBlockInvalidException("Điểm kiến thức của bài học phải cùng kỹ năng với chủ đề của khóa học");
         }
     }
 
@@ -187,7 +187,7 @@ public class LessonAuthoringUseCase {
                 assetId, vocabularySenseIds, questionVersionIds, knowledgePointIds);
         if (type == BlockType.VOCABULARY
                 && !vocabulary.findActiveSenseIds(block.getVocabularySenseIds()).containsAll(block.getVocabularySenseIds())) {
-            throw new LessonBlockInvalidException("Vocabulary block contains a missing or inactive sense");
+            throw new LessonBlockInvalidException("Khối từ vựng có nghĩa bị thiếu hoặc đã ngừng dùng");
         }
     }
 

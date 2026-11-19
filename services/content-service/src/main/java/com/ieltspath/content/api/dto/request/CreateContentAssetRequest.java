@@ -5,7 +5,7 @@ import com.ieltspath.content.domain.vo.AccessTier;
 import jakarta.validation.constraints.NotNull;
 
 public record CreateContentAssetRequest(
-        @NotNull(message = "assetType is required")
+        @NotNull(message = "Cần chọn loại tài nguyên")
         AssetType assetType,
 
         String textContent,

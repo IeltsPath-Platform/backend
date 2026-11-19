@@ -9,7 +9,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 public record CreateQuestionRequest(
-        @NotNull(message = "questionType is required")
+        @NotNull(message = "Cần chọn loại câu hỏi")
         QuestionType questionType,
 
         Skill skill,
@@ -17,8 +17,8 @@ public record CreateQuestionRequest(
         QuestionPurpose purpose,
 
         /** Optional key for spreadsheet imports and drafts. Unique across questions. */
-        @Size(max = 100, message = "importRef must not exceed 100 characters")
-        @Pattern(regexp = "^\\s*$|[A-Za-z0-9._-]+", message = "importRef may use letters, digits, dot, underscore and dash")
+        @Size(max = 100, message = "Mã tham chiếu (importRef) không được dài quá 100 ký tự")
+        @Pattern(regexp = "^\\s*$|[A-Za-z0-9._-]+", message = "Mã tham chiếu (importRef) chỉ gồm chữ, số, dấu chấm, gạch dưới và gạch ngang")
         String importRef
 ) {
     public CreateQuestionRequest {

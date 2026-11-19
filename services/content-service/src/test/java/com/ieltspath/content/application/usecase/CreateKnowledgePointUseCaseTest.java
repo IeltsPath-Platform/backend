@@ -73,7 +73,7 @@ class CreateKnowledgePointUseCaseTest {
 
         assertThatThrownBy(() -> useCase.execute(new CreateKnowledgePointCommand(topicId, "S60_PART2_LONG_TURN",
                 "Long turn", KnowledgePointKind.STRATEGY, LearningType.PROCEDURE, Skill.SPEAKING, null)))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("must match its skill");
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("cùng kỹ năng với chủ đề");
     }
 
     @Test
@@ -95,7 +95,7 @@ class CreateKnowledgePointUseCaseTest {
         assertThatThrownBy(() -> useCase.execute(new CreateKnowledgePointCommand(topicId, "S60_PART2_LONG_TURN",
                 "Long turn", KnowledgePointKind.STRATEGY, LearningType.PROCEDURE, Skill.SPEAKING, null,
                 null, "Deliver a long turn.", null, null)))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("cefrLevel");
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("cấp CEFR");
     }
 
     @Test

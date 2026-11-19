@@ -4,6 +4,6 @@ import java.util.UUID;
 
 public class KnowledgePointInUseException extends ContentDomainException {
     public KnowledgePointInUseException(UUID id) {
-        super("Knowledge point is already used by a published question or lesson: " + id);
+        super("Điểm kiến thức đang được câu hỏi hoặc bài học đã xuất bản sử dụng");
     }
 }

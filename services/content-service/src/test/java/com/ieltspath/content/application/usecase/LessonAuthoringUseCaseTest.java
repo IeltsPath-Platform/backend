@@ -53,7 +53,7 @@ class LessonAuthoringUseCaseTest {
         when(repository.knowledgePointSkills(List.of(point))).thenReturn(java.util.Map.of(point, Skill.WRITING));
 
         assertThatThrownBy(() -> useCase.knowledgePoints(lessonId, List.of(point)))
-                .isInstanceOf(LessonBlockInvalidException.class).hasMessageContaining("must match");
+                .isInstanceOf(LessonBlockInvalidException.class).hasMessageContaining("cùng kỹ năng");
         verify(repository, never()).save(any(Lesson.class));
     }
 

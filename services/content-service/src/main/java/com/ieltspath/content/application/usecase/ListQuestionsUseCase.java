@@ -26,7 +26,7 @@ public class ListQuestionsUseCase {
     /** One page of the catalog, newest first. {@code page} is zero-based. */
     public Page execute(Skill skill, QuestionPurpose purpose, PublicationStatus status, int page, int size) {
         if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
-            throw new IllegalArgumentException("page must be >= 0 and size between 1 and " + MAX_PAGE_SIZE);
+            throw new IllegalArgumentException("Trang phải từ 0 trở lên và kích thước trang từ 1 đến " + MAX_PAGE_SIZE);
         }
         QuestionRepository.Page result = questionRepository.findPage(skill, purpose, status, page, size);
         return new Page(result.totalElements(), page, size, result.items().stream().map(QuestionResult::of).toList());

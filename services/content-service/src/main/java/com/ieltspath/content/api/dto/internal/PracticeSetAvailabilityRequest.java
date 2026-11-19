@@ -10,11 +10,11 @@ import java.util.UUID;
 
 /** Omitted fields take defaults: no exclusions, at least 3 questions. */
 public record PracticeSetAvailabilityRequest(
-        @NotEmpty(message = "knowledgePointIds is required")
-        @Size(max = 50, message = "knowledgePointIds must hold at most 50 ids")
+        @NotEmpty(message = "Cần chọn ít nhất một điểm kiến thức")
+        @Size(max = 50, message = "Chỉ chọn tối đa 50 điểm kiến thức")
         List<@NotNull UUID> knowledgePointIds,
-        @Size(max = 1000, message = "excludePackageIds must hold at most 1000 ids")
+        @Size(max = 1000, message = "Danh sách gói loại trừ tối đa 1000 gói")
         List<@NotNull UUID> excludePackageIds,
-        @Min(value = 1, message = "minQuestions must be at least 1")
+        @Min(value = 1, message = "Số câu tối thiểu phải từ 1")
         Integer minQuestions
 ) {}

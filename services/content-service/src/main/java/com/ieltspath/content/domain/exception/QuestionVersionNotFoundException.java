@@ -4,6 +4,6 @@ import java.util.UUID;
 
 public class QuestionVersionNotFoundException extends ContentDomainException {
     public QuestionVersionNotFoundException(UUID id) {
-        super("Question version not found: " + id);
+        super("Không tìm thấy phiên bản câu hỏi");
     }
 }

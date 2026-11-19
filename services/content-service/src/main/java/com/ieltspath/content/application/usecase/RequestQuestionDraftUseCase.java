@@ -41,20 +41,20 @@ public class RequestQuestionDraftUseCase {
         KnowledgePoint point = knowledgePoints.findById(request.knowledgePointId())
                 .orElseThrow(() -> new KnowledgePointNotFoundException(request.knowledgePointId()));
         if (point.getStatus() != ContentStatus.ACTIVE) {
-            throw new InvalidContentStateException("Knowledge point is not active");
+            throw new InvalidContentStateException("Điểm kiến thức đang ngừng dùng");
         }
         if (request.questionType() == null || !QuestionDraftValidator.supports(request.questionType())) {
-            throw new IllegalArgumentException("questionType is not supported for AI drafts");
+            throw new IllegalArgumentException("AI chưa viết được loại câu hỏi này");
         }
         if (request.difficulty() == null) {
-            throw new IllegalArgumentException("difficulty is required");
+            throw new IllegalArgumentException("Cần chọn độ khó");
         }
         int maxItems = properties.getAi().getMaxItemsPerRequest();
         if (request.count() < 1 || request.count() > maxItems) {
-            throw new IllegalArgumentException("count must be between 1 and " + maxItems);
+            throw new IllegalArgumentException("Số câu phải từ 1 đến " + maxItems);
         }
         if (request.instructions() != null && request.instructions().length() > MAX_INSTRUCTIONS) {
-            throw new IllegalArgumentException("instructions must not exceed " + MAX_INSTRUCTIONS + " characters");
+            throw new IllegalArgumentException("Hướng dẫn thêm không được dài quá " + MAX_INSTRUCTIONS + " ký tự");
         }
         return start.execute(author, DraftKind.QUESTIONS, body(request), properties.getAi().getDailyLimit());
     }
@@ -63,7 +63,7 @@ public class RequestQuestionDraftUseCase {
         try {
             return json.writeValueAsString(request);
         } catch (JsonProcessingException invalid) {
-            throw new IllegalStateException("Request could not be serialized", invalid);
+            throw new IllegalStateException("Không ghi được yêu cầu", invalid);
         }
     }
 }

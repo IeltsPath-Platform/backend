@@ -13,17 +13,17 @@ import java.util.UUID;
 public record UpdateTopicRequest(
         UUID parentTopicId,
 
-        @NotBlank(message = "name is required")
-        @Size(max = 255, message = "name must not exceed 255 characters")
+        @NotBlank(message = "Tên không được để trống")
+        @Size(max = 255, message = "Tên không được dài quá 255 ký tự")
         String name,
 
         int sortOrder,
         ContentStatus status,
-        @DecimalMin(value = "0.0", message = "bandMin must be at least 0.0")
-        @DecimalMax(value = "9.0", message = "bandMin must be at most 9.0")
+        @DecimalMin(value = "0.0", message = "Band thấp nhất không được nhỏ hơn 0.0")
+        @DecimalMax(value = "9.0", message = "Band thấp nhất không được lớn hơn 9.0")
         BigDecimal bandMin,
-        @DecimalMin(value = "0.0", message = "bandMax must be at least 0.0")
-        @DecimalMax(value = "9.0", message = "bandMax must be at most 9.0")
+        @DecimalMin(value = "0.0", message = "Band cao nhất không được nhỏ hơn 0.0")
+        @DecimalMax(value = "9.0", message = "Band cao nhất không được lớn hơn 9.0")
         BigDecimal bandMax,
         // Null keeps the current skill; a change is refused once the topic has published lessons.
         Skill skill,

@@ -4,11 +4,11 @@ import java.util.UUID;
 
 public class KnowledgePointNotFoundException extends ContentDomainException {
     public KnowledgePointNotFoundException(UUID id) {
-        super("Knowledge point not found with id: " + id);
+        super("Không tìm thấy điểm kiến thức");
     }
 
     public KnowledgePointNotFoundException(String code) {
-        super("Knowledge point not found with code: " + code);
+        super("Không tìm thấy điểm kiến thức");
     }
 }
 

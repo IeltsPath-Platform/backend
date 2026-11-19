@@ -78,7 +78,7 @@ public class Question {
         String trimmed = raw.trim();
         if (!IMPORT_REF.matcher(trimmed).matches()) {
             throw new IllegalArgumentException(
-                    "importRef may use letters, digits, dot, underscore and dash, up to 100 characters");
+                    "Mã tham chiếu (importRef) chỉ gồm chữ, số, dấu chấm, gạch dưới, gạch ngang và dài tối đa 100 ký tự");
         }
         return trimmed;
     }

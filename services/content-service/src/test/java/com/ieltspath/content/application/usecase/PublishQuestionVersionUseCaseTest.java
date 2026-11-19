@@ -94,7 +94,7 @@ class PublishQuestionVersionUseCaseTest {
         question.publishVersion(versionId);
         assertThatThrownBy(() -> useCase.execute(question.getId(), versionId))
                 .isInstanceOf(QuestionVersionStateException.class)
-                .hasMessage("Only draft question versions can be published");
+                .hasMessage("Chỉ xuất bản được phiên bản câu hỏi nháp");
         question.archiveVersion(versionId);
         assertThatThrownBy(() -> useCase.execute(question.getId(), versionId))
                 .isInstanceOf(QuestionVersionStateException.class);

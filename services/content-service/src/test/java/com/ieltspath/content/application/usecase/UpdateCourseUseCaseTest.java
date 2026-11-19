@@ -36,7 +36,7 @@ class UpdateCourseUseCaseTest {
     @Test
     void aCourseCannotMoveOntoABandAnotherCourseUses() {
         assertThatThrownBy(() -> useCase.execute(new UpdateCourseCommand(six.getId(), "IELTS 6.0", new BigDecimal("5.5"), ContentStatus.ACTIVE)))
-                .isInstanceOf(DuplicateCourseException.class).hasMessageContaining("bandLevel");
+                .isInstanceOf(DuplicateCourseException.class).hasMessageContaining("Band 5.5");
         assertThat(six.getBandLevel()).isEqualByComparingTo("6.0");
         verify(courses, never()).save(any());
     }
@@ -55,7 +55,7 @@ class UpdateCourseUseCaseTest {
         assertThatThrownBy(() -> useCase.execute(new UpdateCourseCommand(unknown, "X", new BigDecimal("7.0"), null)))
                 .isInstanceOf(CourseNotFoundException.class);
         assertThatThrownBy(() -> useCase.execute(new UpdateCourseCommand(five.getId(), "X", null, null)))
-                .isInstanceOf(IllegalArgumentException.class).hasMessage("bandLevel is required");
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("Cần nhập band của khóa học");
         verify(courses, never()).save(any());
     }
 }

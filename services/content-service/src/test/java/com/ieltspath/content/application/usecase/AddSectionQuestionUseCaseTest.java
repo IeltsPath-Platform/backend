@@ -54,9 +54,9 @@ class AddSectionQuestionUseCaseTest {
     @Test
     void theScoreMustBePositiveAndDefaultsToOne() {
         assertThatThrownBy(() -> add(section.getId(), questionVersion, BigDecimal.ZERO))
-                .isInstanceOf(IllegalArgumentException.class).hasMessage("maxScore must be positive");
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("Điểm tối đa phải lớn hơn 0");
         assertThatThrownBy(() -> add(section.getId(), questionVersion, new BigDecimal("-1")))
-                .isInstanceOf(IllegalArgumentException.class).hasMessage("maxScore must be positive");
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("Điểm tối đa phải lớn hơn 0");
         var result = useCase.execute(pkg.getId(), version.getId(), section.getId(), questionVersion, null);
         assertThat(result.maxScore()).isEqualByComparingTo("1");
         verify(packages).save(pkg);
@@ -65,7 +65,7 @@ class AddSectionQuestionUseCaseTest {
     @Test
     void aMissingOrUnknownQuestionVersionIsRefused() {
         assertThatThrownBy(() -> add(section.getId(), null, BigDecimal.ONE))
-                .isInstanceOf(IllegalArgumentException.class).hasMessage("questionVersionId is required");
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("Cần chọn phiên bản câu hỏi");
         UUID unknown = UUID.randomUUID();
         assertThatThrownBy(() -> add(section.getId(), unknown, BigDecimal.ONE)).isInstanceOf(QuestionVersionNotFoundException.class);
         verify(packages, never()).save(any());

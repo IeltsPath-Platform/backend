@@ -41,7 +41,7 @@ public class GetWritingTaskUseCase {
         try {
             return JSON.readTree(json);
         } catch (JsonProcessingException exception) {
-            throw new IllegalStateException("Stored writing guide steps are unreadable", exception);
+            throw new IllegalStateException("Không đọc được các bước hướng dẫn viết đã lưu", exception);
         }
     }
 

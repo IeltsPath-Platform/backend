@@ -7,7 +7,7 @@ public class UnknownErrorCodeException extends ContentDomainException {
     private final List<String> codes;
 
     public UnknownErrorCodeException(List<String> codes) {
-        super("Unknown or inactive error code(s): " + String.join(", ", codes));
+        super("Mã lỗi không tồn tại hoặc đã ngừng dùng: " + String.join(", ", codes));
         this.codes = List.copyOf(codes);
     }
 

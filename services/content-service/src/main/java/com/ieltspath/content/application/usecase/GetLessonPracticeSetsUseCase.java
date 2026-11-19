@@ -29,7 +29,7 @@ public class GetLessonPracticeSetsUseCase {
         if (!reader.publishedLessonExists(lessonId)) {
             throw new LessonNotFoundException(lessonId);
         }
-        if (skill.orElse(null) == Skill.ALL) throw new IllegalArgumentException("skill must select one skill");
+        if (skill.orElse(null) == Skill.ALL) throw new IllegalArgumentException("Chỉ được chọn một kỹ năng");
         return skill.isEmpty() ? reader.lessonPracticeSets(lessonId) : reader.lessonPracticeSets(lessonId, skill);
     }
 }

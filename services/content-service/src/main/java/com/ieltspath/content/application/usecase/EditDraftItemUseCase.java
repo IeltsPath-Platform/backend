@@ -109,7 +109,7 @@ public class EditDraftItemUseCase {
                 .filter(found -> found.getRequestedBy().equals(author))
                 .orElseThrow(() -> new AiDraftNotFoundException(draftId));
         if (draft.getKind() != DraftKind.QUESTIONS) {
-            throw new InvalidContentStateException("Draft is not a question draft");
+            throw new InvalidContentStateException("Bản nháp này không phải bản nháp câu hỏi");
         }
         return draft;
     }
@@ -121,12 +121,12 @@ public class EditDraftItemUseCase {
         } catch (JsonProcessingException invalid) {
             // falls through to the same refusal as a result that is not an object
         }
-        throw new InvalidContentStateException("Stored draft result is unreadable");
+        throw new InvalidContentStateException("Không đọc được kết quả bản nháp đã lưu");
     }
 
     private ArrayNode items(ObjectNode result) {
         if (result.path("items") instanceof ArrayNode items) return items;
-        throw new InvalidContentStateException("Stored draft result has no items");
+        throw new InvalidContentStateException("Kết quả bản nháp đã lưu không có câu hỏi nào");
     }
 
     private JsonNode item(ArrayNode items, int index) {
@@ -140,7 +140,7 @@ public class EditDraftItemUseCase {
         try {
             return json.readValue(draft.getRequestJson(), QuestionDraftRequest.class);
         } catch (JsonProcessingException invalid) {
-            throw new InvalidContentStateException("Stored draft request is unreadable");
+            throw new InvalidContentStateException("Không đọc được yêu cầu bản nháp đã lưu");
         }
     }
 
@@ -148,7 +148,7 @@ public class EditDraftItemUseCase {
         try {
             return json.writeValueAsString(node);
         } catch (JsonProcessingException invalid) {
-            throw new IllegalStateException("Draft result could not be written", invalid);
+            throw new IllegalStateException("Không ghi được kết quả bản nháp", invalid);
         }
     }
 }

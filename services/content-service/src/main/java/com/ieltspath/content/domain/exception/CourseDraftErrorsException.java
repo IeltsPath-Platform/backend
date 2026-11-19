@@ -14,7 +14,7 @@ public class CourseDraftErrorsException extends ContentDomainException {
     private final boolean conflict;
 
     public CourseDraftErrorsException(List<Issue> issues, boolean conflict) {
-        super(conflict ? "A code in the course draft is already taken" : "The course draft has errors");
+        super(conflict ? "Có mã trong bản nháp khóa học đã được dùng" : "Bản nháp khóa học có lỗi");
         this.issues = List.copyOf(issues);
         this.conflict = conflict;
     }

@@ -63,7 +63,7 @@ public class CourseDraftController {
     @PutMapping("/{id}")
     public AiDraftResponse save(@PathVariable("id") UUID id, @RequestBody StructureBody body) {
         if (body == null || body.structure() == null) {
-            throw new IllegalArgumentException("structure is required");
+            throw new IllegalArgumentException("Cần có cấu trúc khóa học");
         }
         return AiDraftResponse.from(drafts.save(currentUser.requireUserId(), id, body.structure()), json);
     }

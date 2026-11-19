@@ -138,7 +138,7 @@ public class ErrorType {
         List<String> distinct = values.stream().distinct().sorted().toList();
         for (String skill : distinct) {
             if (!ALLOWED_SKILLS.contains(skill)) {
-                throw new InvalidErrorTypeException("skill must be READING, LISTENING, WRITING or SPEAKING");
+                throw new InvalidErrorTypeException("Kỹ năng phải là READING, LISTENING, WRITING hoặc SPEAKING");
             }
         }
         return distinct;
@@ -149,7 +149,7 @@ public class ErrorType {
         List<String> distinct = values.stream().distinct().sorted().toList();
         for (String task : distinct) {
             if (!ALLOWED_WRITING_TASKS.contains(task)) {
-                throw new InvalidErrorTypeException("writing task must be TASK_1 or TASK_2");
+                throw new InvalidErrorTypeException("Bài viết phải là TASK_1 hoặc TASK_2");
             }
         }
         return distinct;
@@ -157,28 +157,28 @@ public class ErrorType {
 
     private static String requireCode(String value) {
         if (value == null || value.length() > MAX_CODE_LENGTH || !CODE.matcher(value).matches()) {
-            throw new InvalidErrorTypeException("error code must be upper snake case, at most 60 characters");
+            throw new InvalidErrorTypeException("Mã lỗi phải viết hoa, nối bằng dấu gạch dưới và dài tối đa 60 ký tự");
         }
         return value;
     }
 
     private static String requireName(String value) {
         if (value == null || value.isBlank() || value.length() > 255) {
-            throw new InvalidErrorTypeException("error name is required and must be at most 255 characters");
+            throw new InvalidErrorTypeException("Tên lỗi là bắt buộc và dài tối đa 255 ký tự");
         }
         return value.trim();
     }
 
     private static int requireSeverity(int value) {
         if (value < 1 || value > 3) {
-            throw new InvalidErrorTypeException("severity must be 1, 2 or 3");
+            throw new InvalidErrorTypeException("Mức độ nghiêm trọng phải là 1, 2 hoặc 3");
         }
         return value;
     }
 
     private static String requireFixHint(String value) {
         if (value == null || value.isBlank()) {
-            throw new InvalidErrorTypeException("fix hint is required");
+            throw new InvalidErrorTypeException("Cần có gợi ý cách sửa");
         }
         return value.trim();
     }

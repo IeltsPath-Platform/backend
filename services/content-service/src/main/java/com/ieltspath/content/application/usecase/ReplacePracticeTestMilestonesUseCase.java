@@ -33,6 +33,6 @@ public class ReplacePracticeTestMilestonesUseCase {
         return milestones.findByCourse(courseId, false);
     }
     private static InvalidContentStateException invalid() {
-        return new InvalidContentStateException("Milestones require unique published PRACTICE_TEST packages and a reachable topic position (maximum 100)");
+        return new InvalidContentStateException("Mốc bài kiểm tra cần các gói PRACTICE_TEST đã xuất bản, không trùng nhau, ở vị trí chủ đề hợp lệ (tối đa 100 mốc)");
     }
 }

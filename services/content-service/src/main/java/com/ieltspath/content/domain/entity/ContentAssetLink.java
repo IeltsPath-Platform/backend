@@ -17,7 +17,7 @@ public class ContentAssetLink {
         this.id = Objects.requireNonNull(id, "id must not be null");
         this.assetId = Objects.requireNonNull(assetId, "assetId must not be null");
         if ((sectionId == null && questionVersionId == null) || (sectionId != null && questionVersionId != null)) {
-            throw new IllegalArgumentException("Exactly one of sectionId or questionVersionId must be non-null");
+            throw new IllegalArgumentException("Phải chọn đúng một trong phần của gói hoặc phiên bản câu hỏi");
         }
         this.sectionId = sectionId;
         this.questionVersionId = questionVersionId;

@@ -19,7 +19,7 @@ public class UpdateCourseUseCase {
 
     public CourseResult execute(UpdateCourseCommand command) {
         Course course = repository.findById(command.id()).orElseThrow(() -> new CourseNotFoundException(command.id()));
-        if (command.bandLevel() == null) throw new IllegalArgumentException("bandLevel is required");
+        if (command.bandLevel() == null) throw new IllegalArgumentException("Cần nhập band của khóa học");
         var band = BandRange.of(command.bandLevel(), command.bandLevel()).min();
         if (repository.findByBandLevel(band).filter(existing -> !existing.getId().equals(course.getId())).isPresent()) {
             throw new DuplicateCourseException("bandLevel", band.toPlainString());

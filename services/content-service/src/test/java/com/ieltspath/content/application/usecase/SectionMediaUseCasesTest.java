@@ -162,7 +162,7 @@ class SectionMediaUseCasesTest {
         assertEquals(50_000, longest.transcript().length());
         IllegalArgumentException tooLong = assertThrows(IllegalArgumentException.class, () -> useCase.setAudio(pkg.getId(),
                 draft.getId(), section.getId(), "listening/demo/ls1.mp3", 45, "t".repeat(50_001)));
-        assertEquals("transcript must not exceed 50000 characters", tooLong.getMessage());
+        assertEquals("Bản chép lời không được dài quá 50000 ký tự", tooLong.getMessage());
     }
 
     @Test

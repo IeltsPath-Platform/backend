@@ -52,7 +52,7 @@ public class UpdateKnowledgePointUseCase {
                 .orElseThrow(() -> new TopicNotFoundException(command.topicId()));
         if (topic.getCourseId() != null && command.skill() != com.ieltspath.content.domain.vo.Skill.ALL
                 && command.skill() != topic.getSkill()) {
-            throw new IllegalArgumentException("A knowledge point in a course topic must match its skill");
+            throw new IllegalArgumentException("Điểm kiến thức trong chủ đề của khóa học phải cùng kỹ năng với chủ đề");
         }
         if (!knowledgePoint.getCode().equals(command.code())) {
             if (!KnowledgePointCodeRules.isValid(command.code(), command.kind(), command.skill())) {

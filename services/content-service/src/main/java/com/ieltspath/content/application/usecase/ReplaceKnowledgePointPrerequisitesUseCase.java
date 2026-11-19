@@ -41,14 +41,14 @@ public class ReplaceKnowledgePointPrerequisitesUseCase {
     public List<KnowledgePointResult> execute(UUID id, List<UUID> requestedIds) {
         prerequisiteRepository.lockTree();
         if (errorTypeRepository.containsTrapKnowledgePoints(List.of(id))) {
-            throw new InvalidErrorTypeException("TRAP_KNOWLEDGE_POINT_NOT_ASSIGNABLE");
+            throw InvalidErrorTypeException.trapKnowledgePointNotAssignable();
         }
         KnowledgePoint dependent = knowledgePointRepository.findById(id)
                 .orElseThrow(() -> new KnowledgePointNotFoundException(id));
 
         List<UUID> prerequisiteIds = List.copyOf(new LinkedHashSet<>(requestedIds));
         if (errorTypeRepository.containsTrapKnowledgePoints(prerequisiteIds)) {
-            throw new InvalidErrorTypeException("TRAP_KNOWLEDGE_POINT_NOT_ASSIGNABLE");
+            throw InvalidErrorTypeException.trapKnowledgePointNotAssignable();
         }
         Map<UUID, KnowledgePoint> prerequisitesById = new HashMap<>();
         knowledgePointRepository.findByIds(prerequisiteIds)
