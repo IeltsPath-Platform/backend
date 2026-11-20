@@ -181,9 +181,12 @@ class CourseImportIntegrationTest {
 
     @Test
     void importCreatesAnInactiveCourseDraftLessonsDraftQuestionsPackagesAndTheMilestone() {
+        jdbc.update("UPDATE code_settings SET applied=TRUE, editable=FALSE WHERE code_kind='COURSE'");
         var imported = imports.execute(author, "course.xlsx", goodWorkbook());
         entityManager.flush(); // the JDBC reads below must see what JPA has queued
 
+        assertThat(jdbc.queryForObject("SELECT code FROM courses WHERE id=?", String.class, imported.courseId()))
+                .isEqualTo(tag + "_C");
         assertThat(jdbc.queryForObject("SELECT status FROM courses WHERE id=?", String.class, imported.courseId()))
                 .isEqualTo("INACTIVE");
         assertThat(imported.topicIds()).hasSize(1);

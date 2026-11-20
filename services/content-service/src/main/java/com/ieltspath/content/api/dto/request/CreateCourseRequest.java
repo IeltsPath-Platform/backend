@@ -7,7 +7,7 @@ import com.ieltspath.content.domain.vo.ContentStatus;
 import com.ieltspath.content.domain.vo.Skill;
 
 /** {@code status} left out creates the course active; an author still building a course creates it inactive. */
-public record CreateCourseRequest(@NotBlank @Size(max = 100) String code,
+public record CreateCourseRequest(@Size(max = 100) String code,
                                   @NotBlank @Size(max = 255) String name,
                                   @NotNull @DecimalMin("0.0") @DecimalMax("9.0") BigDecimal bandLevel,
                                   @Size(max = 500) @Pattern(regexp = "(?i)^\\s*(https?://\\S+|content-image/[A-Za-z0-9._/-]+)?\\s*$") String coverImageUrl,

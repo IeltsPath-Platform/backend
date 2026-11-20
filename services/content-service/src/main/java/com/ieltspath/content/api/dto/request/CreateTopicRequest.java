@@ -12,7 +12,6 @@ import java.util.UUID;
 public record CreateTopicRequest(
         UUID parentTopicId,
 
-        @NotBlank(message = "Mã không được để trống")
         @Size(max = 100, message = "Mã không được dài quá 100 ký tự")
         String code,
 
