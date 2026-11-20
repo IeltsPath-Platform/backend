@@ -16,6 +16,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.UUID;
+import com.ieltspath.content.domain.vo.Skill;
 
 @RestController
 @PreAuthorize("hasRole('CONTENT_AUTHOR')")
@@ -41,7 +43,9 @@ public class CodeSettingsController {
 
     @GetMapping("/api/content/admin/code-suggestion")
     public CodeSuggestionResponse suggest(@RequestParam(defaultValue = "COURSE") String kind,
-                              @RequestParam(required = false) String band) {
-        return CodeSuggestionResponse.from(codeSettings.suggest(kind, band));
+                              @RequestParam(required = false) String band,
+                              @RequestParam(required = false) UUID courseId,
+                              @RequestParam(required = false) Skill skill) {
+        return CodeSuggestionResponse.from(codeSettings.suggest(kind, band, courseId, skill));
     }
 }

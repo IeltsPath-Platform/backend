@@ -9,7 +9,7 @@ import com.ieltspath.content.api.dto.response.TopicTreeResponse;
 import com.ieltspath.content.application.command.CreateTopicCommand;
 import com.ieltspath.content.application.command.UpdateTopicCommand;
 import com.ieltspath.content.application.result.TopicResult;
-import com.ieltspath.content.application.usecase.CreateTopicUseCase;
+import com.ieltspath.content.application.usecase.CodeSettingsUseCases;
 import com.ieltspath.content.application.usecase.GetTopicTreeUseCase;
 import com.ieltspath.content.application.usecase.GetTopicUseCase;
 import com.ieltspath.content.application.usecase.ReorderTopicsUseCase;
@@ -37,7 +37,7 @@ public class TopicController {
 
     private final GetTopicTreeUseCase getTopicTreeUseCase;
     private final GetTopicUseCase getTopicUseCase;
-    private final CreateTopicUseCase createTopicUseCase;
+    private final CodeSettingsUseCases codeSettings;
     private final UpdateTopicUseCase updateTopicUseCase;
     private final ReorderTopicsUseCase reorderTopicsUseCase;
 
@@ -59,7 +59,7 @@ public class TopicController {
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public TopicResponse createTopic(@Valid @RequestBody CreateTopicRequest request) {
-        TopicResult result = createTopicUseCase.execute(new CreateTopicCommand(
+        TopicResult result = codeSettings.createTopic(new CreateTopicCommand(
                 request.parentTopicId(),
                 request.code(),
                 request.name(),

@@ -4,9 +4,14 @@ import com.ieltspath.content.application.command.CreateCourseCommand;
 import com.ieltspath.content.application.port.CodeSettingsStore;
 import com.ieltspath.content.application.result.CodeSetting;
 import com.ieltspath.content.application.result.UpdateCodeSettings;
+import com.ieltspath.content.application.command.CreateTopicCommand;
+import com.ieltspath.content.domain.aggregate.Course;
 import com.ieltspath.content.domain.exception.InvalidContentStateException;
 import com.ieltspath.content.domain.repository.CourseRepository;
+import com.ieltspath.content.domain.repository.TopicRepository;
 import com.ieltspath.content.domain.service.CodePattern;
+import com.ieltspath.content.domain.vo.BandRange;
+import com.ieltspath.content.domain.vo.Skill;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -85,6 +90,46 @@ class CodeSettingsUseCasesTest {
         when(store.peek("COURSE", "", 1)).thenReturn(3L);
         useCases.update("COURSE", new UpdateCodeSettings(true, "COURSE_{SEQ:3}", 10, true), UUID.randomUUID());
         verify(store).reset("COURSE", "", 10);
+    }
+
+    @Test
+    void suggestsAndCreatesTopicCodesWithCourseAndSkillContext() {
+        UUID courseId = UUID.randomUUID();
+        TopicRepository topics = mock(TopicRepository.class);
+        CreateTopicUseCase createTopic = mock(CreateTopicUseCase.class);
+        Course course = mock(Course.class);
+        when(course.getCode()).thenReturn("COURSE_001");
+        when(courses.findById(courseId)).thenReturn(Optional.of(course));
+        when(store.find("TOPIC")).thenReturn(Optional.of(new CodeSetting("TOPIC", true,
+                "{COURSE}_{SKILL}_T{SEQ:2}", 1, true)));
+        when(store.peek("TOPIC", courseId.toString(), 1)).thenReturn(1L);
+        when(store.allocate("TOPIC", courseId.toString(), 1)).thenReturn(1L);
+        when(topics.existsByCode(any())).thenReturn(false);
+        var topicCodes = new CodeSettingsUseCases(store, new CodePattern(), courses, topics, createCourse, createTopic);
+        assertEquals("COURSE_001_R_T01", topicCodes.suggest("TOPIC", null, courseId, Skill.READING).code());
+        topicCodes.createTopic(new CreateTopicCommand(null, "", "Topic", 1, BandRange.UNBOUNDED,
+                Skill.READING, courseId, null));
+        verify(createTopic).execute(argThat(command -> command.code().equals("COURSE_001_R_T01")));
+    }
+
+    @Test
+    void lockedTopicCodeRejectsManualCodeDifferentFromSuggestion() {
+        UUID courseId = UUID.randomUUID();
+        TopicRepository topics = mock(TopicRepository.class);
+        CreateTopicUseCase createTopic = mock(CreateTopicUseCase.class);
+        Course course = mock(Course.class);
+        when(course.getCode()).thenReturn("COURSE_001");
+        when(courses.findById(courseId)).thenReturn(Optional.of(course));
+        when(store.find("TOPIC")).thenReturn(Optional.of(new CodeSetting("TOPIC", true,
+                "{COURSE}_T{SEQ:2}", 1, false)));
+        when(store.allocate("TOPIC", courseId.toString(), 1)).thenReturn(1L);
+        when(topics.existsByCode(any())).thenReturn(false);
+        var topicCodes = new CodeSettingsUseCases(store, new CodePattern(), courses, topics, createCourse, createTopic);
+        InvalidContentStateException error = assertThrows(InvalidContentStateException.class,
+                () -> topicCodes.createTopic(new CreateTopicCommand(null, "MANUAL", "Topic", 1,
+                        BandRange.UNBOUNDED, Skill.READING, courseId, null)));
+        assertEquals(InvalidContentStateException.CODE_LOCKED, error.getCode());
+        verifyNoInteractions(createTopic);
     }
 
     private static CreateCourseCommand command(String code, String band) {

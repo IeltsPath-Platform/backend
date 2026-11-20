@@ -84,7 +84,10 @@ class ContentAuthorizationWebMvcTest {
                 .andExpect(status().isForbidden());
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(
                 "/api/content/admin/courses/{id}", UUID.randomUUID())).andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/content/admin/topics").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Topic\",\"sortOrder\":1}")).andExpect(status().isForbidden());
         verifyNoInteractions(createCourse, updateCourse, deleteCourse);
+        verifyNoInteractions(codeSettings);
     }
 
     @Test
@@ -102,8 +105,14 @@ class ContentAuthorizationWebMvcTest {
         when(createCourse.execute(any())).thenReturn(course);
         when(codeSettings.createCourse(any())).thenReturn(course);
         when(updateCourse.execute(any())).thenReturn(course);
+        var topic = new com.ieltspath.content.application.result.TopicResult(UUID.randomUUID(), null, "TOPIC", "Topic", 1,
+                ContentStatus.ACTIVE, Instant.now(), Instant.now(), BandRange.UNBOUNDED, null, null);
+        when(codeSettings.createTopic(any())).thenReturn(topic);
         mockMvc.perform(post("/api/content/admin/courses").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"code\":\"IELTS\",\"name\":\"IELTS\",\"bandLevel\":5.5}"))
+                .andExpect(status().isCreated());
+        mockMvc.perform(post("/api/content/admin/topics").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Topic\",\"sortOrder\":1}"))
                 .andExpect(status().isCreated());
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
                         "/api/content/admin/courses/{id}", UUID.randomUUID()).contentType(MediaType.APPLICATION_JSON)
@@ -132,7 +141,7 @@ class ContentAuthorizationWebMvcTest {
         var setting = new com.ieltspath.content.application.result.CodeSetting("COURSE", true, "COURSE_{SEQ:3}", 1, true);
         when(codeSettings.listConnected()).thenReturn(List.of(setting));
         when(codeSettings.update(any(), any(), any())).thenReturn(setting);
-        when(codeSettings.suggest("COURSE", "6")).thenReturn(
+        when(codeSettings.suggest("COURSE", "6", null, null)).thenReturn(
                 new com.ieltspath.content.application.result.CodeSuggestion("COURSE_001", true, true));
         var userId = UUID.randomUUID();
         when(currentUser.requireUserId()).thenReturn(userId);
@@ -150,7 +159,7 @@ class ContentAuthorizationWebMvcTest {
     @Test
     @WithMockUser(roles = "CONTENT_AUTHOR")
     void invalidSuggestionBandReturnsVietnameseBadRequest() throws Exception {
-        when(codeSettings.suggest("COURSE", "6.2"))
+        when(codeSettings.suggest("COURSE", "6.2", null, null))
                 .thenThrow(new IllegalArgumentException("Band phải từ 0 đến 9, theo bước 0,5."));
 
         mockMvc.perform(get("/api/content/admin/code-suggestion?kind=COURSE&band=6.2"))
@@ -188,7 +197,6 @@ class ContentAuthorizationWebMvcTest {
     @MockitoBean ReplaceKnowledgePointPrerequisitesUseCase replaceKnowledgePointPrerequisites;
     @MockitoBean GetTopicTreeUseCase getTopicTree;
     @MockitoBean GetTopicUseCase getTopic;
-    @MockitoBean CreateTopicUseCase createTopic;
     @MockitoBean UpdateTopicUseCase updateTopic;
     @MockitoBean ReorderTopicsUseCase reorderTopics;
     @MockitoBean GetReadingPassageUseCase getReadingPassage;

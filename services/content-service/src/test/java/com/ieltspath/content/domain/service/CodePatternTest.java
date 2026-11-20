@@ -35,4 +35,17 @@ class CodePatternTest {
     void requiresUniquenessComponent() {
         assertThrows(IllegalArgumentException.class, () -> patterns.validate("COURSE", "COURSE_{YYYY}"));
     }
+
+    @Test
+    void rendersTopicCourseAndSkillTokensWithPaddedSequence() {
+        patterns.validate("TOPIC", "{COURSE}_{SKILL}_T{SEQ:2}");
+        assertEquals("COURSE_001_R_T03", patterns.render("TOPIC", "{COURSE}_{SKILL}_T{SEQ:2}", 3,
+                Map.of("course", "COURSE_001", "skill", "R")));
+    }
+
+    @Test
+    void rejectsTopicTokensThatDoNotApplyAndMissingUniquePart() {
+        assertThrows(IllegalArgumentException.class, () -> patterns.validate("TOPIC", "{TYPE}_{SEQ}"));
+        assertThrows(IllegalArgumentException.class, () -> patterns.validate("TOPIC", "{COURSE}_{SKILL}"));
+    }
 }
