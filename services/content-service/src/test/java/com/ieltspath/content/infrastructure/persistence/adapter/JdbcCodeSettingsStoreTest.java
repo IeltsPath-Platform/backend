@@ -1,13 +1,19 @@
 package com.ieltspath.content.infrastructure.persistence.adapter;
 
 import com.ieltspath.content.application.command.CreateCourseCommand;
+import com.ieltspath.content.application.command.CreateTopicCommand;
 import com.ieltspath.content.application.port.CodeSettingsStore;
 import com.ieltspath.content.application.result.CodeSetting;
 import com.ieltspath.content.application.result.UpdateCodeSettings;
 import com.ieltspath.content.application.usecase.CodeSettingsUseCases;
 import com.ieltspath.content.application.usecase.CreateCourseUseCase;
+import com.ieltspath.content.application.usecase.CreateTopicUseCase;
+import com.ieltspath.content.domain.aggregate.Course;
 import com.ieltspath.content.domain.repository.CourseRepository;
+import com.ieltspath.content.domain.repository.TopicRepository;
 import com.ieltspath.content.domain.service.CodePattern;
+import com.ieltspath.content.domain.vo.BandRange;
+import com.ieltspath.content.domain.vo.Skill;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,6 +73,9 @@ class JdbcCodeSettingsStoreTest {
         assertEquals("COURSE_{SEQ:3}", setting.pattern());
         assertEquals(1, setting.startNumber());
         assertTrue(setting.editable());
+        CodeSetting topic = store.find("TOPIC").orElseThrow();
+        assertFalse(topic.applied());
+        assertEquals("{COURSE}_T{SEQ:2}", topic.pattern());
         assertThrows(DataIntegrityViolationException.class,
                 () -> plainJdbc.update("INSERT INTO code_settings(code_kind, applied, pattern, start_number, editable) VALUES ('BOGUS', false, 'X', 1, true)"));
         assertThrows(DataIntegrityViolationException.class,
@@ -101,6 +110,54 @@ class JdbcCodeSettingsStoreTest {
         assertEquals(8, store.allocate("TOPIC", "course-a", 8));
         assertEquals(8, store.allocate("TOPIC", "course-b", 8));
         assertEquals(9, store.allocate("TOPIC", "course-a", 8));
+    }
+
+    @Test
+    void topicCountersStartIndependentlyForEachCourse() {
+        String firstCourse = UUID.randomUUID().toString();
+        String secondCourse = UUID.randomUUID().toString();
+        assertEquals(1, store.allocate("TOPIC", firstCourse, 1));
+        assertEquals(1, store.allocate("TOPIC", secondCourse, 1));
+        assertEquals(2, store.allocate("TOPIC", firstCourse, 1));
+    }
+
+    @Test
+    void topicCreationUsesCourseScopedCountersAndRollsBackWhenCreationFails() {
+        plainJdbc.update("UPDATE code_settings SET applied = TRUE, pattern = '{COURSE}_T{SEQ:2}', start_number = 1, editable = TRUE WHERE code_kind = 'TOPIC'");
+        CourseRepository courses = mock(CourseRepository.class);
+        TopicRepository topics = mock(TopicRepository.class);
+        CreateTopicUseCase createTopic = mock(CreateTopicUseCase.class);
+        UUID firstId = UUID.randomUUID();
+        UUID secondId = UUID.randomUUID();
+        Course firstCourse = mock(Course.class);
+        Course secondCourse = mock(Course.class);
+        when(firstCourse.getCode()).thenReturn("COURSE_A");
+        when(secondCourse.getCode()).thenReturn("COURSE_B");
+        when(courses.findById(firstId)).thenReturn(java.util.Optional.of(firstCourse));
+        when(courses.findById(secondId)).thenReturn(java.util.Optional.of(secondCourse));
+        when(topics.existsByCode(anyString())).thenReturn(false);
+        var useCases = new CodeSettingsUseCases(store, new CodePattern(), courses, topics,
+                mock(CreateCourseUseCase.class), createTopic);
+        when(createTopic.execute(any())).thenReturn(null);
+
+        useCases.createTopic(topicCommand(firstId));
+        useCases.createTopic(topicCommand(secondId));
+        var first = org.mockito.ArgumentCaptor.forClass(CreateTopicCommand.class);
+        verify(createTopic, times(2)).execute(first.capture());
+        assertEquals(List.of("COURSE_A_T01", "COURSE_B_T01"), first.getAllValues().stream().map(CreateTopicCommand::code).toList());
+
+        doThrow(new IllegalStateException("failed")).when(createTopic).execute(any());
+        assertThrows(IllegalStateException.class,
+                () -> transactions.execute(status -> useCases.createTopic(topicCommand(firstId))));
+        doReturn(null).when(createTopic).execute(any());
+        useCases.createTopic(topicCommand(firstId));
+        var retried = org.mockito.ArgumentCaptor.forClass(CreateTopicCommand.class);
+        verify(createTopic, times(4)).execute(retried.capture());
+        assertEquals("COURSE_A_T02", retried.getAllValues().get(3).code());
+    }
+
+    private static CreateTopicCommand topicCommand(UUID courseId) {
+        return new CreateTopicCommand(null, "", "Topic", 1, BandRange.UNBOUNDED, Skill.READING, courseId, null);
     }
 
     @Test
