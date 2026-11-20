@@ -21,7 +21,7 @@ public class InvalidContentStateException extends ContentDomainException {
     }
 
     public static InvalidContentStateException codeLocked() {
-        return new InvalidContentStateException(CODE_LOCKED, "Mã khóa học được tạo tự động và không thể chỉnh sửa.");
+        return new InvalidContentStateException(CODE_LOCKED, "Mã được tạo tự động và không thể chỉnh sửa.");
     }
 
     /** The stable code the client can act on, or null when the message is all there is. */
