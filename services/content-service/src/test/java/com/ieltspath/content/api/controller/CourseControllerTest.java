@@ -5,6 +5,9 @@ import com.ieltspath.content.application.usecase.*;
 import com.ieltspath.content.domain.aggregate.Course;
 import com.ieltspath.content.domain.repository.CourseRepository;
 import com.ieltspath.content.domain.vo.MediaReferencePolicy;
+import com.ieltspath.content.application.port.CodeSettingsStore;
+import com.ieltspath.content.application.result.CodeSetting;
+import com.ieltspath.content.domain.service.CodePattern;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -23,11 +26,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class CourseControllerTest {
     private final CourseRepository repository = mock(CourseRepository.class);
+    private final CodeSettingsStore codeStore = mock(CodeSettingsStore.class);
+    private final CodeSettingsUseCases codeSettings = new CodeSettingsUseCases(codeStore, new CodePattern(), repository,
+            new CreateCourseUseCase(repository));
     private MockMvc mvc;
 
     @BeforeEach
     void setup() {
-        mvc = MockMvcBuilders.standaloneSetup(new CourseController(new CreateCourseUseCase(repository),
+        when(codeStore.find("COURSE")).thenReturn(Optional.of(new CodeSetting("COURSE", false, "COURSE_{SEQ:3}", 1, true)));
+        mvc = MockMvcBuilders.standaloneSetup(new CourseController(codeSettings,
                         new UpdateCourseUseCase(repository), new DeleteCourseUseCase(repository),
                         new ListCoursesUseCase(repository),
                         new MediaReferencePolicy("https://media.example.test/storage/v1/object/public/media")))
@@ -41,6 +48,26 @@ class CourseControllerTest {
                         .content("{\"code\":\"IELTS_5_5\",\"name\":\"IELTS 5.5\",\"bandLevel\":5.5}"))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.code").value("IELTS_5_5"))
                 .andExpect(jsonPath("$.bandLevel").value(5.5)).andExpect(jsonPath("$.status").value("ACTIVE"));
+    }
+
+    @Test
+    void refusesMissingCodeWhenAutogenerationIsNotApplied() throws Exception {
+        mvc.perform(post("/api/content/admin/courses").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"IELTS 5.5\",\"bandLevel\":5.5}"))
+                .andExpect(status().isBadRequest());
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void returnsConflictCodeWhenAClientChangesALockedSuggestion() throws Exception {
+        when(codeStore.find("COURSE")).thenReturn(Optional.of(new CodeSetting("COURSE", true, "COURSE_{SEQ:3}", 1, false)));
+        when(codeStore.allocate("COURSE", "", 1)).thenReturn(1L);
+        mvc.perform(post("/api/content/admin/courses").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"MANUAL\",\"name\":\"IELTS 5.5\",\"bandLevel\":5.5}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.details.code").value("CODE_LOCKED"))
+                .andExpect(jsonPath("$.message").exists());
+        verify(repository, never()).save(any());
     }
 
     @Test

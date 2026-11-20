@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -40,7 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = {
         QuestionController.class, ContentPackageController.class, ContentPackageAdminController.class, ContentAssetController.class,
-        QuestionPublicationAdminController.class, LessonAuthoringAdminController.class,
+        QuestionPublicationAdminController.class, LessonAuthoringAdminController.class, CodeSettingsController.class,
         KnowledgePointController.class, TopicController.class, ReadingController.class, CourseController.class
 }, properties = {
         "spring.cloud.config.enabled=false",
@@ -62,6 +63,8 @@ class ContentAuthorizationWebMvcTest {
     @Autowired MockMvc mockMvc;
     @MockitoBean ListCoursesUseCase listCourses;
     @MockitoBean CreateCourseUseCase createCourse;
+    @MockitoBean CodeSettingsUseCases codeSettings;
+    @MockitoBean com.ieltspath.commonsecurity.currentuser.CurrentUserProvider currentUser;
     @MockitoBean UpdateCourseUseCase updateCourse;
     @MockitoBean DeleteCourseUseCase deleteCourse;
     @MockitoBean MediaReferencePolicy mediaReferencePolicy;
@@ -97,6 +100,7 @@ class ContentAuthorizationWebMvcTest {
         var course = com.ieltspath.content.application.result.CourseResult.from(
                 com.ieltspath.content.domain.aggregate.Course.create("IELTS", "IELTS", new java.math.BigDecimal("5.5")));
         when(createCourse.execute(any())).thenReturn(course);
+        when(codeSettings.createCourse(any())).thenReturn(course);
         when(updateCourse.execute(any())).thenReturn(course);
         mockMvc.perform(post("/api/content/admin/courses").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"code\":\"IELTS\",\"name\":\"IELTS\",\"bandLevel\":5.5}"))
@@ -109,6 +113,49 @@ class ContentAuthorizationWebMvcTest {
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(
                 "/api/content/admin/courses/{id}", courseId)).andExpect(status().isNoContent());
         verify(deleteCourse).execute(courseId);
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void learnerCannotReadOrChangeCodeSettings() throws Exception {
+        mockMvc.perform(get("/api/content/admin/code-settings")).andExpect(status().isForbidden());
+        mockMvc.perform(put("/api/content/admin/code-settings/COURSE").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"applied\":true,\"pattern\":\"COURSE_{SEQ:3}\",\"startNumber\":1,\"editable\":true}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/content/admin/code-suggestion?kind=COURSE")).andExpect(status().isForbidden());
+        verifyNoInteractions(codeSettings, currentUser);
+    }
+
+    @Test
+    @WithMockUser(roles = "CONTENT_AUTHOR")
+    void authorCanUseAllCodeSettingsEndpoints() throws Exception {
+        var setting = new com.ieltspath.content.application.result.CodeSetting("COURSE", true, "COURSE_{SEQ:3}", 1, true);
+        when(codeSettings.listConnected()).thenReturn(List.of(setting));
+        when(codeSettings.update(any(), any(), any())).thenReturn(setting);
+        when(codeSettings.suggest("COURSE", "6")).thenReturn(
+                new com.ieltspath.content.application.result.CodeSuggestion("COURSE_001", true, true));
+        var userId = UUID.randomUUID();
+        when(currentUser.requireUserId()).thenReturn(userId);
+
+        mockMvc.perform(get("/api/content/admin/code-settings")).andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].kind").value("COURSE"));
+        mockMvc.perform(put("/api/content/admin/code-settings/COURSE").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"applied\":true,\"pattern\":\"COURSE_{SEQ:3}\",\"startNumber\":1,\"editable\":true}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/content/admin/code-suggestion?kind=COURSE&band=6")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("COURSE_001"));
+        verify(codeSettings).update(eq("COURSE"), any(), eq(userId));
+    }
+
+    @Test
+    @WithMockUser(roles = "CONTENT_AUTHOR")
+    void invalidSuggestionBandReturnsVietnameseBadRequest() throws Exception {
+        when(codeSettings.suggest("COURSE", "6.2"))
+                .thenThrow(new IllegalArgumentException("Band phải từ 0 đến 9, theo bước 0,5."));
+
+        mockMvc.perform(get("/api/content/admin/code-suggestion?kind=COURSE&band=6.2"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Band phải từ 0 đến 9, theo bước 0,5."));
     }
     @MockitoBean ListQuestionsUseCase listQuestions;
     @MockitoBean GetQuestionDetailUseCase getQuestionDetail;
