@@ -19,6 +19,40 @@ class SpeakingResultValidatorTest {
     private final Set<String> kps = Set.of("S65_GRAMMAR_RANGE");
 
     @Test
+    void feedbackTextKeepsItsParagraphsAndNumberedLinesButNotMarkupOrLinks() {
+        String written = "Điểm giữ em ở band 4 là LR.  <b>Ngoài ra</b> em lặp 'very'.\r\n\r\n\r\n\r\nĐể lên band 5, em cần:\r\n"
+                + "1.   diễn đạt lại bằng từ đơn giản\n2. học sẵn collocation https://example.com/x";
+
+        assertThat(SpeakingResultValidator.cleanText(written, 1200)).isEqualTo(
+                "Điểm giữ em ở band 4 là LR. Ngoài ra em lặp 'very'.\n\nĐể lên band 5, em cần:\n"
+                        + "1. diễn đạt lại bằng từ đơn giản\n2. học sẵn collocation");
+        // the one-line cleaner is unchanged: it still flattens everything
+        assertThat(SpeakingResultValidator.clean(written, 1200)).doesNotContain("\n");
+    }
+
+    /** The codes of the errors list mean nothing to the learner; a model given the list sometimes starts a weakness with one. */
+    @Test
+    void anErrorCodeWrittenInsideTheFeedbackIsDropped() {
+        assertThat(SpeakingResultValidator.clean("SPK_PLURAL_ENDING — thiếu đuôi số nhiều ở 2 chỗ", 700))
+                .isEqualTo("Thiếu đuôi số nhiều ở 2 chỗ");
+        assertThat(SpeakingResultValidator.clean("SPK_WORD_FORM: sai dạng từ ở 3 chỗ", 700)).isEqualTo("Sai dạng từ ở 3 chỗ");
+        assertThat(SpeakingResultValidator.clean("Lỗi lặp lại (SPK_REPEATED_WORD) ở 5 chỗ", 700)).isEqualTo("Lỗi lặp lại ở 5 chỗ");
+        assertThat(SpeakingResultValidator.cleanText("Đoạn một.\n\nSPK_L1_TRANSLATION - dịch từng chữ.", 1200))
+                .isEqualTo("Đoạn một.\n\nDịch từng chữ.");
+        assertThat(SpeakingResultValidator.clean("Không có mã nào ở đây", 700)).isEqualTo("Không có mã nào ở đây");
+    }
+
+    @Test
+    void feedbackTextThatIsTooLongIsCutAtTheEndOfASentenceOrALine() {
+        String text = "Câu một đủ dài để cắt ở đây. Câu hai cũng khá dài và nằm ngoài giới hạn của đoạn.\n\nĐoạn sau.";
+
+        String cut = SpeakingResultValidator.cleanText(text, 40);
+
+        assertThat(cut).isEqualTo("Câu một đủ dài để cắt ở đây.");
+        assertThat(SpeakingResultValidator.cleanText(null, 40)).isEmpty();
+    }
+
+    @Test
     void keepsTheThreeBandsAndDropsWhatItCannotCheck() {
         ValidatedGrade grade = validator.validate(SpeakingTestData.goodAnswer("6.0", "6.5", "5.5"), input, kps);
 

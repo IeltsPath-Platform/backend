@@ -9,6 +9,9 @@ import com.ieltspath.learning.application.port.LlmClient;
 import com.ieltspath.learning.application.service.SpeakingPromptAssembler.Graded;
 import com.ieltspath.learning.application.service.SpeakingPromptAssembler.Task;
 import com.ieltspath.learning.application.service.SpeakingResultValidator.InvalidSpeakingGradeException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -21,6 +24,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Supplier;
 
 /**
  * Grades one Speaking submission with the language model: builds the prompts, asks, checks the answers and puts the
@@ -35,6 +39,7 @@ import java.util.concurrent.Executors;
  */
 @Service
 public class SpeakingGrader {
+    private static final Logger log = LoggerFactory.getLogger(SpeakingGrader.class);
     /**
      * One call writes a part of the grade, not all of it, so it needs far less than a whole grade did; the wait is kept
      * short enough that a grade that is stuck on a retry still finishes before another worker takes the submission over.
@@ -77,9 +82,13 @@ public class SpeakingGrader {
     }
 
     public SpeakingResultAssembler.Assembled grade(SpeakingPromptAssembler.Prepared prepared, SpeakingGradingInput input) {
+        long begun = System.nanoTime();
+        // The calls run on other threads: they carry the submission id of this one, so every log line of a call names it.
+        Map<String, String> logContext = MDC.getCopyOfContextMap();
         Map<Task, CompletableFuture<JsonNode>> started = new EnumMap<>(Task.class);
         for (Task task : FIRST_ROUND) {
-            started.put(task, CompletableFuture.supplyAsync(() -> ask(prepared, input, task, prepared.userPrompt()), CALLS));
+            started.put(task, CompletableFuture.supplyAsync(
+                    () -> inContext(logContext, () -> ask(prepared, input, task, prepared.userPrompt())), CALLS));
         }
         Map<Task, JsonNode> answers = new EnumMap<>(Task.class);
         RuntimeException failure = null;
@@ -92,10 +101,16 @@ public class SpeakingGrader {
                 if (failure == null) failure = cause; else failure.addSuppressed(cause);
             }
         }
+        long firstRoundNanos = System.nanoTime() - begun;
         if (failure != null) throw failure;
 
+        long synthesisBegun = System.nanoTime();
         JsonNode overall = ask(prepared, input, Task.SYNTHESIS,
                 prompts.withGraded(prepared.userPrompt(), graded(answers)));
+        long synthesisNanos = System.nanoTime() - synthesisBegun;
+        log.info("Speaking LLM calls done: submissionId={}, firstRoundMs={}, synthesisMs={}, totalMs={}",
+                MDC.get("submissionId"), firstRoundNanos / 1_000_000, synthesisNanos / 1_000_000,
+                (firstRoundNanos + synthesisNanos) / 1_000_000);
         ObjectNode merged = merge(answers, overall);
         return results.assemble(prepared.rubric(), input,
                 validator.validate(merged.toString(), input, input.learner().allowedKpCodes()));
@@ -104,26 +119,69 @@ public class SpeakingGrader {
     /** One call, asked again once with a reminder when its answer is not usable. */
     private JsonNode ask(SpeakingPromptAssembler.Prepared prepared, SpeakingGradingInput input, Task task, String user) {
         String system = prompts.system(prepared.rubric(), input, task);
-        InvalidSpeakingGradeException failure;
+        // The LLM client names the task in its timing line.
+        MDC.put("llmTask", task.name());
         try {
-            return checked(task, llm.completeJson(system, user, BUDGET));
-        } catch (InvalidSpeakingGradeException first) {
-            failure = first;
-        }
-        try {
-            return checked(task, llm.completeJson(system + REMINDER, user, BUDGET));
-        } catch (InvalidSpeakingGradeException second) {
-            second.addSuppressed(failure);
-            throw second;
+            InvalidSpeakingGradeException failure;
+            try {
+                return checked(task, llm.completeJson(system, user, BUDGET));
+            } catch (InvalidSpeakingGradeException first) {
+                failure = first;
+                log.warn("Speaking LLM answer not usable, asking again: submissionId={}, task={}, reason={}",
+                        MDC.get("submissionId"), task, first.reason());
+            }
+            try {
+                return checked(task, llm.completeJson(system + reminder(task, failure.reason()), user, BUDGET));
+            } catch (InvalidSpeakingGradeException second) {
+                log.warn("Speaking LLM answer not usable twice: submissionId={}, task={}, firstReason={}, secondReason={}",
+                        MDC.get("submissionId"), task, failure.reason(), second.reason());
+                second.addSuppressed(failure);
+                throw second;
+            }
+        } finally {
+            MDC.remove("llmTask");
         }
     }
 
-    /** The answer as an object, and for a criterion call with its criterion and a band that can be trusted. */
+    /** Runs {@code work} with the logging context of the thread that started it. */
+    private static <T> T inContext(Map<String, String> context, Supplier<T> work) {
+        if (context != null) MDC.setContextMap(context);
+        try {
+            return work.get();
+        } finally {
+            MDC.clear();
+        }
+    }
+
+    /**
+     * What the model is told when its answer could not be used: the reminder of the format, and for a band or criterion
+     * mistake the one rule it broke, because a model that only hears "could not be used" often repeats the same mistake.
+     */
+    static String reminder(Task task, String reason) {
+        String hint = switch (reason) {
+            case "BAND_MISSING", "BAND_NOT_A_NUMBER", "BAND_OUT_OF_RANGE", "BAND_NOT_HALF_STEP" ->
+                    " The entry in criteria must contain \"band\" as a JSON number such as 6 (not text), written inside that"
+                            + " entry between \"weaknesses\" and \"comment\", not outside criteria.";
+            case "WRONG_CRITERION", "CRITERION_MISSING", "NO_CRITERIA" -> task.criterion() == null ? ""
+                    : " criteria must hold exactly one entry, with code \"" + task.criterion() + "\".";
+            default -> "";
+        };
+        return REMINDER + hint;
+    }
+
+    /**
+     * The answer as an object, and for a criterion call with its criterion and a band that can be trusted. A band written
+     * beside {@code criteria} instead of inside its entry is moved into the entry: it is the model's own band, only put in
+     * the wrong place, and a second call to ask for the same number would cost a full model round.
+     */
     private JsonNode checked(Task task, String raw) {
         JsonNode root = validator.parse(raw);
         if (task.criterion() != null) {
             JsonNode entry = root.path("criteria").path(0);
-            if (!task.criterion().equals(entry.path("code").asText(""))) throw new InvalidSpeakingGradeException();
+            if (!task.criterion().equals(entry.path("code").asText(""))) throw new InvalidSpeakingGradeException("WRONG_CRITERION");
+            if (entry.path("band").isMissingNode() && root.path("band").isNumber() && entry instanceof ObjectNode object) {
+                object.set("band", root.path("band"));
+            }
             SpeakingResultValidator.band(entry.path("band"));
         }
         return root;

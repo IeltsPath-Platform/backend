@@ -3,6 +3,7 @@ package com.ieltspath.learning.application.usecase;
 import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.port.LearnerLock;
 import com.ieltspath.learning.application.port.LearningContentClient;
+import com.ieltspath.learning.application.port.SpeakingGradingTrigger;
 import com.ieltspath.learning.application.result.SpeakingSubmissionResult;
 import com.ieltspath.learning.application.service.SpeakingGradingContextCapture;
 import com.ieltspath.learning.domain.aggregate.SpeakingSubmission;
@@ -29,6 +30,8 @@ public class CompleteSpeakingSubmissionUseCase {
     private final ObjectMapper json;
     private final SpeakingGradingContextCapture contextCapture;
     private final Clock clock = Clock.systemUTC();
+    /** Optional: without it a queued submission is found by the periodic poll instead of at once. */
+    private SpeakingGradingTrigger trigger;
 
     public CompleteSpeakingSubmissionUseCase(SpeakingSubmissionRepository submissions, LearnerLock lock,
                                              PlatformTransactionManager transactionManager) {
@@ -48,6 +51,9 @@ public class CompleteSpeakingSubmissionUseCase {
         this.contextCapture = contextCapture;
     }
 
+    @Autowired(required = false)
+    void setTrigger(SpeakingGradingTrigger trigger) { this.trigger = trigger; }
+
     public SpeakingSubmissionResult execute(UUID userId, UUID submissionId) {
         SpeakingSubmission existing = submissions.findOwned(submissionId, userId)
                 .orElseThrow(() -> new LearningRequestException(404, "SPEAKING_SUBMISSION_NOT_FOUND",
@@ -64,7 +70,7 @@ public class CompleteSpeakingSubmissionUseCase {
         }
         Map<String, Object> snapshot = rubricSnapshot;
         String context = gradingContext;
-        return transaction.execute(status -> {
+        SpeakingSubmissionResult queued = transaction.execute(status -> {
             lock.lock(userId);
             SpeakingSubmission submission = submissions.findForUpdate(submissionId)
                     .filter(found -> found.userId().equals(userId))
@@ -85,5 +91,8 @@ public class CompleteSpeakingSubmissionUseCase {
             }
             return SpeakingSubmissionResult.from(submission);
         });
+        // After the commit, so the worker finds the submission queued. A hint only: the periodic poll is the safety net.
+        if (trigger != null && queued != null && queued.status() == SpeakingSubmissionStatus.QUEUED) trigger.wake();
+        return queued;
     }
 }

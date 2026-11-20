@@ -285,6 +285,55 @@ class OpenAiCompatibleLlmClientTest {
     }
 
     @Test
+    void everyCallLogsTheModelTheTaskTheTimeAndTheTokensButNotWhatWasSaid(CapturedOutput output) {
+        Setup setup = client("deepseek-chat", "");
+        String answer = "{\"choices\":[{\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\",\"content\":\"{}\"}}],"
+                + "\"usage\":{\"prompt_tokens\":1200,\"completion_tokens\":340,\"completion_tokens_details\":{\"reasoning_tokens\":25}}}";
+        setup.server().expect(requestTo(BASE_URL + "/chat/completions"))
+                .andRespond(withSuccess(answer, MediaType.APPLICATION_JSON));
+        org.slf4j.MDC.put("llmTask", "FC");
+        org.slf4j.MDC.put("submissionId", "sub-1");
+        try {
+            setup.client().completeJson("private system prompt", "private learner words");
+        } finally {
+            org.slf4j.MDC.clear();
+        }
+
+        assertTrue(output.getAll().contains("LLM call: model=deepseek-chat, task=FC, submissionId=sub-1, millis="), output.getAll());
+        assertTrue(output.getAll().contains("promptTokens=1200, completionTokens=340, reasoningTokens=25, finishReason=stop"), output.getAll());
+        assertFalse(output.getAll().contains("private system prompt"));
+        assertFalse(output.getAll().contains("private learner words"));
+    }
+
+    @Test
+    void aProviderThatReportsNoUsageStillLogsTheTime(CapturedOutput output) {
+        Setup setup = client("gpt-4o-mini", "");
+        setup.server().expect(requestTo(BASE_URL + "/chat/completions"))
+                .andRespond(withSuccess(reply("\"x\""), MediaType.APPLICATION_JSON));
+
+        setup.client().completeJson("s", "u");
+
+        assertTrue(output.getAll().contains("LLM call: model=gpt-4o-mini, task=-, submissionId=-, millis="), output.getAll());
+        assertTrue(output.getAll().contains("promptTokens=-, completionTokens=-, reasoningTokens=-, finishReason=-"), output.getAll());
+    }
+
+    @Test
+    void aFailedCallLogsHowLongTheProviderTookBeforeItFailed(CapturedOutput output) {
+        Setup setup = client("deepseek-chat", "");
+        setup.server().expect(requestTo(BASE_URL + "/chat/completions"))
+                .andRespond(withException(new SocketTimeoutException("private network failure details")));
+        org.slf4j.MDC.put("llmTask", "SYNTHESIS");
+        try {
+            assertThrows(LlmUnavailableException.class, () -> setup.client().completeJson("s", "u"));
+        } finally {
+            org.slf4j.MDC.clear();
+        }
+
+        assertTrue(output.getAll().contains("LLM call failed: model=deepseek-chat, task=SYNTHESIS, submissionId=-, millis="), output.getAll());
+        assertFalse(output.getAll().contains("private network failure details"));
+    }
+
+    @Test
     void reasoningDefaultsFollowTheModelFamily() {
         assertEquals("none", OpenAiCompatibleLlmClient.resolveReasoningEffort("gemini-2.5-flash", null));
         assertEquals("minimal", OpenAiCompatibleLlmClient.resolveReasoningEffort("gemini-2.5-pro", ""));

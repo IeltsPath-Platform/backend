@@ -15,6 +15,32 @@ from the wallet's owner, and a background job holds no learner token. The learne
 after a top-up settles it) and 503 `ACCESS_UNAVAILABLE` when points cannot be reached. The result page calls it by itself,
 so the learner presses nothing.
 
+Workers. Completing a submission wakes a grading worker at once (`learning.speaking.wake-on-submit`), and a periodic poll
+(`learning.speaking.job-delay-ms`) finds what a wake-up missed, including retryable and stalled submissions. An instance
+grades up to `learning.speaking.grading-workers` submissions at the same time and analyses the recordings of one submission
+at the same time (`learning.speaking.analysis-parallelism`); Azure's `learning.speech.max-concurrent` caps all analyses
+together and the `llm` bulkhead caps the model calls (a grading asks four at once), so these are raised together. The claim
+is `FOR UPDATE SKIP LOCKED`, so several workers or instances never take the same submission, and a worker touches its row at
+a third of `stale-after-seconds`, so a slow step is not taken over. No status or endpoint changes.
+
+Timing logs. They name the submission and carry no learner words. Every line of a grading's worker thread, including the
+model calls, carries the `submissionId`.
+- Azure: `Speech analysis done: ... part, audioSeconds, analysisMs, outcome` for each recording (`outcome` is `ok` or the failure
+  code, such as `SPEECH_TIMEOUT`); `analysisMs` against `audioSeconds` shows whether analysing runs close to real time.
+- Model: `LLM call: model, task, submissionId, millis, promptTokens, completionTokens, reasoningTokens, finishReason` for every
+  attempt (`task` is FC, LR, GRA, OVERVIEW or SYNTHESIS; `-` where a value is unknown, for example a provider that reports no
+  usage), and `LLM call failed: ... millis, reason` when the provider fails or times out. `Speaking LLM calls done:
+  firstRoundMs, synthesisMs, totalMs` gives the two rounds of a grading. A `finishReason` of `length` means the answer was cut.
+- Whole grading: `Speaking submission graded: recordings, sinceCreatedMs, sinceQueuedMs, queueWaitMs, analysisMs, gradingMs,
+  totalMs`. `sinceCreatedMs` counts from the learner's browser opening the submission (so it holds the uploads), `sinceQueuedMs`
+  from the submission being completed, both up to the grade being stored; `queueWaitMs` is the wait for a free worker.
+- Release: `Speaking grade released: sinceCreatedMs, sinceQueuedMs, waitedForLearnerMs`, written when the learner's own request
+  releases the grade. `waitedForLearnerMs` is how long the finished grade waited for the page to ask for it (its polling
+  interval). The timer `learning.speaking.stage` (stages `since_created`, `queue_wait`, `analysis`, `grading`, `total`) holds the
+  same numbers for Micrometer.
+- Browser: the learner's page writes `[speaking-timing] {...}` to the console when the grade is on screen: `openMs`, `uploadMs`,
+  `completeMs`, `gradingMs`, `releaseMs`, `totalMs` and `polls`, from the moment the learner pressed send.
+
 `GET /api/learning/speaking-practice/submissions/{id}` returns the learner-safe `display` object as `result` only once the
 submission is `GRADED`; a grade that is not yet paid for is never shown. It contains estimated criterion bands and
 comments, transcript quality, transcripts, rhythm, pronunciation summary, weak words, and criteria below the configured
@@ -44,10 +70,17 @@ Listing mistakes. The grader reports a mistake in `display.errors` only with an 
 vocabulary mistake it has to list needs one (V115 and V124: tense, verb form, agreement, plural and past endings, articles,
 prepositions, word order, missing subject or verb, run-on sentences, complex structures, word choice, word form, translation
 from Vietnamese, repeated words, misused idioms, register; V125 adds wandering sentence, repeated idea and undeveloped idea
-for coherence). Prompt version `spk5` asks each criterion call for every place a mistake happens, one entry per place with
+for coherence). Prompt version `spk7` is `spk6` with every weakness asked for in one fixed form: a title with how often and where,
+the learner's words in double quotes, then `Sửa:` (corrected words in double quotes), `Quy tắc:` (the rule) and `Luyện:` (one
+exercise). The result page lays a weakness out by these labels; a weakness without them is still shown, as plain text. Prompt
+version `spk6` is `spk5` with the shape of the reply written last, after the list of allowed codes, and
+with a sample band: with `deepseek-flash` about half of the criterion answers left the band out when the shape stood in the
+middle of the prompt, and an answer without a band is refused. A refused answer is asked again once with the rule it broke
+(`reason` in the log: `BAND_MISSING`, `WRONG_CRITERION`, ...), and a band written beside `criteria` instead of inside its entry
+is accepted. Prompt version `spk5` asks each criterion call for every place a mistake happens, one entry per place with
 its own part, exact excerpt and a solution, never only the fault: the corrected sentence and rule for GRA, the better word
 and alternatives for LR, and for FC how to cut, link, develop or replace the sentence, written about the learner's own topic.
-Up to 15 entries per criterion and 45 in all; a weakness may be up to 700 characters. Entries that carry a code, a part or an
+Up to 15 entries per criterion and 45 in all; a weakness may be up to 850 characters. Entries that carry a code, a part or an
 excerpt that is not valid are dropped as before. A code without a trap point only explains the result and adds no evidence.
 
 Busy provider. A grade is five model calls (FC, LR, GRA, overview, synthesis) and one failed call spoils it, so each call is

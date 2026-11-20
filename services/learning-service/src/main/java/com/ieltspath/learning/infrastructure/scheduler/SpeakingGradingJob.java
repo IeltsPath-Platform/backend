@@ -6,6 +6,7 @@ import com.ieltspath.learning.application.exception.LlmUnavailableException;
 import com.ieltspath.learning.application.exception.SpeechUnavailableException;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.port.LlmUsageQuota;
+import com.ieltspath.learning.application.port.SpeakingGradingTrigger;
 import com.ieltspath.learning.application.port.SpeechAnalysisClient;
 import com.ieltspath.learning.application.service.SpeakingGrader;
 import com.ieltspath.learning.application.service.SpeakingGradingContext;
@@ -24,29 +25,61 @@ import com.ieltspath.learning.domain.vo.SpeechAnalysis;
 import com.ieltspath.learning.domain.vo.SpeakingRecording;
 import com.ieltspath.learning.domain.vo.SpeakingSubmissionStatus;
 import com.ieltspath.learning.domain.vo.TranscriptQuality;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-/** Claims and grades one submission at a time. Audio and LLM calls run outside database transactions. */
+/**
+ * Claims and grades Speaking submissions, up to {@code gradingWorkers} at once. A worker is started by a wake-up when a
+ * submission is completed and by the periodic poll as a safety net, and a worker that finishes looks for the next
+ * submission at once. The claim is {@code FOR UPDATE SKIP LOCKED}, so several workers (or instances) never take the same
+ * submission. The recordings of one submission are analysed at the same time ({@code analysisParallelism}); the Azure
+ * client's own cap bounds all analyses together. Audio and LLM calls run outside database transactions.
+ */
 @Component
 @EnableScheduling
-public class SpeakingGradingJob {
+public class SpeakingGradingJob implements SpeakingGradingTrigger {
     private static final Logger log = LoggerFactory.getLogger(SpeakingGradingJob.class);
     private static final String USAGE_KIND = "speaking_grading";
+    /** A worker and an analysis mostly wait for the network, so a virtual thread each costs almost nothing. */
+    private static final ExecutorService WORKERS = Executors.newThreadPerTaskExecutor(
+            Thread.ofVirtual().name("speaking-job-", 0).factory());
+    private static final ExecutorService ANALYSES = Executors.newThreadPerTaskExecutor(
+            Thread.ofVirtual().name("speaking-analyse-", 0).factory());
+    /** Keeps the rows of running submissions fresh, so a slow one is not taken over by another worker as stale. */
+    private static final ScheduledExecutorService HEARTBEAT = Executors.newSingleThreadScheduledExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "speaking-heartbeat");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     private final SpeakingSubmissionRepository submissions;
     private final ObjectStorage storage;
@@ -58,6 +91,10 @@ public class SpeakingGradingJob {
     private final SpeakingGradingContextCapture contexts;
     private final SpeakingHistorySummarizer history;
     private final Clock clock = Clock.systemUTC();
+    /** One permit per worker this instance may run. */
+    private final Semaphore workerSlots;
+    /** Optional: without a registry the job still grades, it only stops recording stage timers. */
+    private MeterRegistry metrics;
 
     public SpeakingGradingJob(SpeakingSubmissionRepository submissions, @Lazy ObjectStorage storage,
                               SpeechAnalysisClient speech, SpeakingGrader grader, LlmUsageQuota quota,
@@ -72,20 +109,91 @@ public class SpeakingGradingJob {
         this.quota = quota;
         this.settings = settings;
         this.json = json;
+        this.workerSlots = new Semaphore(settings.gradingWorkers());
     }
 
+    @Autowired(required = false)
+    void setMetrics(MeterRegistry metrics) { this.metrics = metrics; }
+
+    /** The safety net: starts workers for any queued, retryable or stalled submission a wake-up did not reach. */
     @Scheduled(fixedDelayString = "${learning.speaking.job-delay-ms:5000}")
+    public void poll() {
+        drain();
+    }
+
+    /** Claims one submission and grades it on the calling thread (the workers do the same on their own threads). */
     public void runOne() {
         if (!settings.enabled()) return;
+        claim().ifPresent(this::process);
+    }
+
+    @Override
+    public void wake() {
+        if (!settings.enabled() || !settings.wakeOnSubmit()) return;
+        try {
+            WORKERS.execute(this::drain);
+        } catch (RuntimeException rejected) {
+            // Best effort: the periodic poll finds the submission anyway.
+            log.warn("Speaking grading wake-up not started: reason={}", rejected.getClass().getSimpleName());
+        }
+    }
+
+    /**
+     * Starts a worker for every free slot while there is a submission to claim, and returns at once. A worker that
+     * finishes calls this again, so a queue is worked off without waiting for the next poll.
+     */
+    void drain() {
+        if (!settings.enabled()) return;
+        while (workerSlots.tryAcquire()) {
+            Optional<SpeakingSubmission> next;
+            try {
+                next = claim();
+            } catch (RuntimeException failure) {
+                workerSlots.release();
+                log.warn("Speaking submission could not be claimed: reason={}", failure.getClass().getSimpleName());
+                return;
+            }
+            if (next.isEmpty()) {
+                workerSlots.release();
+                return;
+            }
+            SpeakingSubmission claimed = next.get();
+            try {
+                WORKERS.execute(() -> work(claimed));
+            } catch (RejectedExecutionException rejected) {
+                // The claim stays on the row until it goes stale, then another poll takes it over.
+                workerSlots.release();
+                throw rejected;
+            }
+        }
+    }
+
+    private void work(SpeakingSubmission submission) {
+        try {
+            process(submission);
+        } finally {
+            workerSlots.release();
+        }
+        drain();
+    }
+
+    private Optional<SpeakingSubmission> claim() {
         Instant now = Instant.now(clock);
-        submissions.claimNext(now.minusSeconds(settings.staleAfterSeconds()), now.minusSeconds(settings.retryDelaySeconds()),
-                        settings.maxAttempts())
-                .ifPresent(this::process);
+        return submissions.claimNext(now.minusSeconds(settings.staleAfterSeconds()),
+                now.minusSeconds(settings.retryDelaySeconds()), settings.maxAttempts());
     }
 
     private void process(SpeakingSubmission submission) {
         LocalDate quotaDay = null;
         boolean graded = false;
+        long begun = System.nanoTime();
+        long analysisNanos = 0;
+        long gradingNanos = 0;
+        long queueWaitMillis = submission.queuedAt() == null ? -1
+                : Math.max(0, Duration.between(submission.queuedAt(), Instant.now(clock)).toMillis());
+        ScheduledFuture<?> heartbeat = startHeartbeat(submission.id());
+        // Every log line of this thread, including the model calls, names the submission.
+        MDC.put("submissionId", submission.id().toString());
         try {
             if (submission.result() != null) {
                 // Already graded (an earlier run stopped before the status was saved): keep the grade, never grade twice.
@@ -104,7 +212,9 @@ public class SpeakingGradingJob {
                 return;
             }
             List<SpeakingRecording> recordings = submission.recordings();
+            long analysisBegun = System.nanoTime();
             List<SpeechAnalysis> analyses = analyze(submission, recordings);
+            analysisNanos = System.nanoTime() - analysisBegun;
             if (analyses.stream().allMatch(SpeechAnalysis::isEmpty)) {
                 // Nothing was heard, so there is nothing to grade and nothing to charge.
                 submission.noSpeech(Instant.now(clock));
@@ -119,11 +229,14 @@ public class SpeakingGradingJob {
             submission.beginGrading(prepared.rubric().code(), prepared.rubric().version(), prepared.checksum(),
                     SpeakingPromptAssembler.PROMPT_VERSION, Instant.now(clock));
             submissions.save(submission);
+            long gradingBegun = System.nanoTime();
             SpeakingResultAssembler.Assembled result = grader.grade(prepared, input);
+            gradingNanos = System.nanoTime() - gradingBegun;
             // The grade is kept as PAYMENT_PENDING and the learner's own request charges it (SettleSpeakingSubmissionUseCase).
             submission.paymentPending(result.result(), result.overallBand(), Instant.now(clock));
             submissions.save(submission);
             graded = true;
+            recordTimings(submission, recordings.size(), queueWaitMillis, analysisNanos, gradingNanos, System.nanoTime() - begun);
         } catch (SpeakingPromptAssembler.TranscriptTooLongException exception) {
             needsExaminer(submission, "TRANSCRIPT_TOO_LONG");
         } catch (SpeakingPromptAssembler.UnusableRubricException exception) {
@@ -148,14 +261,87 @@ public class SpeakingGradingJob {
                     origin == null ? "-" : origin.getClassName() + "." + origin.getMethodName() + ":" + origin.getLineNumber());
             failRetryable(submission, "INTERNAL_FAILURE");
         } finally {
+            heartbeat.cancel(false);
+            MDC.remove("submissionId");
             // A call that produced no grade does not use up the learner's day.
             if (quotaDay != null && !graded) releaseQuota(submission.userId(), quotaDay);
         }
     }
 
+    /** How often a running submission's row is touched: a third of the stale limit, so it is never taken over while worked on. */
+    static long heartbeatSeconds(int staleAfterSeconds) {
+        return Math.max(5, staleAfterSeconds / 3);
+    }
+
+    private ScheduledFuture<?> startHeartbeat(UUID submissionId) {
+        long seconds = heartbeatSeconds(settings.staleAfterSeconds());
+        return HEARTBEAT.scheduleAtFixedRate(() -> {
+            try {
+                submissions.touch(submissionId);
+            } catch (RuntimeException failure) {
+                log.warn("Speaking submission could not be kept fresh: submissionId={}, reason={}", submissionId,
+                        failure.getClass().getSimpleName());
+            }
+        }, seconds, seconds, TimeUnit.SECONDS);
+    }
+
+    /**
+     * Where the time of one grading went. {@code sinceCreatedMs} runs from the moment the learner's browser opened the
+     * submission (so it holds the uploads) and {@code sinceQueuedMs} from the moment the last recording was in and the
+     * submission was completed; both end when the grade is stored, before the learner's own request releases it. It names
+     * no learner and carries no words; the numbers tell what to speed up next.
+     */
+    private void recordTimings(SpeakingSubmission submission, int recordings, long queueWaitMillis, long analysisNanos,
+                               long gradingNanos, long totalNanos) {
+        Instant now = Instant.now(clock);
+        long sinceCreatedMillis = submission.createdAt() == null ? -1
+                : Math.max(0, Duration.between(submission.createdAt(), now).toMillis());
+        long sinceQueuedMillis = submission.queuedAt() == null ? -1
+                : Math.max(0, Duration.between(submission.queuedAt(), now).toMillis());
+        log.info("Speaking submission graded: submissionId={}, recordings={}, sinceCreatedMs={}, sinceQueuedMs={}, queueWaitMs={}, analysisMs={}, gradingMs={}, totalMs={}",
+                submission.id(), recordings, sinceCreatedMillis, sinceQueuedMillis, queueWaitMillis,
+                TimeUnit.NANOSECONDS.toMillis(analysisNanos), TimeUnit.NANOSECONDS.toMillis(gradingNanos),
+                TimeUnit.NANOSECONDS.toMillis(totalNanos));
+        if (metrics == null) return;
+        if (sinceCreatedMillis >= 0) stageTimer("since_created").record(Duration.ofMillis(sinceCreatedMillis));
+        if (queueWaitMillis >= 0) stageTimer("queue_wait").record(Duration.ofMillis(queueWaitMillis));
+        stageTimer("analysis").record(Duration.ofNanos(analysisNanos));
+        stageTimer("grading").record(Duration.ofNanos(gradingNanos));
+        stageTimer("total").record(Duration.ofNanos(totalNanos));
+    }
+
+    private Timer stageTimer(String stage) {
+        return Timer.builder("learning.speaking.stage").tag("stage", stage).register(metrics);
+    }
+
+    /**
+     * The analyses of all recordings, in the order of the recordings. They run at the same time ({@code analysisParallelism}
+     * at once, and the Azure client's own cap bounds all analyses together). Every one is waited for, so none is left running
+     * unseen, and each finished analysis is already stored: when one fails the others are not done again on the retry.
+     */
     private List<SpeechAnalysis> analyze(SpeakingSubmission submission, List<SpeakingRecording> recordings) {
-        List<SpeechAnalysis> analyses = new ArrayList<>();
+        Semaphore atOnce = new Semaphore(settings.analysisParallelism());
+        List<CompletableFuture<SpeechAnalysis>> started = new ArrayList<>();
         for (SpeakingRecording recording : recordings) {
+            started.add(CompletableFuture.supplyAsync(() -> analyzeOne(submission, recording, atOnce), ANALYSES));
+        }
+        List<SpeechAnalysis> analyses = new ArrayList<>();
+        RuntimeException failure = null;
+        for (CompletableFuture<SpeechAnalysis> future : started) {
+            try {
+                analyses.add(future.join());
+            } catch (CompletionException exception) {
+                RuntimeException cause = exception.getCause() instanceof RuntimeException runtime ? runtime : exception;
+                if (failure == null) failure = cause; else failure.addSuppressed(cause);
+            }
+        }
+        if (failure != null) throw failure;
+        return analyses;
+    }
+
+    private SpeechAnalysis analyzeOne(SpeakingSubmission submission, SpeakingRecording recording, Semaphore atOnce) {
+        atOnce.acquireUninterruptibly();
+        try {
             String cached = submissions.findAnalysis(submission.id(), recording.questionVersionId()).orElse(null);
             SpeechAnalysis analysis;
             if (cached != null) {
@@ -163,15 +349,35 @@ public class SpeakingGradingJob {
                 catch (Exception exception) { throw new IllegalStateException("Stored speech analysis is invalid", exception); }
             } else {
                 byte[] audio = storage.download(settings.bucket(), recording.objectKey());
-                analysis = speech.analyze(audio, null);
+                long begun = System.nanoTime();
+                try {
+                    analysis = speech.analyze(audio, null);
+                } catch (RuntimeException failure) {
+                    // How long Azure took before it failed or timed out; the code says why.
+                    logSpeechTiming(submission, recording, System.nanoTime() - begun,
+                            failure instanceof SpeechUnavailableException ? failure.getMessage() : failure.getClass().getSimpleName());
+                    throw failure;
+                }
+                logSpeechTiming(submission, recording, System.nanoTime() - begun, "ok");
                 try { submissions.saveAnalysis(submission.id(), recording.questionVersionId(), json.writeValueAsString(analysis)); }
                 catch (Exception exception) { throw new IllegalStateException("Speech analysis is not serializable", exception); }
             }
-            analyses.add(analysis);
             // A long submission must not look stuck to another instance while it is still being worked on.
             submissions.touch(submission.id());
+            return analysis;
+        } finally {
+            atOnce.release();
         }
-        return analyses;
+    }
+
+    /**
+     * How long Azure took for how much audio: the ratio tells whether analysing is close to real time. {@code outcome} is
+     * {@code ok} or the failure code (SPEECH_TIMEOUT, SPEECH_BUSY...), so a timeout shows how long it waited.
+     */
+    private void logSpeechTiming(SpeakingSubmission submission, SpeakingRecording recording, long nanos, String outcome) {
+        log.info("Speech analysis done: submissionId={}, part={}, audioSeconds={}, analysisMs={}, outcome={}", submission.id(),
+                recording.partNo(), recording.durationMs() == null ? "-" : String.format(java.util.Locale.ROOT, "%.1f", recording.durationMs() / 1000.0),
+                TimeUnit.NANOSECONDS.toMillis(nanos), outcome);
     }
 
     private LearningContentClient.Rubric readRubricSnapshot(SpeakingSubmission submission) {

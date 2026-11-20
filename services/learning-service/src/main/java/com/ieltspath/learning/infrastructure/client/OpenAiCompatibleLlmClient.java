@@ -12,6 +12,7 @@ import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.port.LlmClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -168,15 +169,53 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
     }
 
     private String requestContent(RestClient client, Request body) {
-        JsonNode response = client.post().uri("/chat/completions")
-                .headers(headers -> headers.setBearerAuth(apiKey))
-                .body(body).retrieve().body(JsonNode.class);
+        long begun = System.nanoTime();
+        JsonNode response;
+        try {
+            response = client.post().uri("/chat/completions")
+                    .headers(headers -> headers.setBearerAuth(apiKey))
+                    .body(body).retrieve().body(JsonNode.class);
+        } catch (RuntimeException failure) {
+            // How long the provider took before it failed or timed out; the cause is logged by the caller.
+            log.info("LLM call failed: model={}, task={}, submissionId={}, millis={}, reason={}", model, mdc("llmTask"),
+                    mdc("submissionId"), millisSince(begun), failure.getClass().getSimpleName());
+            throw failure;
+        }
+        logCall(response, millisSince(begun));
         JsonNode content = response == null ? null : response.path("choices").path(0).path("message").path("content");
         if (content == null || !content.isTextual()) {
             log.warn("LLM reply carried no text content");
             throw new LlmUnavailableException(null);
         }
         return content.asText();
+    }
+
+    /**
+     * One line per attempt: how long the provider took to answer and how much it read and wrote. Time follows the tokens
+     * written, so the numbers show whether a slow answer is a long answer or a slow model. It names the work (task) and the
+     * submission the thread is on, and carries nothing the learner said.
+     */
+    private void logCall(JsonNode response, long millis) {
+        JsonNode usage = response == null ? null : response.path("usage");
+        log.info("LLM call: model={}, task={}, submissionId={}, millis={}, promptTokens={}, completionTokens={}, reasoningTokens={}, finishReason={}",
+                model, mdc("llmTask"), mdc("submissionId"), millis,
+                count(usage, "prompt_tokens"), count(usage, "completion_tokens"),
+                usage == null ? "-" : count(usage.path("completion_tokens_details"), "reasoning_tokens"),
+                response == null ? "-" : identifier(response.path("choices").path(0).path("finish_reason")));
+    }
+
+    private static String count(JsonNode node, String field) {
+        JsonNode value = node == null ? null : node.path(field);
+        return value != null && value.isNumber() ? value.asText() : "-";
+    }
+
+    private static String mdc(String key) {
+        String value = MDC.get(key);
+        return value == null ? "-" : value;
+    }
+
+    private static long millisSince(long begunNanos) {
+        return (System.nanoTime() - begunNanos) / 1_000_000;
     }
 
     /** The {@code reasoning_effort} to send, or null to leave the field out. */

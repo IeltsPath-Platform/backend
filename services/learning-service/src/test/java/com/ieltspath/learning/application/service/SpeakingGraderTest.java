@@ -7,6 +7,7 @@ import com.ieltspath.learning.application.port.LlmClient;
 import com.ieltspath.learning.application.service.SpeakingResultValidator.InvalidSpeakingGradeException;
 import com.ieltspath.learning.domain.vo.SpeakingScope;
 import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -130,6 +131,25 @@ class SpeakingGraderTest {
     }
 
     @Test
+    void everyCallCarriesTheSubmissionAndItsTaskInTheLoggingContextAndLeavesNothingBehind() {
+        Scripted llm = good();
+        MDC.put("submissionId", "sub-42");
+        try {
+            grader(llm).grade(prepared(llm), input);
+            // The last call runs on the calling thread: it must not leave its task behind.
+            assertThat(MDC.get("llmTask")).isNull();
+            assertThat(MDC.get("submissionId")).isEqualTo("sub-42");
+        } finally {
+            MDC.clear();
+        }
+
+        for (String task : List.of("FC", "LR", "GRA", "OVERVIEW", "SYNTHESIS")) {
+            assertThat(llm.loggedTask).containsEntry(task, task);
+            assertThat(llm.loggedSubmission).containsEntry(task, "sub-42");
+        }
+    }
+
+    @Test
     void theErrorsOfTheCriteriaAreTakenInTurnAndTheSameFindingIsKeptOnce() throws Exception {
         JsonNode fc = JSON.readTree("[" + ERROR + ",{\"code\":\"SPK_A\",\"excerpt\":\"fc2\"},{\"code\":\"SPK_A\",\"excerpt\":\"fc3\"}]");
         JsonNode lr = JSON.readTree("[{\"code\":\"SPK_B\",\"excerpt\":\"lr1\"}]");
@@ -158,6 +178,9 @@ class SpeakingGraderTest {
         final Map<String, List<String>> systems = new java.util.concurrent.ConcurrentHashMap<>();
         final Map<String, String> users = new java.util.concurrent.ConcurrentHashMap<>();
         final List<Budget> budgets = Collections.synchronizedList(new ArrayList<>());
+        /** What the logging context held at the moment of each call: the task and the submission it names. */
+        final Map<String, String> loggedTask = new java.util.concurrent.ConcurrentHashMap<>();
+        final Map<String, String> loggedSubmission = new java.util.concurrent.ConcurrentHashMap<>();
         private CountDownLatch together;
         volatile boolean firstRoundWasConcurrent;
 
@@ -180,6 +203,8 @@ class SpeakingGraderTest {
         public String completeJson(String system, String user, Budget budget) {
             String task = task(system);
             budgets.add(budget);
+            loggedTask.put(task, String.valueOf(MDC.get("llmTask")));
+            loggedSubmission.put(task, String.valueOf(MDC.get("submissionId")));
             systems.computeIfAbsent(task, key -> Collections.synchronizedList(new ArrayList<>())).add(system);
             users.put(task, user);
             if (together != null && !task.equals("SYNTHESIS") && together.getCount() > 0) {
