@@ -13,7 +13,7 @@ public final class CodePattern {
     private static final Set<String> ALL_TOKENS = Set.of("SEQ", "BAND", "COURSE", "TOPIC", "SKILL", "TYPE", "NAME", "YYYY");
     private static final Map<String, Set<String>> ALLOWED = Map.of(
             "COURSE", Set.of("SEQ", "BAND", "YYYY"),
-            "TOPIC", Set.of("SEQ", "COURSE"),
+            "TOPIC", Set.of("SEQ", "COURSE", "SKILL"),
             "LESSON", Set.of("SEQ", "TOPIC"),
             "PACKAGE", Set.of("SEQ", "COURSE", "TYPE"),
             "KNOWLEDGE_POINT", Set.of("NAME", "SKILL"),
@@ -55,8 +55,27 @@ public final class CodePattern {
     }
 
     public boolean usesSequence(String pattern) {
+        if (pattern == null) return false;
         Matcher matcher = TOKEN.matcher(pattern);
         while (matcher.find()) if (matcher.group(1).equals("SEQ")) return true;
+        return false;
+    }
+
+    public boolean hasToken(String pattern, String token) {
+        if (pattern == null) return false;
+        Matcher matcher = TOKEN.matcher(pattern);
+        while (matcher.find()) if (matcher.group(1).equals(token)) return true;
+        return false;
+    }
+
+    public boolean requiresContext(String pattern, Map<String, String> context) {
+        Matcher matcher = TOKEN.matcher(pattern);
+        while (matcher.find()) {
+            String token = matcher.group(1);
+            if (Set.of("BAND", "COURSE", "TOPIC", "SKILL", "TYPE", "NAME").contains(token)
+                    && (context.get(token.toLowerCase(java.util.Locale.ROOT)) == null
+                    || context.get(token.toLowerCase(java.util.Locale.ROOT)).isBlank())) return true;
+        }
         return false;
     }
 
