@@ -64,6 +64,9 @@ public class GlobalExceptionHandler {
         String code = ex instanceof InvalidErrorTypeException errorType ? errorType.getCode()
                 : ex instanceof InvalidContentStateException state ? state.getCode() : null;
         Map<String, Object> details = code == null ? null : Map.of("code", code);
+        if (InvalidContentStateException.CODE_LOCKED.equals(code)) {
+            return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(), details);
+        }
         return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI(), details);
     }
 
