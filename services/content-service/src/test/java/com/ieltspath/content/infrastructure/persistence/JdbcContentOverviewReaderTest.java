@@ -11,7 +11,11 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.util.List;
+import java.util.UUID;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 @Testcontainers(disabledWithoutDocker = true)
 class JdbcContentOverviewReaderTest {
@@ -68,5 +72,67 @@ class JdbcContentOverviewReaderTest {
                 """));
         assertThat(overview.draftQuestionVersions())
                 .isEqualTo(count("SELECT count(*) FROM question_versions WHERE status = 'DRAFT'"));
+    }
+
+    @Test
+    void coverageCellsAddUpToTheActivePointsAndTheirQuestionCounts() {
+        ContentOverviewResult overview = reader.read();
+
+        assertThat(overview.coverage().stream().mapToLong(ContentOverviewResult.CoverageCell::activeKnowledgePoints).sum())
+                .isEqualTo(count("SELECT count(*) FROM knowledge_points WHERE status = 'ACTIVE'"));
+        assertThat(overview.coverage().stream().mapToLong(ContentOverviewResult.CoverageCell::withoutPublishedQuestion).sum())
+                .isEqualTo(overview.activeKnowledgePointsWithoutPublishedQuestion());
+        assertThat(overview.coverage().stream().mapToLong(ContentOverviewResult.CoverageCell::withOnePublishedQuestion).sum())
+                .isEqualTo(count("""
+                        SELECT count(*) FROM knowledge_points kp WHERE kp.status = 'ACTIVE' AND (
+                            SELECT count(DISTINCT qkp.question_version_id) FROM question_knowledge_points qkp
+                            JOIN question_versions qv ON qv.id = qkp.question_version_id
+                            WHERE qkp.knowledge_point_id = kp.id AND qv.status = 'PUBLISHED') = 1
+                        """));
+        assertThat(overview.coverage()).allSatisfy(cell -> {
+            assertThat(cell.skill()).isNotBlank();
+            assertThat(cell.cefrLevel()).isNotBlank();
+            assertThat(cell.withoutPublishedQuestion() + cell.withOnePublishedQuestion()).isLessThanOrEqualTo(cell.activeKnowledgePoints());
+        });
+    }
+
+    @Test
+    void versionAndPackageCountsListEveryStatusAndMatchTheTables() {
+        ContentOverviewResult overview = reader.read();
+
+        assertThat(overview.questionVersions()).containsKeys("DRAFT", "PUBLISHED", "ARCHIVED");
+        assertThat(overview.questionVersions().values().stream().mapToLong(Long::longValue).sum())
+                .isEqualTo(count("SELECT count(*) FROM question_versions"));
+        assertThat(overview.packages()).containsKeys("DRAFT", "PUBLISHED", "ARCHIVED");
+        assertThat(overview.packages().values().stream().mapToLong(Long::longValue).sum())
+                .isEqualTo(count("SELECT count(*) FROM content_packages"));
+    }
+
+    @Test
+    void staleDraftsAreTheDraftVersionsNobodyTouchedForTheStatedDays() {
+        ContentOverviewResult overview = reader.read();
+
+        assertThat(overview.staleDraftAfterDays()).isEqualTo(14);
+        assertThat(overview.staleDraftQuestionVersions()).isEqualTo(count("""
+                SELECT count(*) FROM question_versions
+                WHERE status = 'DRAFT' AND updated_at < now() - interval '14 days'
+                """));
+        assertThat(overview.staleDraftQuestionVersions()).isLessThanOrEqualTo(overview.draftQuestionVersions());
+    }
+
+    @Test
+    void aQuestionVersionIsLabelledByTheStartOfItsStemAndAnUnknownIdIsLeftOut() {
+        List<UUID> known = jdbc.queryForList("SELECT id FROM question_versions WHERE trim(stem) <> '' LIMIT 3", UUID.class);
+        assumeFalse(known.isEmpty(), "the migrations seed no question to label");
+
+        List<ContentOverviewResult.QuestionLabel> labels = reader.questionLabels(
+                java.util.stream.Stream.concat(known.stream(), java.util.stream.Stream.of(UUID.randomUUID())).toList());
+
+        assertThat(labels).extracting(ContentOverviewResult.QuestionLabel::questionVersionId).containsExactlyInAnyOrderElementsOf(known);
+        assertThat(labels).allSatisfy(label -> {
+            assertThat(label.label()).isNotBlank().hasSizeLessThanOrEqualTo(90).doesNotContain("\n");
+            assertThat(label.questionId()).isNotNull();
+        });
+        assertThat(reader.questionLabels(List.of())).isEmpty();
     }
 }
