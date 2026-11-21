@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.UUID;
 import com.ieltspath.content.domain.vo.Skill;
+import com.ieltspath.content.domain.vo.PackageType;
 
 @RestController
 @PreAuthorize("hasRole('CONTENT_AUTHOR')")
@@ -45,7 +46,10 @@ public class CodeSettingsController {
     public CodeSuggestionResponse suggest(@RequestParam(defaultValue = "COURSE") String kind,
                               @RequestParam(required = false) String band,
                               @RequestParam(required = false) UUID courseId,
-                              @RequestParam(required = false) Skill skill) {
-        return CodeSuggestionResponse.from(codeSettings.suggest(kind, band, courseId, skill));
+                              @RequestParam(required = false) Skill skill,
+                              @RequestParam(required = false) UUID topicId,
+                              @RequestParam(required = false) UUID lessonId,
+                              @RequestParam(required = false) PackageType packageType) {
+        return CodeSuggestionResponse.from(codeSettings.suggest(kind, band, courseId, skill, topicId, lessonId, packageType));
     }
 }

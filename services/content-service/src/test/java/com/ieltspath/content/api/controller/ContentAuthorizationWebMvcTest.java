@@ -141,8 +141,13 @@ class ContentAuthorizationWebMvcTest {
         var setting = new com.ieltspath.content.application.result.CodeSetting("COURSE", true, "COURSE_{SEQ:3}", 1, true);
         when(codeSettings.listConnected()).thenReturn(List.of(setting));
         when(codeSettings.update(any(), any(), any())).thenReturn(setting);
-        when(codeSettings.suggest("COURSE", "6", null, null)).thenReturn(
+        when(codeSettings.suggest("COURSE", "6", null, null, null, null, null)).thenReturn(
                 new com.ieltspath.content.application.result.CodeSuggestion("COURSE_001", true, true));
+        UUID topicId = UUID.randomUUID();
+        UUID lessonId = UUID.randomUUID();
+        when(codeSettings.suggest("PACKAGE", null, null, null, topicId, lessonId,
+                com.ieltspath.content.domain.vo.PackageType.MOCK_TEST)).thenReturn(
+                new com.ieltspath.content.application.result.CodeSuggestion("PKG_MT001", true, true));
         var userId = UUID.randomUUID();
         when(currentUser.requireUserId()).thenReturn(userId);
 
@@ -153,13 +158,18 @@ class ContentAuthorizationWebMvcTest {
                 .andExpect(status().isOk());
         mockMvc.perform(get("/api/content/admin/code-suggestion?kind=COURSE&band=6")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("COURSE_001"));
+        mockMvc.perform(get("/api/content/admin/code-suggestion?kind=PACKAGE&topicId=" + topicId
+                        + "&lessonId=" + lessonId + "&packageType=MOCK_TEST"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("PKG_MT001"));
         verify(codeSettings).update(eq("COURSE"), any(), eq(userId));
+        verify(codeSettings).suggest("PACKAGE", null, null, null, topicId, lessonId,
+                com.ieltspath.content.domain.vo.PackageType.MOCK_TEST);
     }
 
     @Test
     @WithMockUser(roles = "CONTENT_AUTHOR")
     void invalidSuggestionBandReturnsVietnameseBadRequest() throws Exception {
-        when(codeSettings.suggest("COURSE", "6.2", null, null))
+        when(codeSettings.suggest("COURSE", "6.2", null, null, null, null, null))
                 .thenThrow(new IllegalArgumentException("Band phải từ 0 đến 9, theo bước 0,5."));
 
         mockMvc.perform(get("/api/content/admin/code-suggestion?kind=COURSE&band=6.2"))

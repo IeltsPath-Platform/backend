@@ -2,6 +2,7 @@ package com.ieltspath.content.api.controller;
 
 import com.ieltspath.commonsecurity.config.CommonSecurityAutoConfiguration;
 import com.ieltspath.content.application.usecase.CreateContentSectionUseCase;
+import com.ieltspath.content.application.usecase.CodeSettingsUseCases;
 import com.ieltspath.content.application.usecase.CreateDraftPackageVersionUseCase;
 import com.ieltspath.content.application.usecase.DeleteContentSectionUseCase;
 import com.ieltspath.content.application.usecase.GetAuthorPackageUseCase;
@@ -59,6 +60,7 @@ class ContentPackageAuthoringControllerTest {
     @MockitoBean com.ieltspath.content.application.usecase.RemoveAndReorderSectionQuestionsUseCase removeAndReorderQuestions;
     @MockitoBean com.ieltspath.content.application.usecase.ListAuthorPackagesUseCase listPackages;
     @MockitoBean com.ieltspath.content.application.usecase.CreateContentPackageUseCase createPackage;
+    @MockitoBean CodeSettingsUseCases codeSettings;
 
     @Test
     @WithMockUser(roles = "CUSTOMER")
