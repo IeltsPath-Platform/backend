@@ -49,12 +49,59 @@ class SpeakingPromptAssemblerTest {
         assertThat(system).contains("Be thorough, not brief")
                 .contains("overrides any earlier line about how many points to mention")
                 .contains("up to " + SpeakingPromptAssembler.ERRORS_PER_CRITERION + " errors")
-                .contains("decide the band last");
+                .contains("decide the band from them, and write the comment last");
         assertThat(system.indexOf("\"evidence\":[{\"quote\"")).isPositive()
-                .isLessThan(system.indexOf("\"band\":<JSON number"));
+                .isLessThan(system.indexOf("\"band\":6,"));
         assertThat(SpeakingPromptAssembler.ERRORS_PER_CRITERION * SpeakingPromptAssembler.GRADED_CRITERIA.size())
                 .isEqualTo(SpeakingResultValidator.MAX_ERRORS);
-        assertThat(SpeakingPromptAssembler.PROMPT_VERSION).isEqualTo("spk5");
+        assertThat(SpeakingPromptAssembler.PROMPT_VERSION).isEqualTo("spk7");
+    }
+
+    /** The result page lays a weakness out by its labels, so every criterion's prompt has to ask for them. */
+    @Test
+    void everyCriterionIsToWriteEachWeaknessWithTheLabelsTheResultPageLaysOut() {
+        for (var task : List.of(SpeakingPromptAssembler.Task.FC, SpeakingPromptAssembler.Task.LR, SpeakingPromptAssembler.Task.GRA)) {
+            assertThat(flat(system(task))).as(task.name())
+                    .contains("written as one line in this fixed form")
+                    .contains("\"Sửa:\" with the corrected words")
+                    .contains("\"Quy tắc:\" with the rule in one short sentence")
+                    .contains("\"Luyện:\" with one short exercise")
+                    .contains("Never write an error code (such as SPK_PLURAL_ENDING) inside a weakness");
+        }
+    }
+
+    /**
+     * A model that read the shape of the reply in the middle of a long prompt left the band out of about half of its
+     * answers, and a grade without a band is thrown away. So the shape is the last thing the model reads, the band has a
+     * sample value, and the prompt says what happens without it.
+     */
+    @Test
+    void theShapeOfTheReplyComesLastAndTheBandIsRequiredWithASampleValue() {
+        for (var task : List.of(SpeakingPromptAssembler.Task.FC, SpeakingPromptAssembler.Task.LR, SpeakingPromptAssembler.Task.GRA)) {
+            String system = system(task);
+
+            assertThat(system).as(task.name()).contains("Every key of the entry is required")
+                    .contains("\"weaknesses\":[\"...\"],\"band\":6,\"comment\":\"...\"}]")
+                    .contains("An entry without band is thrown away")
+                    .contains("check that criteria[0] holds \"band\"")
+                    .doesNotContain("half a band");
+            // After the list of allowed error codes, nothing but the shape follows.
+            assertThat(system.indexOf("Reply with one JSON object in exactly this shape"))
+                    .as(task.name()).isGreaterThan(system.lastIndexOf("\n- SPK_"));
+        }
+    }
+
+    @Test
+    void theCommentAndTheOverallFeedbackAreAskedForInShortParagraphsNotOneBlock() {
+        for (var task : List.of(SpeakingPromptAssembler.Task.FC, SpeakingPromptAssembler.Task.LR, SpeakingPromptAssembler.Task.GRA)) {
+            assertThat(flat(system(task))).as(task.name())
+                    .contains("never as one block of text")
+                    .contains("separated by a blank line")
+                    .contains("\"Để lên band N,\"")
+                    .contains("each change on its own line numbered 1., 2.");
+        }
+        assertThat(flat(system(SpeakingPromptAssembler.Task.SYNTHESIS)))
+                .contains("never as one block of text").contains("separated by a blank line");
     }
 
     @Test

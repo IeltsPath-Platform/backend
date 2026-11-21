@@ -36,7 +36,7 @@ import java.util.stream.Collectors;
  */
 @Component
 public class SpeakingPromptAssembler {
-    public static final String PROMPT_VERSION = "spk5";
+    public static final String PROMPT_VERSION = "spk7";
     /** The criteria the model grades. PR is not among them: its band comes from the speech scores. */
     public static final List<String> GRADED_CRITERIA = List.of("FC", "LR", "GRA");
     private static final int MAX_EXAMPLES = 2;
@@ -153,13 +153,6 @@ public class SpeakingPromptAssembler {
 
                 """).append(UNTRUSTED).append(String.format(Locale.ROOT, """
 
-                Reply with one JSON object in exactly this shape:
-                {"criteria":[{"code":"%s","evidence":[{"quote":"<exact text from the transcript>","note":"..."}],
-                "strengths":["..."],"weaknesses":["..."],"comment":"...","band":<JSON number, 0 to 9 in steps of 0.5>}],
-                "errors":[{"code":"<allowed error code>","partNo":<number>,"excerpt":"<exact text>","suggestion":"..."}]}
-                Give exactly one entry in criteria, with code %s, and band must be a number. Put in errors only the mistakes that
-                cost this criterion.
-
                 Be thorough, not brief; this instruction overrides any earlier line about how many points to mention.
                 Work through the transcript part by part and find every distinct problem you can quote. Order evidence,
                 weaknesses and errors by how much they cost the band, most serious first. You may give up to %d evidence
@@ -171,25 +164,53 @@ public class SpeakingPromptAssembler {
                 only the clearest example. When there are more mistakes than the limit allows, keep the ones that cost the
                 band most and say in the comment how many more of each kind you left out. Before you answer, read the
                 transcript once more for this criterion and add every mistake you missed.
-                Each weakness names one kind of mistake, says how many times it happens and in which parts, shows two or three
-                of its places as quoted words with the corrected words, states the rule in one short sentence and says how to
-                practise it. Every error suggestion is a solution the learner can use at once: it says what to say instead
+                Each weakness is one kind of mistake, written as one line in this fixed form so the app can lay it out: a
+                short title that names the kind of mistake and says how many times it happens and in which parts, then a
+                colon; the two or three places that show it, each in double quotes exactly as the learner said it (a hint in
+                brackets after a quote is fine); then "Sửa:" with the corrected words, each in double quotes; then "Quy tắc:"
+                with the rule in one short sentence; then "Luyện:" with one short exercise the learner can do. Keep the
+                labels Sửa:, Quy tắc: and Luyện: exactly as written and use them in every weakness. Never write an error code
+                (such as SPK_PLURAL_ENDING) inside a weakness, a strength or the comment: name the problem in plain words, and
+                put the codes only in the code field of errors. Illustration of the form
+                only, never copy its words: Thiếu -s ngôi thứ ba ở 3 chỗ trong Part 2: "he work", "she help". Sửa: "he works",
+                "she helps". Quy tắc: chủ ngữ số ít ở hiện tại đơn thì động từ thêm -s. Luyện: viết 5 câu về người thân và
+                kiểm tra từng động từ. Every error suggestion is a solution the learner can use at once: it says what to say instead
                 (the corrected words, or the whole corrected sentence when the fix spans it) and the rule in one short
                 sentence, never only what was wrong. Say in the comment how often each kind recurs (for example
                 "sai thì ở 5/7 câu nói về quá khứ"); count only what the transcript shows. Strengths must be real and quoted,
                 never filler praise.
-                Fill evidence, strengths, weaknesses and comment first, and decide the band last from them. The comment states
-                what holds the learner at this band and the one or two concrete changes that would lift them half a band.
+                Fill evidence, strengths and weaknesses first, decide the band from them, and write the comment last. The
+                comment states what holds the learner at this band and the one or two concrete changes that would lift them
+                to the next band. Lay the comment out for easy reading, never as one block of text: two to four short
+                paragraphs separated by a blank line (write \\n\\n inside the JSON string). The first paragraph says what holds
+                the learner at this band, with one or two quoted examples; the next gives the other main pattern and how often
+                it happens; the last begins "Để lên band N," and puts each change on its own line numbered 1., 2. (write \\n
+                between the lines).
                 Look at Vietnamese learners' usual problems: dropped plural -s and past -ed, missing or wrong articles,
                 missing subject or verb, word-for-word translation from Vietnamese, wrong prepositions, and over-used
                 simple linkers.
-                """, code, code, SpeakingResultValidator.MAX_EVIDENCE, SpeakingResultValidator.MAX_POINTS,
+                """, SpeakingResultValidator.MAX_EVIDENCE, SpeakingResultValidator.MAX_POINTS,
                 SpeakingResultValidator.MAX_POINTS, ERRORS_PER_CRITERION)).append(checklist(code)).append(QUOTES);
         contract.append("\nAllowed error codes:");
         if (input.errorCodes().isEmpty()) contract.append(" none (leave errors empty)");
         for (SpeakingGradingInput.ErrorOption option : input.errorCodes()) {
             contract.append("\n- ").append(option.code()).append(": ").append(option.name());
         }
+        // The shape of the reply comes last, next to where the model starts to write: after a long prompt a model that read
+        // it in the middle left the last key of the entry (band) out in about half of the answers, and a grade without a
+        // band is thrown away. The band has a sample value and a check, not only a description.
+        contract.append(String.format(Locale.ROOT, """
+
+
+                Reply with one JSON object in exactly this shape. Every key of the entry is required, and band is a JSON
+                number written after weaknesses and before comment (the 6 below is only an example):
+                {"criteria":[{"code":"%s","evidence":[{"quote":"<exact text from the transcript>","note":"..."}],
+                "strengths":["..."],"weaknesses":["..."],"band":6,"comment":"..."}],
+                "errors":[{"code":"<allowed error code>","partNo":<number>,"excerpt":"<exact text>","suggestion":"..."}]}
+                Give exactly one entry in criteria, with code %s. An entry without band is thrown away and the whole grade
+                fails, so before you answer check that criteria[0] holds "band": a number from 0 to 9. Put in errors only
+                the mistakes that cost this criterion.
+                """, code, code));
         return contract.toString();
     }
 
@@ -274,7 +295,9 @@ public class SpeakingPromptAssembler {
                 {"summary":"...","focus":["..."],
                 "personalFeedback":{"note":"...","priorityKps":[{"kpCode":"<code from history>","excerpt":"<exact text>"}],
                 "studyPlan":["..."]}}
-                summary says in a few sentences how the answer went overall, what is good and what holds the learner back.
+                summary says in a few sentences how the answer went overall, what is good and what holds the learner back. Write
+                summary and note for easy reading, never as one block of text: two or three short paragraphs separated by a
+                blank line (write \\n\\n inside the JSON string).
                 focus lists at most 4 things most worth practising first, in order of importance, each one something the learner
                 can practise this week. studyPlan lists at most 6 concrete practice steps. note speaks to this learner directly
                 and may use <history> to point out a weak point that came back, without mentioning earlier bands or scores.

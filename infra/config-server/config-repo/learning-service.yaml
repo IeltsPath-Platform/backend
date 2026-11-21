@@ -122,6 +122,9 @@ learning:
     region: ${LEARNING_SPEECH_REGION:}
     locale: ${LEARNING_SPEECH_LOCALE:en-US}
     timeout-seconds: 180
+    # How many recordings Azure analyses at once on this instance, across all submissions. Several submissions and the
+    # recordings of each are analysed at the same time (speaking.grading-workers, speaking.analysis-parallelism), so this is
+    # what limits them: set it to what the Azure resource's tier allows for concurrent requests (the free tier allows very few).
     max-concurrent: 2
   # AI-graded Speaking practice. Recordings live in the shared bucket under practice/{userId}/{date}_{submissionId}/.
   speaking:
@@ -137,12 +140,23 @@ learning:
     retention-days: ${LEARNING_SPEAKING_RETENTION_DAYS:90}
     timezone: Asia/Ho_Chi_Minh
     daily-grading-limit: ${LEARNING_SPEAKING_DAILY_LIMIT:5}
-    # A row being graded that has not changed for this long is taken over. The job signals progress after every recording,
-    # so this only has to cover one step (analysing one recording, or the LLM call), not the whole submission.
+    # A row being graded that has not changed for this long is taken over. The job touches the row of every submission it
+    # works on at a third of this time and after every recording, so this only has to cover a stopped instance, not a slow step.
     stale-after-seconds: 300
+    # Submissions this instance grades at once. Each one asks the model four times at once, and the "llm" bulkhead in
+    # application.yaml (max-concurrent-calls, no waiting) rejects the calls above its limit, so workers x 4 must stay below it
+    # with room for Writing's gradings; Azure's speech.max-concurrent bounds the analyses. Raise them together.
+    grading-workers: ${LEARNING_SPEAKING_GRADING_WORKERS:2}
+    # Recordings of one submission analysed at the same time. Azure's speech.max-concurrent caps all analyses together, so keep
+    # this near it and raise both: an analysis that waits longer than speech.timeout-seconds for a free place fails as SPEECH_BUSY.
+    analysis-parallelism: ${LEARNING_SPEAKING_ANALYSIS_PARALLELISM:2}
+    # A completed submission starts a worker at once; the poll (job-delay-ms, 5000 by default) stays as the safety net.
+    wake-on-submit: true
     # A grading that failed for a reason that may pass (model or speech service unreachable) waits this long before it is
     # tried again. Kept short: the wait is what the learner sees, and the speech analysis is stored, so a retry is cheap.
-    retry-delay-seconds: 30
+    # Each model call already retries a 5xx or a dropped connection three times, 2 s apart, so this wait is for an outage that
+    # lasts longer than that. The job polls every 5 s, so a retry starts up to 5 s after this delay. Minimum 5.
+    retry-delay-seconds: ${LEARNING_SPEAKING_RETRY_DELAY_SECONDS:10}
     max-attempts: 3
     pass-band: 6.0
     max-input-chars: 60000

@@ -11,6 +11,7 @@ import com.ieltspath.learning.application.port.LearningContentClient.Item;
 import com.ieltspath.learning.application.port.LearningContentClient.PackageVersion;
 import com.ieltspath.learning.application.port.LearningContentClient.Section;
 import com.ieltspath.learning.application.result.SpeakingSubmissionResult;
+import com.ieltspath.learning.application.port.SpeakingGradingTrigger;
 import com.ieltspath.learning.application.port.SpeechAnalysisClient;
 import com.ieltspath.learning.application.service.SpeakingAvailability;
 import com.ieltspath.learning.application.service.SpeakingGrader;
@@ -356,6 +357,22 @@ class SpeakingPracticeUseCasesTest {
         assertEquals(SpeakingSubmissionStatus.QUEUED, complete.execute(USER, opened.id()).status());
         // A second call, such as a retry after a lost response, does not change anything.
         assertEquals(SpeakingSubmissionStatus.QUEUED, complete.execute(USER, opened.id()).status());
+    }
+
+    @Test
+    void completingWakesTheGradingWorkersOnlyOnceTheSubmissionIsQueued() {
+        SpeakingGradingTrigger trigger = mock(SpeakingGradingTrigger.class);
+        complete.setTrigger(trigger);
+        SpeakingSubmissionResult opened = open(UUID.randomUUID());
+        record(opened.id(), Q1);
+        record(opened.id(), Q2);
+
+        assertThrows(LearningRequestException.class, () -> complete.execute(USER, opened.id()));
+        verify(trigger, never()).wake();
+
+        record(opened.id(), Q3);
+        complete.execute(USER, opened.id());
+        verify(trigger).wake();
     }
 
     @Test

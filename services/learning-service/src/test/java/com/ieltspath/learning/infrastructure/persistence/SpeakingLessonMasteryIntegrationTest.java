@@ -69,7 +69,7 @@ import static org.mockito.Mockito.when;
 @SpringBootTest(properties = {"spring.config.import=", "spring.cloud.config.enabled=false", "eureka.client.enabled=false",
         "spring.jpa.hibernate.ddl-auto=validate", "spring.jpa.open-in-view=false", "management.health.rabbit.enabled=false",
         "learning.messaging.consumer-enabled=false", "app.auth.internal-jwt-issuer=urn:code-base:api-gateway",
-        "learning.speaking.enabled=true", "learning.speaking.job-delay-ms=3600000"})
+        "learning.speaking.enabled=true", "learning.speaking.job-delay-ms=3600000", "learning.speaking.wake-on-submit=false"})
 @Testcontainers(disabledWithoutDocker = true)
 class SpeakingLessonMasteryIntegrationTest {
     @Container static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine");
