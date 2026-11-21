@@ -7,11 +7,14 @@ import com.ieltspath.learning.application.result.SpeakingSubmissionResult;
 import com.ieltspath.learning.domain.aggregate.SpeakingSubmission;
 import com.ieltspath.learning.domain.repository.SpeakingSubmissionRepository;
 import com.ieltspath.learning.domain.vo.SpeakingSubmissionStatus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -25,6 +28,7 @@ import java.util.UUID;
  */
 @Service
 public class SettleSpeakingSubmissionUseCase {
+    private static final Logger log = LoggerFactory.getLogger(SettleSpeakingSubmissionUseCase.class);
     private final SpeakingSubmissionRepository submissions;
     private final AccessClient points;
     private final LearnerLock learnerLock;
@@ -51,14 +55,34 @@ public class SettleSpeakingSubmissionUseCase {
 
         UUID ledgerEntry = points.debit(userId, submission.pointCost(), "SPEAKING_AI", submission.id(),
                 "speaking:" + userId + ":" + submission.requestId(), "AI Speaking practice grading");
+        boolean[] released = {false};
         SpeakingSubmission settled = transaction.execute(status -> {
             learnerLock.lock(userId);
             SpeakingSubmission current = submissions.findForUpdate(submissionId).orElseThrow();
             if (current.status() != SpeakingSubmissionStatus.PAYMENT_PENDING) return current;
             current.graded(ledgerEntry, Instant.now(clock));
             submissions.save(current);
+            released[0] = true;
             return current;
         });
+        if (released[0]) logReleased(submission, settled);
         return SpeakingSubmissionResult.from(settled);
+    }
+
+    /**
+     * The last server-side mark of the wait: {@code sinceCreatedMs} from the moment the learner's browser opened the
+     * submission and {@code sinceQueuedMs} from the moment it was completed, up to the grade being released. {@code
+     * waitedForLearnerMs} is how long the finished grade waited for the learner's page to ask for it (its polling interval).
+     */
+    private void logReleased(SpeakingSubmission pending, SpeakingSubmission settled) {
+        Instant now = Instant.now(clock);
+        log.info("Speaking grade released: submissionId={}, sinceCreatedMs={}, sinceQueuedMs={}, waitedForLearnerMs={}",
+                settled.id(), millisSince(settled.createdAt(), now), millisSince(settled.queuedAt(), now),
+                millisSince(pending.updatedAt(), now));
+    }
+
+    /** Milliseconds from {@code from} to {@code now}, or -1 when the moment is not known: a log line never breaks a request. */
+    private static long millisSince(Instant from, Instant now) {
+        return from == null ? -1 : Math.max(0, Duration.between(from, now).toMillis());
     }
 }
