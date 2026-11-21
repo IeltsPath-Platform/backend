@@ -144,7 +144,7 @@ public class CodeSettingsUseCases {
             context.putAll(resolved.values());
             scope = resolved.scopeKey();
             if (!resolved.courseResolved()) {
-                return new CodeSuggestion(unusedSuggestion(setting, "PKG_{TYPE}{SEQ:3}", context, scope),
+                return new CodeSuggestion(unusedSuggestion(setting, PACKAGE_FALLBACK_PATTERN, context, scope),
                         true, setting.editable());
             }
         }
@@ -219,7 +219,7 @@ public class CodeSettingsUseCases {
             return createPackage.executeAsAuthor(withCode(command, supplied));
         }
         var resolved = contexts.packageContext(command.courseId(), command.topicId(), command.lessonId(), command.packageType());
-        String pattern = resolved.courseResolved() ? setting.pattern() : "PKG_{TYPE}{SEQ:3}";
+        String pattern = resolved.courseResolved() ? setting.pattern() : PACKAGE_FALLBACK_PATTERN;
         String code = supplied;
         if (supplied.isBlank() || !setting.editable()) {
             code = allocateUnused(setting, pattern, resolved.values(), resolved.scopeKey());
