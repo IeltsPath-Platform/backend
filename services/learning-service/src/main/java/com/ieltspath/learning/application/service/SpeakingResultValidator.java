@@ -2,6 +2,7 @@ package com.ieltspath.learning.application.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ieltspath.learning.application.port.LearningContentClient;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -68,7 +69,7 @@ public class SpeakingResultValidator {
 
     /**
      * The model's answer cannot be used as a grade. {@code reason} says which rule it broke (NOT_JSON, NO_CRITERIA,
-     * CRITERION_MISSING, WRONG_CRITERION, BAND_MISSING, BAND_NOT_A_NUMBER, BAND_OUT_OF_RANGE, BAND_NOT_HALF_STEP): it is
+     * CRITERION_MISSING, WRONG_CRITERION, BAND_MISSING, BAND_NOT_A_NUMBER, BAND_OUT_OF_RANGE, BAND_NOT_HALF_STEP, BAND_NOT_WHOLE): it is
      * logged and told to the model when it is asked again. It never holds text of the answer.
      */
     public static class InvalidSpeakingGradeException extends RuntimeException {
@@ -95,10 +96,15 @@ public class SpeakingResultValidator {
      * @throws InvalidSpeakingGradeException when the answer is not a JSON object or its bands cannot be trusted
      */
     public ValidatedGrade validate(String raw, SpeakingGradingInput input, Set<String> allowedKpCodes) {
+        return validate(raw, input, allowedKpCodes, false);
+    }
+
+    /** @param wholeBands the rubric describes whole bands only (see {@link #wholeBandsOnly}), so a half band is refused */
+    public ValidatedGrade validate(String raw, SpeakingGradingInput input, Set<String> allowedKpCodes, boolean wholeBands) {
         JsonNode root = parse(raw);
         String transcript = SpeakingGradingInput.normalize(input.transcript());
         Set<Integer> parts = input.parts();
-        return new ValidatedGrade(criteria(root, transcript), partNotes(root.path("partNotes"), parts), flags(root.path("flags")),
+        return new ValidatedGrade(criteria(root, transcript, wholeBands), partNotes(root.path("partNotes"), parts), flags(root.path("flags")),
                 reliability(root.path("transcriptReliability")), cleanText(root.path("summary").asText(""), 800),
                 texts(root.path("focus"), 4, 200), errors(root.path("errors"), input, transcript, parts),
                 observations(root.path("kpObservations"), allowedKpCodes, transcript, parts),
@@ -117,7 +123,7 @@ public class SpeakingResultValidator {
         throw new InvalidSpeakingGradeException("NOT_JSON");
     }
 
-    private static List<Criterion> criteria(JsonNode root, String transcript) {
+    private static List<Criterion> criteria(JsonNode root, String transcript, boolean wholeBands) {
         JsonNode array = root.path("criteria");
         if (!array.isArray()) throw new InvalidSpeakingGradeException("NO_CRITERIA");
         Map<String, JsonNode> byCode = new LinkedHashMap<>();
@@ -129,7 +135,7 @@ public class SpeakingResultValidator {
         for (String code : SpeakingPromptAssembler.GRADED_CRITERIA) {
             JsonNode item = byCode.get(code);
             if (item == null) throw new InvalidSpeakingGradeException("CRITERION_MISSING");
-            criteria.add(new Criterion(code, band(item.path("band")), cleanText(item.path("comment").asText(""), 1200),
+            criteria.add(new Criterion(code, band(item.path("band"), wholeBands), cleanText(item.path("comment").asText(""), 1200),
                     texts(item.path("strengths"), MAX_POINTS, MAX_STRENGTH_CHARS),
                     texts(item.path("weaknesses"), MAX_POINTS, MAX_WEAKNESS_CHARS),
                     evidence(item.path("evidence"), transcript)));
@@ -139,11 +145,38 @@ public class SpeakingResultValidator {
 
     /** A JSON number from 0 to 9 in steps of 0.5; anything else, including a missing field, is not a band. */
     static BigDecimal band(JsonNode node) {
+        return band(node, false);
+    }
+
+    /**
+     * Like {@link #band(JsonNode)}; with {@code wholeBands} a band must also be a whole number (5, 6, 7), as the descriptors of
+     * a whole-band rubric are. A half band there has no descriptor to be judged against, so it is refused and asked for again.
+     */
+    static BigDecimal band(JsonNode node, boolean wholeBands) {
         if (!node.isNumber()) throw new InvalidSpeakingGradeException(node.isMissingNode() ? "BAND_MISSING" : "BAND_NOT_A_NUMBER");
         BigDecimal band = node.decimalValue();
         if (band.compareTo(BigDecimal.ZERO) < 0 || band.compareTo(NINE) > 0) throw new InvalidSpeakingGradeException("BAND_OUT_OF_RANGE");
         if (band.remainder(HALF).signum() != 0) throw new InvalidSpeakingGradeException("BAND_NOT_HALF_STEP");
+        if (wholeBands && band.remainder(BigDecimal.ONE).signum() != 0) throw new InvalidSpeakingGradeException("BAND_NOT_WHOLE");
         return band.stripTrailingZeros().scale() < 1 ? band.setScale(1) : band;
+    }
+
+    /**
+     * Whether the rubric describes whole bands only. The rubric is what the model grades against, so it also says what a band
+     * can be: the half bands of the first Speaking rubric stay valid while it is active, and stop being valid with the rubric
+     * that has no descriptor for them. Nothing here depends on which version of the code is deployed.
+     */
+    static boolean wholeBandsOnly(LearningContentClient.Rubric rubric) {
+        if (rubric == null || rubric.criteria() == null) return false;
+        boolean any = false;
+        for (LearningContentClient.RubricCriterion criterion : rubric.criteria()) {
+            if (criterion.bandDescriptors() == null) continue;
+            for (LearningContentClient.RubricBandDescriptor descriptor : criterion.bandDescriptors()) {
+                any = true;
+                if (descriptor.band().remainder(BigDecimal.ONE).signum() != 0) return false;
+            }
+        }
+        return any;
     }
 
     private static List<Evidence> evidence(JsonNode node, String transcript) {

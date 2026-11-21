@@ -92,6 +92,27 @@ class SpeakingGraderTest {
     }
 
     @Test
+    void aHalfBandIsAskedForAgainWithAWholeBandReminderUnderAWholeBandRubric() {
+        // The usual answers hold half bands too, so every criterion is answered with a whole band except LR's first answer.
+        Scripted llm = good().answer("FC", criterion("FC", "6.0", "")).answer("GRA", criterion("GRA", "6.0", ""))
+                .answerFirst("LR", criterion("LR", "6.5", "")).answer("LR", criterion("LR", "6.0", ""));
+
+        grader(llm).grade(preparedWholeBands(llm), input);
+
+        assertThat(llm.calls).filteredOn("LR"::equals).hasSize(2);
+        assertThat(llm.systems.get("LR").get(1)).contains("must be a whole number such as 5, 6 or 7");
+    }
+
+    @Test
+    void aHalfBandIsAcceptedAsItIsWhileTheRubricStillDescribesHalfBands() {
+        Scripted llm = good().answerFirst("LR", criterion("LR", "6.5", ""));
+        var assembled = grader(llm).grade(prepared(llm), input);
+
+        assertThat(llm.calls).filteredOn("LR"::equals).hasSize(1);
+        assertThat(assembled.result()).containsKeys("display", "signals");
+    }
+
+    @Test
     void aCriterionCallThatAnswersForAnotherCriterionIsUnusable() {
         Scripted llm = good().answerFirst("LR", criterion("FC", "6.0", ""));
 
@@ -166,7 +187,12 @@ class SpeakingGraderTest {
                 new SpeakingResultAssembler(SpeakingSettingsFixture.enabled()), JSON);
     }
 
+    /** The usual answers hold half bands, so they are graded against a rubric that describes them. */
     private SpeakingPromptAssembler.Prepared prepared(LlmClient llm) {
+        return grader(llm).prepare(SpeakingTestData.rubricWithHalfBands(), input);
+    }
+
+    private SpeakingPromptAssembler.Prepared preparedWholeBands(LlmClient llm) {
         return grader(llm).prepare(SpeakingTestData.rubric(), input);
     }
 

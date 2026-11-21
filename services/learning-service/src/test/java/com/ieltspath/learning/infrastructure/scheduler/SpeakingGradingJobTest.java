@@ -331,6 +331,73 @@ class SpeakingGradingJobTest {
         verify(submissions, after(300).never()).claimNext(any(), any(), anyInt());
     }
 
+    // ---- stopping the instance ----------------------------------------------------------------------------------------
+
+    @Test
+    void aSubmissionStillBeingGradedWhenTheInstanceStopsIsHandedBackAndTheAttemptIsNotCounted() throws Exception {
+        SpeakingGradingJob stopping = jobWith(1, false);
+        stopping.shutdownWaitSeconds(1);
+        SpeakingSubmission running = oneRecording("practice/a.wav");
+        int attemptsBefore = running.gradingAttempts();
+        when(submissions.claimNext(any(), any(), anyInt())).thenReturn(Optional.of(running), Optional.empty());
+        when(submissions.findById(running.id())).thenReturn(Optional.of(running));
+        CountDownLatch analysing = new CountDownLatch(1);
+        CountDownLatch never = new CountDownLatch(1);
+        when(speech.analyze(any(), any())).thenAnswer(invocation -> {
+            analysing.countDown();
+            never.await(10, TimeUnit.SECONDS); // longer than the wait of the shutdown
+            return heard();
+        });
+
+        stopping.drain();
+        assertTrue(analysing.await(5, TimeUnit.SECONDS), "the submission did not start");
+        stopping.shutdown();
+        never.countDown();
+
+        ArgumentCaptor<SpeakingSubmission> saved = ArgumentCaptor.forClass(SpeakingSubmission.class);
+        verify(submissions, timeout(2000).atLeastOnce()).save(saved.capture());
+        SpeakingSubmission handedBack = saved.getAllValues().get(0);
+        assertEquals(SpeakingSubmissionStatus.FAILED_RETRYABLE, handedBack.status());
+        assertEquals("INSTANCE_STOPPED", handedBack.failureCode());
+        assertEquals(attemptsBefore - 1, handedBack.gradingAttempts(), "a hand-back is not an attempt of the learner's submission");
+    }
+
+    @Test
+    void aSubmissionThatFinishesWithinTheWaitIsNotHandedBack() throws Exception {
+        SpeakingGradingJob stopping = jobWith(1, false);
+        SpeakingSubmission running = oneRecording("practice/a.wav");
+        when(submissions.claimNext(any(), any(), anyInt())).thenReturn(Optional.of(running), Optional.empty());
+        when(submissions.findById(running.id())).thenReturn(Optional.of(running));
+        CountDownLatch analysing = new CountDownLatch(1);
+        when(speech.analyze(any(), any())).thenAnswer(invocation -> {
+            analysing.countDown();
+            Thread.sleep(200);
+            return heard();
+        });
+        when(quota.tryConsume(any(), any(), anyString(), anyInt())).thenReturn(true);
+        gradingFailsWith(new LlmUnavailableException(null));
+
+        stopping.drain();
+        assertTrue(analysing.await(5, TimeUnit.SECONDS), "the submission did not start");
+        stopping.shutdown();
+
+        // It ended as its own outcome says (the model could not be reached), not as a hand-back.
+        ArgumentCaptor<SpeakingSubmission> saved = ArgumentCaptor.forClass(SpeakingSubmission.class);
+        verify(submissions, timeout(2000).atLeastOnce()).save(saved.capture());
+        assertTrue(saved.getAllValues().stream().noneMatch(row -> "INSTANCE_STOPPED".equals(row.failureCode())));
+    }
+
+    @Test
+    void aStoppedInstanceClaimsNothingNew() {
+        SpeakingGradingJob stopped = jobWith(1, true);
+        stopped.shutdown();
+
+        stopped.wake();
+        stopped.drain();
+
+        verify(submissions, after(300).never()).claimNext(any(), any(), anyInt());
+    }
+
     @Test
     void aRunningSubmissionIsKeptFreshThreeTimesWithinTheStaleLimit() {
         assertEquals(40, SpeakingGradingJob.heartbeatSeconds(120));

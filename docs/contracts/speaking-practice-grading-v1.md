@@ -23,6 +23,21 @@ together and the `llm` bulkhead caps the model calls (a grading asks four at onc
 is `FOR UPDATE SKIP LOCKED`, so several workers or instances never take the same submission, and a worker touches its row at
 a third of `stale-after-seconds`, so a slow step is not taken over. No status or endpoint changes.
 
+Stopping an instance. A stopping instance claims nothing new and gives the submissions it is grading 25 seconds to finish
+(under the 30 s of Spring's shutdown phase and the container's 40 s grace). One that is still running after that is handed
+back: it becomes `FAILED_RETRYABLE` with failure code `INSTANCE_STOPPED` and the claim does not count as an attempt, so a
+deploy neither leaves a submission waiting for `stale-after-seconds` nor uses up its three attempts. If the hand-back cannot be
+saved, another instance takes the row over once it is stale, as before.
+
+Retry wait. A grading that failed for a reason that may pass (`FAILED_RETRYABLE`) waits `learning.speaking.retry-delay-seconds`
+(10 by default, `LEARNING_SPEAKING_RETRY_DELAY_SECONDS`) and is tried again, up to `max-attempts` (3); the poll adds up to
+`job-delay-ms` (5 s) to the wait. After the last attempt the submission is `NEEDS_EXAMINER` with `MAX_ATTEMPTS_REACHED`.
+
+Release order. The learner's result page in the frontend repository can ship before or after this change:
+it lays a weakness out by the labels `Sửa:` / `Quy tắc:` / `Luyện:` of prompt `spk7` and shows an older one, or one without
+the labels, as plain text; it also removes `SPK_*` codes from stored feedback. Backend first is the usual order. The
+`[speaking-timing]` console line of the frontend and the timing logs below are independent of each other.
+
 Timing logs. They name the submission and carry no learner words. Every line of a grading's worker thread, including the
 model calls, carries the `submissionId`.
 - Azure: `Speech analysis done: ... part, audioSeconds, analysisMs, outcome` for each recording (`outcome` is `ok` or the failure
@@ -77,7 +92,11 @@ version `spk6` is `spk5` with the shape of the reply written last, after the lis
 with a sample band: with `deepseek-flash` about half of the criterion answers left the band out when the shape stood in the
 middle of the prompt, and an answer without a band is refused. A refused answer is asked again once with the rule it broke
 (`reason` in the log: `BAND_MISSING`, `WRONG_CRITERION`, ...), and a band written beside `criteria` instead of inside its entry
-is accepted. Prompt version `spk5` asks each criterion call for every place a mistake happens, one entry per place with
+is accepted. Whether a band may be a half band follows the rubric the grade is made against: when no band descriptor of the rubric
+is a half band (rubric v6, migration V143) the validator refuses a half band of FC, LR and GRA (`BAND_NOT_WHOLE`) and the
+call is asked again with the rule; while the first rubric (half bands described) is active a half band is accepted. So rolling
+the rubric back or forward needs no code change, and the Pronunciation band and the overall band may still be half bands.
+Prompt version `spk5` asks each criterion call for every place a mistake happens, one entry per place with
 its own part, exact excerpt and a solution, never only the fault: the corrected sentence and rule for GRA, the better word
 and alternatives for LR, and for FC how to cut, link, develop or replace the sentence, written about the learner's own topic.
 Up to 15 entries per criterion and 45 in all; a weakness may be up to 850 characters. Entries that carry a code, a part or an

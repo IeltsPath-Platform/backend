@@ -123,6 +123,29 @@ class SpeakingResultValidatorTest {
         }
     }
 
+    /** The same answer is right under the first rubric (half bands described) and refused under a whole-band rubric. */
+    @Test
+    void aHalfBandIsRefusedOnlyWhenTheRubricDescribesWholeBandsOnly() {
+        String half = SpeakingTestData.goodAnswer("6.0", "6.5", "5.5");
+
+        assertThat(validator.validate(half, input, kps, false).criteria()).extracting("band")
+                .containsExactly(new BigDecimal("6.0"), new BigDecimal("6.5"), new BigDecimal("5.5"));
+        assertThatThrownBy(() -> validator.validate(half, input, kps, true)).isInstanceOf(InvalidSpeakingGradeException.class)
+                .extracting(failure -> ((InvalidSpeakingGradeException) failure).reason()).isEqualTo("BAND_NOT_WHOLE");
+        assertThat(validator.validate(SpeakingTestData.goodAnswer("6.0", "7.0", "5.0"), input, kps, true).criteria())
+                .extracting("band").containsExactly(new BigDecimal("6.0"), new BigDecimal("7.0"), new BigDecimal("5.0"));
+    }
+
+    @Test
+    void aRubricDescribesWholeBandsOnlyWhenNoDescriptorIsAHalfBand() {
+        var whole = SpeakingTestData.rubric();
+        var half = SpeakingTestData.rubricWithHalfBands();
+
+        assertThat(SpeakingResultValidator.wholeBandsOnly(whole)).isTrue();
+        assertThat(SpeakingResultValidator.wholeBandsOnly(half)).isFalse();
+        assertThat(SpeakingResultValidator.wholeBandsOnly(null)).isFalse();
+    }
+
     @Test
     void aMissingCriterionOrAnAnswerThatIsNotAnObjectIsRefused() {
         assertThatThrownBy(() -> validator.validate("{\"criteria\":[{\"code\":\"FC\",\"band\":6}]}", input, kps))

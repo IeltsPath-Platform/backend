@@ -26,6 +26,7 @@ import com.ieltspath.learning.domain.vo.SpeakingRecording;
 import com.ieltspath.learning.domain.vo.SpeakingSubmissionStatus;
 import com.ieltspath.learning.domain.vo.TranscriptQuality;
 import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.annotation.PreDestroy;
 import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,6 +49,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
@@ -69,17 +71,27 @@ import java.util.stream.Collectors;
 public class SpeakingGradingJob implements SpeakingGradingTrigger {
     private static final Logger log = LoggerFactory.getLogger(SpeakingGradingJob.class);
     private static final String USAGE_KIND = "speaking_grading";
-    /** A worker and an analysis mostly wait for the network, so a virtual thread each costs almost nothing. */
-    private static final ExecutorService WORKERS = Executors.newThreadPerTaskExecutor(
+    /** How long a stopping instance waits for the submissions it is grading; under Spring's shutdown phase and the 40 s grace of the container. */
+    static final long SHUTDOWN_WAIT_SECONDS = 25;
+    /**
+     * A worker and an analysis mostly wait for the network, so a virtual thread each costs almost nothing. The executors
+     * belong to the instance of the job, so stopping it (see {@link #shutdown}) stops them and nothing else.
+     */
+    private final ExecutorService workers = Executors.newThreadPerTaskExecutor(
             Thread.ofVirtual().name("speaking-job-", 0).factory());
-    private static final ExecutorService ANALYSES = Executors.newThreadPerTaskExecutor(
+    private final ExecutorService analyses = Executors.newThreadPerTaskExecutor(
             Thread.ofVirtual().name("speaking-analyse-", 0).factory());
     /** Keeps the rows of running submissions fresh, so a slow one is not taken over by another worker as stale. */
-    private static final ScheduledExecutorService HEARTBEAT = Executors.newSingleThreadScheduledExecutor(runnable -> {
+    private final ScheduledExecutorService heartbeats = Executors.newSingleThreadScheduledExecutor(runnable -> {
         Thread thread = new Thread(runnable, "speaking-heartbeat");
         thread.setDaemon(true);
         return thread;
     });
+    /** Set once the instance is stopping: nothing new is claimed. */
+    private volatile boolean stopping;
+    /** The submissions this instance is grading right now, so the ones that do not finish before it stops can be handed back. */
+    private final Set<UUID> running = ConcurrentHashMap.newKeySet();
+    private long shutdownWaitSeconds = SHUTDOWN_WAIT_SECONDS;
 
     private final SpeakingSubmissionRepository submissions;
     private final ObjectStorage storage;
@@ -129,9 +141,9 @@ public class SpeakingGradingJob implements SpeakingGradingTrigger {
 
     @Override
     public void wake() {
-        if (!settings.enabled() || !settings.wakeOnSubmit()) return;
+        if (!settings.enabled() || !settings.wakeOnSubmit() || stopping) return;
         try {
-            WORKERS.execute(this::drain);
+            workers.execute(this::drain);
         } catch (RuntimeException rejected) {
             // Best effort: the periodic poll finds the submission anyway.
             log.warn("Speaking grading wake-up not started: reason={}", rejected.getClass().getSimpleName());
@@ -143,7 +155,7 @@ public class SpeakingGradingJob implements SpeakingGradingTrigger {
      * finishes calls this again, so a queue is worked off without waiting for the next poll.
      */
     void drain() {
-        if (!settings.enabled()) return;
+        if (!settings.enabled() || stopping) return;
         while (workerSlots.tryAcquire()) {
             Optional<SpeakingSubmission> next;
             try {
@@ -158,10 +170,12 @@ public class SpeakingGradingJob implements SpeakingGradingTrigger {
                 return;
             }
             SpeakingSubmission claimed = next.get();
+            running.add(claimed.id());
             try {
-                WORKERS.execute(() -> work(claimed));
+                workers.execute(() -> work(claimed));
             } catch (RejectedExecutionException rejected) {
                 // The claim stays on the row until it goes stale, then another poll takes it over.
+                running.remove(claimed.id());
                 workerSlots.release();
                 throw rejected;
             }
@@ -169,12 +183,57 @@ public class SpeakingGradingJob implements SpeakingGradingTrigger {
     }
 
     private void work(SpeakingSubmission submission) {
+        running.add(submission.id());
         try {
             process(submission);
         } finally {
+            running.remove(submission.id());
             workerSlots.release();
         }
         drain();
+    }
+
+    /**
+     * Stops the instance without leaving a submission stuck. Nothing new is claimed; the submissions being graded get
+     * {@link #SHUTDOWN_WAIT_SECONDS} to finish. A submission that is still running after that is handed back: it becomes
+     * retryable at once and the claim does not count as an attempt, so a deploy does not use up the three attempts of a learner's
+     * submission and does not leave it waiting for the stale limit.
+     */
+    @PreDestroy
+    public void shutdown() {
+        stopping = true;
+        workers.shutdown();
+        boolean finished = false;
+        try {
+            finished = workers.awaitTermination(shutdownWaitSeconds, TimeUnit.SECONDS);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
+        if (!finished) {
+            for (UUID id : List.copyOf(running)) handBack(id);
+        }
+        workers.shutdownNow();
+        analyses.shutdownNow();
+        heartbeats.shutdownNow();
+    }
+
+    /** Best effort: whatever cannot be saved here is taken over by another instance once the row is stale. */
+    private void handBack(UUID id) {
+        try {
+            submissions.findById(id).ifPresent(row -> {
+                if (row.status() != SpeakingSubmissionStatus.ANALYZING && row.status() != SpeakingSubmissionStatus.GRADING) return;
+                row.deferred("INSTANCE_STOPPED", Instant.now(clock));
+                submissions.save(row);
+                log.warn("Speaking grading handed back, the instance is stopping: submissionId={}", id);
+            });
+        } catch (RuntimeException failure) {
+            log.warn("Speaking grading could not be handed back: submissionId={}, reason={}", id, failure.getClass().getSimpleName());
+        }
+    }
+
+    /** For a test of the shutdown: how long it waits for the submissions being graded. */
+    void shutdownWaitSeconds(long seconds) {
+        this.shutdownWaitSeconds = seconds;
     }
 
     private Optional<SpeakingSubmission> claim() {
@@ -275,7 +334,7 @@ public class SpeakingGradingJob implements SpeakingGradingTrigger {
 
     private ScheduledFuture<?> startHeartbeat(UUID submissionId) {
         long seconds = heartbeatSeconds(settings.staleAfterSeconds());
-        return HEARTBEAT.scheduleAtFixedRate(() -> {
+        return heartbeats.scheduleAtFixedRate(() -> {
             try {
                 submissions.touch(submissionId);
             } catch (RuntimeException failure) {
@@ -323,7 +382,7 @@ public class SpeakingGradingJob implements SpeakingGradingTrigger {
         Semaphore atOnce = new Semaphore(settings.analysisParallelism());
         List<CompletableFuture<SpeechAnalysis>> started = new ArrayList<>();
         for (SpeakingRecording recording : recordings) {
-            started.add(CompletableFuture.supplyAsync(() -> analyzeOne(submission, recording, atOnce), ANALYSES));
+            started.add(CompletableFuture.supplyAsync(() -> analyzeOne(submission, recording, atOnce), analyses));
         }
         List<SpeechAnalysis> analyses = new ArrayList<>();
         RuntimeException failure = null;

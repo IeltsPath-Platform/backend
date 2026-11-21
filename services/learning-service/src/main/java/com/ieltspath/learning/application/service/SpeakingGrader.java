@@ -50,7 +50,7 @@ public class SpeakingGrader {
      */
     static final LlmClient.Budget BUDGET = new LlmClient.Budget(8_000, 60, true);
     private static final String REMINDER = "\n\nYour previous answer could not be used. Reply with one valid JSON object "
-            + "only, in exactly the shape described above, with every band a number from 0 to 9 in steps of 0.5.";
+            + "only, in exactly the shape described above, with every band a number from 0 to 9.";
     private static final List<Task> FIRST_ROUND = List.of(Task.FC, Task.LR, Task.GRA, Task.OVERVIEW);
     /** Waiting threads cost almost nothing, and the number of calls at once is limited by the model bulkhead. */
     private static final ExecutorService CALLS = Executors.newThreadPerTaskExecutor(
@@ -113,25 +113,27 @@ public class SpeakingGrader {
                 (firstRoundNanos + synthesisNanos) / 1_000_000);
         ObjectNode merged = merge(answers, overall);
         return results.assemble(prepared.rubric(), input,
-                validator.validate(merged.toString(), input, input.learner().allowedKpCodes()));
+                validator.validate(merged.toString(), input, input.learner().allowedKpCodes(),
+                        SpeakingResultValidator.wholeBandsOnly(prepared.rubric())));
     }
 
     /** One call, asked again once with a reminder when its answer is not usable. */
     private JsonNode ask(SpeakingPromptAssembler.Prepared prepared, SpeakingGradingInput input, Task task, String user) {
         String system = prompts.system(prepared.rubric(), input, task);
+        boolean wholeBands = SpeakingResultValidator.wholeBandsOnly(prepared.rubric());
         // The LLM client names the task in its timing line.
         MDC.put("llmTask", task.name());
         try {
             InvalidSpeakingGradeException failure;
             try {
-                return checked(task, llm.completeJson(system, user, BUDGET));
+                return checked(task, llm.completeJson(system, user, BUDGET), wholeBands);
             } catch (InvalidSpeakingGradeException first) {
                 failure = first;
                 log.warn("Speaking LLM answer not usable, asking again: submissionId={}, task={}, reason={}",
                         MDC.get("submissionId"), task, first.reason());
             }
             try {
-                return checked(task, llm.completeJson(system + reminder(task, failure.reason()), user, BUDGET));
+                return checked(task, llm.completeJson(system + reminder(task, failure.reason()), user, BUDGET), wholeBands);
             } catch (InvalidSpeakingGradeException second) {
                 log.warn("Speaking LLM answer not usable twice: submissionId={}, task={}, firstReason={}, secondReason={}",
                         MDC.get("submissionId"), task, failure.reason(), second.reason());
@@ -162,6 +164,8 @@ public class SpeakingGrader {
             case "BAND_MISSING", "BAND_NOT_A_NUMBER", "BAND_OUT_OF_RANGE", "BAND_NOT_HALF_STEP" ->
                     " The entry in criteria must contain \"band\" as a JSON number such as 6 (not text), written inside that"
                             + " entry between \"weaknesses\" and \"comment\", not outside criteria.";
+            case "BAND_NOT_WHOLE" -> " The band must be a whole number such as 5, 6 or 7, never 5.5 or 6.5: choose the band"
+                    + " whose descriptor fits best, written as a JSON number inside the entry between \"weaknesses\" and \"comment\".";
             case "WRONG_CRITERION", "CRITERION_MISSING", "NO_CRITERIA" -> task.criterion() == null ? ""
                     : " criteria must hold exactly one entry, with code \"" + task.criterion() + "\".";
             default -> "";
@@ -174,7 +178,7 @@ public class SpeakingGrader {
      * beside {@code criteria} instead of inside its entry is moved into the entry: it is the model's own band, only put in
      * the wrong place, and a second call to ask for the same number would cost a full model round.
      */
-    private JsonNode checked(Task task, String raw) {
+    private JsonNode checked(Task task, String raw, boolean wholeBands) {
         JsonNode root = validator.parse(raw);
         if (task.criterion() != null) {
             JsonNode entry = root.path("criteria").path(0);
@@ -182,7 +186,7 @@ public class SpeakingGrader {
             if (entry.path("band").isMissingNode() && root.path("band").isNumber() && entry instanceof ObjectNode object) {
                 object.set("band", root.path("band"));
             }
-            SpeakingResultValidator.band(entry.path("band"));
+            SpeakingResultValidator.band(entry.path("band"), wholeBands);
         }
         return root;
     }
