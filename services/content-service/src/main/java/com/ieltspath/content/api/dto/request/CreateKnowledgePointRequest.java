@@ -6,7 +6,6 @@ import com.ieltspath.content.domain.vo.Skill;
 import com.ieltspath.content.domain.vo.CefrLevel;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.util.UUID;
@@ -15,11 +14,10 @@ public record CreateKnowledgePointRequest(
         @NotNull(message = "Cần chọn chủ đề")
         UUID topicId,
 
-        @NotBlank(message = "Mã không được để trống")
         @Size(max = 100, message = "Mã không được dài quá 100 ký tự")
-        @Pattern(regexp = "^[RLWGVS](55|60|65|70)_[A-Z0-9_]{2,60}$",
-                message = "Mã phải theo dạng R55_EXAMPLE, G55_EXAMPLE, V60_EXAMPLE hoặc S60_EXAMPLE")
         String code,
+
+        Integer codeLevel,
 
         @NotBlank(message = "Tên không được để trống")
         @Size(max = 255, message = "Tên không được dài quá 255 ký tự")
