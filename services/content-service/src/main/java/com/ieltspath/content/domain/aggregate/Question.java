@@ -90,8 +90,8 @@ public class Question {
 
     /** Assigns the stable code once, before the question is first persisted. */
     public void assignCode(String code) {
-        if (this.code != null) throw new IllegalStateException("MÃ£ cÃ¢u há»i Ä‘Ã£ Ä‘Æ°á»£c gáº¯n.");
-        if (code == null || code.isBlank()) throw new IllegalArgumentException("MÃ£ cÃ¢u há»i khÃ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng.");
+        if (this.code != null) throw new IllegalStateException("Mã câu hỏi đã được gắn.");
+        if (code == null || code.isBlank()) throw new IllegalArgumentException("Mã câu hỏi không được để trống.");
         this.code = code;
     }
 

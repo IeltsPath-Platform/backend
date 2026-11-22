@@ -25,7 +25,7 @@ public class QuestionCodeGenerator {
 
     public String allocate() {
         CodeSetting setting = settings.find(KIND)
-                .orElseThrow(() -> new IllegalStateException("ChÆ°a cÃ³ cáº¥u hÃ¬nh mÃ£ cÃ¢u há»i."));
+                .orElseThrow(() -> new IllegalStateException("Chưa có cấu hình mã câu hỏi."));
         long sequence = settings.allocate(KIND, SCOPE, setting.startNumber());
         String code = patterns.render(KIND, setting.pattern(), sequence, Map.of());
         while (questions.existsByCode(code)) {
