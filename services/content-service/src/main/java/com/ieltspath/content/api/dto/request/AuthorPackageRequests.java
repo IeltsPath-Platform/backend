@@ -21,7 +21,7 @@ public final class AuthorPackageRequests {
      * {@code PRACTICE_SET} and {@code sourceCode} for a {@code PRACTICE_TEST}; the use case checks which fit.
      */
     public record CreatePackage(
-            @NotBlank @Size(max = 100) String code,
+            @Size(max = 100) String code,
             @NotBlank @Size(max = 255) String title,
             @NotNull PackageType packageType,
             AccessLevel accessLevel,

@@ -92,6 +92,13 @@ public class LessonAuthoringRepositoryAdapter implements LessonAuthoringReposito
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public boolean existsByCode(String code) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM lessons WHERE code = ?)",
+                Boolean.class, code));
+    }
+
+    @Override
     @Transactional
     public Optional<Lesson> lockAndFindById(UUID lessonId) {
         List<UUID> locked = jdbc.query("SELECT id FROM lessons WHERE id = ? FOR UPDATE",

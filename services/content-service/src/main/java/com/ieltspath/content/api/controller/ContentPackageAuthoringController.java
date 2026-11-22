@@ -7,7 +7,7 @@ import com.ieltspath.content.api.dto.response.AuthorPackageSummaryResponse;
 import com.ieltspath.content.application.command.CreateContentPackageCommand;
 import com.ieltspath.content.application.command.SaveContentSectionCommand;
 import com.ieltspath.content.application.port.AuthorPackageReader;
-import com.ieltspath.content.application.usecase.CreateContentPackageUseCase;
+import com.ieltspath.content.application.usecase.CodeSettingsUseCases;
 import com.ieltspath.content.application.usecase.ListAuthorPackagesUseCase;
 import com.ieltspath.content.domain.vo.PackageType;
 import com.ieltspath.content.domain.vo.PlacementPool;
@@ -57,7 +57,7 @@ public class ContentPackageAuthoringController {
     private final AddSectionQuestionUseCase addSectionQuestion;
     private final RemoveAndReorderSectionQuestionsUseCase removeAndReorderQuestions;
     private final ListAuthorPackagesUseCase listPackages;
-    private final CreateContentPackageUseCase createPackage;
+    private final CodeSettingsUseCases codeSettings;
 
     @GetMapping
     public List<AuthorPackageSummaryResponse> list(
@@ -75,7 +75,7 @@ public class ContentPackageAuthoringController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public AuthorPackageResponse create(@Valid @RequestBody AuthorPackageRequests.CreatePackage request) {
-        return AuthorPackageResponse.from(createPackage.executeAsAuthor(new CreateContentPackageCommand(
+        return AuthorPackageResponse.from(codeSettings.createPackage(new CreateContentPackageCommand(
                 request.code(), request.title(), request.packageType(),
                 AccessLevelCompatibility.toRequiredFeatureKey(request.accessLevel(), "PREMIUM_CONTENT"),
                 request.lessonId(), request.sourceCode(), request.topicId(), request.courseId(), request.placementPool())));

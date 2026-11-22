@@ -17,6 +17,7 @@ public interface LessonAuthoringRepository {
                                  Integer estimatedMinutes, Integer sortOrder);
     List<LessonAuthoringSnapshot> findByTopic(UUID topicId);
     Optional<LessonAuthoringSnapshot> findSnapshotById(UUID lessonId);
+    boolean existsByCode(String code);
     Optional<Lesson> lockAndFindById(UUID lessonId);
     Lesson save(Lesson lesson);
     void reorderLessons(UUID topicId, List<UUID> lessonIds);

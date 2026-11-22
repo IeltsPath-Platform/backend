@@ -6,13 +6,17 @@ import com.ieltspath.content.application.port.CodeSettingsStore;
 import com.ieltspath.content.application.result.CodeSetting;
 import com.ieltspath.content.application.result.CodeSuggestion;
 import com.ieltspath.content.application.result.CourseResult;
+import com.ieltspath.content.application.result.AuthorPackageResult;
+import com.ieltspath.content.application.result.LessonAuthoringResult;
 import com.ieltspath.content.application.result.TopicResult;
 import com.ieltspath.content.application.result.UpdateCodeSettings;
+import com.ieltspath.content.application.command.CreateContentPackageCommand;
 import com.ieltspath.content.domain.aggregate.Course;
 import com.ieltspath.content.domain.exception.CourseNotFoundException;
 import com.ieltspath.content.domain.exception.InvalidContentStateException;
 import com.ieltspath.content.domain.repository.CourseRepository;
 import com.ieltspath.content.domain.repository.TopicRepository;
+import com.ieltspath.content.domain.vo.PackageType;
 import com.ieltspath.content.domain.service.CodePattern;
 import com.ieltspath.content.domain.vo.Skill;
 import org.springframework.stereotype.Service;
@@ -30,34 +34,56 @@ import java.util.UUID;
 public class CodeSettingsUseCases {
     private static final String COURSE = "COURSE";
     private static final String TOPIC = "TOPIC";
+    private static final String LESSON = "LESSON";
+    private static final String PACKAGE = "PACKAGE";
+    private static final String PACKAGE_FALLBACK_PATTERN = "PKG_{TYPE}{SEQ:3}";
+    private static final List<String> CONNECTED_KINDS = List.of(COURSE, TOPIC, LESSON, PACKAGE);
     private final CodeSettingsStore store;
     private final CodePattern patterns;
     private final CourseRepository courses;
     private final TopicRepository topics;
     private final CreateCourseUseCase createCourse;
     private final CreateTopicUseCase createTopic;
+    private final LessonAuthoringUseCase lessonAuthoring;
+    private final CreateContentPackageUseCase createPackage;
+    private final CodeContextResolver contexts;
+    private final CodeExistence existence;
 
     @Autowired
     public CodeSettingsUseCases(CodeSettingsStore store, CodePattern patterns, CourseRepository courses,
-                                TopicRepository topics, CreateCourseUseCase createCourse, CreateTopicUseCase createTopic) {
+                                TopicRepository topics, CreateCourseUseCase createCourse, CreateTopicUseCase createTopic,
+                                LessonAuthoringUseCase lessonAuthoring, CreateContentPackageUseCase createPackage,
+                                CodeContextResolver contexts, CodeExistence existence) {
         this.store = store;
         this.patterns = patterns;
         this.courses = courses;
         this.topics = topics;
         this.createCourse = createCourse;
         this.createTopic = createTopic;
+        this.lessonAuthoring = lessonAuthoring;
+        this.createPackage = createPackage;
+        this.contexts = contexts;
+        this.existence = existence;
     }
 
     /** Compatibility constructor for focused course-only unit tests. */
     public CodeSettingsUseCases(CodeSettingsStore store, CodePattern patterns, CourseRepository courses,
                                 CreateCourseUseCase createCourse) {
-        this(store, patterns, courses, null, createCourse, null);
+        this(store, patterns, courses, null, createCourse, null, null, null, null,
+                new CodeExistence(courses, null, null, null));
+    }
+
+    /** Compatibility constructor for focused course and topic unit tests. */
+    public CodeSettingsUseCases(CodeSettingsStore store, CodePattern patterns, CourseRepository courses,
+                                TopicRepository topics, CreateCourseUseCase createCourse, CreateTopicUseCase createTopic) {
+        this(store, patterns, courses, topics, createCourse, createTopic, null, null, null,
+                new CodeExistence(courses, topics, null, null));
     }
 
     @Transactional(readOnly = true)
     public List<CodeSetting> listConnected() {
         List<CodeSetting> connected = new ArrayList<>();
-        for (String kind : List.of(COURSE, TOPIC)) {
+        for (String kind : CONNECTED_KINDS) {
             store.find(kind).ifPresent(setting -> {
                 long next = COURSE.equals(kind) ? store.peek(kind, "", setting.startNumber()) : setting.startNumber();
                 connected.add(new CodeSetting(kind, setting.applied(), setting.pattern(), next, setting.editable()));
@@ -89,6 +115,12 @@ public class CodeSettingsUseCases {
 
     @Transactional(readOnly = true)
     public CodeSuggestion suggest(String kind, String band, UUID courseId, Skill skill) {
+        return suggest(kind, band, courseId, skill, null, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public CodeSuggestion suggest(String kind, String band, UUID courseId, Skill skill,
+                                  UUID topicId, UUID lessonId, PackageType packageType) {
         CodeSetting setting = setting(kind);
         validateBand(band);
         if (!setting.applied()) return new CodeSuggestion("", false, setting.editable());
@@ -101,9 +133,23 @@ public class CodeSettingsUseCases {
             context.put("course", course.getCode());
             if (skill != null && skill != Skill.ALL) context.put("skill", skillCode(skill));
             scope = courseId.toString();
+        } else if (LESSON.equals(kind)) {
+            if (topicId == null) return new CodeSuggestion("", true, setting.editable());
+            var resolved = contexts.lesson(topicId);
+            context.putAll(resolved.values());
+            scope = resolved.scopeKey();
+        } else if (PACKAGE.equals(kind)) {
+            if (packageType == null) return new CodeSuggestion("", true, setting.editable());
+            var resolved = contexts.packageContext(courseId, topicId, lessonId, packageType);
+            context.putAll(resolved.values());
+            scope = resolved.scopeKey();
+            if (!resolved.courseResolved()) {
+                return new CodeSuggestion(unusedSuggestion(setting, PACKAGE_FALLBACK_PATTERN, context, scope),
+                        true, setting.editable());
+            }
         }
         if (patterns.requiresContext(setting.pattern(), context)) return new CodeSuggestion("", true, setting.editable());
-        return new CodeSuggestion(unusedSuggestion(setting, context, scope), true, setting.editable());
+        return new CodeSuggestion(unusedSuggestion(setting, setting.pattern(), context, scope), true, setting.editable());
     }
 
     @Transactional
@@ -144,23 +190,71 @@ public class CodeSettingsUseCases {
         return createTopic.execute(withCode(command, code));
     }
 
+    @Transactional
+    public LessonAuthoringResult createLesson(UUID topicId, String suppliedCode, String title, String summary,
+                                              String summaryMarkdown, Integer estimatedMinutes, Integer sortOrder) {
+        CodeSetting setting = setting(LESSON);
+        String supplied = suppliedCode == null ? "" : suppliedCode.trim();
+        if (!setting.applied()) {
+            if (supplied.isBlank()) throw new IllegalArgumentException("Mã bài học không được để trống.");
+            return lessonAuthoring.create(topicId, supplied, title, summary, summaryMarkdown, estimatedMinutes, sortOrder);
+        }
+        var resolved = contexts.lesson(topicId);
+        String code = supplied;
+        if (supplied.isBlank() || !setting.editable()) {
+            code = allocateUnused(setting, setting.pattern(), resolved.values(), resolved.scopeKey());
+        }
+        if (!setting.editable() && !supplied.isBlank() && !supplied.equals(code)) {
+            throw InvalidContentStateException.codeLocked();
+        }
+        return lessonAuthoring.create(topicId, code, title, summary, summaryMarkdown, estimatedMinutes, sortOrder);
+    }
+
+    @Transactional
+    public AuthorPackageResult createPackage(CreateContentPackageCommand command) {
+        CodeSetting setting = setting(PACKAGE);
+        String supplied = command.code() == null ? "" : command.code().trim();
+        if (!setting.applied()) {
+            if (supplied.isBlank()) throw new IllegalArgumentException("Mã gói đề không được để trống.");
+            return createPackage.executeAsAuthor(withCode(command, supplied));
+        }
+        var resolved = contexts.packageContext(command.courseId(), command.topicId(), command.lessonId(), command.packageType());
+        String pattern = resolved.courseResolved() ? setting.pattern() : PACKAGE_FALLBACK_PATTERN;
+        String code = supplied;
+        if (supplied.isBlank() || !setting.editable()) {
+            code = allocateUnused(setting, pattern, resolved.values(), resolved.scopeKey());
+        }
+        if (!setting.editable() && !supplied.isBlank() && !supplied.equals(code)) {
+            throw InvalidContentStateException.codeLocked();
+        }
+        return createPackage.executeAsAuthor(withCode(command, code));
+    }
+
     private String unusedSuggestion(CodeSetting setting, Map<String, String> context, String scope) {
+        return unusedSuggestion(setting, setting.pattern(), context, scope);
+    }
+
+    private String unusedSuggestion(CodeSetting setting, String pattern, Map<String, String> context, String scope) {
         long sequence = store.peek(setting.kind(), scope, setting.startNumber());
-        String candidate = patterns.render(setting.kind(), setting.pattern(), sequence, context);
-        if (patterns.usesSequence(setting.pattern())) {
-            while (exists(setting.kind(), candidate)) candidate = patterns.render(setting.kind(), setting.pattern(), ++sequence, context);
+        String candidate = patterns.render(setting.kind(), pattern, sequence, context);
+        if (patterns.usesSequence(pattern)) {
+            while (exists(setting.kind(), candidate)) candidate = patterns.render(setting.kind(), pattern, ++sequence, context);
             return candidate;
         }
         return uniqueSuffix(setting.kind(), candidate);
     }
 
     private String allocateUnused(CodeSetting setting, Map<String, String> context, String scope) {
+        return allocateUnused(setting, setting.pattern(), context, scope);
+    }
+
+    private String allocateUnused(CodeSetting setting, String pattern, Map<String, String> context, String scope) {
         long sequence = store.allocate(setting.kind(), scope, setting.startNumber());
-        String candidate = patterns.render(setting.kind(), setting.pattern(), sequence, context);
-        if (patterns.usesSequence(setting.pattern())) {
+        String candidate = patterns.render(setting.kind(), pattern, sequence, context);
+        if (patterns.usesSequence(pattern)) {
             while (exists(setting.kind(), candidate)) {
                 sequence = store.allocate(setting.kind(), scope, setting.startNumber());
-                candidate = patterns.render(setting.kind(), setting.pattern(), sequence, context);
+                candidate = patterns.render(setting.kind(), pattern, sequence, context);
             }
             return candidate;
         }
@@ -175,7 +269,7 @@ public class CodeSettingsUseCases {
     }
 
     private boolean exists(String kind, String code) {
-        return COURSE.equals(kind) ? courses.existsByCode(code) : topics.existsByCode(code);
+        return existence.exists(kind, code);
     }
 
     private Map<String, String> topicContext(UUID courseId, Skill skill, String pattern) {
@@ -206,9 +300,7 @@ public class CodeSettingsUseCases {
     }
 
     private static void requireConnected(String kind) {
-        if (!COURSE.equals(kind) && !TOPIC.equals(kind)) {
-            throw new IllegalArgumentException("Loại bộ mã này chưa được kết nối với luồng tạo.");
-        }
+        if (!CONNECTED_KINDS.contains(kind)) throw new IllegalArgumentException("Loại bộ mã này chưa được kết nối với luồng tạo.");
     }
 
     private static void validateBand(String band) {
@@ -232,5 +324,10 @@ public class CodeSettingsUseCases {
     private static CreateTopicCommand withCode(CreateTopicCommand source, String code) {
         return new CreateTopicCommand(source.parentTopicId(), code, source.name(), source.sortOrder(), source.band(),
                 source.skill(), source.courseId(), source.description());
+    }
+
+    private static CreateContentPackageCommand withCode(CreateContentPackageCommand source, String code) {
+        return new CreateContentPackageCommand(code, source.title(), source.packageType(), source.requiredFeatureKey(),
+                source.lessonId(), source.sourceCode(), source.topicId(), source.courseId(), source.placementPool());
     }
 }
