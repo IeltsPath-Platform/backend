@@ -21,7 +21,8 @@ public record QuestionResponse(
         Instant createdAt,
         Instant updatedAt,
         QuestionPurpose purpose,
-        String importRef
+        String importRef,
+        String code
 ) {
     public static QuestionResponse from(QuestionResult result) {
         return new QuestionResponse(
@@ -34,7 +35,8 @@ public record QuestionResponse(
                 result.createdAt(),
                 result.updatedAt(),
                 result.purpose(),
-                result.importRef()
+                result.importRef(),
+                result.code()
         );
     }
 }

@@ -18,9 +18,13 @@ public interface QuestionRepository {
      * One page of catalog metadata, newest first. Every filter is optional and applied in the database; versions are
      * not needed by the list response. {@code page} is zero-based.
      */
-    Page findPage(Skill skill, QuestionPurpose purpose, PublicationStatus status, int page, int size);
+    Page findPage(Skill skill, QuestionPurpose purpose, PublicationStatus status, String code, int page, int size);
+    default Page findPage(Skill skill, QuestionPurpose purpose, PublicationStatus status, int page, int size) {
+        return findPage(skill, purpose, status, null, page, size);
+    }
     /** The question carrying this import reference, if any. Matched exactly. */
     Optional<Question> findByImportRef(String importRef);
+    boolean existsByCode(String code);
 
     record Page(long totalElements, List<Question> items) {}
 }

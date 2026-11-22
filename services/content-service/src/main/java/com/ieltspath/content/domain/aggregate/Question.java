@@ -24,6 +24,7 @@ public class Question {
     private final List<QuestionVersion> versions;
     /** Stable key that Excel rows and drafts use to refer to this question; never shown to learners. */
     private final String importRef;
+    private String code;
 
     private static final java.util.regex.Pattern IMPORT_REF = java.util.regex.Pattern.compile("[A-Za-z0-9._-]{1,100}");
 
@@ -84,6 +85,15 @@ public class Question {
     }
 
     public String getImportRef() { return importRef; }
+
+    public String getCode() { return code; }
+
+    /** Assigns the stable code once, before the question is first persisted. */
+    public void assignCode(String code) {
+        if (this.code != null) throw new IllegalStateException("MÃ£ cÃ¢u há»i Ä‘Ã£ Ä‘Æ°á»£c gáº¯n.");
+        if (code == null || code.isBlank()) throw new IllegalArgumentException("MÃ£ cÃ¢u há»i khÃ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng.");
+        this.code = code;
+    }
 
     public void publishVersion(UUID versionId) {
         Objects.requireNonNull(versionId, "versionId must not be null");

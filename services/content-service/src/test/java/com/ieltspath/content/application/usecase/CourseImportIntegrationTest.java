@@ -63,7 +63,9 @@ import static org.mockito.Mockito.doThrow;
 @DataJpaTest(properties = {"spring.cloud.config.enabled=false", "spring.jpa.hibernate.ddl-auto=none"})
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({CourseImportUseCases.class, PoiCourseWorkbookReader.class, JdbcImportCatalogReader.class,
-        JdbcErrorTypeRepository.class, JdbcAiUsageQuota.class, CreateQuestionUseCase.class,
+        JdbcErrorTypeRepository.class, JdbcAiUsageQuota.class, CreateQuestionUseCase.class, QuestionCodeGenerator.class,
+        com.ieltspath.content.infrastructure.config.CodePatternConfiguration.class,
+        com.ieltspath.content.infrastructure.persistence.adapter.JdbcCodeSettingsStore.class,
         AddQuestionVersionUseCase.class, QuestionRepositoryAdapter.class, QuestionPersistenceMapper.class,
         CreateContentSectionUseCase.class, AddSectionQuestionUseCase.class, CourseMaterializer.class,
         CreateLessonResourceUseCase.class, LessonResourceRepositoryAdapter.class, LessonResourcePersistenceMapperImpl.class,
@@ -128,8 +130,8 @@ class CourseImportIntegrationTest {
         jdbc.update("INSERT INTO error_types(code,name,category,severity,fix_hint,status,review_status) "
                 + "VALUES(?,?,'READING_STRATEGY',2,'Hint','ACTIVE','APPROVED')", tag + "_ERR", "Fixture error");
         existingQuestion = UUID.randomUUID();
-        jdbc.update("INSERT INTO questions(id,question_type,skill,purpose,status,import_ref) "
-                + "VALUES(?,'MULTIPLE_CHOICE','READING','LEARNING','PUBLISHED',?)", existingQuestion, tag + "-Q0");
+        jdbc.update("INSERT INTO questions(id,code,question_type,skill,purpose,status,import_ref) "
+                + "VALUES(?,'Q-' || replace(?::text,'-',''),'MULTIPLE_CHOICE','READING','LEARNING','PUBLISHED',?)", existingQuestion, existingQuestion, tag + "-Q0");
         UUID version = UUID.randomUUID();
         jdbc.update("INSERT INTO question_versions(id,question_id,version_number,stem,status) "
                 + "VALUES(?,?,1,'Stem','PUBLISHED')", version, existingQuestion);

@@ -195,9 +195,9 @@ class JdbcAuthorPackageReaderTest {
 
     private static UUID insertQuestion(String purpose, String versionStatus, String stem) {
         UUID questionId = UUID.randomUUID();
-        jdbc.update("INSERT INTO questions (id, question_type, skill, purpose, status) "
-                + "VALUES (:id, 'MULTIPLE_CHOICE', 'READING', :purpose, 'DRAFT')",
-                Map.of("id", questionId, "purpose", purpose));
+        jdbc.update("INSERT INTO questions (id, code, question_type, skill, purpose, status) "
+                + "VALUES (:id, :code, 'MULTIPLE_CHOICE', 'READING', :purpose, 'DRAFT')",
+                Map.of("id", questionId, "code", "Q-" + questionId.toString().replace("-", ""), "purpose", purpose));
         UUID versionId = UUID.randomUUID();
         jdbc.update("INSERT INTO question_versions (id, question_id, version_number, stem, status) "
                 + "VALUES (:id, :question, 1, :stem, :status)",

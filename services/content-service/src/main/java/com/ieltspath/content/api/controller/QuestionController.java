@@ -43,13 +43,14 @@ public class QuestionController {
             @RequestParam(value = "purpose", required = false) QuestionPurpose purpose,
             @RequestParam(value = "status", required = false) PublicationStatus status,
             @RequestParam(value = "importRef", required = false) String importRef,
+            @RequestParam(value = "code", required = false) String code,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "25") int size
     ) {
         if (importRef != null) {
             return QuestionPageResponse.from(listQuestionsUseCase.findByImportRef(importRef));
         }
-        return QuestionPageResponse.from(listQuestionsUseCase.execute(skill, purpose, status, page, size));
+        return QuestionPageResponse.from(listQuestionsUseCase.execute(skill, purpose, status, code, page, size));
     }
 
     /** The reading passages that go with one version of a question; empty when it has none. */

@@ -12,6 +12,7 @@ then `id`). The equivalent `/api/content/questions` alias behaves the same. Both
 | `skill` | Optional. `LISTENING`, `READING`, `WRITING`, `SPEAKING` or `ALL`. |
 | `purpose` | Optional. `LEARNING`, `EXAM` or `PLACEMENT`. |
 | `status` | Optional. `DRAFT`, `PUBLISHED` or `ARCHIVED` (the question's own status). |
+| `code` | Optional. Case-insensitive partial match against the stable question code. |
 | `page` | Zero-based page index. Default `0`. |
 | `size` | Page size, `1` to `100`. Default `25`. |
 
@@ -28,8 +29,9 @@ returns `400`.
 }
 ```
 
-Each item has the same fields the route returned before (`id`, `questionType`, `skill`, `accessLevel`, `status`,
-`currentPublishedVersionId`, `createdAt`, `updatedAt`, `purpose`, `importRef`). `totalPages` is `0` when nothing
+Each item includes `code` along with (`id`, `questionType`, `skill`, `accessLevel`, `status`,
+`currentPublishedVersionId`, `createdAt`, `updatedAt`, `purpose`, `importRef`). The detail response also includes `code`.
+`totalPages` is `0` when nothing
 matches. A page beyond the end returns an empty `content` with the real `totalElements`.
 
 **Changed from the earlier version of this route:** the response was a bare JSON array and ignored `page`, `size` and
@@ -41,6 +43,10 @@ Questions may carry an optional `importRef`: a stable key used by spreadsheet im
 question. It is trimmed; blank means none. Allowed characters are letters, digits, dot, underscore and dash, up to 100
 characters; anything else returns `400`. It is unique across questions (`409` with `details.code = "IMPORT_REF_CONFLICT"`
 when another question has it). Learners never see it.
+
+Every question has a stable generated `code`. Existing questions are numbered by `createdAt`, then `id`; new questions
+use the configured `QUESTION` pattern (default `Q-{SEQ:6}`). Codes are included in create, list, detail, new-version and
+archive responses. List searches can filter by code with the `code` query parameter.
 
 - `POST /api/content/admin/questions` accepts `importRef` and returns it.
 - The list, create, new-version and archive responses include `importRef`, `null` when unset. The detail response

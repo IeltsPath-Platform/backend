@@ -46,6 +46,9 @@ public class QuestionJpaEntity {
     @Column(name = "import_ref", length = 100)
     private String importRef;
 
+    @Column(name = "code", nullable = false, length = 40, unique = true)
+    private String code;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)
     private PublicationStatus status;

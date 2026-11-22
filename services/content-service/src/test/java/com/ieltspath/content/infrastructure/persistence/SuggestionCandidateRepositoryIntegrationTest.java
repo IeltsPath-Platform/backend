@@ -278,8 +278,8 @@ class SuggestionCandidateRepositoryIntegrationTest {
         jdbc.update("UPDATE content_packages SET current_published_version_id=? WHERE id=?", versionId, packageId);
         jdbc.update("INSERT INTO content_sections(id,package_version_id,title,skill,sort_order) "
                         + "VALUES (?,?,'Section','READING',1)", sectionId, versionId);
-        jdbc.update("INSERT INTO questions(id,question_type,skill,status) "
-                        + "VALUES (?,'MULTIPLE_CHOICE','READING','PUBLISHED')", questionId);
+        jdbc.update("INSERT INTO questions(id,code,question_type,skill,status) "
+                        + "VALUES (?,'Q-' || replace(?::text,'-',''),'MULTIPLE_CHOICE','READING','PUBLISHED')", questionId, questionId);
         jdbc.update("INSERT INTO question_versions(id,question_id,version_number,stem,status) "
                         + "VALUES (?,?,1,'Question','PUBLISHED')", questionVersionId, questionId);
         jdbc.update("INSERT INTO section_questions(section_id,question_version_id,sort_order) VALUES (?,?,1)",

@@ -47,8 +47,8 @@ class PackageVersionPreviewIntegrationTest {
                 packageId, "PREVIEW-" + packageId, "Preview", "PRACTICE_SET");
         jdbc.update("INSERT INTO content_package_versions(id,package_id,version_number,status) VALUES (?,?,1,'DRAFT')",
                 versionId, packageId);
-        jdbc.update("INSERT INTO questions(id,question_type,skill,status) VALUES (?,?,?,'DRAFT')",
-                questionId, "MULTIPLE_CHOICE", "READING");
+        jdbc.update("INSERT INTO questions(id,code,question_type,skill,status) VALUES (?,'Q-' || replace(?::text,'-',''),?,?,'DRAFT')",
+                questionId, questionId, "MULTIPLE_CHOICE", "READING");
         jdbc.update("""
                 INSERT INTO question_versions(id,question_id,version_number,stem,options,answer_spec,status)
                 VALUES (?,?,1,?,?::jsonb,?::jsonb,'DRAFT')
