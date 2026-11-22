@@ -21,6 +21,8 @@ public interface QuestionJpaRepository extends JpaRepository<QuestionJpaEntity, 
 
     Optional<QuestionJpaEntity> findFirstByImportRef(String importRef);
 
+    boolean existsByCode(String code);
+
     @Override
     @EntityGraph(attributePaths = {"versions"})
     Optional<QuestionJpaEntity> findById(UUID id);
@@ -30,10 +32,12 @@ public interface QuestionJpaRepository extends JpaRepository<QuestionJpaEntity, 
 
     @Query(value = "SELECT q FROM QuestionJpaEntity q WHERE (:skill IS NULL OR q.skill = :skill)"
             + " AND (:purpose IS NULL OR q.purpose = :purpose) AND (:status IS NULL OR q.status = :status)"
+            + " AND (:code = '' OR LOWER(q.code) LIKE LOWER(CONCAT('%', :code, '%')))"
             + " ORDER BY q.createdAt DESC, q.id",
             countQuery = "SELECT COUNT(q) FROM QuestionJpaEntity q WHERE (:skill IS NULL OR q.skill = :skill)"
-                    + " AND (:purpose IS NULL OR q.purpose = :purpose) AND (:status IS NULL OR q.status = :status)")
+                    + " AND (:purpose IS NULL OR q.purpose = :purpose) AND (:status IS NULL OR q.status = :status)"
+                    + " AND (:code = '' OR LOWER(q.code) LIKE LOWER(CONCAT('%', :code, '%')))")
     Page<QuestionJpaEntity> findPage(@Param("skill") Skill skill, @Param("purpose") QuestionPurpose purpose,
-                                     @Param("status") PublicationStatus status, Pageable pageable);
+                                     @Param("status") PublicationStatus status, @Param("code") String code, Pageable pageable);
 }
 

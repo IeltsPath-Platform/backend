@@ -81,7 +81,7 @@ class QuestionControllerTest {
                 PublicationStatus.PUBLISHED, UUID.randomUUID(), Instant.now(), Instant.now()
         );
 
-        when(listQuestionsUseCase.execute(Skill.READING, null, null, 0, 25))
+        when(listQuestionsUseCase.execute(Skill.READING, null, null, null, 0, 25))
                 .thenReturn(new ListQuestionsUseCase.Page(1, 0, 25, List.of(qResult)));
 
         mockMvc.perform(get("/api/content/questions?skill=READING"))
@@ -97,7 +97,7 @@ class QuestionControllerTest {
     @Test
     @DisplayName("GET /api/content/admin/questions passes status, page and size to the use case")
     void shouldPassStatusAndPaging() throws Exception {
-        when(listQuestionsUseCase.execute(null, QuestionPurpose.LEARNING, PublicationStatus.PUBLISHED, 2, 10))
+        when(listQuestionsUseCase.execute(null, QuestionPurpose.LEARNING, PublicationStatus.PUBLISHED, null, 2, 10))
                 .thenReturn(new ListQuestionsUseCase.Page(23, 2, 10, List.of()));
 
         mockMvc.perform(get("/api/content/admin/questions?purpose=LEARNING&status=PUBLISHED&page=2&size=10"))
@@ -106,6 +106,17 @@ class QuestionControllerTest {
                 .andExpect(jsonPath("$.page").value(2))
                 .andExpect(jsonPath("$.totalElements").value(23))
                 .andExpect(jsonPath("$.totalPages").value(3));
+    }
+
+    @Test
+    void codeQueryIsPassedToQuestionCatalogSearch() throws Exception {
+        when(listQuestionsUseCase.execute(null, null, null, "Q-000042", 0, 25))
+                .thenReturn(new ListQuestionsUseCase.Page(0, 0, 25, List.of()));
+
+        mockMvc.perform(get("/api/content/admin/questions?code=Q-000042"))
+                .andExpect(status().isOk());
+
+        verify(listQuestionsUseCase).execute(null, null, null, "Q-000042", 0, 25);
     }
 
     @Test
@@ -126,7 +137,7 @@ class QuestionControllerTest {
 
     @Test
     void invalidPagingReturns400() throws Exception {
-        when(listQuestionsUseCase.execute(null, null, null, 0, 1000)).thenThrow(new IllegalArgumentException("size"));
+        when(listQuestionsUseCase.execute(null, null, null, null, 0, 1000)).thenThrow(new IllegalArgumentException("size"));
 
         mockMvc.perform(get("/api/content/admin/questions?size=1000")).andExpect(status().isBadRequest());
     }
@@ -241,7 +252,7 @@ class QuestionControllerTest {
         QuestionResult exam = new QuestionResult(questionId, QuestionType.MULTIPLE_CHOICE, Skill.READING, null,
                 PublicationStatus.DRAFT, null, Instant.now(), Instant.now(), QuestionPurpose.EXAM);
         when(createQuestionUseCase.execute(any())).thenReturn(exam);
-        when(listQuestionsUseCase.execute(Skill.READING, QuestionPurpose.EXAM, null, 0, 25))
+        when(listQuestionsUseCase.execute(Skill.READING, QuestionPurpose.EXAM, null, null, 0, 25))
                 .thenReturn(new ListQuestionsUseCase.Page(1, 0, 25, List.of(exam)));
 
         mockMvc.perform(post("/api/content/questions").contentType(MediaType.APPLICATION_JSON)

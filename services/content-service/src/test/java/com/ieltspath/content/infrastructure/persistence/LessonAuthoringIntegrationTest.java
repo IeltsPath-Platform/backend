@@ -226,7 +226,7 @@ class LessonAuthoringIntegrationTest {
 
     private UUID question(String type, String purpose, String status, String answerSpec) {
         UUID qid = UUID.randomUUID(), versionId = UUID.randomUUID();
-        jdbc.update("INSERT INTO questions(id,question_type,skill,purpose,status) VALUES(?,?, 'READING', ?, 'DRAFT')", qid, type, purpose);
+        jdbc.update("INSERT INTO questions(id,code,question_type,skill,purpose,status) VALUES(?, 'Q-' || replace(?::text,'-',''), ?, 'READING', ?, 'DRAFT')", qid, qid, type, purpose);
         jdbc.update("INSERT INTO question_versions(id,question_id,version_number,stem,answer_spec,status) VALUES(?,?,1,'Fixture stem',?::jsonb,?)", versionId, qid, answerSpec, status);
         questionIds.add(qid); return versionId;
     }

@@ -168,8 +168,8 @@ class ApproveCourseDraftIntegrationTest {
         jdbc.update("INSERT INTO knowledge_point_prerequisites(knowledge_point_id,prerequisite_id) VALUES(?,?)",
                 kpAdvanced, kpFoundation);
         UUID question = UUID.randomUUID();
-        jdbc.update("INSERT INTO questions(id,question_type,skill,purpose,status,import_ref) "
-                + "VALUES(?,'MULTIPLE_CHOICE','READING','LEARNING','PUBLISHED',?)", question, tag + "-Q1");
+        jdbc.update("INSERT INTO questions(id,code,question_type,skill,purpose,status,import_ref) "
+                + "VALUES(?,'Q-' || replace(?::text,'-',''),'MULTIPLE_CHOICE','READING','LEARNING','PUBLISHED',?)", question, question, tag + "-Q1");
         questionVersion = UUID.randomUUID();
         jdbc.update("INSERT INTO question_versions(id,question_id,version_number,stem,status) "
                 + "VALUES(?,?,1,'Stem','PUBLISHED')", questionVersion, question);
@@ -526,8 +526,8 @@ class ApproveCourseDraftIntegrationTest {
                 section, version);
         // A package holds a question of its own: the exercise question of a lesson belongs to that lesson alone.
         UUID ownQuestion = UUID.randomUUID();
-        jdbc.update("INSERT INTO questions(id,question_type,skill,purpose,status) "
-                + "VALUES(?,'MULTIPLE_CHOICE','READING','LEARNING','PUBLISHED')", ownQuestion);
+        jdbc.update("INSERT INTO questions(id,code,question_type,skill,purpose,status) "
+                + "VALUES(?,'Q-' || replace(?::text,'-',''),'MULTIPLE_CHOICE','READING','LEARNING','PUBLISHED')", ownQuestion, ownQuestion);
         UUID ownVersion = UUID.randomUUID();
         jdbc.update("INSERT INTO question_versions(id,question_id,version_number,stem,status) "
                 + "VALUES(?,?,1,'Package stem','PUBLISHED')", ownVersion, ownQuestion);

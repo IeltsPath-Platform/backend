@@ -16,7 +16,8 @@ These endpoints are available to `CONTENT_AUTHOR` through the API Gateway.
 }
 ```
 
-Connected kinds are `COURSE`, `TOPIC`, `LESSON`, `PACKAGE`, `KNOWLEDGE_POINT` and `ERROR_TYPE`.
+Connected kinds are `COURSE`, `TOPIC`, `LESSON`, `PACKAGE`, `KNOWLEDGE_POINT`, `ERROR_TYPE` and `QUESTION`.
+Question codes are always applied and cannot be edited; the pattern and next sequence can be configured.
 
 ## Update a setting
 
@@ -30,7 +31,7 @@ Vietnamese error response.
 
 | Parameter | Used by | Meaning |
 | --- | --- | --- |
-| `kind` | All | Connected kind: `COURSE`, `TOPIC`, `LESSON`, `PACKAGE`, `KNOWLEDGE_POINT` or `ERROR_TYPE`; defaults to `COURSE` |
+| `kind` | All | Connected kind: `COURSE`, `TOPIC`, `LESSON`, `PACKAGE`, `KNOWLEDGE_POINT`, `ERROR_TYPE` or `QUESTION`; defaults to `COURSE` |
 | `band` | `COURSE` | Course band, such as `6.5` |
 | `courseId` | `TOPIC`, `PACKAGE` | Course UUID. For a package, this is the first course source checked. |
 | `skill` | `TOPIC` | Topic skill |
@@ -41,6 +42,9 @@ Vietnamese error response.
 | `skill` | `TOPIC`, `KNOWLEDGE_POINT` | Skill used to determine the code prefix |
 | `level` | `KNOWLEDGE_POINT` | Code level: `55`, `60`, `65` or `70` |
 | `name` | `KNOWLEDGE_POINT`, `ERROR_TYPE` | Name used by `{NAME}` |
+
+Question suggestions need no context parameters. `GET /api/content/admin/code-suggestion?kind=QUESTION` previews the next
+`Q-{SEQ:6}` code and returns `editable: false`; previewing does not consume a sequence number.
 
 For packages, the service resolves a course in this order: `courseId`, the course of `topicId`, then the course of the
 topic containing `lessonId`. Without a course it previews the fixed pattern `PKG_{TYPE}{SEQ:3}` and uses a separate

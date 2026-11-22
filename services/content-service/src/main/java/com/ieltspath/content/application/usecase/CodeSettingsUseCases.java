@@ -44,9 +44,10 @@ public class CodeSettingsUseCases {
     private static final String LESSON = "LESSON";
     private static final String PACKAGE = "PACKAGE";
     private static final String KNOWLEDGE_POINT = "KNOWLEDGE_POINT";
+    private static final String QUESTION = "QUESTION";
     private static final String PACKAGE_FALLBACK_PATTERN = "PKG_{TYPE}{SEQ:3}";
     private static final String ERROR_TYPE = "ERROR_TYPE";
-    private static final List<String> CONNECTED_KINDS = List.of(COURSE, TOPIC, LESSON, PACKAGE, KNOWLEDGE_POINT, ERROR_TYPE);
+    private static final List<String> CONNECTED_KINDS = List.of(COURSE, TOPIC, LESSON, PACKAGE, KNOWLEDGE_POINT, ERROR_TYPE, QUESTION);
     private final CodeSettingsStore store;
     private final CodePattern patterns;
     private final CourseRepository courses;
@@ -117,7 +118,8 @@ public class CodeSettingsUseCases {
         List<CodeSetting> connected = new ArrayList<>();
         for (String kind : CONNECTED_KINDS) {
             store.find(kind).ifPresent(setting -> {
-                long next = COURSE.equals(kind) ? store.peek(kind, "", setting.startNumber()) : setting.startNumber();
+                long next = COURSE.equals(kind) || QUESTION.equals(kind)
+                        ? store.peek(kind, "", setting.startNumber()) : setting.startNumber();
                 connected.add(new CodeSetting(kind, setting.applied(), setting.pattern(), next, setting.editable()));
             });
         }
@@ -130,11 +132,15 @@ public class CodeSettingsUseCases {
         if (update.startNumber() < 0) throw new IllegalArgumentException("Số bắt đầu khởi tạo phải lớn hơn hoặc bằng 0.");
         patterns.validate(kind, update.pattern());
         CodeSetting previous = setting(kind);
-        CodeSetting changed = new CodeSetting(kind, update.applied(), update.pattern(), update.startNumber(), update.editable());
+        CodeSetting changed = new CodeSetting(kind, QUESTION.equals(kind) || update.applied(), update.pattern(),
+                update.startNumber(), QUESTION.equals(kind) ? false : update.editable());
         store.save(changed, updatedBy);
         // COURSE uses one shared counter whose displayed start number is its current next value.
         // TOPIC counters are created lazily for each course and use this value only as their initial value.
         if (COURSE.equals(kind) && store.peek(kind, "", previous.startNumber()) != update.startNumber()) {
+            store.reset(kind, "", update.startNumber());
+        }
+        if (QUESTION.equals(kind) && store.peek(kind, "", previous.startNumber()) != update.startNumber()) {
             store.reset(kind, "", update.startNumber());
         }
         return changed;
@@ -191,6 +197,8 @@ public class CodeSettingsUseCases {
             context.putAll(contexts.knowledgePoint(kpKind, skill, level, name).values());
         } else if (ERROR_TYPE.equals(kind)) {
             if (name != null) context.put("name", name);
+        } else if (QUESTION.equals(kind)) {
+            return new CodeSuggestion(unusedSuggestion(setting, context, ""), true, false);
         }
         if (patterns.requiresContext(setting.pattern(), context)) return new CodeSuggestion("", true, setting.editable());
         String code = KNOWLEDGE_POINT.equals(kind)

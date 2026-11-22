@@ -91,7 +91,7 @@ class JdbcQuestionPassageReaderTest {
 
     private UUID questionVersion() {
         UUID question = UUID.randomUUID();
-        jdbc.update("INSERT INTO questions(id,question_type,skill,purpose,status) VALUES(?,'MULTIPLE_CHOICE','READING','LEARNING','DRAFT')", question);
+        jdbc.update("INSERT INTO questions(id,code,question_type,skill,purpose,status) VALUES(?,'Q-' || replace(?::text,'-',''),'MULTIPLE_CHOICE','READING','LEARNING','DRAFT')", question, question);
         UUID version = UUID.randomUUID();
         jdbc.update("INSERT INTO question_versions(id,question_id,version_number,stem,status) VALUES(?,?,1,'Stem','DRAFT')", version, question);
         return version;
