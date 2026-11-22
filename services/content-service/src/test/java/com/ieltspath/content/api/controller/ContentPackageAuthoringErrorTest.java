@@ -3,11 +3,13 @@ package com.ieltspath.content.api.controller;
 import com.ieltspath.content.api.exception.GlobalExceptionHandler;
 import com.ieltspath.content.application.usecase.AddSectionQuestionUseCase;
 import com.ieltspath.content.application.usecase.RemoveAndReorderSectionQuestionsUseCase;
+import com.ieltspath.content.application.usecase.CodeSettingsUseCases;
 import com.ieltspath.content.application.usecase.CreateContentPackageUseCase;
 import com.ieltspath.content.application.usecase.CreateContentSectionUseCase;
 import com.ieltspath.content.application.usecase.ListAuthorPackagesUseCase;
 import com.ieltspath.content.domain.exception.InvalidPackageCourseException;
 import com.ieltspath.content.domain.exception.InvalidPackageTopicException;
+import com.ieltspath.content.domain.exception.InvalidContentStateException;
 import com.ieltspath.content.application.usecase.CreateDraftPackageVersionUseCase;
 import com.ieltspath.content.application.usecase.DeleteContentSectionUseCase;
 import com.ieltspath.content.application.usecase.GetAuthorPackageUseCase;
@@ -37,7 +39,7 @@ class ContentPackageAuthoringErrorTest {
     private final CreateDraftPackageVersionUseCase createDraft = mock(CreateDraftPackageVersionUseCase.class);
     private final UpdateContentSectionUseCase updateSection = mock(UpdateContentSectionUseCase.class);
     private final ReorderContentSectionsUseCase reorderSections = mock(ReorderContentSectionsUseCase.class);
-    private final CreateContentPackageUseCase createPackage = mock(CreateContentPackageUseCase.class);
+    private final CodeSettingsUseCases codeSettings = mock(CodeSettingsUseCases.class);
 
     private final ListAuthorPackagesUseCase listPackages = mock(ListAuthorPackagesUseCase.class);
     private MockMvc mockMvc;
@@ -48,7 +50,7 @@ class ContentPackageAuthoringErrorTest {
                         mock(GetAuthorPackageUseCase.class), createDraft, mock(CreateContentSectionUseCase.class),
                         updateSection, mock(DeleteContentSectionUseCase.class), reorderSections,
                         mock(AddSectionQuestionUseCase.class), mock(RemoveAndReorderSectionQuestionsUseCase.class),
-                        listPackages, createPackage))
+                        listPackages, codeSettings))
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
     }
 
@@ -72,7 +74,29 @@ class ContentPackageAuthoringErrorTest {
             mockMvc.perform(post("/api/content/admin/packages").contentType("application/json").content(body))
                     .andExpect(status().isBadRequest());
         }
-        org.mockito.Mockito.verifyNoInteractions(createPackage);
+        org.mockito.Mockito.verifyNoInteractions(codeSettings);
+    }
+
+    @Test
+    void blankCodeWithoutAppliedSettingReturnsVietnameseValidationError() throws Exception {
+        when(codeSettings.createPackage(any()))
+                .thenThrow(new IllegalArgumentException("Mã gói đề không được để trống."));
+
+        mockMvc.perform(post("/api/content/admin/packages").contentType("application/json")
+                        .content("{\"code\":\"\",\"title\":\"Practice\",\"packageType\":\"PRACTICE_SET\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Mã gói đề không được để trống."));
+        org.mockito.Mockito.verify(codeSettings).createPackage(any());
+    }
+
+    @Test
+    void lockedPackageCodeReturnsConflict() throws Exception {
+        when(codeSettings.createPackage(any())).thenThrow(InvalidContentStateException.codeLocked());
+
+        mockMvc.perform(post("/api/content/admin/packages").contentType("application/json")
+                        .content("{\"code\":\"MANUAL\",\"title\":\"Practice\",\"packageType\":\"PRACTICE_SET\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.details.code").value("CODE_LOCKED"));
     }
 
     @Test
@@ -81,7 +105,7 @@ class ContentPackageAuthoringErrorTest {
         when(repository.save(any())).thenAnswer(call -> call.getArgument(0));
         var useCase = new CreateContentPackageUseCase(repository,
                 mock(com.ieltspath.content.application.port.LearningContentReader.class));
-        when(createPackage.executeAsAuthor(any())).thenAnswer(call -> useCase.executeAsAuthor(call.getArgument(0)));
+        when(codeSettings.createPackage(any())).thenAnswer(call -> useCase.executeAsAuthor(call.getArgument(0)));
         mockMvc.perform(post("/api/content/admin/packages").contentType("application/json")
                         .content("{\"code\":\"P\",\"title\":\"Placement\",\"packageType\":\"PLACEMENT_TEST\",\"placementPool\":\"BAND_3_5\"}"))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.placementPool").value("BAND_3_5"));
@@ -104,7 +128,7 @@ class ContentPackageAuthoringErrorTest {
 
     @Test
     void finalTestWithoutItsTopicIsBadRequestWithItsCode() throws Exception {
-        when(createPackage.executeAsAuthor(any())).thenThrow(new InvalidPackageTopicException("topic missing"));
+        when(codeSettings.createPackage(any())).thenThrow(new InvalidPackageTopicException("topic missing"));
 
         mockMvc.perform(post("/api/content/admin/packages").contentType("application/json")
                         .content("{\"code\":\"X\",\"title\":\"T\",\"packageType\":\"TOPIC_TEST\"}"))
@@ -114,7 +138,7 @@ class ContentPackageAuthoringErrorTest {
 
     @Test
     void courseTestWithoutItsCourseIsBadRequestWithItsCode() throws Exception {
-        when(createPackage.executeAsAuthor(any())).thenThrow(new InvalidPackageCourseException("course missing"));
+        when(codeSettings.createPackage(any())).thenThrow(new InvalidPackageCourseException("course missing"));
 
         mockMvc.perform(post("/api/content/admin/packages").contentType("application/json")
                         .content("{\"code\":\"X\",\"title\":\"T\",\"packageType\":\"COURSE_TEST\"}"))

@@ -24,6 +24,10 @@ learner-facing `/internal/learning-content/lessons/**` response remains unchange
 }
 ```
 
+`code` may be omitted or blank while lesson code generation is enabled; the service generates it from the parent topic's
+code and the topic-scoped sequence. When generation is disabled, `code` is required. An enabled locked setting rejects a
+manually supplied code that differs from the current suggestion with `409 CODE_LOCKED`.
+
 `sortOrder` defaults to the last lesson position for the topic. Duplicate codes and topic/order conflicts return `409`.
 
 `GET /api/content/admin/lessons/{lessonId}` returns the full authoring detail, including all blocks and question

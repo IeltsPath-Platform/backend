@@ -48,4 +48,11 @@ class CodePatternTest {
         assertThrows(IllegalArgumentException.class, () -> patterns.validate("TOPIC", "{TYPE}_{SEQ}"));
         assertThrows(IllegalArgumentException.class, () -> patterns.validate("TOPIC", "{COURSE}_{SKILL}"));
     }
+
+    @Test
+    void everyPackageTypeHasAStableCodeAbbreviation() {
+        var abbreviations = java.util.Arrays.stream(com.ieltspath.content.domain.vo.PackageType.values())
+                .map(com.ieltspath.content.domain.vo.PackageType::codeAbbreviation).toList();
+        assertEquals(java.util.List.of("MT", "PL", "PS", "PT", "QZ", "LS", "TT", "CT"), abbreviations);
+    }
 }

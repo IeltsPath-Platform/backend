@@ -200,7 +200,11 @@ Providing only one is an invalid storage configuration. Multipart limits are `25
 ```
 
 Returns `201` with the detail shape of section 1 and `versions: []`. The package is created as `DRAFT` and has no
-version; call `POST /versions` next. `code` (up to 100 characters) and `title` (up to 255) are required.
+version; call `POST /versions` next. `title` (up to 255) is required. `code` may be omitted or blank while package code
+generation is enabled; the service generates it from the associated course and package type, or uses the fixed
+`PKG_{TYPE}{SEQ:3}` fallback when no course can be inferred. When generation is disabled, `code` (up to 100 characters)
+is required. An enabled locked setting rejects a manually supplied code that differs from the current suggestion with
+`409 CODE_LOCKED`.
 
 - `packageType` is any of `PRACTICE_SET`, `PRACTICE_TEST`, `MOCK_TEST`, `PLACEMENT_TEST`, `QUIZ`, `TOPIC_TEST`,
   `COURSE_TEST`. `LESSON` returns `400`.
