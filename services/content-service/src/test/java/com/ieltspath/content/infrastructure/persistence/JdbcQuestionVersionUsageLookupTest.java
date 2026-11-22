@@ -49,9 +49,9 @@ class JdbcQuestionVersionUsageLookupTest {
         UUID questionId = UUID.randomUUID();
         UUID versionId = UUID.randomUUID();
         jdbc.update("""
-                INSERT INTO questions (id, question_type, skill, status, purpose, created_at, updated_at)
-                VALUES (?, 'MULTIPLE_CHOICE', 'READING', 'DRAFT', 'LEARNING', now(), now())
-                """, questionId);
+                INSERT INTO questions (id, code, question_type, skill, status, purpose, created_at, updated_at)
+                VALUES (?, 'Q-' || replace(?::text,'-',''), 'MULTIPLE_CHOICE', 'READING', 'DRAFT', 'LEARNING', now(), now())
+                """, questionId, questionId);
         jdbc.update("""
                 INSERT INTO question_versions (id, question_id, version_number, stem, options, answer_spec,
                     schema_version, status, created_at, updated_at)

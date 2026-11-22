@@ -99,6 +99,11 @@ class JdbcCodeSettingsStoreTest {
         assertEquals("{COURSE}_{TYPE}{SEQ:2}", pkg.pattern());
         assertEquals(1L, pkg.startNumber());
         assertTrue(pkg.editable());
+        CodeSetting errorType = store.find("ERROR_TYPE").orElseThrow();
+        assertFalse(errorType.applied());
+        assertEquals("{NAME}", errorType.pattern());
+        assertEquals(1L, errorType.startNumber());
+        assertTrue(errorType.editable());
         assertThrows(DataIntegrityViolationException.class,
                 () -> plainJdbc.update("INSERT INTO code_settings(code_kind, applied, pattern, start_number, editable) VALUES ('BOGUS', false, 'X', 1, true)"));
         assertThrows(DataIntegrityViolationException.class,

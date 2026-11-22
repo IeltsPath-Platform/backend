@@ -57,7 +57,8 @@ public class GetQuestionDetailUseCase {
                 question.getCreatedAt(),
                 question.getUpdatedAt(),
                 versionResults,
-                question.getPurpose()
+                question.getPurpose(),
+                question.getCode()
         );
     }
 }

@@ -13,9 +13,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class CreateQuestionUseCase {
 
     private final QuestionRepository questionRepository;
+    private final QuestionCodeGenerator codeGenerator;
 
-    public CreateQuestionUseCase(QuestionRepository questionRepository) {
+    public CreateQuestionUseCase(QuestionRepository questionRepository, QuestionCodeGenerator codeGenerator) {
         this.questionRepository = questionRepository;
+        this.codeGenerator = codeGenerator;
     }
 
     public QuestionResult execute(CreateQuestionCommand command) {
@@ -31,6 +33,7 @@ public class CreateQuestionUseCase {
                 command.purpose(),
                 importRef
         );
+        question.assignCode(codeGenerator.allocate());
 
         return QuestionResult.of(questionRepository.save(question));
     }

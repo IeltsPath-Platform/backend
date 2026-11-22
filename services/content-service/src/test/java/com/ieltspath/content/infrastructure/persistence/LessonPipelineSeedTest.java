@@ -256,8 +256,8 @@ class LessonPipelineSeedTest {
                 assertThat(sameTransaction.countEligiblePracticeSets(List.of(kp1), List.of(), 3).get(kp1)).isEqualTo(4);
             }
             update(connection, """
-                    INSERT INTO questions (id, question_type, skill, purpose)
-                    VALUES ('90000000-0000-4000-8000-000000000004', 'MULTIPLE_CHOICE', 'READING', 'EXAM');
+                    INSERT INTO questions (id, code, question_type, skill, purpose)
+                    VALUES ('90000000-0000-4000-8000-000000000004', 'Q-PIPELINE-1', 'MULTIPLE_CHOICE', 'READING', 'EXAM');
                     INSERT INTO question_versions (id, question_id, version_number, stem, answer_spec)
                     VALUES ('90000000-0000-4000-8000-000000000005', '90000000-0000-4000-8000-000000000004', 1,
                             'New exam question', '{"type":"CHOICE","correct":"A"}');
@@ -368,8 +368,8 @@ class LessonPipelineSeedTest {
                     .locations("classpath:db/migration").load().migrate();
             assertThat(jdbc.queryForObject("SELECT purpose FROM purpose_backfill.questions WHERE id = :id",
                     Map.of("id", UUID.fromString("90000000-0000-4000-8000-000000000004")), String.class)).isEqualTo("EXAM");
-            execute("INSERT INTO purpose_backfill.questions (id, question_type) "
-                    + "VALUES ('90000000-0000-4000-8000-000000000006', 'MULTIPLE_CHOICE')");
+            execute("INSERT INTO purpose_backfill.questions (id, code, question_type) "
+                    + "VALUES ('90000000-0000-4000-8000-000000000006', 'Q-PURPOSE-NEW', 'MULTIPLE_CHOICE')");
             assertThat(jdbc.queryForObject("SELECT purpose FROM purpose_backfill.questions WHERE id = :id",
                     Map.of("id", UUID.fromString("90000000-0000-4000-8000-000000000006")), String.class)).isEqualTo("LEARNING");
             assertThrows(SQLException.class, () -> execute("UPDATE purpose_backfill.questions SET purpose = 'INVALID'"));
@@ -525,8 +525,8 @@ class LessonPipelineSeedTest {
                     WHERE id = '90000000-0000-4000-8000-000000000001';
                     INSERT INTO content_sections (id, package_version_id, title, skill, sort_order)
                     VALUES ('90000000-0000-4000-8000-000000000003', '90000000-0000-4000-8000-000000000002', 'S', 'READING', 1);
-                    INSERT INTO questions (id, question_type, skill, status)
-                    VALUES ('90000000-0000-4000-8000-000000000004', 'MULTIPLE_CHOICE', 'READING', 'PUBLISHED');
+                    INSERT INTO questions (id, code, question_type, skill, status)
+                    VALUES ('90000000-0000-4000-8000-000000000004', 'Q-PIPELINE-3', 'MULTIPLE_CHOICE', 'READING', 'PUBLISHED');
                     INSERT INTO question_versions (id, question_id, version_number, stem, answer_spec, status)
                     VALUES ('90000000-0000-4000-8000-000000000005', '90000000-0000-4000-8000-000000000004', 1, 'S',
                             '{"type":"CHOICE","correct":"A"}', 'PUBLISHED');

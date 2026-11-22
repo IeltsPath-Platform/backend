@@ -20,7 +20,8 @@ public record QuestionDetailResult(
         Instant createdAt,
         Instant updatedAt,
         List<QuestionVersionResult> versions,
-        QuestionPurpose purpose
+        QuestionPurpose purpose,
+        String code
 ) {
     public static QuestionDetailResult from(Question question) {
         List<QuestionVersionResult> versions = question.getVersions().stream().map(v -> new QuestionVersionResult(
@@ -30,13 +31,20 @@ public record QuestionDetailResult(
                         kp.getQuestionVersionId(), kp.getKnowledgePointId(), kp.getWeight())).toList())).toList();
         return new QuestionDetailResult(question.getId(), question.getQuestionType(), question.getSkill(),
                 question.getRequiredFeatureKey(), question.getStatus(), question.getCurrentPublishedVersionId(),
-                question.getCreatedAt(), question.getUpdatedAt(), versions, question.getPurpose());
+                question.getCreatedAt(), question.getUpdatedAt(), versions, question.getPurpose(), question.getCode());
     }
 
     public QuestionDetailResult(UUID id, QuestionType questionType, Skill skill, String requiredFeatureKey,
                                 PublicationStatus status, UUID currentPublishedVersionId, Instant createdAt,
                                 Instant updatedAt, List<QuestionVersionResult> versions) {
         this(id, questionType, skill, requiredFeatureKey, status, currentPublishedVersionId, createdAt, updatedAt,
-                versions, QuestionPurpose.LEARNING);
+                versions, QuestionPurpose.LEARNING, null);
+    }
+
+    public QuestionDetailResult(UUID id, QuestionType questionType, Skill skill, String requiredFeatureKey,
+                                PublicationStatus status, UUID currentPublishedVersionId, Instant createdAt,
+                                Instant updatedAt, List<QuestionVersionResult> versions, QuestionPurpose purpose) {
+        this(id, questionType, skill, requiredFeatureKey, status, currentPublishedVersionId, createdAt, updatedAt,
+                versions, purpose, null);
     }
 }

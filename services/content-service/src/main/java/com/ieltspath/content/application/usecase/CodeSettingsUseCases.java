@@ -14,6 +14,8 @@ import com.ieltspath.content.application.result.KnowledgePointResult;
 import com.ieltspath.content.application.result.UpdateCodeSettings;
 import com.ieltspath.content.application.command.CreateContentPackageCommand;
 import com.ieltspath.content.domain.aggregate.Course;
+import com.ieltspath.content.domain.aggregate.ErrorType;
+import com.ieltspath.content.domain.vo.ErrorCategory;
 import com.ieltspath.content.domain.exception.CourseNotFoundException;
 import com.ieltspath.content.domain.exception.InvalidContentStateException;
 import com.ieltspath.content.domain.repository.CourseRepository;
@@ -42,8 +44,10 @@ public class CodeSettingsUseCases {
     private static final String LESSON = "LESSON";
     private static final String PACKAGE = "PACKAGE";
     private static final String KNOWLEDGE_POINT = "KNOWLEDGE_POINT";
+    private static final String QUESTION = "QUESTION";
     private static final String PACKAGE_FALLBACK_PATTERN = "PKG_{TYPE}{SEQ:3}";
-    private static final List<String> CONNECTED_KINDS = List.of(COURSE, TOPIC, LESSON, PACKAGE, KNOWLEDGE_POINT);
+    private static final String ERROR_TYPE = "ERROR_TYPE";
+    private static final List<String> CONNECTED_KINDS = List.of(COURSE, TOPIC, LESSON, PACKAGE, KNOWLEDGE_POINT, ERROR_TYPE, QUESTION);
     private final CodeSettingsStore store;
     private final CodePattern patterns;
     private final CourseRepository courses;
@@ -55,13 +59,25 @@ public class CodeSettingsUseCases {
     private final CodeContextResolver contexts;
     private final CodeExistence existence;
     private final CreateKnowledgePointUseCase createKnowledgePoint;
+    private final CreateErrorTypeUseCase createErrorType;
+
+    public CodeSettingsUseCases(CodeSettingsStore store, CodePattern patterns, CourseRepository courses,
+                                TopicRepository topics, CreateCourseUseCase createCourse, CreateTopicUseCase createTopic,
+                                LessonAuthoringUseCase lessonAuthoring, CreateContentPackageUseCase createPackage,
+                                CodeContextResolver contexts, CodeExistence existence,
+                                CreateKnowledgePointUseCase createKnowledgePoint) {
+        this(store, patterns, courses, topics, createCourse, createTopic, lessonAuthoring, createPackage, contexts,
+                existence, createKnowledgePoint, null);
+    }
 
     @Autowired
     public CodeSettingsUseCases(CodeSettingsStore store, CodePattern patterns, CourseRepository courses,
                                 TopicRepository topics, CreateCourseUseCase createCourse, CreateTopicUseCase createTopic,
                                 LessonAuthoringUseCase lessonAuthoring, CreateContentPackageUseCase createPackage,
                                 CodeContextResolver contexts, CodeExistence existence,
-                                CreateKnowledgePointUseCase createKnowledgePoint) {
+                                CreateKnowledgePointUseCase createKnowledgePoint,
+                                CreateErrorTypeUseCase createErrorType) {
+        this.createErrorType = createErrorType;
         this.store = store;
         this.patterns = patterns;
         this.courses = courses;
@@ -102,7 +118,8 @@ public class CodeSettingsUseCases {
         List<CodeSetting> connected = new ArrayList<>();
         for (String kind : CONNECTED_KINDS) {
             store.find(kind).ifPresent(setting -> {
-                long next = COURSE.equals(kind) ? store.peek(kind, "", setting.startNumber()) : setting.startNumber();
+                long next = COURSE.equals(kind) || QUESTION.equals(kind)
+                        ? store.peek(kind, "", setting.startNumber()) : setting.startNumber();
                 connected.add(new CodeSetting(kind, setting.applied(), setting.pattern(), next, setting.editable()));
             });
         }
@@ -115,11 +132,15 @@ public class CodeSettingsUseCases {
         if (update.startNumber() < 0) throw new IllegalArgumentException("Số bắt đầu khởi tạo phải lớn hơn hoặc bằng 0.");
         patterns.validate(kind, update.pattern());
         CodeSetting previous = setting(kind);
-        CodeSetting changed = new CodeSetting(kind, update.applied(), update.pattern(), update.startNumber(), update.editable());
+        CodeSetting changed = new CodeSetting(kind, QUESTION.equals(kind) || update.applied(), update.pattern(),
+                update.startNumber(), QUESTION.equals(kind) ? false : update.editable());
         store.save(changed, updatedBy);
         // COURSE uses one shared counter whose displayed start number is its current next value.
         // TOPIC counters are created lazily for each course and use this value only as their initial value.
         if (COURSE.equals(kind) && store.peek(kind, "", previous.startNumber()) != update.startNumber()) {
+            store.reset(kind, "", update.startNumber());
+        }
+        if (QUESTION.equals(kind) && store.peek(kind, "", previous.startNumber()) != update.startNumber()) {
             store.reset(kind, "", update.startNumber());
         }
         return changed;
@@ -174,12 +195,55 @@ public class CodeSettingsUseCases {
             }
         } else if (KNOWLEDGE_POINT.equals(kind)) {
             context.putAll(contexts.knowledgePoint(kpKind, skill, level, name).values());
+        } else if (ERROR_TYPE.equals(kind)) {
+            if (name != null) context.put("name", name);
+        } else if (QUESTION.equals(kind)) {
+            return new CodeSuggestion(unusedSuggestion(setting, context, ""), true, false);
         }
         if (patterns.requiresContext(setting.pattern(), context)) return new CodeSuggestion("", true, setting.editable());
         String code = KNOWLEDGE_POINT.equals(kind)
                 ? knowledgePointSuggestion(setting, context, kpKind, skill, false)
+                : ERROR_TYPE.equals(kind)
+                ? errorTypeSuggestion(setting, context)
                 : unusedSuggestion(setting, setting.pattern(), context, scope);
         return new CodeSuggestion(code, true, setting.editable());
+    }
+
+    @Transactional
+    public ErrorType createErrorType(String suppliedCode, String name, ErrorCategory category, int severity,
+                                     UUID knowledgePointId, String fixHint) {
+        CodeSetting setting = setting(ERROR_TYPE);
+        String supplied = suppliedCode == null ? "" : suppliedCode.trim();
+        if (!setting.applied()) {
+            if (supplied.isBlank()) throw new IllegalArgumentException("Mã lỗi không được để trống.");
+            return createErrorType.execute(supplied, name, category, severity, knowledgePointId, fixHint);
+        }
+        Map<String, String> context = new HashMap<>();
+        if (name != null) context.put("name", name);
+        if (patterns.requiresContext(setting.pattern(), context)) {
+            throw new IllegalArgumentException("Vui lòng nhập tên để tạo mã lỗi.");
+        }
+        String code = supplied;
+        if (supplied.isBlank() || !setting.editable()) code = errorTypeSuggestion(setting, context);
+        if (code.isBlank()) throw new IllegalArgumentException("Không tạo được mã lỗi từ tên này. Hãy dùng tên có chữ hoặc số.");
+        if (!setting.editable() && !supplied.isBlank() && !supplied.equals(code)) {
+            throw InvalidContentStateException.codeLocked();
+        }
+        return createErrorType.execute(code, name, category, severity, knowledgePointId, fixHint);
+    }
+
+    /** The name-based code, kept within the error code rules, with a numeric suffix when the code is taken. */
+    private String errorTypeSuggestion(CodeSetting setting, Map<String, String> context) {
+        String candidate = CodePattern.fitErrorCode(patterns.render(setting.kind(), setting.pattern(), 0, context));
+        if (candidate.isBlank() || !exists(setting.kind(), candidate)) return candidate;
+        for (int suffix = 2; ; suffix++) {
+            String tail = "_" + suffix;
+            String base = candidate.length() + tail.length() > CodePattern.MAX_ERROR_CODE_LENGTH
+                    ? CodePattern.fitErrorCode(candidate.substring(0, CodePattern.MAX_ERROR_CODE_LENGTH - tail.length()))
+                    : candidate;
+            String suffixed = base + tail;
+            if (!exists(setting.kind(), suffixed)) return suffixed;
+        }
     }
 
     @Transactional

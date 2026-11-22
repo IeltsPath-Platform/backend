@@ -9,6 +9,7 @@ import java.util.regex.Pattern;
 
 /** Validates and renders the small, user-configurable code pattern language. */
 public final class CodePattern {
+    public static final int MAX_ERROR_CODE_LENGTH = 60;
     private static final Pattern TOKEN = Pattern.compile("\\{([A-Z]+)(?::(\\d+))?}");
     private static final Set<String> ALL_TOKENS = Set.of("SEQ", "BAND", "COURSE", "TOPIC", "SKILL", "TYPE", "NAME", "PREFIX", "LEVEL", "YYYY");
     private static final Map<String, Set<String>> ALLOWED = Map.of(
@@ -99,6 +100,24 @@ public final class CodePattern {
         return result.toString();
     }
 
+    /**
+     * Brings a rendered error code within the rules of an error code: it starts with a letter (a name that begins with a
+     * digit gets an {@code E_} in front) and has at most {@value #MAX_ERROR_CODE_LENGTH} characters, cut at a word
+     * boundary when there is one. A blank code stays blank.
+     */
+    public static String fitErrorCode(String code) {
+        String fitted = normalizeName(code);
+        if (fitted.isEmpty()) return "";
+        if (fitted.charAt(0) < 'A' || fitted.charAt(0) > 'Z') fitted = "E_" + fitted;
+        if (fitted.length() <= MAX_ERROR_CODE_LENGTH) return fitted;
+        String head = fitted.substring(0, MAX_ERROR_CODE_LENGTH);
+        if (fitted.charAt(MAX_ERROR_CODE_LENGTH) != '_') {
+            int boundary = head.lastIndexOf('_');
+            if (boundary > 0) head = head.substring(0, boundary);
+        }
+        return head.replaceAll("_+$", "");
+    }
+
     private static String sequence(long value, String widthText) {
         int width = widthText == null ? 1 : Integer.parseInt(widthText);
         return String.format(java.util.Locale.ROOT, "%0" + width + "d", value);
@@ -110,7 +129,8 @@ public final class CodePattern {
 
     private static String normalizeName(String name) {
         if (name == null || name.isBlank()) return "";
-        String normalized = Normalizer.normalize(name, Normalizer.Form.NFD)
+        // Đ has no decomposition, so it would otherwise be dropped from the name.
+        String normalized = Normalizer.normalize(name.replace('đ', 'd').replace('Đ', 'D'), Normalizer.Form.NFD)
                 .replaceAll("\\p{M}+", "")
                 .toUpperCase(java.util.Locale.ROOT)
                 .replaceAll("[^A-Z0-9]+", "_");

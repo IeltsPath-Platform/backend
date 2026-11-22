@@ -20,7 +20,8 @@ import static org.mockito.Mockito.when;
 
 class CreateQuestionUseCaseTest {
     private final QuestionRepository questions = mock(QuestionRepository.class);
-    private final CreateQuestionUseCase useCase = new CreateQuestionUseCase(questions);
+    private final QuestionCodeGenerator codes = mock(QuestionCodeGenerator.class);
+    private final CreateQuestionUseCase useCase = new CreateQuestionUseCase(questions, codes);
 
     @Test
     void aReusedOrMalformedImportReferenceIsRefused() {
