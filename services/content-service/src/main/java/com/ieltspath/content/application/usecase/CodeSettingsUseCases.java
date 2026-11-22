@@ -1,6 +1,7 @@
 package com.ieltspath.content.application.usecase;
 
 import com.ieltspath.content.application.command.CreateCourseCommand;
+import com.ieltspath.content.application.command.CreateKnowledgePointCommand;
 import com.ieltspath.content.application.command.CreateTopicCommand;
 import com.ieltspath.content.application.port.CodeSettingsStore;
 import com.ieltspath.content.application.result.CodeSetting;
@@ -9,6 +10,7 @@ import com.ieltspath.content.application.result.CourseResult;
 import com.ieltspath.content.application.result.AuthorPackageResult;
 import com.ieltspath.content.application.result.LessonAuthoringResult;
 import com.ieltspath.content.application.result.TopicResult;
+import com.ieltspath.content.application.result.KnowledgePointResult;
 import com.ieltspath.content.application.result.UpdateCodeSettings;
 import com.ieltspath.content.application.command.CreateContentPackageCommand;
 import com.ieltspath.content.domain.aggregate.Course;
@@ -19,6 +21,8 @@ import com.ieltspath.content.domain.repository.TopicRepository;
 import com.ieltspath.content.domain.vo.PackageType;
 import com.ieltspath.content.domain.service.CodePattern;
 import com.ieltspath.content.domain.vo.Skill;
+import com.ieltspath.content.domain.vo.KnowledgePointKind;
+import com.ieltspath.content.domain.vo.KnowledgePointCodeRules;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +33,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.Set;
 
 @Service
 public class CodeSettingsUseCases {
@@ -36,8 +41,9 @@ public class CodeSettingsUseCases {
     private static final String TOPIC = "TOPIC";
     private static final String LESSON = "LESSON";
     private static final String PACKAGE = "PACKAGE";
+    private static final String KNOWLEDGE_POINT = "KNOWLEDGE_POINT";
     private static final String PACKAGE_FALLBACK_PATTERN = "PKG_{TYPE}{SEQ:3}";
-    private static final List<String> CONNECTED_KINDS = List.of(COURSE, TOPIC, LESSON, PACKAGE);
+    private static final List<String> CONNECTED_KINDS = List.of(COURSE, TOPIC, LESSON, PACKAGE, KNOWLEDGE_POINT);
     private final CodeSettingsStore store;
     private final CodePattern patterns;
     private final CourseRepository courses;
@@ -48,12 +54,14 @@ public class CodeSettingsUseCases {
     private final CreateContentPackageUseCase createPackage;
     private final CodeContextResolver contexts;
     private final CodeExistence existence;
+    private final CreateKnowledgePointUseCase createKnowledgePoint;
 
     @Autowired
     public CodeSettingsUseCases(CodeSettingsStore store, CodePattern patterns, CourseRepository courses,
                                 TopicRepository topics, CreateCourseUseCase createCourse, CreateTopicUseCase createTopic,
                                 LessonAuthoringUseCase lessonAuthoring, CreateContentPackageUseCase createPackage,
-                                CodeContextResolver contexts, CodeExistence existence) {
+                                CodeContextResolver contexts, CodeExistence existence,
+                                CreateKnowledgePointUseCase createKnowledgePoint) {
         this.store = store;
         this.patterns = patterns;
         this.courses = courses;
@@ -64,20 +72,29 @@ public class CodeSettingsUseCases {
         this.createPackage = createPackage;
         this.contexts = contexts;
         this.existence = existence;
+        this.createKnowledgePoint = createKnowledgePoint;
+    }
+
+    public CodeSettingsUseCases(CodeSettingsStore store, CodePattern patterns, CourseRepository courses,
+                                TopicRepository topics, CreateCourseUseCase createCourse, CreateTopicUseCase createTopic,
+                                LessonAuthoringUseCase lessonAuthoring, CreateContentPackageUseCase createPackage,
+                                CodeContextResolver contexts, CodeExistence existence) {
+        this(store, patterns, courses, topics, createCourse, createTopic, lessonAuthoring, createPackage,
+                contexts, existence, null);
     }
 
     /** Compatibility constructor for focused course-only unit tests. */
     public CodeSettingsUseCases(CodeSettingsStore store, CodePattern patterns, CourseRepository courses,
                                 CreateCourseUseCase createCourse) {
         this(store, patterns, courses, null, createCourse, null, null, null, null,
-                new CodeExistence(courses, null, null, null));
+                new CodeExistence(courses, null, null, null), null);
     }
 
     /** Compatibility constructor for focused course and topic unit tests. */
     public CodeSettingsUseCases(CodeSettingsStore store, CodePattern patterns, CourseRepository courses,
                                 TopicRepository topics, CreateCourseUseCase createCourse, CreateTopicUseCase createTopic) {
         this(store, patterns, courses, topics, createCourse, createTopic, null, null, null,
-                new CodeExistence(courses, topics, null, null));
+                new CodeExistence(courses, topics, null, null), null);
     }
 
     @Transactional(readOnly = true)
@@ -121,8 +138,16 @@ public class CodeSettingsUseCases {
     @Transactional(readOnly = true)
     public CodeSuggestion suggest(String kind, String band, UUID courseId, Skill skill,
                                   UUID topicId, UUID lessonId, PackageType packageType) {
+        return suggest(kind, band, courseId, skill, topicId, lessonId, packageType, null, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public CodeSuggestion suggest(String kind, String band, UUID courseId, Skill skill,
+                                  UUID topicId, UUID lessonId, PackageType packageType,
+                                  KnowledgePointKind kpKind, Integer level, String name) {
         CodeSetting setting = setting(kind);
         validateBand(band);
+        if (KNOWLEDGE_POINT.equals(kind)) validateKnowledgePointLevel(level);
         if (!setting.applied()) return new CodeSuggestion("", false, setting.editable());
         Map<String, String> context = new HashMap<>();
         if (band != null && !band.isBlank()) context.put("band", band);
@@ -147,9 +172,70 @@ public class CodeSettingsUseCases {
                 return new CodeSuggestion(unusedSuggestion(setting, PACKAGE_FALLBACK_PATTERN, context, scope),
                         true, setting.editable());
             }
+        } else if (KNOWLEDGE_POINT.equals(kind)) {
+            context.putAll(contexts.knowledgePoint(kpKind, skill, level, name).values());
         }
         if (patterns.requiresContext(setting.pattern(), context)) return new CodeSuggestion("", true, setting.editable());
-        return new CodeSuggestion(unusedSuggestion(setting, setting.pattern(), context, scope), true, setting.editable());
+        String code = KNOWLEDGE_POINT.equals(kind)
+                ? knowledgePointSuggestion(setting, context, kpKind, skill, false)
+                : unusedSuggestion(setting, setting.pattern(), context, scope);
+        return new CodeSuggestion(code, true, setting.editable());
+    }
+
+    @Transactional
+    public KnowledgePointResult createKnowledgePoint(CreateKnowledgePointCommand command, Integer codeLevel) {
+        CodeSetting setting = setting(KNOWLEDGE_POINT);
+        validateKnowledgePointLevel(codeLevel);
+        String supplied = command.code() == null ? "" : command.code().trim();
+        if (!setting.applied()) {
+            if (supplied.isBlank()) throw new IllegalArgumentException("Mã điểm kiến thức không được để trống.");
+            return createKnowledgePoint.execute(withCode(command, supplied));
+        }
+        Map<String, String> context = contexts.knowledgePoint(command.kind(), command.skill(), codeLevel, command.name()).values();
+        if (patterns.requiresContext(setting.pattern(), context)) {
+            throw new IllegalArgumentException("Vui lòng chọn loại, kỹ năng, mức band và tên để tạo mã điểm kiến thức.");
+        }
+        String code = supplied;
+        if (supplied.isBlank() || !setting.editable()) {
+            code = knowledgePointSuggestion(setting, context, command.kind(), command.skill(), true);
+        }
+        if (!setting.editable() && !supplied.isBlank() && !supplied.equals(code)) {
+            throw InvalidContentStateException.codeLocked();
+        }
+        if (!KnowledgePointCodeRules.isValid(code, command.kind(), command.skill())) {
+            throw new IllegalArgumentException("Mã điểm kiến thức không hợp lệ. Hãy kiểm tra cấu trúc, mức band, loại và kỹ năng.");
+        }
+        return createKnowledgePoint.execute(withCode(command, code));
+    }
+
+    private String knowledgePointSuggestion(CodeSetting setting, Map<String, String> context,
+                                            KnowledgePointKind kind, Skill skill, boolean allocate) {
+        long sequence = allocate
+                ? store.allocate(setting.kind(), "", setting.startNumber())
+                : store.peek(setting.kind(), "", setting.startNumber());
+        String candidate = patterns.render(setting.kind(), setting.pattern(), sequence, context);
+        if (!KnowledgePointCodeRules.isValid(candidate, kind, skill)) return "";
+        if (patterns.usesSequence(setting.pattern())) {
+            while (exists(setting.kind(), candidate)) {
+                sequence = allocate ? store.allocate(setting.kind(), "", setting.startNumber()) : sequence + 1;
+                candidate = patterns.render(setting.kind(), setting.pattern(), sequence, context);
+                if (!KnowledgePointCodeRules.isValid(candidate, kind, skill)) return "";
+            }
+            return candidate;
+        }
+        if (!exists(setting.kind(), candidate)) return candidate;
+        int suffix = 2;
+        while (true) {
+            String suffixed = candidate + "_" + suffix++;
+            if (!KnowledgePointCodeRules.isValid(suffixed, kind, skill)) return "";
+            if (!exists(setting.kind(), suffixed)) return suffixed;
+        }
+    }
+
+    private static void validateKnowledgePointLevel(Integer level) {
+        if (level != null && !Set.of(55, 60, 65, 70).contains(level)) {
+            throw new IllegalArgumentException("Mức band phải là 5.5, 6.0, 6.5 hoặc 7.0.");
+        }
     }
 
     @Transactional
@@ -329,5 +415,10 @@ public class CodeSettingsUseCases {
     private static CreateContentPackageCommand withCode(CreateContentPackageCommand source, String code) {
         return new CreateContentPackageCommand(code, source.title(), source.packageType(), source.requiredFeatureKey(),
                 source.lessonId(), source.sourceCode(), source.topicId(), source.courseId(), source.placementPool());
+    }
+
+    private static CreateKnowledgePointCommand withCode(CreateKnowledgePointCommand source, String code) {
+        return new CreateKnowledgePointCommand(source.topicId(), code, source.name(), source.kind(), source.learningType(),
+                source.skill(), source.description(), source.cefrLevel(), source.canDo(), source.scopeIn(), source.scopeOut());
     }
 }

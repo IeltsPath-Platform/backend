@@ -16,7 +16,7 @@ These endpoints are available to `CONTENT_AUTHOR` through the API Gateway.
 }
 ```
 
-Connected kinds are `COURSE`, `TOPIC`, `LESSON` and `PACKAGE`.
+Connected kinds are `COURSE`, `TOPIC`, `LESSON`, `PACKAGE` and `KNOWLEDGE_POINT`.
 
 ## Update a setting
 
@@ -37,6 +37,10 @@ Vietnamese error response.
 | `topicId` | `LESSON`, `PACKAGE` | Parent topic UUID for a lesson, or a topic from which a package course may be inferred |
 | `lessonId` | `PACKAGE` | Lesson UUID from which the containing topic and course may be inferred |
 | `packageType` | `PACKAGE` | Package type, such as `PRACTICE_SET` or `MOCK_TEST` |
+| `kpKind` | `KNOWLEDGE_POINT` | Knowledge point kind, such as `GRAMMAR` or `VOCABULARY` |
+| `skill` | `TOPIC`, `KNOWLEDGE_POINT` | Skill used to determine the code prefix |
+| `level` | `KNOWLEDGE_POINT` | Code level: `55`, `60`, `65` or `70` |
+| `name` | `KNOWLEDGE_POINT` | Knowledge point name used by `{NAME}` |
 
 For packages, the service resolves a course in this order: `courseId`, the course of `topicId`, then the course of the
 topic containing `lessonId`. Without a course it previews the fixed pattern `PKG_{TYPE}{SEQ:3}` and uses a separate
@@ -49,6 +53,7 @@ The response shape is:
 { "code": "COURSE_001_PS01", "applied": true, "editable": true }
 ```
 
-When required context is missing, `code` is an empty string. `applied` reports whether generation is enabled and
+For knowledge points, `{PREFIX}` is resolved from `kpKind` and `skill`, `{LEVEL}` from `level`, and `{NAME}` from `name`.
+When required context is missing or the rendered value does not satisfy the knowledge point code rules, `code` is an empty string. `applied` reports whether generation is enabled and
 `editable` reports whether the author may change the suggestion. Errors use the common error response with a
 Vietnamese `message` and stable `details.code` when the client needs to handle a specific case.

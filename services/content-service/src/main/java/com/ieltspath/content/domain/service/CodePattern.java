@@ -10,13 +10,13 @@ import java.util.regex.Pattern;
 /** Validates and renders the small, user-configurable code pattern language. */
 public final class CodePattern {
     private static final Pattern TOKEN = Pattern.compile("\\{([A-Z]+)(?::(\\d+))?}");
-    private static final Set<String> ALL_TOKENS = Set.of("SEQ", "BAND", "COURSE", "TOPIC", "SKILL", "TYPE", "NAME", "YYYY");
+    private static final Set<String> ALL_TOKENS = Set.of("SEQ", "BAND", "COURSE", "TOPIC", "SKILL", "TYPE", "NAME", "PREFIX", "LEVEL", "YYYY");
     private static final Map<String, Set<String>> ALLOWED = Map.of(
             "COURSE", Set.of("SEQ", "BAND", "YYYY"),
             "TOPIC", Set.of("SEQ", "COURSE", "SKILL"),
             "LESSON", Set.of("SEQ", "TOPIC"),
             "PACKAGE", Set.of("SEQ", "COURSE", "TYPE"),
-            "KNOWLEDGE_POINT", Set.of("NAME", "SKILL"),
+            "KNOWLEDGE_POINT", Set.of("NAME", "PREFIX", "LEVEL"),
             "ERROR_TYPE", Set.of("NAME"),
             "QUESTION", Set.of("SEQ", "YYYY"));
 
@@ -72,7 +72,7 @@ public final class CodePattern {
         Matcher matcher = TOKEN.matcher(pattern);
         while (matcher.find()) {
             String token = matcher.group(1);
-            if (Set.of("BAND", "COURSE", "TOPIC", "SKILL", "TYPE", "NAME").contains(token)
+            if (Set.of("BAND", "COURSE", "TOPIC", "SKILL", "TYPE", "NAME", "PREFIX", "LEVEL").contains(token)
                     && (context.get(token.toLowerCase(java.util.Locale.ROOT)) == null
                     || context.get(token.toLowerCase(java.util.Locale.ROOT)).isBlank())) return true;
         }
@@ -90,6 +90,7 @@ public final class CodePattern {
                 case "YYYY" -> Integer.toString(Year.now().getValue());
                 case "BAND" -> normalizeBand(context.get("band"));
                 case "NAME" -> normalizeName(context.get("name"));
+                case "PREFIX", "LEVEL" -> context.getOrDefault(token.toLowerCase(java.util.Locale.ROOT), "");
                 default -> context.getOrDefault(token.toLowerCase(java.util.Locale.ROOT), "");
             };
             matcher.appendReplacement(result, Matcher.quoteReplacement(value));

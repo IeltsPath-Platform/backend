@@ -8,6 +8,8 @@ import com.ieltspath.content.domain.repository.LessonAuthoringRepository;
 import com.ieltspath.content.domain.repository.TopicRepository;
 import com.ieltspath.content.domain.vo.LessonAuthoringSnapshot;
 import com.ieltspath.content.domain.vo.PackageType;
+import com.ieltspath.content.domain.vo.KnowledgePointKind;
+import com.ieltspath.content.domain.vo.Skill;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
@@ -33,6 +35,21 @@ class CodeContextResolverTest {
 
         assertEquals("FOUNDATION_T01", context.values().get("topic"));
         assertEquals(topicId.toString(), context.scopeKey());
+    }
+
+    @Test
+    void knowledgePointContextResolvesPrefixLevelAndNameWithoutDatabaseReads() {
+        var context = resolver.knowledgePoint(KnowledgePointKind.GRAMMAR, Skill.ALL, 65, "Complex sentences");
+        assertEquals("G", context.values().get("prefix"));
+        assertEquals("65", context.values().get("level"));
+        assertEquals("Complex sentences", context.values().get("name"));
+        verifyNoInteractions(courses, topics, lessons);
+
+        assertEquals("R", resolver.knowledgePoint(KnowledgePointKind.STRATEGY, Skill.READING, 55, "Reading").values().get("prefix"));
+        assertEquals("L", resolver.knowledgePoint(KnowledgePointKind.STRATEGY, Skill.LISTENING, 55, "Listening").values().get("prefix"));
+        assertEquals("W", resolver.knowledgePoint(KnowledgePointKind.STRATEGY, Skill.WRITING, 55, "Writing").values().get("prefix"));
+        assertEquals("S", resolver.knowledgePoint(KnowledgePointKind.STRATEGY, Skill.SPEAKING, 55, "Speaking").values().get("prefix"));
+        assertEquals("V", resolver.knowledgePoint(KnowledgePointKind.VOCABULARY, Skill.ALL, 60, "Words").values().get("prefix"));
     }
 
     @Test

@@ -50,6 +50,17 @@ class CodePatternTest {
     }
 
     @Test
+    void rendersKnowledgePointPrefixLevelAndNormalizedName() {
+        patterns.validate("KNOWLEDGE_POINT", "{PREFIX}{LEVEL}_{NAME}");
+        assertEquals("R55_READ_SHORT_TEXTS", patterns.render("KNOWLEDGE_POINT", "{PREFIX}{LEVEL}_{NAME}", 1,
+                Map.of("prefix", "R", "level", "55", "name", "Read short texts")));
+        assertEquals("G70_COMPLEX_SENTENCES", patterns.render("KNOWLEDGE_POINT", "{PREFIX}{LEVEL}_{NAME}", 1,
+                Map.of("prefix", "G", "level", "70", "name", "Complex sentences")));
+        assertThrows(IllegalArgumentException.class,
+                () -> patterns.validate("KNOWLEDGE_POINT", "{SKILL}_{NAME}"));
+    }
+
+    @Test
     void everyPackageTypeHasAStableCodeAbbreviation() {
         var abbreviations = java.util.Arrays.stream(com.ieltspath.content.domain.vo.PackageType.values())
                 .map(com.ieltspath.content.domain.vo.PackageType::codeAbbreviation).toList();

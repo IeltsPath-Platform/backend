@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.UUID;
 import com.ieltspath.content.domain.vo.Skill;
 import com.ieltspath.content.domain.vo.PackageType;
+import com.ieltspath.content.domain.vo.KnowledgePointKind;
 
 @RestController
 @PreAuthorize("hasRole('CONTENT_AUTHOR')")
@@ -49,7 +50,11 @@ public class CodeSettingsController {
                               @RequestParam(required = false) Skill skill,
                               @RequestParam(required = false) UUID topicId,
                               @RequestParam(required = false) UUID lessonId,
-                              @RequestParam(required = false) PackageType packageType) {
-        return CodeSuggestionResponse.from(codeSettings.suggest(kind, band, courseId, skill, topicId, lessonId, packageType));
+                              @RequestParam(required = false) PackageType packageType,
+                              @RequestParam(required = false) KnowledgePointKind kpKind,
+                              @RequestParam(required = false) Integer level,
+                              @RequestParam(required = false) String name) {
+        return CodeSuggestionResponse.from(codeSettings.suggest(kind, band, courseId, skill, topicId, lessonId,
+                packageType, kpKind, level, name));
     }
 }

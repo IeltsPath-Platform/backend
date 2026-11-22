@@ -8,6 +8,8 @@ import com.ieltspath.content.domain.repository.CourseRepository;
 import com.ieltspath.content.domain.repository.LessonAuthoringRepository;
 import com.ieltspath.content.domain.repository.TopicRepository;
 import com.ieltspath.content.domain.vo.PackageType;
+import com.ieltspath.content.domain.vo.KnowledgePointKind;
+import com.ieltspath.content.domain.vo.Skill;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -28,6 +30,29 @@ public class CodeContextResolver {
     public CodeContext lesson(UUID topicId) {
         var topic = topics.findById(topicId).orElseThrow(() -> new TopicNotFoundException(topicId));
         return new CodeContext(Map.of("topic", topic.getCode()), topicId.toString(), true);
+    }
+
+    public CodeContext knowledgePoint(KnowledgePointKind kind, Skill skill, Integer level, String name) {
+        Map<String, String> values = new java.util.HashMap<>();
+        String prefix = knowledgePointPrefix(kind, skill);
+        if (!prefix.isBlank()) values.put("prefix", prefix);
+        if (level != null) values.put("level", Integer.toString(level));
+        if (name != null) values.put("name", name);
+        return new CodeContext(Map.copyOf(values), "", false);
+    }
+
+    private static String knowledgePointPrefix(KnowledgePointKind kind, Skill skill) {
+        if (kind == null) return "";
+        if (kind == KnowledgePointKind.GRAMMAR && skill == Skill.ALL) return "G";
+        if (kind == KnowledgePointKind.VOCABULARY && skill == Skill.ALL) return "V";
+        if (skill == null) return "";
+        return switch (skill) {
+            case LISTENING -> "L";
+            case READING -> "R";
+            case WRITING -> "W";
+            case SPEAKING -> "S";
+            case ALL -> "";
+        };
     }
 
     public CodeContext packageContext(UUID courseId, UUID topicId, UUID lessonId, PackageType packageType) {
