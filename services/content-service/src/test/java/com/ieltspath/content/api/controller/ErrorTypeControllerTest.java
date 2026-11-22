@@ -1,7 +1,7 @@
 package com.ieltspath.content.api.controller;
 
 import com.ieltspath.commonsecurity.config.CommonSecurityAutoConfiguration;
-import com.ieltspath.content.application.usecase.CreateErrorTypeUseCase;
+import com.ieltspath.content.application.usecase.CodeSettingsUseCases;
 import com.ieltspath.content.application.usecase.ListErrorTypesUseCase;
 import com.ieltspath.content.application.usecase.UpdateErrorTypeUseCase;
 import com.ieltspath.content.domain.aggregate.ErrorType;
@@ -50,7 +50,7 @@ class ErrorTypeControllerTest {
 
     @Autowired MockMvc mockMvc;
     @MockitoBean ListErrorTypesUseCase listErrorTypes;
-    @MockitoBean CreateErrorTypeUseCase createErrorType;
+    @MockitoBean CodeSettingsUseCases codeSettings;
     @MockitoBean UpdateErrorTypeUseCase updateErrorType;
 
     @Test
@@ -105,12 +105,26 @@ class ErrorTypeControllerTest {
     @Test
     @WithMockUser(roles = "CONTENT_AUTHOR")
     void contentAuthorCanCreateAnErrorType() throws Exception {
-        when(createErrorType.execute(anyString(), anyString(), any(), anyInt(), isNull(), anyString()))
+        when(codeSettings.createErrorType(anyString(), anyString(), any(), anyInt(), isNull(), anyString()))
                 .thenReturn(ErrorType.create("TENSE", "Tense", ErrorCategory.GRAMMAR, 1, null, "hint"));
 
         mockMvc.perform(post("/api/content/error-types")
                         .contentType("application/json")
                         .content("{\"code\":\"TENSE\",\"name\":\"Tense\",\"category\":\"GRAMMAR\",\"severity\":1,"
+                                + "\"fixHint\":\"hint\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.code").value("TENSE"));
+    }
+
+    @Test
+    @WithMockUser(roles = "CONTENT_AUTHOR")
+    void contentAuthorCanOmitCodeWhenGenerationIsEnabled() throws Exception {
+        when(codeSettings.createErrorType(isNull(), anyString(), any(), anyInt(), isNull(), anyString()))
+                .thenReturn(ErrorType.create("TENSE", "Tense", ErrorCategory.GRAMMAR, 1, null, "hint"));
+
+        mockMvc.perform(post("/api/content/error-types")
+                        .contentType("application/json")
+                        .content("{\"name\":\"Tense\",\"category\":\"GRAMMAR\",\"severity\":1,"
                                 + "\"fixHint\":\"hint\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.code").value("TENSE"));

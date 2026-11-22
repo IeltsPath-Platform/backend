@@ -22,6 +22,16 @@ class CodePatternTest {
     void normalizesNamesByRemovingDiacriticsAndJoiningWords() {
         assertEquals("COLLOCATION", patterns.render("ERROR_TYPE", "{NAME}", 1, Map.of("name", "Collocation")));
         assertEquals("CAFE_AU_LAIT", patterns.render("ERROR_TYPE", "{NAME}", 1, Map.of("name", "Café au lait")));
+        assertEquals("DAO_NGU", patterns.render("ERROR_TYPE", "{NAME}", 1, Map.of("name", "Đảo ngữ")));
+    }
+
+    @Test
+    void fitsErrorCodesToTheAllowedPrefixAndLength() {
+        assertEquals("E_2ND_CONDITIONAL", CodePattern.fitErrorCode("2ND_CONDITIONAL"));
+        assertEquals("E_2ND_CONDITIONAL", CodePattern.fitErrorCode("2nd-conditional"));
+        assertEquals("A_WORD", CodePattern.fitErrorCode("A_WORD_" + "LONG".repeat(20)));
+        assertEquals("A".repeat(60), CodePattern.fitErrorCode("A".repeat(70)));
+        assertEquals("", CodePattern.fitErrorCode("   "));
     }
 
     @Test

@@ -1,6 +1,6 @@
 package com.ieltspath.content.api.controller;
 
-import com.ieltspath.content.application.usecase.CreateErrorTypeUseCase;
+import com.ieltspath.content.application.usecase.CodeSettingsUseCases;
 import com.ieltspath.content.application.usecase.ListErrorTypesUseCase;
 import com.ieltspath.content.application.usecase.UpdateErrorTypeUseCase;
 import com.ieltspath.content.domain.aggregate.ErrorType;
@@ -25,7 +25,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ErrorTypeController {
     private final ListErrorTypesUseCase listErrorTypes;
-    private final CreateErrorTypeUseCase createErrorType;
+    private final CodeSettingsUseCases codeSettings;
     private final UpdateErrorTypeUseCase updateErrorType;
 
     @GetMapping
@@ -48,7 +48,7 @@ public class ErrorTypeController {
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public ErrorTypeResponse create(@Valid @RequestBody CreateErrorTypeRequest request) {
-        return ErrorTypeResponse.from(createErrorType.execute(request.code(), request.name(), request.category(),
+        return ErrorTypeResponse.from(codeSettings.createErrorType(request.code(), request.name(), request.category(),
                 request.severity(), request.knowledgePointId(), request.fixHint()));
     }
 
@@ -65,8 +65,9 @@ public class ErrorTypeController {
         return ErrorTypeResponse.from(updated);
     }
 
+    /** The code may be left out when the code settings generate it from the name. */
     public record CreateErrorTypeRequest(
-            @NotBlank String code,
+            String code,
             @NotBlank String name,
             @NotNull ErrorCategory category,
             @Min(1) @Max(3) int severity,
