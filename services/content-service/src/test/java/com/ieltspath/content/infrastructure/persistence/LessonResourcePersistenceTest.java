@@ -22,8 +22,8 @@ import static org.mockito.Mockito.*;
 
 class LessonResourcePersistenceTest {
     private final LessonResourcePersistenceMapper mapper = Mappers.getMapper(LessonResourcePersistenceMapper.class);
-    private final LessonResource resource = LessonResource.create(UUID.randomUUID(), LessonResourceType.SLIDE,
-            "Slide", "https://docs.google.com/presentation/d/x", 2);
+    private final LessonResource resource = LessonResource.createFile(UUID.randomUUID(), LessonResourceType.SLIDE,
+            "Slide", "lesson-document/" + UUID.randomUUID() + "/" + UUID.randomUUID() + ".pdf", 2);
 
     @Test
     void aConcurrentOrderClashBecomesAResourceConflict() {
@@ -55,7 +55,7 @@ class LessonResourcePersistenceTest {
 
     @Test
     void anUploadedFileRoundTripsThroughTheJpaMapper() {
-        var file = LessonResource.createFile(UUID.randomUUID(), "Giáo trình",
+        var file = LessonResource.createFile(UUID.randomUUID(), LessonResourceType.DOCUMENT, "Giáo trình",
                 "lesson-document/0b1f7c9e-3a40-4d3a-9a52-1d2c8e0a7f11/9c2e5d3a-77b1-4f0a-8f6e-2b8d1c4a9e10.pdf", 1);
 
         assertThat(mapper.toDomain(mapper.toEntity(file))).usingRecursiveComparison().isEqualTo(file);

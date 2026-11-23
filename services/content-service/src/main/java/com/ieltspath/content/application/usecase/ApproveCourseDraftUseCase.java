@@ -76,7 +76,7 @@ public class ApproveCourseDraftUseCase {
         Map<String, UUID> newWordSenses = resolveNewWords(plan);
 
         CourseMaterializer.Created created = materializer.create(plan, checked.facts().resolvedQuestionRefs(),
-                newWordSenses, describeChosenSenses(plan));
+                newWordSenses, describeChosenSenses(plan), reviewer);
 
         draft.approve(reviewer, clock.instant());
         drafts.save(draft);

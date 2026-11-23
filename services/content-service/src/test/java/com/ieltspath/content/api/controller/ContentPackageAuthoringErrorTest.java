@@ -61,9 +61,10 @@ class ContentPackageAuthoringErrorTest {
                 com.ieltspath.content.domain.vo.PublicationStatus.DRAFT, null, null, null, null, null,
                 java.time.Instant.now(), java.time.Instant.now(), null, false,
                 com.ieltspath.content.domain.vo.PlacementPool.BAND_3_5);
-        when(listPackages.execute(any())).thenReturn(java.util.List.of(summary));
+        when(listPackages.execute(any(), org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(new com.ieltspath.content.application.usecase.ListAuthorPackagesUseCase.Page(1, 0, 25, java.util.List.of(summary)));
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/content/admin/packages"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$[0].placementPool").value("BAND_3_5"));
+                .andExpect(status().isOk()).andExpect(jsonPath("$.content[0].placementPool").value("BAND_3_5"));
     }
 
     @Test
@@ -116,11 +117,12 @@ class ContentPackageAuthoringErrorTest {
 
     @Test
     void authorListForwardsPoolAndRejectsUnknownPool() throws Exception {
-        when(listPackages.execute(any())).thenReturn(java.util.List.of());
+        when(listPackages.execute(any(), org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(new com.ieltspath.content.application.usecase.ListAuthorPackagesUseCase.Page(0, 0, 25, java.util.List.of()));
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/content/admin/packages")
                         .param("placementPool", "BAND_5_9")).andExpect(status().isOk());
         var filter = org.mockito.ArgumentCaptor.forClass(com.ieltspath.content.application.port.AuthorPackageReader.Filter.class);
-        org.mockito.Mockito.verify(listPackages).execute(filter.capture());
+        org.mockito.Mockito.verify(listPackages).execute(filter.capture(), org.mockito.ArgumentMatchers.eq(0), org.mockito.ArgumentMatchers.eq(25));
         org.assertj.core.api.Assertions.assertThat(filter.getValue().placementPool().name()).isEqualTo("BAND_5_9");
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/content/admin/packages")
                         .param("placementPool", "UNKNOWN")).andExpect(status().isBadRequest());

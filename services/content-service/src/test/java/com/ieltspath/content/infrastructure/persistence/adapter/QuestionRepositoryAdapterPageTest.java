@@ -2,6 +2,7 @@ package com.ieltspath.content.infrastructure.persistence.adapter;
 
 import com.ieltspath.content.domain.aggregate.Question;
 import com.ieltspath.content.domain.repository.QuestionRepository;
+import com.ieltspath.content.domain.repository.LessonAuthoringRepository;
 import com.ieltspath.content.domain.vo.PublicationStatus;
 import com.ieltspath.content.domain.vo.QuestionPurpose;
 import com.ieltspath.content.domain.vo.Skill;
@@ -30,7 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** The question catalog page on the real schema: filters, ordering and totals are computed by the database. */
 @DataJpaTest(properties = {"spring.cloud.config.enabled=false", "spring.jpa.hibernate.ddl-auto=none"})
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({QuestionRepositoryAdapter.class, QuestionPersistenceMapper.class, JacksonAutoConfiguration.class})
+@Import({QuestionRepositoryAdapter.class, LessonAuthoringRepositoryAdapter.class, QuestionPersistenceMapper.class, JacksonAutoConfiguration.class})
 @Testcontainers(disabledWithoutDocker = true)
 class QuestionRepositoryAdapterPageTest {
 
@@ -47,6 +48,7 @@ class QuestionRepositoryAdapterPageTest {
 
     @Autowired JdbcTemplate jdbc;
     @Autowired QuestionRepository questions;
+    @Autowired LessonAuthoringRepository lessonAuthoring;
 
     private UUID question(String skill, String purpose, String status, Instant createdAt) {
         UUID id = UUID.randomUUID();
@@ -54,6 +56,40 @@ class QuestionRepositoryAdapterPageTest {
                         + "VALUES(?,'Q-' || replace(?::text,'-',''),'MULTIPLE_CHOICE',?,?,?,?)",
                 id, id, skill, purpose, status, Timestamp.from(createdAt));
         return id;
+    }
+
+    private UUID publishedVersion(UUID questionId, String stem) {
+        UUID versionId = UUID.randomUUID();
+        jdbc.update("INSERT INTO question_versions(id,question_id,version_number,stem,status) VALUES(?,?,1,?,'PUBLISHED')",
+                versionId, questionId, stem);
+        jdbc.update("UPDATE questions SET current_published_version_id = ?, status = 'PUBLISHED' WHERE id = ?",
+                versionId, questionId);
+        return versionId;
+    }
+
+    private UUID lessonBlock(String code) {
+        UUID topicId = UUID.randomUUID();
+        UUID lessonId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        jdbc.update("INSERT INTO topics(id,code,name) VALUES(?,?,?)", topicId, "T-" + code, code);
+        jdbc.update("INSERT INTO lessons(id,topic_id,code,title,sort_order) VALUES(?,?,?,?,0)",
+                lessonId, topicId, "L-" + code, code);
+        jdbc.update("INSERT INTO lesson_blocks(id,lesson_id,sort_order,block_type) VALUES(?,?,0,'EXERCISE')",
+                blockId, lessonId);
+        return blockId;
+    }
+
+    private UUID section() {
+        UUID packageId = UUID.randomUUID();
+        UUID packageVersionId = UUID.randomUUID();
+        UUID sectionId = UUID.randomUUID();
+        jdbc.update("INSERT INTO content_packages(id,code,title,package_type) VALUES(?,?,?,'PRACTICE_SET')",
+                packageId, "P-" + packageId, "Package");
+        jdbc.update("INSERT INTO content_package_versions(id,package_id,version_number,status) VALUES(?,?,1,'DRAFT')",
+                packageVersionId, packageId);
+        jdbc.update("INSERT INTO content_sections(id,package_version_id,title,sort_order) VALUES(?,?,?,0)",
+                sectionId, packageVersionId, "Section");
+        return sectionId;
     }
 
     private long count(String where) {
@@ -139,6 +175,41 @@ class QuestionRepositoryAdapterPageTest {
 
         assertThat(collected).hasSize((int) total).doesNotHaveDuplicates();
         assertThat(questions.findPage(Skill.SPEAKING, QuestionPurpose.PLACEMENT, null, pages, 2).items()).isEmpty();
+    }
+
+    @Test
+    void onlyFreeFiltersBeforePagingAndKeepsQuestionsUsedOnlyByTheExceptedBlock() {
+        Instant at = Instant.parse("2104-01-01T00:00:00Z");
+        UUID currentBlock = lessonBlock("CURRENT");
+        UUID otherBlock = lessonBlock("OTHER");
+        UUID sectionId = section();
+        UUID currentVersion = publishedVersion(question("READING", "LEARNING", "PUBLISHED", at), "Current block");
+        UUID otherVersion = publishedVersion(question("READING", "LEARNING", "PUBLISHED", at.plusSeconds(1)), "Other block");
+        UUID sectionVersion = publishedVersion(question("READING", "LEARNING", "PUBLISHED", at.plusSeconds(2)), "Section");
+        UUID freeVersion = publishedVersion(question("READING", "LEARNING", "PUBLISHED", at.plusSeconds(3)), "Free");
+        question("READING", "LEARNING", "DRAFT", at.plusSeconds(4));
+        jdbc.update("INSERT INTO lesson_block_questions(block_id,question_version_id,sort_order) VALUES(?,?,0)", currentBlock, currentVersion);
+        jdbc.update("INSERT INTO lesson_block_questions(block_id,question_version_id,sort_order) VALUES(?,?,0)", otherBlock, otherVersion);
+        jdbc.update("INSERT INTO section_questions(section_id,question_version_id,sort_order) VALUES(?,?,0)", sectionId, sectionVersion);
+
+        QuestionRepository.Page firstFreePage = questions.findFreePage(Skill.READING, QuestionPurpose.LEARNING,
+                null, "", null, 0, 1);
+        QuestionRepository.Page secondFreePage = questions.findFreePage(Skill.READING, QuestionPurpose.LEARNING,
+                null, "", null, 1, 1);
+
+        assertThat(firstFreePage.totalElements()).isEqualTo(2);
+        assertThat(secondFreePage.totalElements()).isEqualTo(2);
+        assertThat(List.of(firstFreePage, secondFreePage).stream().flatMap(page -> page.items().stream())
+                .map(Question::getCurrentPublishedVersionId)).containsExactlyInAnyOrder(freeVersion, null);
+
+        QuestionRepository.Page exceptedBlockPage = questions.findFreePage(Skill.READING, QuestionPurpose.LEARNING,
+                null, "", currentBlock, 0, 25);
+        assertThat(exceptedBlockPage.totalElements()).isEqualTo(3);
+        assertThat(exceptedBlockPage.items()).extracting(Question::getCurrentPublishedVersionId)
+                .contains(currentVersion, freeVersion, null);
+        assertThat(lessonAuthoring.questionVersionsOwnedElsewhere(currentBlock,
+                List.of(currentVersion, otherVersion, sectionVersion, freeVersion)))
+                .containsExactlyInAnyOrder(otherVersion, sectionVersion);
     }
 
     private static List<UUID> ids(QuestionRepository.Page page) {

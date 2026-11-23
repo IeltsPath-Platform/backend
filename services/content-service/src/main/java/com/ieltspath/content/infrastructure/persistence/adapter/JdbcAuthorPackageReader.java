@@ -31,8 +31,8 @@ public class JdbcAuthorPackageReader implements AuthorPackageReader {
     }
 
     @Override
-    public List<AuthorPackageSummary> list(Filter filter) {
-        MapSqlParameterSource params = new MapSqlParameterSource("limit", LIST_LIMIT);
+    public Page list(Filter filter, int page, int size) {
+        MapSqlParameterSource params = new MapSqlParameterSource();
         StringBuilder where = new StringBuilder(" WHERE TRUE");
         if (filter.type() != null) {
             where.append(" AND p.package_type = :type");
@@ -62,7 +62,9 @@ public class JdbcAuthorPackageReader implements AuthorPackageReader {
             where.append(" AND (p.code ILIKE :q ESCAPE '\\' OR p.title ILIKE :q ESCAPE '\\')");
             params.addValue("q", "%" + escapeLike(filter.q().strip()) + "%");
         }
-        return jdbc.query("""
+        Long total = jdbc.queryForObject("SELECT COUNT(*) FROM content_packages p" + where, params, Long.class);
+        params.addValue("limit", size).addValue("offset", (long) page * size);
+        List<AuthorPackageSummary> items = jdbc.query("""
                 SELECT p.id, p.code, p.title, p.package_type, p.required_feature_key, p.status,
                        p.current_published_version_id, p.lesson_id, p.topic_id, p.course_id, p.source_code,
                        p.created_at, p.updated_at, p.placement_pool,
@@ -74,7 +76,7 @@ public class JdbcAuthorPackageReader implements AuthorPackageReader {
                 """ + where + """
 
                 ORDER BY p.updated_at DESC, p.id
-                LIMIT :limit
+                LIMIT :limit OFFSET :offset
                 """, params, (rs, i) -> new AuthorPackageSummary(uuid(rs, "id"), rs.getString("code"),
                 rs.getString("title"), PackageType.valueOf(rs.getString("package_type")),
                 rs.getString("required_feature_key"), PublicationStatus.valueOf(rs.getString("status")),
@@ -83,6 +85,7 @@ public class JdbcAuthorPackageReader implements AuthorPackageReader {
                 instant(rs, "updated_at"), (Integer) rs.getObject("latest_version_number"),
                 rs.getBoolean("has_draft"), rs.getString("placement_pool") == null ? null
                         : PlacementPool.valueOf(rs.getString("placement_pool"))));
+        return new Page(total == null ? 0 : total, items);
     }
 
     @Override

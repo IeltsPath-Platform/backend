@@ -39,5 +39,44 @@ public interface QuestionJpaRepository extends JpaRepository<QuestionJpaEntity, 
                     + " AND (:code = '' OR LOWER(q.code) LIKE LOWER(CONCAT('%', :code, '%')))")
     Page<QuestionJpaEntity> findPage(@Param("skill") Skill skill, @Param("purpose") QuestionPurpose purpose,
                                      @Param("status") PublicationStatus status, @Param("code") String code, Pageable pageable);
+
+    @Query(value = "SELECT q.* FROM questions q WHERE (:skill IS NULL OR q.skill = :skill)"
+            + " AND (:purpose IS NULL OR q.purpose = :purpose) AND (:status IS NULL OR q.status = :status)"
+            + " AND (:code = '' OR LOWER(q.code) LIKE LOWER(CONCAT('%', :code, '%')))"
+            + " AND NOT EXISTS (SELECT 1 FROM lesson_block_questions lbq"
+            + " WHERE lbq.question_version_id = q.current_published_version_id)"
+            + " AND NOT EXISTS (SELECT 1 FROM section_questions sq"
+            + " WHERE sq.question_version_id = q.current_published_version_id)"
+            + " ORDER BY q.created_at DESC, q.id",
+            countQuery = "SELECT COUNT(*) FROM questions q WHERE (:skill IS NULL OR q.skill = :skill)"
+                    + " AND (:purpose IS NULL OR q.purpose = :purpose) AND (:status IS NULL OR q.status = :status)"
+                    + " AND (:code = '' OR LOWER(q.code) LIKE LOWER(CONCAT('%', :code, '%')))"
+                    + " AND NOT EXISTS (SELECT 1 FROM lesson_block_questions lbq"
+                    + " WHERE lbq.question_version_id = q.current_published_version_id)"
+                    + " AND NOT EXISTS (SELECT 1 FROM section_questions sq"
+                    + " WHERE sq.question_version_id = q.current_published_version_id)", nativeQuery = true)
+    Page<QuestionJpaEntity> findFreePage(@Param("skill") String skill, @Param("purpose") String purpose,
+                                         @Param("status") String status, @Param("code") String code,
+                                         Pageable pageable);
+
+    @Query(value = "SELECT q.* FROM questions q WHERE (:skill IS NULL OR q.skill = :skill)"
+            + " AND (:purpose IS NULL OR q.purpose = :purpose) AND (:status IS NULL OR q.status = :status)"
+            + " AND (:code = '' OR LOWER(q.code) LIKE LOWER(CONCAT('%', :code, '%')))"
+            + " AND NOT EXISTS (SELECT 1 FROM lesson_block_questions lbq"
+            + " WHERE lbq.question_version_id = q.current_published_version_id AND lbq.block_id <> :exceptBlockId)"
+            + " AND NOT EXISTS (SELECT 1 FROM section_questions sq"
+            + " WHERE sq.question_version_id = q.current_published_version_id)"
+            + " ORDER BY q.created_at DESC, q.id",
+            countQuery = "SELECT COUNT(*) FROM questions q WHERE (:skill IS NULL OR q.skill = :skill)"
+                    + " AND (:purpose IS NULL OR q.purpose = :purpose) AND (:status IS NULL OR q.status = :status)"
+                    + " AND (:code = '' OR LOWER(q.code) LIKE LOWER(CONCAT('%', :code, '%')))"
+                    + " AND NOT EXISTS (SELECT 1 FROM lesson_block_questions lbq"
+                    + " WHERE lbq.question_version_id = q.current_published_version_id AND lbq.block_id <> :exceptBlockId)"
+                    + " AND NOT EXISTS (SELECT 1 FROM section_questions sq"
+                    + " WHERE sq.question_version_id = q.current_published_version_id)", nativeQuery = true)
+    Page<QuestionJpaEntity> findFreePageExceptBlock(@Param("skill") String skill, @Param("purpose") String purpose,
+                                                    @Param("status") String status, @Param("code") String code,
+                                                    @Param("exceptBlockId") java.util.UUID exceptBlockId,
+                                                    Pageable pageable);
 }
 

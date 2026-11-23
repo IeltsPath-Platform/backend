@@ -22,6 +22,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Set;
+import java.util.Arrays;
+import java.util.stream.Collectors;
 import java.util.UUID;
 
 @RestController
@@ -30,6 +33,7 @@ import java.util.UUID;
 public class QuestionController {
 
     private final ListQuestionsUseCase listQuestionsUseCase;
+    private final ListQuestionsWithIncludesUseCase listQuestionsWithIncludesUseCase;
     private final GetQuestionDetailUseCase getQuestionDetailUseCase;
     private final GetQuestionPassagesUseCase getQuestionPassagesUseCase;
     private final CreateQuestionUseCase createQuestionUseCase;
@@ -45,12 +49,29 @@ public class QuestionController {
             @RequestParam(value = "importRef", required = false) String importRef,
             @RequestParam(value = "code", required = false) String code,
             @RequestParam(value = "page", defaultValue = "0") int page,
-            @RequestParam(value = "size", defaultValue = "25") int size
+            @RequestParam(value = "size", defaultValue = "25") int size,
+            @RequestParam(value = "include", required = false) String include,
+            @RequestParam(value = "exceptBlockId", required = false) UUID exceptBlockId,
+            @RequestParam(value = "onlyFree", defaultValue = "false") boolean onlyFree
     ) {
         if (importRef != null) {
             return QuestionPageResponse.from(listQuestionsUseCase.findByImportRef(importRef));
         }
+        Set<String> includes = parseIncludes(include);
+        if (!includes.isEmpty() || onlyFree) {
+            return QuestionPageResponse.from(listQuestionsWithIncludesUseCase.execute(
+                    skill, purpose, status, code, page, size, includes, onlyFree, exceptBlockId));
+        }
         return QuestionPageResponse.from(listQuestionsUseCase.execute(skill, purpose, status, code, page, size));
+    }
+
+    private static Set<String> parseIncludes(String include) {
+        if (include == null || include.isBlank()) return Set.of();
+        Set<String> values = Arrays.stream(include.split(",", -1)).map(String::trim).collect(Collectors.toSet());
+        if (values.stream().anyMatch(value -> !value.equals("ownership") && !value.equals("preview"))) {
+            throw new IllegalArgumentException("Chỉ hỗ trợ bổ sung trạng thái sử dụng hoặc bản xem trước câu hỏi.");
+        }
+        return Set.copyOf(values);
     }
 
     /** The reading passages that go with one version of a question; empty when it has none. */

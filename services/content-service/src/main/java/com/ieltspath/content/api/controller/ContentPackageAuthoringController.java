@@ -3,6 +3,7 @@ package com.ieltspath.content.api.controller;
 import com.ieltspath.content.api.AccessLevelCompatibility;
 import com.ieltspath.content.api.dto.request.AddContentSectionRequest;
 import com.ieltspath.content.api.dto.request.AuthorPackageRequests;
+import com.ieltspath.content.api.dto.response.AuthorPackagePageResponse;
 import com.ieltspath.content.api.dto.response.AuthorPackageSummaryResponse;
 import com.ieltspath.content.application.command.CreateContentPackageCommand;
 import com.ieltspath.content.application.command.SaveContentSectionCommand;
@@ -60,16 +61,18 @@ public class ContentPackageAuthoringController {
     private final CodeSettingsUseCases codeSettings;
 
     @GetMapping
-    public List<AuthorPackageSummaryResponse> list(
+    public AuthorPackagePageResponse list(
             @RequestParam(value = "type", required = false) PackageType type,
             @RequestParam(value = "status", required = false) PublicationStatus status,
             @RequestParam(value = "lessonId", required = false) UUID lessonId,
             @RequestParam(value = "topicId", required = false) UUID topicId,
             @RequestParam(value = "courseId", required = false) UUID courseId,
             @RequestParam(value = "q", required = false) String q,
-            @RequestParam(value = "placementPool", required = false) PlacementPool placementPool) {
-        return listPackages.execute(new AuthorPackageReader.Filter(type, status, lessonId, topicId, courseId, q, placementPool))
-                .stream().map(AuthorPackageSummaryResponse::from).toList();
+            @RequestParam(value = "placementPool", required = false) PlacementPool placementPool,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "25") int size) {
+        return AuthorPackagePageResponse.from(listPackages.execute(
+                new AuthorPackageReader.Filter(type, status, lessonId, topicId, courseId, q, placementPool), page, size));
     }
 
     @PostMapping

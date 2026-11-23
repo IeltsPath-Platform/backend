@@ -78,12 +78,15 @@ Audio URLs use the same `MediaReferencePolicy` as preview; raw audio keys and op
 remain author-only. Asset selection uses the first link by `sort_order` and ID for each asset type.
 The reader loads relations in bounded bulk queries, never one query per version/section/question.
 
-`GET /api/content/admin/packages?type=&status=&lessonId=&topicId=&courseId=&q=&placementPool=` returns an array of the
+`GET /api/content/admin/packages?type=&status=&lessonId=&topicId=&courseId=&q=&placementPool=&page=&size=` returns one page,
+`{ "content": [...], "page", "size", "totalElements", "totalPages" }`. `page` is zero-based (default `0`) and `size` is `1`
+to `100` (default `25`); a value outside those ranges returns `400`. `totalElements` counts every package that matches the
+filters. **Changed from the earlier version of this route:** the response was a bare array limited to the 500 most
+recently updated packages, so older packages could not be listed at all. Each item has the
 `ContentPackageResponse` fields plus `topicId`, `courseId`, `latestVersionNumber` (null if no version) and
 `hasDraft` (boolean) and `placementPool` (the pool enum for placement packages, null for others). Optional `placementPool` filters by `BAND_0_3`, `BAND_3_5` or `BAND_5_9` (added 2026-11-17). Optional `type` is a `PackageType`; `status` is a publication status; `lessonId`,
 `topicId` and `courseId` are UUIDs. `q` matches code or title case-insensitively as a literal substring (`%`
-and `_` are not wildcards). Results are limited to 500, ordered by decreasing `updatedAt` then ID. There is no
-pagination in v1. An unknown `type`, `status` or `placementPool` value returns `400`.
+and `_` are not wildcards). Results are ordered by decreasing `updatedAt` then ID, so pages do not overlap. An unknown `type`, `status` or `placementPool` value returns `400`.
 
 ## 2. Create a draft version
 

@@ -19,10 +19,12 @@ public interface AuthorPackageReader {
         }
     }
 
-    int LIST_LIMIT = 500;
+    /** One page of the list and how many rows match the filter in all. */
+    record Page(long totalElements, List<AuthorPackageSummary> items) {
+    }
 
-    /** Most recently updated first, at most {@link #LIST_LIMIT} rows. */
-    List<AuthorPackageSummary> list(Filter filter);
+    /** Most recently updated first; {@code page} is zero-based. */
+    Page list(Filter filter, int page, int size);
 
     AuthorPackageExtras extras(UUID packageId);
 }

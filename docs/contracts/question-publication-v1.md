@@ -15,6 +15,9 @@ then `id`). The equivalent `/api/content/questions` alias behaves the same. Both
 | `code` | Optional. Case-insensitive partial match against the stable question code. |
 | `page` | Zero-based page index. Default `0`. |
 | `size` | Page size, `1` to `100`. Default `25`. |
+| `include` | Optional, comma-separated `ownership` and/or `preview`. Unknown values return `400`. Without this parameter the response shape and query behavior are unchanged. |
+| `exceptBlockId` | Optional lesson block UUID. With `include=ownership` or `onlyFree=true`, a question used only by this block is not treated as owned elsewhere. |
+| `onlyFree` | Optional boolean, default `false`. When `true`, filters out versions owned by another lesson block or any package section before pagination. A version in `exceptBlockId` is allowed. |
 
 Filters combine with AND and run in the database. An unknown enum value, a negative `page` or a `size` outside `1..100`
 returns `400`.
@@ -33,6 +36,14 @@ Each item includes `code` along with (`id`, `questionType`, `skill`, `accessLeve
 `currentPublishedVersionId`, `createdAt`, `updatedAt`, `purpose`, `importRef`). The detail response also includes `code`.
 `totalPages` is `0` when nothing
 matches. A page beyond the end returns an empty `content` with the real `totalElements`.
+
+When requested with `include=ownership`, each item adds `ownedElsewhere`, which is `true` when its published version
+belongs to another lesson block or a package section; an unpublished question or one used only by `exceptBlockId` is
+`false`. When requested with `include=preview`, each item adds `stemExcerpt` (at most 160 characters, cut at a word
+boundary and ending in `…` when shortened; null when there is no published version) and `knowledgePoints` (up to four
+`{ "code", "name" }` objects ordered by weight descending, then code ascending). `knowledgePointTotal` is included
+when the version has more than four knowledge points. These additional fields are omitted when their corresponding
+include is not requested. `onlyFree` can be used independently of `include`.
 
 **Changed from the earlier version of this route:** the response was a bare JSON array and ignored `page`, `size` and
 `status`. Clients must read `content`. The only caller in this repository is the `/content-author` question bank.
@@ -53,7 +64,8 @@ archive responses. List searches can filter by code with the `code` query parame
   (`GET /api/content/admin/questions/{id}`) does not include it yet.
 - `GET /api/content/admin/questions?importRef=<ref>` returns the question with exactly that reference in the same page
   shape, with at most one item in `content` (`page` `0`, `size` `100`). When this parameter is present, `skill`,
-  `purpose`, `status`, `page` and `size` are ignored.
+  `purpose`, `status`, `page` and `size` are ignored. `include`, `exceptBlockId` and `onlyFree` are also ignored for
+  this exact-reference lookup.
 
 ## Publish a question version
 
@@ -111,3 +123,17 @@ remaining version.
   "purpose": "LEARNING"
 }
 ```
+
+## Passages and recordings of a question version
+
+`GET /api/content/admin/questions/versions/{versionId}/passages` (`CONTENT_AUTHOR`) returns the reading passages and the recordings
+that go with one version, so an author can see a question in its context; empty when it has none. A question holds no link to
+them: an asset is found when it is linked to the version itself (`source` `DIRECT`), is the nearest `ASSET` block above the lesson
+exercise block that holds the version (`LESSON`), or is linked to a section that holds the version (`SECTION`). Each asset appears
+once, most direct source first, at most 5.
+
+Each item is `{ assetId, text, source, sourceName, type, mediaUrl, durationSeconds }`. `type` is `PASSAGE` (`text` is the passage) or
+`AUDIO` (`text` is the transcript and may be null; a recording without a stored file is left out). `mediaUrl` is a playable link for
+an `AUDIO` item: public audio uses the public media policy, private (`PREMIUM`) audio gets a signed link that expires in the
+configured premium window and is never stored. When a link cannot be made the item keeps its transcript and `mediaUrl` is null.
+`type`, `mediaUrl` and `durationSeconds` were added on 2026-11-24; earlier responses carried only passages.

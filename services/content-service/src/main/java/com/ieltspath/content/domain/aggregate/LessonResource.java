@@ -10,9 +10,8 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * A slide deck or document of a lesson. It is either an http(s) link or, for a document, a file kept in storage and
- * referenced by its key; never both. The type and the file are fixed at creation; title, link and order can change.
- * Order is unique per lesson and type.
+ * A slide is a PDF kept in storage; a document is either an http(s) link or a file kept in storage. The type and the
+ * file are fixed at creation; title and order can change. Order is unique per lesson and type.
  */
 public class LessonResource {
     static final int MAX_URL_LENGTH = 2_000;
@@ -41,8 +40,8 @@ public class LessonResource {
         if (hasFile == (url != null && !url.isBlank())) {
             throw new IllegalArgumentException("Tài nguyên cần một đường dẫn hoặc một tệp, không được cả hai");
         }
-        if (hasFile && resourceType != LessonResourceType.DOCUMENT) {
-            throw new IllegalArgumentException("Chỉ tài liệu mới là tệp tải lên được");
+        if (resourceType == LessonResourceType.SLIDE && !hasFile) {
+            throw new IllegalArgumentException("Slide phải là tệp PDF");
         }
         this.url = hasFile ? null : requireUrl(url);
         this.fileKey = hasFile ? requireFileKey(fileKey) : null;
@@ -57,11 +56,11 @@ public class LessonResource {
         return new LessonResource(UUID.randomUUID(), lessonId, resourceType, title, url, null, sortOrder, now, now);
     }
 
-    /** A document whose file was uploaded to storage. The caller has already checked who owns the key. */
-    public static LessonResource createFile(UUID lessonId, String title, String fileKey, int sortOrder) {
+    /** A slide or document whose file was uploaded to storage. The caller has already checked who owns the key. */
+    public static LessonResource createFile(UUID lessonId, LessonResourceType resourceType, String title, String fileKey,
+                                            int sortOrder) {
         Instant now = Instant.now();
-        return new LessonResource(UUID.randomUUID(), lessonId, LessonResourceType.DOCUMENT, title, null, fileKey,
-                sortOrder, now, now);
+        return new LessonResource(UUID.randomUUID(), lessonId, resourceType, title, null, fileKey, sortOrder, now, now);
     }
 
     /** Used by the reorder use case, which assigns each resource of one type its position in the new sequence. */

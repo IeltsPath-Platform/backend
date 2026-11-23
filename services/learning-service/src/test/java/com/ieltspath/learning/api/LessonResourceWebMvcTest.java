@@ -63,7 +63,7 @@ class LessonResourceWebMvcTest {
     @Test
     void returnsSummarySlidesAndDocumentsForTheCurrentLearner() throws Exception {
         when(getLessonResources.execute(USER, LESSON)).thenReturn(new LessonResources(LESSON, "## Outcomes",
-                List.of(new ResourceLink(UUID.randomUUID(), "Slide", "https://docs.google.com/presentation/d/x", 0)),
+                List.of(new ResourceLink(UUID.randomUUID(), "Slide", "https://storage.example/signed-slide.pdf", 0)),
                 List.of(new ResourceLink(UUID.randomUUID(), "Giáo trình", "https://drive.google.com/x", 0))));
 
         mvc.perform(get("/api/learning/lessons/{id}/resources", LESSON).with(jwt()))
@@ -71,6 +71,7 @@ class LessonResourceWebMvcTest {
                 .andExpect(jsonPath("$.lessonId").value(LESSON.toString()))
                 .andExpect(jsonPath("$.summaryMarkdown").value("## Outcomes"))
                 .andExpect(jsonPath("$.slides[0].title").value("Slide"))
+                .andExpect(jsonPath("$.slides[0].url").value("https://storage.example/signed-slide.pdf"))
                 .andExpect(jsonPath("$.documents[0].url").value("https://drive.google.com/x"));
     }
 

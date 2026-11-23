@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @Transactional(readOnly = true)
@@ -35,6 +36,18 @@ public class ListQuestionsUseCase {
 
     public Page execute(Skill skill, QuestionPurpose purpose, PublicationStatus status, int page, int size) {
         return execute(skill, purpose, status, null, page, size);
+    }
+
+    /** One page of questions that have no owner outside the optional lesson block being edited. */
+    public Page executeOnlyFree(Skill skill, QuestionPurpose purpose, PublicationStatus status, String code,
+                                UUID exceptBlockId, int page, int size) {
+        if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
+            throw new IllegalArgumentException("Trang phải từ 0 trở lên và kích thước trang từ 1 đến " + MAX_PAGE_SIZE);
+        }
+        String normalizedCode = code == null ? "" : code.trim();
+        QuestionRepository.Page result = questionRepository.findFreePage(skill, purpose, status, normalizedCode,
+                exceptBlockId, page, size);
+        return new Page(result.totalElements(), page, size, result.items().stream().map(QuestionResult::of).toList());
     }
 
     /** The question carrying this exact import reference, as a page of at most one. */

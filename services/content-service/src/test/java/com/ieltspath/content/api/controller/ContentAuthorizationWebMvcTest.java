@@ -177,6 +177,7 @@ class ContentAuthorizationWebMvcTest {
                 .andExpect(jsonPath("$.message").value("Band phải từ 0 đến 9, theo bước 0,5."));
     }
     @MockitoBean ListQuestionsUseCase listQuestions;
+    @MockitoBean ListQuestionsWithIncludesUseCase listQuestionsWithIncludes;
     @MockitoBean GetQuestionDetailUseCase getQuestionDetail;
     @MockitoBean GetQuestionPassagesUseCase getQuestionPassages;
     @MockitoBean CreateQuestionUseCase createQuestion;

@@ -52,13 +52,40 @@ class JdbcAuthorPackageReaderTest {
         UUID practice = insertPackage(tag+"-PRACTICE", "PRACTICE_SET", "DRAFT");
         jdbc.update("UPDATE content_packages SET placement_pool='BAND_0_3' WHERE id=:id", Map.of("id", low));
         jdbc.update("UPDATE content_packages SET placement_pool='BAND_5_9' WHERE id=:id", Map.of("id", high));
-        var all = reader.list(filter(null, null, tag));
+        var all = list(filter(null, null, tag));
         assertEquals(3, all.size());
         assertEquals(com.ieltspath.content.domain.vo.PlacementPool.BAND_0_3, byId(all,low).placementPool());
         assertNull(byId(all,practice).placementPool());
-        var filtered = reader.list(new AuthorPackageReader.Filter(null,null,null,null,null,tag,
+        var filtered = list(new AuthorPackageReader.Filter(null,null,null,null,null,tag,
                 com.ieltspath.content.domain.vo.PlacementPool.BAND_5_9));
         assertEquals(java.util.List.of(high), filtered.stream().map(AuthorPackageSummary::id).toList());
+    }
+
+    private List<AuthorPackageSummary> list(AuthorPackageReader.Filter filter) {
+        return reader.list(filter, 0, 100).items();
+    }
+
+    @Test
+    void pagesDoNotOverlapAndTheTotalCountsEveryMatch() {
+        String tag = tag();
+        for (int i = 0; i < 5; i++) insertPackage(tag + "-P" + i, "QUIZ", "DRAFT");
+        insertPackage(tag + "-OTHER", "PRACTICE_SET", "DRAFT");
+
+        var first = reader.list(filter(PackageType.QUIZ, null, tag), 0, 2);
+        var second = reader.list(filter(PackageType.QUIZ, null, tag), 1, 2);
+        var last = reader.list(filter(PackageType.QUIZ, null, tag), 2, 2);
+        var beyond = reader.list(filter(PackageType.QUIZ, null, tag), 3, 2);
+
+        assertEquals(5, first.totalElements());
+        assertEquals(5, last.totalElements());
+        assertEquals(2, first.items().size());
+        assertEquals(2, second.items().size());
+        assertEquals(1, last.items().size());
+        assertTrue(beyond.items().isEmpty());
+        var ids = new java.util.HashSet<UUID>();
+        for (var page : List.of(first, second, last)) page.items().forEach(row -> assertTrue(ids.add(row.id())));
+        assertEquals(5, ids.size());
+        assertEquals(6, reader.list(filter(null, null, tag), 0, 1).totalElements());
     }
 
     @Test
@@ -71,7 +98,7 @@ class JdbcAuthorPackageReaderTest {
         insertVersion(withoutDraft, 1, "PUBLISHED");
         UUID empty = insertPackage(tag + "-C", "QUIZ", "DRAFT");
 
-        List<AuthorPackageSummary> rows = reader.list(filter(null, null, tag));
+        List<AuthorPackageSummary> rows = list(filter(null, null, tag));
 
         assertEquals(3, rows.size());
         AuthorPackageSummary a = byId(rows, withDraft);
@@ -91,10 +118,10 @@ class JdbcAuthorPackageReaderTest {
         insertPackage(tag + "-SET", "PRACTICE_SET", "DRAFT");
         insertPackage(tag + "-QUIZ", "QUIZ", "PUBLISHED");
 
-        assertEquals(1, reader.list(filter(PackageType.QUIZ, null, tag)).size());
-        assertEquals(1, reader.list(filter(null, PublicationStatus.DRAFT, tag)).size());
-        assertEquals(0, reader.list(filter(PackageType.QUIZ, PublicationStatus.DRAFT, tag)).size());
-        assertEquals(1, reader.list(filter(null, null, tag.toLowerCase() + "-quiz")).size());
+        assertEquals(1, list(filter(PackageType.QUIZ, null, tag)).size());
+        assertEquals(1, list(filter(null, PublicationStatus.DRAFT, tag)).size());
+        assertEquals(0, list(filter(PackageType.QUIZ, PublicationStatus.DRAFT, tag)).size());
+        assertEquals(1, list(filter(null, null, tag.toLowerCase() + "-quiz")).size());
     }
 
     @Test
@@ -102,15 +129,15 @@ class JdbcAuthorPackageReaderTest {
         String tag = tag();
         insertPackage(tag + "-X", "QUIZ", "DRAFT");
 
-        assertEquals(0, reader.list(filter(null, null, "%")).stream()
+        assertEquals(0, list(filter(null, null, "%")).stream()
                 .filter(row -> row.code().startsWith(tag)).count());
-        assertEquals(0, reader.list(filter(null, null, tag + "_X")).size());
+        assertEquals(0, list(filter(null, null, tag + "_X")).size());
     }
 
     @Test
     void listFiltersByTopicAndLessonAndCourse() {
         UUID topic = UUID.fromString("23000000-0000-4000-8000-010000000001");
-        List<AuthorPackageSummary> finals = reader.list(new AuthorPackageReader.Filter(
+        List<AuthorPackageSummary> finals = list(new AuthorPackageReader.Filter(
                 PackageType.TOPIC_TEST, null, null, topic, null, null));
 
         assertFalse(finals.isEmpty());

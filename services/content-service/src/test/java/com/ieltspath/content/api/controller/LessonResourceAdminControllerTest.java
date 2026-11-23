@@ -76,7 +76,7 @@ class LessonResourceAdminControllerTest {
         UUID unknown = UUID.randomUUID();
         mvc.perform(get("/api/content/admin/lessons/{id}/resources", unknown)).andExpect(status().isNotFound());
         mvc.perform(post("/api/content/admin/lessons/{id}/resources", unknown).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"type\":\"SLIDE\",\"title\":\"Slide\",\"url\":\"https://a.com\",\"sortOrder\":0}"))
+                        .content(fileBody(ownKey(), "SLIDE")))
                 .andExpect(status().isNotFound());
         mvc.perform(put("/api/content/admin/lessons/{id}/summary", unknown).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"markdown\":\"## Hi\"}"))
@@ -114,9 +114,10 @@ class LessonResourceAdminControllerTest {
 
     @Test
     void aTakenOrderReturnsConflict() throws Exception {
+        when(files.exists(any())).thenReturn(true);
         when(repository.save(any())).thenThrow(new DuplicateLessonResourceOrderException(LessonResourceType.SLIDE, 0));
         mvc.perform(post("/api/content/admin/lessons/{id}/resources", lessonId).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"type\":\"SLIDE\",\"title\":\"Slide\",\"url\":\"https://a.com\",\"sortOrder\":0}"))
+                        .content(fileBody(ownKey(), "SLIDE")))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.details.code").value("DUPLICATE_RESOURCE_ORDER"));
     }
@@ -124,14 +125,14 @@ class LessonResourceAdminControllerTest {
     @Test
     void updatesAndDeletesOnlyAResourceOfThePathLesson() throws Exception {
         LessonResource own = resource(LessonResourceType.SLIDE, "Slide", 0);
-        LessonResource other = LessonResource.create(UUID.randomUUID(), LessonResourceType.SLIDE, "Other",
-                "https://a.com", 0);
+        LessonResource other = LessonResource.createFile(UUID.randomUUID(), LessonResourceType.SLIDE, "Other",
+                "lesson-document/" + userId + "/" + UUID.randomUUID() + ".pdf", 0);
         when(repository.findById(own.getId())).thenReturn(Optional.of(own));
         when(repository.findById(other.getId())).thenReturn(Optional.of(other));
 
         mvc.perform(put("/api/content/admin/lessons/{id}/resources/{rid}", lessonId, own.getId())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"title\":\"Slide mới\",\"url\":\"https://b.com\",\"sortOrder\":3}"))
+                        .content("{\"title\":\"Slide mới\",\"sortOrder\":3}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.title").value("Slide mới"))
                 .andExpect(jsonPath("$.type").value("SLIDE"))
@@ -195,6 +196,24 @@ class LessonResourceAdminControllerTest {
     }
 
     @Test
+    void createsASlideFromAnUploadedPdfAndRejectsASlideLinkInVietnamese() throws Exception {
+        String key = ownKey();
+        when(files.exists(key)).thenReturn(true);
+        when(files.signedUrl(key)).thenReturn("https://storage.example/slide.pdf");
+
+        mvc.perform(post("/api/content/admin/lessons/{id}/resources", lessonId).contentType(MediaType.APPLICATION_JSON)
+                        .content(fileBody(key, "SLIDE")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.type").value("SLIDE"))
+                .andExpect(jsonPath("$.fileKey").value(key))
+                .andExpect(jsonPath("$.url").value("https://storage.example/slide.pdf"));
+        mvc.perform(post("/api/content/admin/lessons/{id}/resources", lessonId).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\":\"SLIDE\",\"title\":\"Slide\",\"url\":\"https://a.com\",\"sortOrder\":0}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Slide phải là tệp PDF"));
+    }
+
+    @Test
     void rejectsAKeyThatAnotherAuthorUploadedWithoutSaving() throws Exception {
         String foreign = "lesson-document/" + UUID.randomUUID() + "/" + UUID.randomUUID() + ".pdf";
         when(files.exists(foreign)).thenReturn(true);
@@ -231,13 +250,10 @@ class LessonResourceAdminControllerTest {
     }
 
     @Test
-    void aSlideCannotBeAnUploadedFileAndALinkAndAFileCannotBeBoth() throws Exception {
+    void aResourceCannotHaveBothALinkAndAFileOrNeither() throws Exception {
         String key = ownKey();
         when(files.exists(key)).thenReturn(true);
 
-        mvc.perform(post("/api/content/admin/lessons/{id}/resources", lessonId).contentType(MediaType.APPLICATION_JSON)
-                        .content(fileBody(key, "SLIDE")))
-                .andExpect(status().isBadRequest());
         mvc.perform(post("/api/content/admin/lessons/{id}/resources", lessonId).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"type\":\"DOCUMENT\",\"title\":\"x\",\"url\":\"https://a.com\",\"fileKey\":\"" + key
                                 + "\",\"sortOrder\":0}"))
@@ -253,7 +269,7 @@ class LessonResourceAdminControllerTest {
         String key = ownKey();
         when(files.signedUrl(key)).thenReturn("https://storage.example/signed?token=t");
         when(repository.findByLessonId(lessonId)).thenReturn(List.of(
-                LessonResource.createFile(lessonId, "Giáo trình", key, 0),
+                LessonResource.createFile(lessonId, LessonResourceType.DOCUMENT, "Giáo trình", key, 0),
                 resource(LessonResourceType.DOCUMENT, "Liên kết", 1)));
 
         mvc.perform(get("/api/content/admin/lessons/{id}/resources", lessonId))
@@ -267,7 +283,7 @@ class LessonResourceAdminControllerTest {
     @Test
     void renamingAFileResourceKeepsItsFileAndRefusesALink() throws Exception {
         String key = ownKey();
-        LessonResource file = LessonResource.createFile(lessonId, "Cũ", key, 0);
+        LessonResource file = LessonResource.createFile(lessonId, LessonResourceType.DOCUMENT, "Cũ", key, 0);
         when(repository.findById(file.getId())).thenReturn(Optional.of(file));
         when(files.signedUrl(key)).thenReturn("https://storage.example/signed?token=t");
 
@@ -283,9 +299,9 @@ class LessonResourceAdminControllerTest {
     }
 
     @Test
-    void deletingAFileResourceRemovesItsFileAndAFailedCleanupDoesNotFailTheDelete() throws Exception {
+    void deletingASlideRemovesItsFileAndAFailedCleanupDoesNotFailTheDelete() throws Exception {
         String key = ownKey();
-        LessonResource file = LessonResource.createFile(lessonId, "Giáo trình", key, 0);
+        LessonResource file = LessonResource.createFile(lessonId, LessonResourceType.SLIDE, "Slide", key, 0);
         when(repository.findById(file.getId())).thenReturn(Optional.of(file));
         doThrow(new IllegalStateException("storage down")).when(files).delete(key);
 
@@ -296,6 +312,10 @@ class LessonResourceAdminControllerTest {
     }
 
     private LessonResource resource(LessonResourceType type, String title, int order) {
+        if (type == LessonResourceType.SLIDE) {
+            return LessonResource.createFile(lessonId, type, title,
+                    "lesson-document/" + userId + "/" + UUID.randomUUID() + ".pdf", order);
+        }
         return LessonResource.create(lessonId, type, title, "https://example.com/" + order, order);
     }
 }

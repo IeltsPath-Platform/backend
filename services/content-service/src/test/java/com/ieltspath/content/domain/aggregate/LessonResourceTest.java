@@ -16,14 +16,15 @@ class LessonResourceTest {
     private final UUID lessonId = UUID.randomUUID();
 
     @Test
-    void createTrimsTitleAndLinkAndKeepsTheType() {
-        LessonResource resource = LessonResource.create(lessonId, LessonResourceType.SLIDE, "  Slide buổi 1 ",
-                " https://docs.google.com/presentation/d/abc/edit ", 0);
+    void createTrimsTitleAndFileKeyAndKeepsTheType() {
+        LessonResource resource = LessonResource.createFile(lessonId, LessonResourceType.SLIDE, "  Slide buổi 1 ",
+                " " + KEY + " ", 0);
 
         assertThat(resource.getLessonId()).isEqualTo(lessonId);
         assertThat(resource.getResourceType()).isEqualTo(LessonResourceType.SLIDE);
         assertThat(resource.getTitle()).isEqualTo("Slide buổi 1");
-        assertThat(resource.getUrl()).isEqualTo("https://docs.google.com/presentation/d/abc/edit");
+        assertThat(resource.getUrl()).isNull();
+        assertThat(resource.getFileKey()).isEqualTo(KEY);
         assertThat(resource.getCreatedAt()).isEqualTo(resource.getUpdatedAt());
     }
 
@@ -31,7 +32,8 @@ class LessonResourceTest {
 
     @Test
     void aDocumentCanBeAnUploadedFileThatHasNoLink() {
-        LessonResource file = LessonResource.createFile(lessonId, " Giáo trình ", " " + KEY + " ", 0);
+        LessonResource file = LessonResource.createFile(lessonId, LessonResourceType.DOCUMENT, " Giáo trình ",
+                " " + KEY + " ", 0);
 
         assertThat(file.getResourceType()).isEqualTo(LessonResourceType.DOCUMENT);
         assertThat(file.getFileKey()).isEqualTo(KEY);
@@ -41,7 +43,7 @@ class LessonResourceTest {
 
     @Test
     void aFileResourceCanBeRenamedAndReorderedButNotTurnedIntoALink() {
-        LessonResource file = LessonResource.createFile(lessonId, "Cũ", KEY, 0);
+        LessonResource file = LessonResource.createFile(lessonId, LessonResourceType.DOCUMENT, "Cũ", KEY, 0);
 
         file.update("Mới", null, 3);
 
@@ -58,9 +60,10 @@ class LessonResourceTest {
                 "https://a.com", KEY, 0, now, now)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new LessonResource(UUID.randomUUID(), lessonId, LessonResourceType.DOCUMENT, "x",
                 null, null, 0, now, now)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new LessonResource(UUID.randomUUID(), lessonId, LessonResourceType.SLIDE, "x",
-                null, KEY, 0, now, now)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> LessonResource.createFile(lessonId, "x", "content-image/u/f.png", 0))
+        assertThatThrownBy(() -> LessonResource.create(lessonId, LessonResourceType.SLIDE, "x", "https://a.com", 0))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("Slide phải là tệp PDF");
+        assertThatThrownBy(() -> LessonResource.createFile(lessonId, LessonResourceType.DOCUMENT, "x",
+                "content-image/u/f.png", 0))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -80,14 +83,14 @@ class LessonResourceTest {
 
     @Test
     void blankOrLongTitlesTooLongLinksAndNegativeOrderAreRejected() {
-        assertThatThrownBy(() -> LessonResource.create(lessonId, LessonResourceType.SLIDE, " ", "https://a.com", 0))
+        assertThatThrownBy(() -> LessonResource.createFile(lessonId, LessonResourceType.SLIDE, " ", KEY, 0))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> LessonResource.create(lessonId, LessonResourceType.SLIDE, "x".repeat(256),
-                "https://a.com", 0)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> LessonResource.create(lessonId, LessonResourceType.SLIDE, "Slide",
+        assertThatThrownBy(() -> LessonResource.createFile(lessonId, LessonResourceType.SLIDE, "x".repeat(256),
+                KEY, 0)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> LessonResource.create(lessonId, LessonResourceType.DOCUMENT, "Doc",
                 "https://a.com/" + "x".repeat(LessonResource.MAX_URL_LENGTH), 0))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> LessonResource.create(lessonId, LessonResourceType.SLIDE, "Slide", "https://a.com", -1))
+        assertThatThrownBy(() -> LessonResource.createFile(lessonId, LessonResourceType.SLIDE, "Slide", KEY, -1))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> LessonResource.create(lessonId, null, "Slide", "https://a.com", 0))
                 .isInstanceOf(IllegalArgumentException.class);

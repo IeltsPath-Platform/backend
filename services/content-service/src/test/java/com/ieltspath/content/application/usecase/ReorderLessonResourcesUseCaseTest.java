@@ -67,6 +67,10 @@ class ReorderLessonResourcesUseCaseTest {
     }
 
     private LessonResource resource(LessonResourceType type, int sortOrder) {
+        if (type == LessonResourceType.SLIDE) {
+            return LessonResource.createFile(lessonId, type, "Resource",
+                    "lesson-document/" + UUID.randomUUID() + "/" + UUID.randomUUID() + ".pdf", sortOrder);
+        }
         return LessonResource.create(lessonId, type, "Resource", "https://example.com/" + UUID.randomUUID(), sortOrder);
     }
 }

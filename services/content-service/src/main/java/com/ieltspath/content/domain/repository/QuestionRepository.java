@@ -19,6 +19,9 @@ public interface QuestionRepository {
      * not needed by the list response. {@code page} is zero-based.
      */
     Page findPage(Skill skill, QuestionPurpose purpose, PublicationStatus status, String code, int page, int size);
+    Page findFreePage(Skill skill, QuestionPurpose purpose, PublicationStatus status, String code, UUID exceptBlockId, int page, int size);
+    List<VersionStem> findVersionStems(List<UUID> versionIds);
+    List<VersionKnowledgePoint> findVersionKnowledgePoints(List<UUID> versionIds);
     default Page findPage(Skill skill, QuestionPurpose purpose, PublicationStatus status, int page, int size) {
         return findPage(skill, purpose, status, null, page, size);
     }
@@ -27,5 +30,7 @@ public interface QuestionRepository {
     boolean existsByCode(String code);
 
     record Page(long totalElements, List<Question> items) {}
+    record VersionStem(UUID versionId, String stem) {}
+    record VersionKnowledgePoint(UUID versionId, String code, String name, int total) {}
 }
 

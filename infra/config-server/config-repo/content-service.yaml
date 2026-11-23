@@ -49,6 +49,9 @@ app:
     supabase:
       url: ${SUPABASE_URL:}
       secret-key: ${SUPABASE_SECRET_KEY:}
+      # The default of 3 s is shorter than a slow TLS handshake to Supabase from some networks, which fails an
+      # upload as STORAGE_UNAVAILABLE before any byte is sent. The upload itself keeps its own 120 s limit.
+      connect-timeout: ${CONTENT_STORAGE_CONNECT_TIMEOUT:10s}
   auth:
     internal-jwt-issuer: ${INTERNAL_JWT_ISSUER:urn:code-base:api-gateway}
     internal-jwt-secret: ${GATEWAY_INTERNAL_JWT_SECRET}

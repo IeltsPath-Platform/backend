@@ -189,8 +189,18 @@ public class CourseDraftCodec {
                 continue;
             }
             text(problems, where + ".title", resource.title(), 255);
-            if (resource.url() == null || resource.url().length() > 2000 || !WEB_LINK.matcher(resource.url().trim()).matches()) {
+            boolean hasUrl = resource.url() != null && !resource.url().isBlank();
+            boolean hasFile = resource.fileKey() != null && !resource.fileKey().isBlank();
+            if (resource.type() == com.ieltspath.content.domain.vo.LessonResourceType.SLIDE) {
+                if (!hasFile || hasUrl) {
+                    problems.add(new Problem(where + ".fileKey", hasUrl ? "FILE_REQUIRED" : "REQUIRED"));
+                }
+            } else if (hasUrl == hasFile) {
+                problems.add(new Problem(where + ".url", hasUrl ? "MUTUALLY_EXCLUSIVE" : "REQUIRED"));
+            } else if (hasUrl && (resource.url().length() > 2000 || !WEB_LINK.matcher(resource.url().trim()).matches())) {
                 problems.add(new Problem(where + ".url", "INVALID"));
+            } else if (hasFile && resource.fileKey().length() > 2000) {
+                problems.add(new Problem(where + ".fileKey", "TOO_LONG"));
             }
         }
         vocabulary(problems, at, lesson);

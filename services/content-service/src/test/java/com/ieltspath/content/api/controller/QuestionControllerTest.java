@@ -45,6 +45,9 @@ class QuestionControllerTest {
     private ListQuestionsUseCase listQuestionsUseCase;
 
     @Mock
+    private ListQuestionsWithIncludesUseCase listQuestionsWithIncludesUseCase;
+
+    @Mock
     private GetQuestionDetailUseCase getQuestionDetailUseCase;
 
     @Mock
@@ -91,7 +94,9 @@ class QuestionControllerTest {
                 .andExpect(jsonPath("$.page").value(0))
                 .andExpect(jsonPath("$.size").value(25))
                 .andExpect(jsonPath("$.totalElements").value(1))
-                .andExpect(jsonPath("$.totalPages").value(1));
+                .andExpect(jsonPath("$.totalPages").value(1))
+                .andExpect(jsonPath("$.content[0].ownedElsewhere").doesNotExist())
+                .andExpect(jsonPath("$.content[0].stemExcerpt").doesNotExist());
     }
 
     @Test
@@ -120,6 +125,33 @@ class QuestionControllerTest {
     }
 
     @Test
+    void unknownIncludeReturnsVietnameseBadRequest() throws Exception {
+        mockMvc.perform(get("/api/content/admin/questions?include=ownership,unknown"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Chỉ hỗ trợ bổ sung trạng thái sử dụng hoặc bản xem trước câu hỏi."));
+    }
+
+    @Test
+    void includesQuestionOwnershipAndPreviewWhenRequested() throws Exception {
+        UUID id = UUID.randomUUID();
+        QuestionResult result = new QuestionResult(id, QuestionType.MULTIPLE_CHOICE, Skill.READING, null,
+                PublicationStatus.PUBLISHED, UUID.randomUUID(), Instant.now(), Instant.now(),
+                QuestionPurpose.LEARNING, null, "Q-000042").enriched(true, "Đoạn đầu…",
+                List.of(new com.ieltspath.content.application.result.QuestionPreviewKnowledgePointResult("R1", "Đọc hiểu")), 5);
+        when(listQuestionsWithIncludesUseCase.execute(Skill.READING, QuestionPurpose.LEARNING,
+                PublicationStatus.PUBLISHED, null, 0, 25, java.util.Set.of("ownership", "preview"), false, null))
+                .thenReturn(new ListQuestionsUseCase.Page(1, 0, 25, List.of(result)));
+
+        mockMvc.perform(get("/api/content/admin/questions?skill=READING&purpose=LEARNING&status=PUBLISHED&include=ownership,preview"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].ownedElsewhere").value(true))
+                .andExpect(jsonPath("$.content[0].stemExcerpt").value("Đoạn đầu…"))
+                .andExpect(jsonPath("$.content[0].knowledgePoints[0].code").value("R1"))
+                .andExpect(jsonPath("$.content[0].knowledgePoints[0].name").value("Đọc hiểu"))
+                .andExpect(jsonPath("$.content[0].knowledgePointTotal").value(5));
+    }
+
+    @Test
     @DisplayName("GET /api/content/admin/questions/versions/{id}/passages returns the passages of the version")
     void shouldReturnThePassagesOfAVersion() throws Exception {
         UUID version = UUID.randomUUID();
@@ -133,6 +165,24 @@ class QuestionControllerTest {
                 .andExpect(jsonPath("$[0].text").value("A. In autumn"))
                 .andExpect(jsonPath("$[0].source").value("LESSON"))
                 .andExpect(jsonPath("$[0].sourceName").value("Reading lesson"));
+    }
+
+    @Test
+    @DisplayName("a recording of the version comes with its transcript, link and length")
+    void shouldReturnTheRecordingOfAVersion() throws Exception {
+        UUID version = UUID.randomUUID();
+        UUID asset = UUID.randomUUID();
+        when(getQuestionPassagesUseCase.execute(version)).thenReturn(List.of(new com.ieltspath.content.application.port.QuestionPassageReader.Passage(
+                asset, com.ieltspath.content.domain.vo.AssetType.AUDIO, "Transcript",
+                com.ieltspath.content.application.port.QuestionPassageReader.Source.SECTION, "Listening section", "clip.mp3",
+                com.ieltspath.content.domain.vo.AccessTier.PUBLIC, 95, "https://media.example/clip.mp3")));
+
+        mockMvc.perform(get("/api/content/admin/questions/versions/" + version + "/passages"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].type").value("AUDIO"))
+                .andExpect(jsonPath("$[0].text").value("Transcript"))
+                .andExpect(jsonPath("$[0].mediaUrl").value("https://media.example/clip.mp3"))
+                .andExpect(jsonPath("$[0].durationSeconds").value(95));
     }
 
     @Test

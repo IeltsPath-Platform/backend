@@ -79,11 +79,36 @@ class JdbcQuestionPassageReaderTest {
     }
 
     @Test
-    void ignoresAssetsThatAreNotPassagesAndAnswersEmptyForAVersionWithNone() {
+    void findsTheRecordingOfASectionWithItsTranscriptTierAndLength() {
         UUID version = questionVersion();
+        UUID section = section("Listening section");
+        jdbc.update("INSERT INTO section_questions(id,section_id,question_version_id,sort_order) VALUES(?,?,?,1)", UUID.randomUUID(), section, version);
         UUID audio = UUID.randomUUID();
-        jdbc.update("INSERT INTO content_assets(id,asset_type,media_reference) VALUES(?,'AUDIO','clip.mp3')", audio);
-        jdbc.update("INSERT INTO content_asset_links(id,asset_id,question_version_id,sort_order) VALUES(?,?,?,0)", UUID.randomUUID(), audio, version);
+        jdbc.update("INSERT INTO content_assets(id,asset_type,media_reference,text_content,duration_seconds,access_tier) VALUES(?,'AUDIO','clip.mp3','Transcript text',95,'PREMIUM')", audio);
+        jdbc.update("INSERT INTO content_asset_links(id,asset_id,section_id,sort_order) VALUES(?,?,?,0)", UUID.randomUUID(), audio, section);
+
+        List<Passage> found = reader.passagesOf(version);
+
+        assertThat(found).hasSize(1);
+        Passage recording = found.get(0);
+        assertThat(recording.type()).isEqualTo(com.ieltspath.content.domain.vo.AssetType.AUDIO);
+        assertThat(recording.mediaReference()).isEqualTo("clip.mp3");
+        assertThat(recording.text()).isEqualTo("Transcript text");
+        assertThat(recording.durationSeconds()).isEqualTo(95);
+        assertThat(recording.tier()).isEqualTo(com.ieltspath.content.domain.vo.AccessTier.PREMIUM);
+        assertThat(recording.source()).isEqualTo(Source.SECTION);
+        assertThat(recording.mediaUrl()).isNull();
+    }
+
+    @Test
+    void ignoresRecordingsWithoutAFileAndOtherAssetsAndAnswersEmptyForAVersionWithNone() {
+        UUID version = questionVersion();
+        UUID noFile = UUID.randomUUID();
+        jdbc.update("INSERT INTO content_assets(id,asset_type,text_content) VALUES(?,'AUDIO','Only a transcript')", noFile);
+        jdbc.update("INSERT INTO content_asset_links(id,asset_id,question_version_id,sort_order) VALUES(?,?,?,0)", UUID.randomUUID(), noFile, version);
+        UUID image = UUID.randomUUID();
+        jdbc.update("INSERT INTO content_assets(id,asset_type,media_reference) VALUES(?,'IMAGE','chart.png')", image);
+        jdbc.update("INSERT INTO content_asset_links(id,asset_id,question_version_id,sort_order) VALUES(?,?,?,1)", UUID.randomUUID(), image, version);
 
         assertThat(reader.passagesOf(version)).isEmpty();
         assertThat(reader.passagesOf(UUID.randomUUID())).isEmpty();
