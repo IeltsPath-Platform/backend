@@ -37,6 +37,7 @@ class GradeGateEssayJobUseCaseTest {
     private final GateEssayJobStore jobs = mock(GateEssayJobStore.class);
     private final EssayGradingPort grader = mock(EssayGradingPort.class);
     private final AssessmentLlmQuota quota = mock(AssessmentLlmQuota.class);
+    private final PremiumLookup premiumLookup = mock(PremiumLookup.class);
     private final GateResultAssembler assembler = mock(GateResultAssembler.class);
     private final PlacementGradingService placement = mock(PlacementGradingService.class);
     private final RecordingTransactionManager tx = new RecordingTransactionManager();
@@ -135,6 +136,32 @@ class GradeGateEssayJobUseCaseTest {
 
         verify(jobs).fail(jobId, now);
         verify(jobs).enqueueHuman(submissionId, userId, "gate-essay:" + itemId + ":human", "LLM_QUOTA");
+        verify(grader, never()).grade(any(), any());
+    }
+
+    @Test
+    void premiumLearnerUsesFortyEssayDailyLimit() {
+        stubClaim();
+        when(grader.available()).thenReturn(true);
+        when(premiumLookup.isPremium(userId)).thenReturn(true);
+        when(quota.tryConsume(eq(userId), any(LocalDate.class), eq(40))).thenReturn(false);
+
+        useCase().gradeBatch();
+
+        verify(quota).tryConsume(eq(userId), any(LocalDate.class), eq(40));
+        verify(grader, never()).grade(any(), any());
+    }
+
+    @Test
+    void failedPremiumLookupUsesTheNormalDailyLimit() {
+        stubClaim();
+        when(grader.available()).thenReturn(true);
+        when(premiumLookup.isPremium(userId)).thenThrow(new IllegalStateException("Access unavailable"));
+        when(quota.tryConsume(eq(userId), any(LocalDate.class), eq(4))).thenReturn(false);
+
+        useCase().gradeBatch();
+
+        verify(quota).tryConsume(eq(userId), any(LocalDate.class), eq(4));
         verify(grader, never()).grade(any(), any());
     }
 
@@ -251,8 +278,9 @@ class GradeGateEssayJobUseCaseTest {
     }
 
     private GradeGateEssayJobUseCase useCase(PromptActivationProvider activations) {
-        return new GradeGateEssayJobUseCase(jobs, grader, quota, assembler, placement, activations, tx, new ObjectMapper(),
-                5, 4, Duration.ofMinutes(10), ZoneId.of("UTC"), java.time.Clock.fixed(now, ZoneId.of("UTC")));
+        return new GradeGateEssayJobUseCase(jobs, grader, quota, assembler, placement, activations, premiumLookup, tx,
+                new ObjectMapper(), 5, 4, 40, Duration.ofMinutes(10), ZoneId.of("UTC"),
+                java.time.Clock.fixed(now, ZoneId.of("UTC")));
     }
 
     /** A real Spring transaction boundary so the assertions detect accidentally moving quota/LLM work inside it. */

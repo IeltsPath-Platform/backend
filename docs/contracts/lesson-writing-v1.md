@@ -242,8 +242,12 @@ results replace this essay's AI criterion evidence, and its marked errors count 
 - 3 points per successful grading (Access Service, `POST /internal/access/points/debit`, idempotency key
   `lesson-writing:{userId}:{requestId}`). Points are charged only after the LLM grade succeeds; there is no refund.
 - At most one `GRADING` submission per learner and block.
-- Daily limit: at most 10 gradings per learner per day (`Asia/Ho_Chi_Minh`), counted when the LLM is called. Exceeding
+- Daily limit: at most 20 gradings per learner per day by default (`Asia/Ho_Chi_Minh`), counted when the LLM is called. Exceeding
   it → 429 `DAILY_LIMIT_REACHED`, no LLM call, no charge.
+- Premium grading: an active Premium learner is graded at `pointCost: 0` without a balance check or points debit.
+  Writing, Practice and free-writing submissions use `learning.writing.premium-daily-grading-limit` (default 20);
+  other learners use `learning.writing.daily-grading-limit` (default 20 in Config Server). A failed Premium lookup
+  falls back to the normal paid path and limit.
 - Mastery evidence (`source = lesson_writing`) is recorded on every graded submission until the block is first passed,
   and never after. It has one row per knowledge point of the question, and one row per rubric criterion whose knowledge
   point is mapped, with `correct = criterion band >= passBand`. A question point judged `PASS` is `correct = true` and one

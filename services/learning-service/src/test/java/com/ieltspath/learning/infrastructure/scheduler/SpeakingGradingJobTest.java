@@ -5,6 +5,7 @@ import com.ieltspath.commonstorage.ObjectStorage;
 import com.ieltspath.learning.application.exception.LlmUnavailableException;
 import com.ieltspath.learning.application.exception.SpeechUnavailableException;
 import com.ieltspath.learning.application.port.LearningContentClient;
+import com.ieltspath.learning.application.port.AccessClient;
 import com.ieltspath.learning.application.port.LlmUsageQuota;
 import com.ieltspath.learning.application.port.SpeechAnalysisClient;
 import com.ieltspath.learning.application.service.SpeakingGrader;
@@ -64,6 +65,7 @@ class SpeakingGradingJobTest {
     private final SpeechAnalysisClient speech = mock(SpeechAnalysisClient.class);
     private final SpeakingGrader grader = mock(SpeakingGrader.class);
     private final LlmUsageQuota quota = mock(LlmUsageQuota.class);
+    private final AccessClient access = mock(AccessClient.class);
     private final SpeakingGradingContextCapture contexts = mock(SpeakingGradingContextCapture.class);
     private final SpeakingHistorySummarizer history = mock(SpeakingHistorySummarizer.class);
     private final ObjectMapper json = new ObjectMapper();
@@ -71,7 +73,7 @@ class SpeakingGradingJobTest {
 
     @BeforeEach
     void setUp() {
-        job = new SpeakingGradingJob(submissions, storage, speech, grader, quota, SpeakingSettingsFixture.enabled(), json,
+        job = new SpeakingGradingJob(submissions, storage, speech, grader, quota, SpeakingSettingsFixture.enabled(), access, json,
                 contexts, history);
         when(grader.available()).thenReturn(true);
         when(speech.available()).thenReturn(true);
@@ -155,6 +157,27 @@ class SpeakingGradingJobTest {
         // Nothing was taken from the day, so nothing is given back.
         verify(quota, never()).release(any(), any(), anyString());
         verify(grader, never()).grade(any(), any());
+        verify(quota).tryConsume(eq(USER), any(LocalDate.class), eq("speaking_grading"), eq(5));
+    }
+
+    @Test
+    void premiumDailyLimitIsTenAndLookupFailureUsesTheNormalLimit() {
+        SpeakingSubmission premiumSubmission = claimed();
+        when(speech.analyze(any(), any())).thenReturn(heard());
+        when(grader.prepare(any(), any())).thenReturn(new SpeakingPromptAssembler.Prepared(
+                new LearningContentClient.Rubric("IELTS_SPEAKING", "SPEAKING", 2, "note", List.of(), List.of()),
+                "a".repeat(64), "user"));
+        when(access.premiumOf(USER)).thenReturn(true);
+        when(quota.tryConsume(any(), any(), anyString(), anyInt())).thenReturn(false);
+
+        job.runOne();
+
+        verify(quota).tryConsume(eq(USER), any(LocalDate.class), eq("speaking_grading"), eq(10));
+
+        SpeakingSubmission normalSubmission = claimed();
+        when(access.premiumOf(USER)).thenThrow(new RuntimeException("unavailable"));
+        job.runOne();
+        verify(quota).tryConsume(eq(USER), any(LocalDate.class), eq("speaking_grading"), eq(5));
     }
 
     @Test
@@ -248,7 +271,7 @@ class SpeakingGradingJobTest {
 
     private SpeakingGradingJob jobWith(int workers, boolean wakeOnSubmit) {
         return new SpeakingGradingJob(submissions, storage, speech, grader, quota,
-                SpeakingSettingsFixture.withWorkers(true, 5L * 1024 * 1024, workers, 4, wakeOnSubmit), json, contexts, history);
+                SpeakingSettingsFixture.withWorkers(true, 5L * 1024 * 1024, workers, 4, wakeOnSubmit), access, json, contexts, history);
     }
 
     /** A claimed submission with one recording, so what runs at the same time is whole submissions. */

@@ -45,6 +45,8 @@ class WritingSettingsBindingTest {
         WritingSettings settings = new Binder(new MapConfigurationPropertySource(Map.of("learning.writing.point-cost", "3")))
                 .bind("learning.writing", WritingSettings.class).get();
 
+        assertEquals(20, settings.dailyGradingLimit());
+        assertEquals(20, settings.premiumDailyGradingLimit());
         var rules = settings.density().rules();
         assertNull(rules.grammarCap());
         assertNull(rules.vocabularyCap());

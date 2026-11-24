@@ -22,8 +22,8 @@ import java.util.UUID;
 
 /**
  * Sends a free-writing essay to the examiner the learner chose, in place of the AI grade. The essay is stored first as
- * AWAITING_EXAMINER, then sent for review: Access spends one Premium grading credit (402 when the learner has no Premium
- * or no credit left) and Assessment queues it for that examiner (409 when the examiner cannot take it). Nothing here
+ * AWAITING_EXAMINER, then sent for review: an active Premium subscription enables unlimited requests (402 without one),
+ * and Assessment queues it for that examiner (409 when the examiner cannot take it). Nothing here
  * grades or charges points. The credit is idempotent by essay, and Mentor requests are idempotent by essay too, so a
  * resend with the same {@code requestId} continues the same essay: after a refusal the learner sends it again, possibly
  * to another examiner, without storing a second essay. A different {@code requestId} is a new essay: it is refused with

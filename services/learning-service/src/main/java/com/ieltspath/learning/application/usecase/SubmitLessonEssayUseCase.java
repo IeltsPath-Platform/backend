@@ -91,6 +91,7 @@ public class SubmitLessonEssayUseCase {
      */
     public WritingSubmissionResult execute(UUID userId, UUID lessonId, UUID blockId, UUID requestId, String essayText,
                                            WritingSubmission revising) {
+        boolean premium = flow.premiumLearner();
         int words = flow.validate(essayText);
 
         Optional<WritingSubmission> existing = essays.findByRequestId(requestId);
@@ -111,11 +112,11 @@ public class SubmitLessonEssayUseCase {
         if (!block.isEssay()) {
             throw new LearningRequestException(409, "NOT_ESSAY_BLOCK", "This block is not an essay");
         }
-        flow.requireBalance();
+        flow.requireBalance(premium);
 
         WritingSubmission grading = transaction.execute(status -> startGrading(userId, lesson, block, requestId,
-                essayText, words, revising));
-        flow.grade(grading);
+                essayText, words, revising, premium));
+        flow.grade(grading, premium);
         return charge(grading);
     }
 
@@ -126,7 +127,7 @@ public class SubmitLessonEssayUseCase {
     }
 
     private WritingSubmission startGrading(UUID userId, Lesson lesson, Block block, UUID requestId, String essayText,
-                                           int words, WritingSubmission revising) {
+                                           int words, WritingSubmission revising, boolean premium) {
         lock.lock(userId);
         var context = access.authorize(userId, lesson);
         access.refresh(userId, lesson, context.progress());
@@ -146,7 +147,7 @@ public class SubmitLessonEssayUseCase {
         if (existing.isEmpty()) {
             WritingSubmission submission = WritingSubmission.start(UUID.randomUUID(), userId, lesson.lessonId(),
                     block.blockId(), requestId, essayText, words, EssayPrompts.of(block.questions().getFirst()),
-                    flow.pointCost(), now);
+                    flow.pointCost(premium), now);
             if (revising != null) {
                 if (essays.hasActiveRevision(revising.id())) {
                     throw new LearningRequestException(409, "REVISION_NOT_LATEST",
