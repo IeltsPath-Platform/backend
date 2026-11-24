@@ -62,14 +62,16 @@ public class CourseImportValidator {
     }
 
     private Validated run(CourseImportModel model, ImportCatalogFacts facts) {
-        CourseInfo course = course(model);
+        CourseInfo course = course(model, facts);
         Map<String, Row> topicRows = new LinkedHashMap<>();
-        List<TopicDraft> topics = topics(model, topicRows);
+        Set<String> declaredTopicCodes = declaredValues(model, CourseImportModel.TOPICS, "code");
+        Set<String> declaredQuestionRefs = declaredValues(model, CourseImportModel.QUESTIONS, "importRef");
+        List<TopicDraft> topics = topics(model, topicRows, facts);
         Map<String, Row> lessonRows = new LinkedHashMap<>();
         Map<String, QuestionPlan> questions = questions(model, facts);
-        List<LessonDraft> lessons = lessons(model, topicRows.keySet(), lessonRows, facts);
-        attachBlocks(model, lessons, lessonRows, questions, facts);
-        List<PackagePlan> packages = packages(model, topicRows.keySet(), lessonRows.keySet(), questions, facts);
+        List<LessonDraft> lessons = lessons(model, topicRows.keySet(), declaredTopicCodes, lessonRows, facts);
+        attachBlocks(model, lessons, lessonRows, questions, declaredQuestionRefs, facts);
+        List<PackagePlan> packages = packages(model, topicRows.keySet(), lessonRows.keySet(), questions, declaredQuestionRefs, facts);
 
         Summary summary = new Summary(topics.size(), lessons.size(), questions.size(), packages.size());
         if (!errors.isEmpty()) {
@@ -89,7 +91,7 @@ public class CourseImportValidator {
 
     // --- Course
 
-    private CourseInfo course(CourseImportModel model) {
+    private CourseInfo course(CourseImportModel model, ImportCatalogFacts facts) {
         List<Row> rows = model.rows(CourseImportModel.COURSE);
         if (rows.size() != 1) {
             add(CourseImportModel.COURSE, rows.isEmpty() ? 0 : rows.get(1).number(), "", rows.isEmpty() ? "REQUIRED"
@@ -100,6 +102,12 @@ public class CourseImportValidator {
         String code = code(CourseImportModel.COURSE, row, "code");
         String name = text(CourseImportModel.COURSE, row, "name", 255);
         BigDecimal band = band(CourseImportModel.COURSE, row, "bandLevel");
+        if (code != null && facts.takenCourseCodes().contains(code)) {
+            add(CourseImportModel.COURSE, row.number(), "code", "CODE_CONFLICT", "A course already has this code.");
+        }
+        if (band != null && facts.takenBandLevels().contains(band.stripTrailingZeros().toPlainString())) {
+            add(CourseImportModel.COURSE, row.number(), "bandLevel", "CODE_CONFLICT", "A course already has this band.");
+        }
         return code == null || name == null || band == null ? null : new CourseInfo(code, name, band);
     }
 
@@ -108,7 +116,7 @@ public class CourseImportValidator {
     private record TopicDraft(String code, String name, Skill skill, int sortOrder) {
     }
 
-    private List<TopicDraft> topics(CourseImportModel model, Map<String, Row> rowsByCode) {
+    private List<TopicDraft> topics(CourseImportModel model, Map<String, Row> rowsByCode, ImportCatalogFacts facts) {
         List<TopicDraft> topics = new ArrayList<>();
         Set<Integer> sortOrders = new HashSet<>();
         List<Row> rows = model.rows(CourseImportModel.TOPICS);
@@ -118,11 +126,19 @@ public class CourseImportValidator {
             String name = text(CourseImportModel.TOPICS, row, "name", 255);
             Skill skill = enumValue(CourseImportModel.TOPICS, row, "skill", Skill.class);
             Integer sortOrder = integer(CourseImportModel.TOPICS, row, "sortOrder", true);
-            if (code != null && rowsByCode.put(code, row) != null) {
-                add(CourseImportModel.TOPICS, row.number(), "code", "DUPLICATE", "This topic code is used twice.");
+            if (code != null) {
+                if (rowsByCode.put(code, row) != null) {
+                    add(CourseImportModel.TOPICS, row.number(), "code", "DUPLICATE", "This topic code is used twice.");
+                } else if (facts.takenTopicCodes().contains(code)) {
+                    add(CourseImportModel.TOPICS, row.number(), "code", "CODE_CONFLICT", "A topic already has this code.");
+                }
             }
-            if (sortOrder != null && !sortOrders.add(sortOrder)) {
-                add(CourseImportModel.TOPICS, row.number(), "sortOrder", "DUPLICATE", "This sort order is used twice.");
+            if (sortOrder != null) {
+                if (!sortOrders.add(sortOrder)) {
+                    add(CourseImportModel.TOPICS, row.number(), "sortOrder", "DUPLICATE", "This sort order is used twice.");
+                } else if (facts.takenTopicSortOrders().contains(sortOrder)) {
+                    add(CourseImportModel.TOPICS, row.number(), "sortOrder", "CODE_CONFLICT", "A topic already uses this sort order.");
+                }
             }
             if (code != null && name != null && skill != null && sortOrder != null) {
                 topics.add(new TopicDraft(code, name, skill, sortOrder));
@@ -165,8 +181,8 @@ public class CourseImportValidator {
     private record BlockDraft(int order, int row, BlockPlan plan) {
     }
 
-    private List<LessonDraft> lessons(CourseImportModel model, Set<String> topicCodes, Map<String, Row> rowsByCode,
-                                      ImportCatalogFacts facts) {
+    private List<LessonDraft> lessons(CourseImportModel model, Set<String> topicCodes, Set<String> declaredTopicCodes,
+                                      Map<String, Row> rowsByCode, ImportCatalogFacts facts) {
         List<LessonDraft> lessons = new ArrayList<>();
         List<Row> rows = model.rows(CourseImportModel.LESSONS);
         if (rows.isEmpty()) add(CourseImportModel.LESSONS, 0, "", "REQUIRED", "The Lessons sheet needs at least one row.");
@@ -176,7 +192,7 @@ public class CourseImportValidator {
             String title = text(CourseImportModel.LESSONS, row, "title", 255);
             if (topicCode.isEmpty()) {
                 add(CourseImportModel.LESSONS, row.number(), "topicCode", "REQUIRED", "A lesson needs its topic.");
-            } else if (!topicCodes.contains(topicCode)) {
+            } else if (!declaredTopicCodes.contains(topicCode)) {
                 add(CourseImportModel.LESSONS, row.number(), "topicCode", "UNKNOWN_REFERENCE",
                         "This topic code is not in the Topics sheet.");
             }
@@ -185,8 +201,12 @@ public class CourseImportValidator {
                     "The summary is longer than 2000 characters.");
             Integer order = integer(CourseImportModel.LESSONS, row, "sortOrder", false);
             List<UUID> points = knowledgePoints(CourseImportModel.LESSONS, row, facts);
-            if (code != null && rowsByCode.put(code, row) != null) {
-                add(CourseImportModel.LESSONS, row.number(), "code", "DUPLICATE", "This lesson code is used twice.");
+            if (code != null) {
+                if (rowsByCode.put(code, row) != null) {
+                    add(CourseImportModel.LESSONS, row.number(), "code", "DUPLICATE", "This lesson code is used twice.");
+                } else if (facts.takenLessonCodes().contains(code)) {
+                    add(CourseImportModel.LESSONS, row.number(), "code", "CODE_CONFLICT", "A lesson already has this code.");
+                }
             }
             if (code != null && title != null && topicCodes.contains(topicCode)) {
                 lessons.add(new LessonDraft(code, topicCode, title, summary.isEmpty() ? null : summary,
@@ -197,7 +217,8 @@ public class CourseImportValidator {
     }
 
     private void attachBlocks(CourseImportModel model, List<LessonDraft> lessons, Map<String, Row> lessonRows,
-                              Map<String, QuestionPlan> questions, ImportCatalogFacts facts) {
+                              Map<String, QuestionPlan> questions, Set<String> declaredQuestionRefs,
+                              ImportCatalogFacts facts) {
         Map<String, LessonDraft> byCode = new HashMap<>();
         lessons.forEach(lesson -> byCode.put(lesson.code, lesson));
         for (Row row : model.rows(CourseImportModel.BLOCKS)) {
@@ -230,7 +251,7 @@ public class CourseImportValidator {
                     add(CourseImportModel.BLOCKS, row.number(), "text", "INVALID_VALUE", "An EXERCISE block has no text.");
                 }
                 plan = new BlockPlan(BlockType.EXERCISE, null, List.of(),
-                        questionRefs(CourseImportModel.BLOCKS, row, questions, facts, true));
+                        questionRefs(CourseImportModel.BLOCKS, row, questions, declaredQuestionRefs, facts, true));
             }
             LessonDraft lesson = byCode.get(lessonCode);
             if (lesson != null) {
@@ -283,7 +304,18 @@ public class CourseImportValidator {
             String correct = "";
             List<String> accepted = new ArrayList<>();
             Map<String, String> distractors = new LinkedHashMap<>();
-            if (type != null && isChoice(type)) {
+            if (type == QuestionType.TRUE_FALSE_NOT_GIVEN) {
+                options.add(new Option("TRUE", "True"));
+                options.add(new Option("FALSE", "False"));
+                options.add(new Option("NOT_GIVEN", "Not Given"));
+                correct = row.get("answer").toUpperCase(java.util.Locale.ROOT);
+                String answer = correct;
+                if (options.stream().noneMatch(option -> option.key().equals(answer))) {
+                    add(sheet, row.number(), "answer", "ANSWER_NOT_IN_OPTIONS",
+                            "The answer is TRUE, FALSE or NOT_GIVEN.");
+                }
+                distractors(sheet, row, options, correct, facts, distractors);
+            } else if (type == QuestionType.MULTIPLE_CHOICE) {
                 for (char key = 'A'; key < 'A' + MAX_OPTIONS; key++) {
                     String content = row.get("option" + key);
                     if (!content.isEmpty()) options.add(new Option(String.valueOf(key), content));
@@ -379,7 +411,8 @@ public class CourseImportValidator {
     // --- Packages
 
     private List<PackagePlan> packages(CourseImportModel model, Set<String> topicCodes, Set<String> lessonCodes,
-                                       Map<String, QuestionPlan> questions, ImportCatalogFacts facts) {
+                                       Map<String, QuestionPlan> questions, Set<String> declaredQuestionRefs,
+                                       ImportCatalogFacts facts) {
         List<PackagePlan> packages = new ArrayList<>();
         Set<String> codes = new HashSet<>();
         for (Row row : model.rows(CourseImportModel.PRACTICE_SETS)) {
@@ -392,7 +425,8 @@ public class CourseImportValidator {
                         "This lesson code is not in the Lessons sheet.");
             }
             knowledgePoints(sheet, row, facts);
-            List<String> refs = questionRefs(sheet, row, questions, facts, true);
+            List<String> refs = questionRefs(sheet, row, questions, declaredQuestionRefs, facts, true);
+            rejectMixedSkills(sheet, row, refs, questions, facts);
             if (code != null && title != null && lessonCodes.contains(lessonCode)) {
                 packages.add(new PackagePlan(PackageType.PRACTICE_SET, code, title, lessonCode, null, null, refs,
                         row.number()));
@@ -404,7 +438,7 @@ public class CourseImportValidator {
             String kind = row.get("kind");
             String code = packageCode(sheet, row, codes, facts);
             String title = text(sheet, row, "title", 255);
-            List<String> refs = questionRefs(sheet, row, questions, facts, true);
+            List<String> refs = questionRefs(sheet, row, questions, declaredQuestionRefs, facts, true);
             String topicCode = row.get("topicCode");
             Integer after = null;
             PackageType type = null;
@@ -447,6 +481,32 @@ public class CourseImportValidator {
         return packages;
     }
 
+    private void rejectMixedSkills(String sheet, Row row, List<String> refs, Map<String, QuestionPlan> questions,
+                                  ImportCatalogFacts facts) {
+        Set<String> skills = new HashSet<>();
+        for (String ref : refs) {
+            QuestionPlan question = questions.get(ref);
+            if (question != null) skills.add(question.skill().name());
+            else {
+                String existing = facts.existingQuestionSkillsByRef().get(ref);
+                if (existing != null) skills.add(existing);
+            }
+        }
+        if (skills.size() > 1) {
+            add(sheet, row.number(), "questionRefs", "MIXED_SKILLS",
+                    "All questions in a package must use the same skill.");
+        }
+    }
+
+    private static Set<String> declaredValues(CourseImportModel model, String sheet, String column) {
+        Set<String> values = new HashSet<>();
+        for (Row row : model.rows(sheet)) {
+            String value = row.get(column);
+            if (!value.isBlank()) values.add(value);
+        }
+        return values;
+    }
+
     private String packageCode(String sheet, Row row, Set<String> seen, ImportCatalogFacts facts) {
         String code = code(sheet, row, "packageCode");
         if (code == null) return null;
@@ -460,14 +520,15 @@ public class CourseImportValidator {
 
     // --- Shared cell rules
 
-    private List<String> questionRefs(String sheet, Row row, Map<String, QuestionPlan> inFile, ImportCatalogFacts facts,
-                                      boolean required) {
+    private List<String> questionRefs(String sheet, Row row, Map<String, QuestionPlan> inFile,
+                                      Set<String> declaredQuestionRefs, ImportCatalogFacts facts, boolean required) {
         List<String> refs = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
         for (String ref : split(row.get("questionRefs"))) {
             if (!seen.add(ref)) {
                 add(sheet, row.number(), "questionRefs", "DUPLICATE", "A question is listed twice in this row.");
-            } else if (!inFile.containsKey(ref) && !facts.existingImportRefs().contains(ref)) {
+            } else if (!inFile.containsKey(ref) && !declaredQuestionRefs.contains(ref)
+                    && !facts.existingImportRefs().contains(ref)) {
                 add(sheet, row.number(), "questionRefs", "UNKNOWN_QUESTION_REF",
                         "A listed question is neither in the Questions sheet nor an existing import reference.");
             } else {
