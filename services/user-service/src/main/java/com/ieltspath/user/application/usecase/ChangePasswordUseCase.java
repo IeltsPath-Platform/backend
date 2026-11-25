@@ -21,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
+import com.ieltspath.user.application.port.AuthMetrics;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +35,14 @@ public class ChangePasswordUseCase {
     private final UserNoticeOutbox notices;
     private final PasswordPolicyService passwordPolicy;
     private final AccessTokenRevocationStore accessTokens;
+    private AuthAuditSupport authAudit;
+    private AuthMetrics authMetrics;
+
+    @Autowired
+    void setAuthAudit(AuthAuditSupport authAudit) { this.authAudit = authAudit; }
+
+    @Autowired
+    void setAuthMetrics(AuthMetrics authMetrics) { this.authMetrics = authMetrics; }
 
     /**
      * A wrong password ends in an exception, and the failure it just counted must still be saved, so that exception
@@ -73,5 +83,8 @@ public class ChangePasswordUseCase {
         UUID eventId = UUID.randomUUID();
         notices.enqueue(eventId, userId, PasswordChangedV1.EVENT_TYPE, new PasswordChangedV1(eventId,
                 PasswordChangedV1.EVENT_TYPE, Instant.now(), userId, user.getEmail().value(), user.getFullName()));
+        if (authAudit != null) authAudit.record("PASSWORD_CHANGED", userId, null, java.util.Map.of());
+        if (authMetrics != null) authMetrics.record("auth.password", "event", "change");
+        if (authMetrics != null) authMetrics.record("auth.session.revoked", "reason", "PASSWORD_CHANGE");
     }
 }

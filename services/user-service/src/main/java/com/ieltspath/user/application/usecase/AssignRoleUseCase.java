@@ -23,6 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Autowired;
+import com.ieltspath.user.application.port.AuthMetrics;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +34,14 @@ public class AssignRoleUseCase {
     private final UserLock userLock;
     private final RefreshTokenRepository refreshTokens;
     private final AccessTokenRevocationStore accessTokens;
+    private AuthAuditSupport authAudit;
+    private AuthMetrics authMetrics;
+
+    @Autowired
+    void setAuthAudit(AuthAuditSupport authAudit) { this.authAudit = authAudit; }
+
+    @Autowired
+    void setAuthMetrics(AuthMetrics authMetrics) { this.authMetrics = authMetrics; }
 
     @Transactional
     public User execute(AssignRoleCommand command) {
@@ -66,6 +76,9 @@ public class AssignRoleUseCase {
         User saved = userRepository.save(user);
         refreshTokens.revokeAllActiveForUser(user.getId(), LocalDateTime.now(), "ADMIN");
         accessTokens.revokeUser(user.getId(), Instant.now());
+        if (authAudit != null) authAudit.record("ROLE_CHANGED", user.getId(), null,
+                java.util.Map.of("reason", "ADMIN"));
+        if (authMetrics != null) authMetrics.record("auth.session.revoked", "reason", "ADMIN");
         return saved;
     }
 }

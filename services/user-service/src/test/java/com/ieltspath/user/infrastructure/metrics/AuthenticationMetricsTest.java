@@ -23,6 +23,6 @@ class AuthenticationMetricsTest {
         assertThat(registry.get("auth.google.signin").tag("result", "conflict").counter().count()).isEqualTo(1);
         assertThat(registry.get("auth.google.signin").tag("result", "inactive").counter().count()).isEqualTo(1);
         assertThat(registry.get("auth.google.signin").tag("result", "unavailable").counter().count()).isEqualTo(1);
-        assertThat(registry.get("auth.password.rehash").counter().count()).isEqualTo(1);
+        assertThat(registry.get("auth.password").tag("event", "rehash").counter().count()).isEqualTo(1);
     }
 }

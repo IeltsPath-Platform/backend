@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.UUID;
 import java.time.Instant;
+import org.springframework.beans.factory.annotation.Autowired;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +28,10 @@ public class UnlinkOAuthIdentityUseCase {
     private final ReauthTokenStore reauthTokens;
     private final UserNoticeOutbox notices;
     @Value("${app.auth.reauth-required-for-unlink:false}") private boolean reauthRequired;
+    private AuthAuditSupport authAudit;
+
+    @Autowired
+    void setAuthAudit(AuthAuditSupport authAudit) { this.authAudit = authAudit; }
 
     public void execute(UUID userId, String providerStr) { execute(userId, providerStr, null, null); }
 
@@ -65,6 +70,7 @@ public class UnlinkOAuthIdentityUseCase {
             notices.enqueue(eventId, userId, GoogleAccountUnlinkedV1.EVENT_TYPE, new GoogleAccountUnlinkedV1(
                     eventId, GoogleAccountUnlinkedV1.EVENT_TYPE, Instant.now(), userId,
                     user.getEmail().value(), user.getFullName()));
+            if (authAudit != null) authAudit.record("GOOGLE_UNLINKED", userId, null, java.util.Map.of("provider", "GOOGLE"));
         }
     }
 

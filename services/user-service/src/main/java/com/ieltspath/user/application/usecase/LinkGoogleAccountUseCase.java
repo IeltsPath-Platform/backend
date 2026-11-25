@@ -34,6 +34,7 @@ import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 
 @Service
 @RequiredArgsConstructor
@@ -46,6 +47,10 @@ public class LinkGoogleAccountUseCase {
     private final AuthTokenIssuer authTokenIssuer;
     private final UserNoticeOutbox notices;
     private final AccessTokenRevocationStore accessTokens;
+    private AuthAuditSupport authAudit;
+
+    @Autowired
+    void setAuthAudit(AuthAuditSupport authAudit) { this.authAudit = authAudit; }
 
     @Transactional
     public GoogleSignInResult execute(GoogleIdentity google) {
@@ -97,6 +102,8 @@ public class LinkGoogleAccountUseCase {
             user.clearPassword();
             refreshTokenRepository.revokeAllActiveForUser(user.getId(), now, "GOOGLE_LINK");
             accessTokens.revokeUser(user.getId(), Instant.now());
+            if (authAudit != null) authAudit.record("GOOGLE_PASSWORD_CLEARED", user.getId(), null,
+                    java.util.Map.of("reason", "UNVERIFIED_ACCOUNT_LINKED"));
         }
         if (unverifiedBefore) {
             user.markEmailVerified(now);
@@ -121,6 +128,9 @@ public class LinkGoogleAccountUseCase {
         }
         identity.recordAuthentication();
         oauthIdentityRepository.save(identity);
+        if (authAudit != null && identity.getLinkedAt().equals(now)) {
+            authAudit.record("GOOGLE_LINKED", user.getId(), null, java.util.Map.of("provider", "GOOGLE"));
+        }
         AuthTokenResult tokens = authTokenIssuer.issue(user);
         return new GoogleSignInResult(user.getId(), tokens);
     }

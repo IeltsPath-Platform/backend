@@ -1,0 +1,35 @@
+groups:
+  - name: authentication
+    rules:
+      - alert: AuthLoginFailureSpike
+        expr: sum(rate(auth_login_total{result!="success"}[5m])) / clamp_min(sum(rate(auth_login_total[5m])), 0.001) > 0.25
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Tỷ lệ đăng nhập thất bại tăng cao
+          description: Hơn 25% lượt đăng nhập thất bại trong 5 phút.
+      - alert: RefreshTokenReuseDetected
+        expr: increase(auth_refresh_total{result="reuse"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: Phát hiện refresh token bị dùng lại
+          description: Có refresh token bị dùng lại trong 5 phút qua.
+      - alert: GoogleSignInErrors
+        expr: increase(auth_google_signin_total{result=~"invalid_token|unavailable"}[5m]) > 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Lỗi đăng nhập Google tăng cao
+          description: Lượt đăng nhập Google không hợp lệ hoặc tạm thời không khả dụng tăng cao.
+      - alert: RevocationStoreErrors
+        expr: increase(auth_revocation_write_errors_total[5m]) > 0 or increase(gateway_auth_revocation_errors_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Kho thu hồi phiên đang gặp lỗi
+          description: Ghi hoặc đọc trạng thái thu hồi phiên đang lỗi kéo dài.

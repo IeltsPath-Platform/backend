@@ -14,6 +14,9 @@ import org.springframework.stereotype.Service;
 
 import java.util.Optional;
 import java.util.Locale;
+import org.springframework.beans.factory.annotation.Autowired;
+import com.ieltspath.user.application.port.AuthMetrics;
+import com.ieltspath.user.application.exception.LoginRateLimitedException;
 
 /**
  * Signs in through {@link LoginUseCase} and records the attempt for the account it targeted. The record is written
@@ -27,21 +30,37 @@ public class AuditedLoginUseCase {
     private final UserRepository userRepository;
     private final LoginHistoryRecorder recorder;
     private final LoginAttemptLimiter loginAttemptLimiter;
+    private AuthMetrics authMetrics;
+
+    @Autowired
+    void setAuthMetrics(AuthMetrics authMetrics) { this.authMetrics = authMetrics; }
 
     public AuthTokenResult execute(String email, String password, LoginContext context) {
         String normalizedEmail = email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
         String clientIp = context == null ? null : context.ipAddress();
-        loginAttemptLimiter.checkAllowed(normalizedEmail, clientIp);
+        try {
+            loginAttemptLimiter.checkAllowed(normalizedEmail, clientIp);
+        } catch (LoginRateLimitedException limited) {
+            if (authMetrics != null) authMetrics.record("auth.login", "result", "rate_limited");
+            throw limited;
+        }
         AuthTokenResult tokens;
         try {
             tokens = loginUseCase.execute(email, password);
         } catch (AuthenticationFailedException exception) {
             loginAttemptLimiter.recordFailure(normalizedEmail, clientIp);
-            findAccount(email).ifPresent(user -> recorder.recordFailure(user.getId(), failureReason(user), context));
+            String[] result = {"bad_credentials"};
+            findAccount(email).ifPresent(user -> {
+                recorder.recordFailure(user.getId(), failureReason(user), context);
+                if (user.getStatus() == UserStatus.LOCKED) result[0] = "locked";
+                else if (user.getStatus() != UserStatus.ACTIVE) result[0] = "inactive";
+            });
+            if (authMetrics != null) authMetrics.record("auth.login", "result", result[0]);
             throw exception;
         }
         loginAttemptLimiter.recordSuccess(normalizedEmail, clientIp);
         findAccount(email).ifPresent(user -> recorder.recordSuccess(user.getId(), context));
+        if (authMetrics != null) authMetrics.record("auth.login", "result", "success");
         return tokens;
     }
 

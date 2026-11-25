@@ -12,6 +12,6 @@ public class MicrometerPasswordRehashMetrics implements PasswordRehashMetrics {
 
     @Override
     public void recordUpgrade() {
-        registry.counter("auth.password.rehash").increment();
+        registry.counter("auth.password", "event", "rehash").increment();
     }
 }

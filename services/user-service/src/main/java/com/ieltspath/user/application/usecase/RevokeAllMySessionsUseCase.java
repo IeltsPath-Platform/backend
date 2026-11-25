@@ -7,6 +7,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
+import com.ieltspath.user.application.port.AuthMetrics;
 import com.ieltspath.user.application.port.AccessTokenRevocationStore;
 
 @Service
@@ -14,6 +16,14 @@ import com.ieltspath.user.application.port.AccessTokenRevocationStore;
 public class RevokeAllMySessionsUseCase {
     private final RefreshTokenRepository tokens;
     private final AccessTokenRevocationStore accessTokens;
+    private AuthAuditSupport authAudit;
+    private AuthMetrics authMetrics;
+
+    @Autowired
+    void setAuthAudit(AuthAuditSupport authAudit) { this.authAudit = authAudit; }
+
+    @Autowired
+    void setAuthMetrics(AuthMetrics authMetrics) { this.authMetrics = authMetrics; }
 
     @Transactional
     public void execute(UUID userId, UUID currentSessionId, boolean exceptCurrent) {
@@ -26,5 +36,8 @@ public class RevokeAllMySessionsUseCase {
             tokens.revokeAllActiveForUser(userId, now, "SESSION_REVOKED");
         }
         revokedSessions.forEach(accessTokens::revokeSession);
+        if (authAudit != null) authAudit.record("SESSIONS_REVOKED_ALL", userId, null,
+                java.util.Map.of("reason", exceptCurrent ? "EXCEPT_CURRENT" : "USER_REQUEST"));
+        if (authMetrics != null) authMetrics.record("auth.session.revoked", "reason", "USER_REQUEST");
     }
 }

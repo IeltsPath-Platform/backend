@@ -22,6 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
+import com.ieltspath.user.application.port.AuthMetrics;
 
 @Slf4j
 @Service
@@ -36,6 +38,14 @@ public class ResetPasswordUseCase {
     private final UserNoticeOutbox notices;
     private final AccessTokenRevocationStore accessTokens;
     private final PasswordPolicyService passwordPolicy;
+    private AuthAuditSupport authAudit;
+    private AuthMetrics authMetrics;
+
+    @Autowired
+    void setAuthAudit(AuthAuditSupport authAudit) { this.authAudit = authAudit; }
+
+    @Autowired
+    void setAuthMetrics(AuthMetrics authMetrics) { this.authMetrics = authMetrics; }
 
     @Transactional
     public void execute(ResetPasswordCommand command) {
@@ -84,7 +94,9 @@ public class ResetPasswordUseCase {
         UUID eventId = UUID.randomUUID();
         notices.enqueue(eventId, user.getId(), PasswordChangedV1.EVENT_TYPE, new PasswordChangedV1(eventId,
                 PasswordChangedV1.EVENT_TYPE, Instant.now(), user.getId(), user.getEmail().value(), user.getFullName()));
+        if (authAudit != null) authAudit.record("PASSWORD_RESET", user.getId(), null, java.util.Map.of());
+        if (authMetrics != null) authMetrics.record("auth.password", "event", "reset");
+        if (authMetrics != null) authMetrics.record("auth.session.revoked", "reason", "PASSWORD_RESET");
         log.info("Đặt lại mật khẩu thành công cho userId={}", user.getId());
     }
 }
-

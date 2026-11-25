@@ -59,6 +59,10 @@ app:
     refresh-token-max-age-seconds: ${REFRESH_TOKEN_MAX_AGE_SECONDS:604800}
     refresh-reuse-grace-seconds: ${APP_AUTH_REFRESH_REUSE_GRACE_SECONDS:10}
     session-max-age-seconds: ${APP_AUTH_SESSION_MAX_AGE_SECONDS:0}
+    audit:
+      retention-days: ${APP_AUTH_AUDIT_RETENTION_DAYS:365}
+      batch-size: ${APP_AUTH_AUDIT_BATCH_SIZE:500}
+      purge-cron: ${APP_AUTH_AUDIT_PURGE_CRON:0 40 3 * * *}
     cookie:
       enabled: ${APP_AUTH_COOKIE_ENABLED:true}
       access-token-name: ${APP_AUTH_COOKIE_ACCESS_TOKEN_NAME:access_token}

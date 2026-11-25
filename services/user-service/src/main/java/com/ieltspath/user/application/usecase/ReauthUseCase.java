@@ -28,6 +28,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
+import com.ieltspath.user.application.port.AuthMetrics;
 
 @Service
 @RequiredArgsConstructor
@@ -41,9 +43,33 @@ public class ReauthUseCase {
     private final GoogleNonceStore nonceStore;
     private final GoogleAuthProperties googleProperties;
     private final ReauthTokenStore reauthTokens;
+    private AuthAuditSupport authAudit;
+    private AuthMetrics authMetrics;
+
+    @Autowired
+    void setAuthAudit(AuthAuditSupport authAudit) { this.authAudit = authAudit; }
+
+    @Autowired
+    void setAuthMetrics(AuthMetrics authMetrics) { this.authMetrics = authMetrics; }
 
     @Transactional(noRollbackFor = PasswordChangeException.class)
     public ReauthResult execute(UUID userId, UUID sessionId, String currentPassword, String googleIdToken) {
+        try {
+            ReauthResult result = executeValidated(userId, sessionId, currentPassword, googleIdToken);
+            if (authAudit != null) authAudit.record("REAUTH_SUCCEEDED", userId, null,
+                    java.util.Map.of("method", result.method(), "sessionId", sessionId));
+            if (authMetrics != null) authMetrics.record("auth.reauth", "result", "success", "method", result.method());
+            return result;
+        } catch (RuntimeException failure) {
+            if (authAudit != null) authAudit.record("REAUTH_FAILED", userId, null,
+                    java.util.Map.of("code", failure instanceof ReauthAccountMismatchException ? "ACCOUNT_MISMATCH" : "REJECTED"));
+            if (authMetrics != null) authMetrics.record("auth.reauth", "result", "failure", "method",
+                    blank(currentPassword) ? (blank(googleIdToken) ? "UNKNOWN" : "GOOGLE") : "PASSWORD");
+            throw failure;
+        }
+    }
+
+    private ReauthResult executeValidated(UUID userId, UUID sessionId, String currentPassword, String googleIdToken) {
         if (sessionId == null || (blank(currentPassword) == blank(googleIdToken))) throw new ReauthRequiredException();
         userLock.lock(userId);
         LocalDateTime now = LocalDateTime.now();

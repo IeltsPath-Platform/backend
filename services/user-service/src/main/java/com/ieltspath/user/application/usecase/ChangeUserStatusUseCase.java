@@ -16,6 +16,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.ieltspath.user.domain.repository.RefreshTokenRepository;
 import java.time.LocalDateTime;
+import org.springframework.beans.factory.annotation.Autowired;
+import com.ieltspath.user.application.port.AuthMetrics;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +26,14 @@ public class ChangeUserStatusUseCase {
     private final UserLock userLock;
     private final RefreshTokenRepository refreshTokens;
     private final AccessTokenRevocationStore accessTokens;
+    private AuthAuditSupport authAudit;
+    private AuthMetrics authMetrics;
+
+    @Autowired
+    void setAuthAudit(AuthAuditSupport authAudit) { this.authAudit = authAudit; }
+
+    @Autowired
+    void setAuthMetrics(AuthMetrics authMetrics) { this.authMetrics = authMetrics; }
 
     @Transactional
     public User execute(ChangeUserStatusCommand command) {
@@ -51,6 +61,11 @@ public class ChangeUserStatusUseCase {
         if (command.status() != UserStatus.ACTIVE) {
             refreshTokens.revokeAllActiveForUser(user.getId(), LocalDateTime.now(), "ADMIN");
             accessTokens.revokeUser(user.getId(), Instant.now());
+        }
+        if (authAudit != null) authAudit.record("ACCOUNT_STATUS_CHANGED", user.getId(), null,
+                java.util.Map.of("reason", command.status().name()));
+        if (authMetrics != null && command.status() != UserStatus.ACTIVE) {
+            authMetrics.record("auth.session.revoked", "reason", "ADMIN");
         }
         return saved;
     }
