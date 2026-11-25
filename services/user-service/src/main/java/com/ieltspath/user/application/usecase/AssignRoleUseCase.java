@@ -12,6 +12,8 @@ import com.ieltspath.user.domain.service.RoleAssignmentPolicy;
 import com.ieltspath.user.domain.vo.RoleName;
 import com.ieltspath.user.domain.vo.UserStatus;
 import com.ieltspath.user.application.port.UserLock;
+import com.ieltspath.user.application.port.AccessTokenRevocationStore;
+import java.time.Instant;
 import com.ieltspath.user.domain.repository.RefreshTokenRepository;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +31,7 @@ public class AssignRoleUseCase {
     private final RoleRepository roleRepository;
     private final UserLock userLock;
     private final RefreshTokenRepository refreshTokens;
+    private final AccessTokenRevocationStore accessTokens;
 
     @Transactional
     public User execute(AssignRoleCommand command) {
@@ -62,6 +65,7 @@ public class AssignRoleUseCase {
         user.assignRoles(roles);
         User saved = userRepository.save(user);
         refreshTokens.revokeAllActiveForUser(user.getId(), LocalDateTime.now(), "ADMIN");
+        accessTokens.revokeUser(user.getId(), Instant.now());
         return saved;
     }
 }

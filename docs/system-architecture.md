@@ -511,3 +511,8 @@ hoạt động upload.
 ### Mobile vocabulary study ownership
 
 Library owns curated vocabulary units, immutable revisions, attempt snapshots, unit progress, and the independent `vocabulary_study_*` XP/streak/hearts ledgers. Completion and real flashcard reviews maintain this vocabulary streak; only first unit completion can award vocabulary XP. Learning web state is neither imported nor called. The shared Access wallet charges heart/freeze purchases through a durable PENDING intent, an HTTP debit outside transactions/locks, and an idempotent effect transaction. Access plan reads also occur outside transactions and are cached per profile for ten minutes; failures retain the stored heart capacity. Public unit GET paths require explicit allowlists at both Gateway and Library.
+# Thu hồi access token
+
+Gateway xác thực external JWT, sau đó kiểm tra các khóa `auth:revoked:*` trong Redis trước khi chuyển tiếp request; cùng
+lớp kiểm tra áp dụng cho WebSocket notifications. User-service chỉ ghi dấu thu hồi sau commit. Mặc định Redis lỗi được
+xử lý fail-open và ghi metric; cờ `gateway.auth.revocation.fail-closed` cho phép trả 503 khi cần.

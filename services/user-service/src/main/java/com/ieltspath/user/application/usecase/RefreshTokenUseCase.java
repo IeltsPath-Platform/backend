@@ -9,6 +9,7 @@ import com.ieltspath.user.domain.exception.UserNotFoundException;
 import com.ieltspath.user.domain.repository.RefreshTokenRepository;
 import com.ieltspath.user.domain.repository.UserRepository;
 import com.ieltspath.user.application.port.UserLock;
+import com.ieltspath.user.application.port.AccessTokenRevocationStore;
 import com.ieltspath.user.domain.vo.UserStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,7 @@ public class RefreshTokenUseCase {
     private final TokenHashService tokenHashService;
     private final AuthTokenIssuer authTokenIssuer;
     private final UserLock userLock;
+    private final AccessTokenRevocationStore accessTokens;
 
     @Transactional(noRollbackFor = AuthenticationFailedException.class)
     public AuthTokenResult execute(String refreshToken, LoginContext context) {
@@ -40,11 +42,13 @@ public class RefreshTokenUseCase {
             if ("ROTATED".equals(current.getRevokedReason())
                     && current.getRevokedAt().plusSeconds(authTokenIssuer.reuseGraceSeconds()).isBefore(now)) {
                 refreshTokenRepository.revokeFamily(current.getFamilyId(), now, "REUSE_DETECTED");
+                accessTokens.revokeSession(current.getFamilyId());
             }
             throw new AuthenticationFailedException("Refresh token không hợp lệ");
         }
         if (authTokenIssuer.sessionExpired(current.getSessionStartedAt(), now)) {
             refreshTokenRepository.revokeFamily(current.getFamilyId(), now, "SESSION_REVOKED");
+            accessTokens.revokeSession(current.getFamilyId());
             throw new AuthenticationFailedException("Refresh token không hợp lệ");
         }
         RefreshToken storedToken = refreshTokenRepository.consumeActiveToken(tokenHash, now, "ROTATED",

@@ -3,6 +3,7 @@ package com.ieltspath.user.application.usecase;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import com.ieltspath.user.domain.aggregate.RefreshToken;
+import com.ieltspath.user.application.port.AccessTokenRevocationStore;
 import com.ieltspath.user.domain.repository.RefreshTokenRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,12 +25,15 @@ class LogoutUseCaseTest {
     private RefreshTokenRepository refreshTokenRepository;
     @Mock
     private TokenHashService tokenHashService;
+    @Mock
+    private AccessTokenRevocationStore accessTokens;
 
     @Test
     void revokesRefreshTokenWhenItExists() {
-        LogoutUseCase useCase = new LogoutUseCase(refreshTokenRepository, tokenHashService);
+        LogoutUseCase useCase = new LogoutUseCase(refreshTokenRepository, tokenHashService, accessTokens);
         RefreshToken storedToken = RefreshToken.builder()
                 .id(UUID.randomUUID())
+                .familyId(UUID.randomUUID())
                 .userId(UUID.randomUUID())
                 .tokenHash("hashed-token")
                 .expiresAt(LocalDateTime.now().plusHours(1))
@@ -41,11 +45,12 @@ class LogoutUseCaseTest {
 
         assertThat(storedToken.getRevokedAt()).isNotNull();
         verify(refreshTokenRepository).save(storedToken);
+        verify(accessTokens).revokeSession(storedToken.getFamilyId());
     }
 
     @Test
     void ignoresBlankRefreshToken() {
-        LogoutUseCase useCase = new LogoutUseCase(refreshTokenRepository, tokenHashService);
+        LogoutUseCase useCase = new LogoutUseCase(refreshTokenRepository, tokenHashService, accessTokens);
 
         useCase.execute(" ");
 
@@ -54,7 +59,7 @@ class LogoutUseCaseTest {
 
     @Test
     void ignoresARefreshTokenThatHasNoStoredRow() {
-        LogoutUseCase useCase = new LogoutUseCase(refreshTokenRepository, tokenHashService);
+        LogoutUseCase useCase = new LogoutUseCase(refreshTokenRepository, tokenHashService, accessTokens);
         when(tokenHashService.hash("unknown")).thenReturn("unknown-hash");
         when(refreshTokenRepository.findByTokenHash("unknown-hash")).thenReturn(Optional.empty());
 

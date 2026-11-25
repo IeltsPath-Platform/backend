@@ -18,6 +18,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.Optional;
 
 import static org.mockito.Mockito.*;
 import static org.hamcrest.Matchers.nullValue;
@@ -47,6 +48,7 @@ class SessionControllerTest {
         UUID userId = UUID.randomUUID();
         UUID familyId = UUID.randomUUID();
         when(currentUser.requireUserId()).thenReturn(userId);
+        when(currentUser.currentSessionId()).thenReturn(Optional.of(familyId));
         when(listSessions.execute(userId)).thenReturn(List.of(RefreshToken.builder().familyId(familyId)
                 .sessionStartedAt(LocalDateTime.of(2026, 11, 25, 10, 0)).lastUsedAt(LocalDateTime.of(2026, 11, 25, 10, 5))
                 .ipAddress("203.0.113.45").userAgent("Browser").build()));
@@ -55,7 +57,7 @@ class SessionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].sessionId").value(familyId.toString()))
                 .andExpect(jsonPath("$[0].ipAddress").value("203.0.113.x"))
-                .andExpect(jsonPath("$[0].current").value(nullValue()));
+                .andExpect(jsonPath("$[0].current").value(true));
     }
 
     @Test

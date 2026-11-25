@@ -10,6 +10,7 @@ import com.ieltspath.user.domain.exception.UserNotFoundException;
 import com.ieltspath.user.domain.repository.AccountActionTokenRepository;
 import com.ieltspath.user.domain.repository.UserRepository;
 import com.ieltspath.user.application.port.UserLock;
+import com.ieltspath.user.application.port.AccessTokenRevocationStore;
 import com.ieltspath.user.domain.repository.RefreshTokenRepository;
 import com.ieltspath.user.domain.vo.ActionTokenPurpose;
 import com.ieltspath.user.domain.vo.UserStatus;
@@ -33,6 +34,7 @@ public class ResetPasswordUseCase {
     private final UserLock userLock;
     private final RefreshTokenRepository refreshTokenRepository;
     private final UserNoticeOutbox notices;
+    private final AccessTokenRevocationStore accessTokens;
     private final PasswordPolicyService passwordPolicy;
 
     @Transactional
@@ -77,6 +79,7 @@ public class ResetPasswordUseCase {
         user.changePassword(passwordEncoder.encode(command.newPassword()));
         userRepository.save(user);
         refreshTokenRepository.revokeAllActiveForUser(user.getId(), java.time.LocalDateTime.now(), "PASSWORD_RESET");
+        accessTokens.revokeUser(user.getId(), java.time.Instant.now());
 
         UUID eventId = UUID.randomUUID();
         notices.enqueue(eventId, user.getId(), PasswordChangedV1.EVENT_TYPE, new PasswordChangedV1(eventId,

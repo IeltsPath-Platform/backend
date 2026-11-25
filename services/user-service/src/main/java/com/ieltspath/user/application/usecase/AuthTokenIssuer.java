@@ -32,7 +32,7 @@ public class AuthTokenIssuer {
     }
 
     public AuthTokenResult issue(User user, UUID familyId, LocalDateTime sessionStartedAt, LoginContext context) {
-        String accessToken = jwtTokenService.createAccessToken(user);
+        String accessToken = jwtTokenService.createAccessToken(user, familyId);
         String refreshToken = newRefreshToken();
         RefreshToken stored = refreshTokenRepository.save(RefreshToken.builder()
                 .userId(user.getId())

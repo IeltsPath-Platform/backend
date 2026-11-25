@@ -76,6 +76,11 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
     }
 
     @Override
+    public List<UUID> findActiveSessionIds(UUID userId, LocalDateTime now, UUID exceptFamilyId) {
+        return refreshTokenJpaRepository.findActiveSessionIds(userId, now, exceptFamilyId);
+    }
+
+    @Override
     public int deleteExpiredOrOldRevoked(LocalDateTime now, LocalDateTime revokedBefore, int limit) {
         return refreshTokenJpaRepository.deleteExpiredOrOldRevoked(now, revokedBefore, limit);
     }

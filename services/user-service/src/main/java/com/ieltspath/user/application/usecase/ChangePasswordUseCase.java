@@ -3,6 +3,7 @@ package com.ieltspath.user.application.usecase;
 import com.ieltspath.events.user.PasswordChangedV1;
 import com.ieltspath.user.application.command.ChangePasswordCommand;
 import com.ieltspath.user.application.port.UserLock;
+import com.ieltspath.user.application.port.AccessTokenRevocationStore;
 import com.ieltspath.user.domain.aggregate.PasswordChangeAttempts;
 import com.ieltspath.user.domain.aggregate.User;
 import com.ieltspath.user.domain.exception.EmailNotVerifiedException;
@@ -31,6 +32,7 @@ public class ChangePasswordUseCase {
     private final PasswordChangeAttemptRepository attemptsRepository;
     private final UserNoticeOutbox notices;
     private final PasswordPolicyService passwordPolicy;
+    private final AccessTokenRevocationStore accessTokens;
 
     /**
      * A wrong password ends in an exception, and the failure it just counted must still be saved, so that exception
@@ -66,6 +68,7 @@ public class ChangePasswordUseCase {
         user.changePassword(encoder.encode(command.newPassword()));
         users.save(user);
         refreshTokens.revokeAllActiveForUser(userId, LocalDateTime.now(), "PASSWORD_CHANGE");
+        accessTokens.revokeUser(userId, Instant.now());
         attemptsRepository.deleteByUserId(userId);
         UUID eventId = UUID.randomUUID();
         notices.enqueue(eventId, userId, PasswordChangedV1.EVENT_TYPE, new PasswordChangedV1(eventId,

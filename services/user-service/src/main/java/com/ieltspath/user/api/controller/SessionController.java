@@ -28,7 +28,9 @@ public class SessionController {
 
     @GetMapping
     public List<SessionResponse> list() {
-        return listSessions.execute(currentUserProvider.requireUserId()).stream().map(this::toResponse).toList();
+        UUID currentSessionId = currentUserProvider.currentSessionId().orElse(null);
+        return listSessions.execute(currentUserProvider.requireUserId()).stream()
+                .map(token -> toResponse(token, currentSessionId)).toList();
     }
 
     @DeleteMapping("/{sessionId}")
@@ -44,12 +46,14 @@ public class SessionController {
 
     @DeleteMapping
     public void revokeAll(@RequestParam(defaultValue = "false") boolean exceptCurrent) {
-        revokeAllSessions.execute(currentUserProvider.requireUserId(), exceptCurrent);
+        revokeAllSessions.execute(currentUserProvider.requireUserId(),
+                currentUserProvider.currentSessionId().orElse(null), exceptCurrent);
     }
 
-    private SessionResponse toResponse(RefreshToken token) {
+    private SessionResponse toResponse(RefreshToken token, UUID currentSessionId) {
         return new SessionResponse(token.getFamilyId(), token.getSessionStartedAt(), token.getLastUsedAt(),
-                maskAddress(token.getIpAddress()), token.getUserAgent(), null);
+                maskAddress(token.getIpAddress()), token.getUserAgent(), token.getFamilyId() != null
+                && token.getFamilyId().equals(currentSessionId));
     }
 
     private String maskAddress(String address) {

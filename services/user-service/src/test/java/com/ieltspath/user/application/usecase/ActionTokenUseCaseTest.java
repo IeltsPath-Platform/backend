@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.user.application.command.ForgotPasswordCommand;
 import com.ieltspath.user.application.command.ResetPasswordCommand;
 import com.ieltspath.user.application.port.UserLock;
+import com.ieltspath.user.application.port.AccessTokenRevocationStore;
 import com.ieltspath.events.user.PasswordResetGoogleOnlyV1;
 import com.ieltspath.user.domain.aggregate.AccountActionToken;
 import com.ieltspath.user.domain.aggregate.OAuthIdentity;
@@ -52,6 +53,7 @@ class ActionTokenUseCaseTest {
     @Mock private RefreshTokenRepository refreshTokenRepository;
     @Mock private UserNoticeOutbox notices;
     @Mock private OAuthIdentityRepository oauthIdentityRepository;
+    @Mock private AccessTokenRevocationStore accessTokens;
 
     private ForgotPasswordUseCase forgotPasswordUseCase;
     private ResetPasswordUseCase resetPasswordUseCase;
@@ -64,7 +66,7 @@ class ActionTokenUseCaseTest {
                 outboxEventRepository, tokenHashService, userLock, new ObjectMapper().findAndRegisterModules(),
                 oauthIdentityRepository, notices);
         resetPasswordUseCase = new ResetPasswordUseCase(userRepository, accountActionTokenRepository, tokenHashService,
-                passwordEncoder, userLock, refreshTokenRepository, notices,
+                passwordEncoder, userLock, refreshTokenRepository, notices, accessTokens,
                 new PasswordPolicyService(password -> false, new com.ieltspath.user.config.AuthPasswordProperties(8, 12)));
         getActionTokensByUserIdUseCase = new GetActionTokensByUserIdUseCase(accountActionTokenRepository);
         revokeUserActionTokensUseCase = new RevokeUserActionTokensUseCase(accountActionTokenRepository);

@@ -3,6 +3,7 @@ package com.ieltspath.user.application.usecase;
 import com.ieltspath.user.application.command.LoginContext;
 import com.ieltspath.user.application.result.AuthTokenResult;
 import com.ieltspath.user.application.port.UserLock;
+import com.ieltspath.user.application.port.AccessTokenRevocationStore;
 import com.ieltspath.user.domain.aggregate.RefreshToken;
 import com.ieltspath.user.domain.aggregate.User;
 import com.ieltspath.user.domain.exception.AuthenticationFailedException;
@@ -31,6 +32,7 @@ class RefreshTokenUseCaseTest {
     @Mock TokenHashService hashes;
     @Mock AuthTokenIssuer issuer;
     @Mock UserLock userLock;
+    @Mock AccessTokenRevocationStore accessTokens;
 
     @Test
     void rotatesWithinTheSameSessionAndRecordsRequestContext() {
@@ -70,6 +72,7 @@ class RefreshTokenUseCaseTest {
                 .isInstanceOf(AuthenticationFailedException.class)
                 .hasMessage("Refresh token không hợp lệ");
         verify(tokens).revokeFamily(eq(familyId), any(), eq("REUSE_DETECTED"));
+        verify(accessTokens).revokeSession(familyId);
         verifyNoInteractions(users);
     }
 
@@ -133,7 +136,7 @@ class RefreshTokenUseCaseTest {
     }
 
     private RefreshTokenUseCase useCase() {
-        return new RefreshTokenUseCase(tokens, users, hashes, issuer, userLock);
+        return new RefreshTokenUseCase(tokens, users, hashes, issuer, userLock, accessTokens);
     }
 
     private RefreshToken token(UUID userId, UUID familyId, LocalDateTime started,

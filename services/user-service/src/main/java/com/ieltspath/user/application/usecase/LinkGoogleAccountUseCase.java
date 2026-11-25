@@ -7,6 +7,7 @@ import com.ieltspath.user.application.exception.GoogleAccountNotActiveException;
 import com.ieltspath.user.application.exception.GoogleEmailNotSupportedException;
 import com.ieltspath.user.application.exception.GoogleSignInNotAllowedException;
 import com.ieltspath.user.application.port.UserLock;
+import com.ieltspath.user.application.port.AccessTokenRevocationStore;
 import com.ieltspath.user.application.result.AuthTokenResult;
 import com.ieltspath.user.application.result.GoogleIdentity;
 import com.ieltspath.user.application.result.GoogleSignInResult;
@@ -44,6 +45,7 @@ public class LinkGoogleAccountUseCase {
     private final UserLock userLock;
     private final AuthTokenIssuer authTokenIssuer;
     private final UserNoticeOutbox notices;
+    private final AccessTokenRevocationStore accessTokens;
 
     @Transactional
     public GoogleSignInResult execute(GoogleIdentity google) {
@@ -94,6 +96,7 @@ public class LinkGoogleAccountUseCase {
             userRepository.clearPasswordHash(user.getId());
             user.clearPassword();
             refreshTokenRepository.revokeAllActiveForUser(user.getId(), now, "GOOGLE_LINK");
+            accessTokens.revokeUser(user.getId(), Instant.now());
         }
         if (unverifiedBefore) {
             user.markEmailVerified(now);

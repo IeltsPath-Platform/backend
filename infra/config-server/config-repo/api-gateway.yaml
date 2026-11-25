@@ -373,6 +373,9 @@ app:
     frontend-origin: ${FRONTEND_ORIGIN:http://localhost:5173}
 
 gateway:
+  auth:
+    revocation:
+      fail-closed: ${GATEWAY_AUTH_REVOCATION_FAIL_CLOSED:false}
   rate-limit:
     trusted-proxies: []
     tiers:

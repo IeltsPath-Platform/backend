@@ -9,6 +9,7 @@ public record GatewayErrorResponse(
         String error,
         String message,
         String path,
-        Map<String, String> details
+        Map<String, String> details,
+        String code
 ) {
 }

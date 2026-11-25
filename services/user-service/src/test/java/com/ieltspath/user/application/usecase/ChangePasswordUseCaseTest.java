@@ -2,6 +2,7 @@ package com.ieltspath.user.application.usecase;
 
 import com.ieltspath.user.application.command.ChangePasswordCommand;
 import com.ieltspath.user.application.port.UserLock;
+import com.ieltspath.user.application.port.AccessTokenRevocationStore;
 import com.ieltspath.user.domain.aggregate.PasswordChangeAttempts;
 import com.ieltspath.user.domain.aggregate.User;
 import com.ieltspath.user.domain.exception.PasswordChangeException;
@@ -41,6 +42,7 @@ class ChangePasswordUseCaseTest {
     @Mock PasswordEncoder encoder;
     @Mock UserLock userLock;
     @Mock UserNoticeOutbox notices;
+    @Mock AccessTokenRevocationStore accessTokens;
 
     private final Map<UUID, PasswordChangeAttempts> stored = new HashMap<>();
     private ChangePasswordUseCase useCase;
@@ -52,7 +54,7 @@ class ChangePasswordUseCaseTest {
             @Override public void save(PasswordChangeAttempts attempts) { stored.put(attempts.getUserId(), attempts); }
             @Override public void deleteByUserId(UUID userId) { stored.remove(userId); }
         }, notices, new PasswordPolicyService(password -> false,
-                new com.ieltspath.user.config.AuthPasswordProperties(8, 12)));
+                new com.ieltspath.user.config.AuthPasswordProperties(8, 12)), accessTokens);
     }
 
     private User userWithHash(UUID id) {
@@ -73,6 +75,7 @@ class ChangePasswordUseCaseTest {
 
         assertEquals("new-hash", user.getPasswordHash());
         verify(tokens).revokeAllActiveForUser(eq(id), any(), eq("PASSWORD_CHANGE"));
+        verify(accessTokens).revokeUser(eq(id), any());
         assertTrue(stored.isEmpty());
     }
 

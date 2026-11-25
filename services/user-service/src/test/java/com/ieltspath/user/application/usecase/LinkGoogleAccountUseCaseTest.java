@@ -7,6 +7,7 @@ import com.ieltspath.user.application.exception.GoogleAccountNotActiveException;
 import com.ieltspath.user.application.exception.GoogleEmailNotSupportedException;
 import com.ieltspath.user.application.exception.GoogleSignInNotAllowedException;
 import com.ieltspath.user.application.port.UserLock;
+import com.ieltspath.user.application.port.AccessTokenRevocationStore;
 import com.ieltspath.user.application.result.AuthTokenResult;
 import com.ieltspath.user.application.result.GoogleIdentity;
 import com.ieltspath.user.domain.aggregate.OAuthIdentity;
@@ -50,6 +51,7 @@ class LinkGoogleAccountUseCaseTest {
     @Mock UserLock userLock;
     @Mock AuthTokenIssuer tokenIssuer;
     @Mock UserNoticeOutbox notices;
+    @Mock AccessTokenRevocationStore accessTokens;
 
     private LinkGoogleAccountUseCase useCase;
     private final UUID userId = UUID.randomUUID();
@@ -58,7 +60,7 @@ class LinkGoogleAccountUseCaseTest {
 
     @BeforeEach
     void setUp() {
-        useCase = new LinkGoogleAccountUseCase(users, identities, roles, refreshTokens, userLock, tokenIssuer, notices);
+        useCase = new LinkGoogleAccountUseCase(users, identities, roles, refreshTokens, userLock, tokenIssuer, notices, accessTokens);
         lenient().when(users.findById(userId)).thenReturn(Optional.of(customerWithPassword));
         lenient().when(tokenIssuer.issue(any(User.class))).thenReturn(tokens);
         lenient().when(identities.save(any(OAuthIdentity.class))).thenAnswer(call -> call.getArgument(0));

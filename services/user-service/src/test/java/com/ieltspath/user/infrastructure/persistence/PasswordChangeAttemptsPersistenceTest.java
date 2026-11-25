@@ -2,6 +2,7 @@ package com.ieltspath.user.infrastructure.persistence;
 
 import com.ieltspath.user.application.command.ChangePasswordCommand;
 import com.ieltspath.user.application.port.UserLock;
+import com.ieltspath.user.application.port.AccessTokenRevocationStore;
 import com.ieltspath.user.application.usecase.ChangePasswordUseCase;
 import com.ieltspath.user.application.usecase.PasswordPolicyService;
 import com.ieltspath.user.application.usecase.UserNoticeOutbox;
@@ -72,6 +73,8 @@ class PasswordChangeAttemptsPersistenceTest {
             return mock(UserNoticeOutbox.class);
         }
 
+        @Bean AccessTokenRevocationStore accessTokenRevocationStore() { return mock(AccessTokenRevocationStore.class); }
+
         @Bean UserRepository users() {
             UserRepository users = mock(UserRepository.class);
             when(users.findById(USER_ID)).thenAnswer(inv -> Optional.of(User.builder().id(USER_ID)
@@ -124,7 +127,8 @@ class PasswordChangeAttemptsPersistenceTest {
         ChangePasswordUseCase otherInstance = new ChangePasswordUseCase(
                 mock(UserRepository.class), mock(RefreshTokenRepository.class), ENCODER,
                 mock(UserLock.class), new PasswordChangeAttemptRepositoryAdapter(jdbc), mock(UserNoticeOutbox.class),
-                new PasswordPolicyService(password -> false, new com.ieltspath.user.config.AuthPasswordProperties(8, 12)));
+                new PasswordPolicyService(password -> false, new com.ieltspath.user.config.AuthPasswordProperties(8, 12)),
+                mock(AccessTokenRevocationStore.class));
         var limited = assertThrows(PasswordChangeException.class,
                 () -> otherInstance.execute(new ChangePasswordCommand(USER_ID, "right-password", "next-password")));
 

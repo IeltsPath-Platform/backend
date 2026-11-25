@@ -7,6 +7,8 @@ import com.ieltspath.user.domain.repository.UserRepository;
 import com.ieltspath.user.domain.vo.RoleName;
 import com.ieltspath.user.domain.vo.UserStatus;
 import com.ieltspath.user.application.port.UserLock;
+import com.ieltspath.user.application.port.AccessTokenRevocationStore;
+import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +23,7 @@ public class DeleteUserUseCase {
     private final UserRepository userRepository;
     private final UserLock userLock;
     private final RefreshTokenRepository refreshTokens;
+    private final AccessTokenRevocationStore accessTokens;
 
     @Transactional
     public User execute(UUID id, UUID actorId) {
@@ -42,6 +45,7 @@ public class DeleteUserUseCase {
         user.deactivate();
         User saved = userRepository.save(user);
         refreshTokens.revokeAllActiveForUser(user.getId(), LocalDateTime.now(), "ADMIN");
+        accessTokens.revokeUser(user.getId(), Instant.now());
         return saved;
     }
 }

@@ -17,6 +17,7 @@ public interface RefreshTokenRepository {
     java.util.List<RefreshToken> findActiveSessions(java.util.UUID userId, java.time.LocalDateTime now, int limit);
     int revokeSession(java.util.UUID userId, java.util.UUID familyId, java.time.LocalDateTime revokedAt, String reason);
     int revokeAllActiveExceptSession(java.util.UUID userId, java.util.UUID currentFamilyId, java.time.LocalDateTime revokedAt, String reason);
+    java.util.List<java.util.UUID> findActiveSessionIds(java.util.UUID userId, java.time.LocalDateTime now, java.util.UUID exceptFamilyId);
     int deleteExpiredOrOldRevoked(java.time.LocalDateTime now, java.time.LocalDateTime revokedBefore, int limit);
     int updateReplacement(String tokenHash, java.util.UUID replacedById);
 }
