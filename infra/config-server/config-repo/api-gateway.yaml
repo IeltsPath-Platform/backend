@@ -387,7 +387,9 @@ gateway:
     revocation:
       fail-closed: ${GATEWAY_AUTH_REVOCATION_FAIL_CLOSED:false}
   rate-limit:
-    trusted-proxies: []
+    # Comma-separated CIDRs/IPs. Local requests trust no forwarded address by default.
+    behind-proxy: ${GATEWAY_BEHIND_PROXY:false}
+    trusted-proxies: ${GATEWAY_RATE_LIMIT_TRUSTED_PROXIES:}
     tiers:
       auth: { replenish-rate: 1, burst-capacity: 5 }
       upload: { replenish-rate: 1, burst-capacity: 5 }

@@ -29,6 +29,22 @@ class ClientKeyResolverTest {
     }
 
     @Test
+    void acceptsTrustedProxyCidr() {
+        ClientKeyResolver resolver = resolver(List.of("172.28.0.0/24"));
+        ServerWebExchange exchange = exchange("198.51.100.7", "172.28.0.2");
+
+        assertThat(resolver.resolve(exchange).block()).isEqualTo("ip:198.51.100.7");
+    }
+
+    @Test
+    void ignoresMalformedForwardedForHops() {
+        ClientKeyResolver resolver = resolver(List.of("10.0.0.1"));
+        ServerWebExchange exchange = exchange("not-an-ip, 198.51.100.7", "10.0.0.1");
+
+        assertThat(resolver.resolve(exchange).block()).isEqualTo("ip:198.51.100.7");
+    }
+
+    @Test
     void fallsBackToRemoteWhenEveryHopIsTrusted() {
         ClientKeyResolver resolver = resolver(List.of("10.0.0.1", "10.0.0.2"));
         ServerWebExchange exchange = exchange("10.0.0.2", "10.0.0.1");
@@ -45,7 +61,7 @@ class ClientKeyResolverTest {
     }
 
     private ClientKeyResolver resolver(List<String> trustedProxies) {
-        return new ClientKeyResolver(new RateLimitProperties(trustedProxies, Map.of()));
+        return new ClientKeyResolver(new RateLimitProperties(false, trustedProxies, Map.of()));
     }
 
     private ServerWebExchange exchange(String forwardedFor, String remoteAddress) {

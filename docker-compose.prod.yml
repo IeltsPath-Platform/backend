@@ -27,10 +27,12 @@ services:
     image: ghcr.io/${IMAGE_OWNER:?Set IMAGE_OWNER}/ieltspath-api-gateway:${IMAGE_TAG:?Set IMAGE_TAG}
     build: !reset null
     volumes: !reset []
-    environment: !reset {}
     env_file: !override
       - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/api-gateway.env
         format: raw
+    environment: !override
+      GATEWAY_BEHIND_PROXY: "true"
+      GATEWAY_RATE_LIMIT_TRUSTED_PROXIES: 172.28.0.2/32
     ports: !reset []
     restart: unless-stopped
     mem_limit: 512m
@@ -187,7 +189,9 @@ services:
       - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/caddy.env
         format: raw
     ports: ["80:80", "443:443"]
-    networks: [codebase-network]
+    networks:
+      codebase-network:
+        ipv4_address: 172.28.0.2
     restart: unless-stopped
     mem_limit: 128m
     volumes:
@@ -201,3 +205,9 @@ volumes:
   redis-data:
   caddy-data:
   caddy-config:
+
+networks:
+  codebase-network:
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24

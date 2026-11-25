@@ -57,6 +57,10 @@ All env files and `operations.json` are written with `umask 077`, directory mode
 
 User cookies are secure, HTTP-only by the existing default, `SameSite=Lax`, host-only on `api.<domain>`, with the existing `/auth` refresh path. Gateway, game WebSocket, and notification origins use `https://app.<domain>`. Preview/third-party origins are rejected by configuration; do not put wildcard origins in production. Demo callbacks are disabled and API documentation is disabled.
 
+### Trusted reverse proxy for rate limiting
+
+Production Compose gives Caddy the fixed `172.28.0.2` address on the `172.28.0.0/24` application network and sets `GATEWAY_BEHIND_PROXY=true` plus `GATEWAY_RATE_LIMIT_TRUSTED_PROXIES=172.28.0.2/32` for the Gateway. Keep those two settings together if the network is changed: the Gateway accepts `X-Forwarded-For` only when its direct peer matches an explicitly trusted IP or CIDR, then selects the right-most untrusted IP. Do not put broad public networks in `GATEWAY_RATE_LIMIT_TRUSTED_PROXIES`; doing so lets an untrusted caller choose another client's bucket. Local deployments leave both variables unset.
+
 ## First bootstrap and manual deployment
 
 With demo data disabled, an empty database has **no smoke account**. Provision a dedicated normal CUSTOMER through the existing public `/api/users/register` endpoint after the first stack start, using a private request-body file and the same strong password stored in `SMOKE_LOGIN_PASSWORD`. Do not create an admin or enable demo callbacks for the smoke test. Initial administrator provisioning is a separate operator decision using existing user-management procedures.
