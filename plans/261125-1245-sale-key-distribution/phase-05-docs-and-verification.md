@@ -39,7 +39,7 @@ nhập key ở trang giá bằng tài khoản học viên, xuất CSV mở bằn
 
 ## Triển khai
 
-1. Đặt `ACCESS_KEY_CODE_SECRET` vào `.env` của môi trường trước khi chạy migration V13 (thiếu thì tạo đợt báo không khả dụng, các phần khác vẫn chạy).
+1. Đặt `ACCESS_KEY_CODE_SECRET` vào `.env` của môi trường trước khi chạy migration V14 (thiếu thì tạo đợt báo không khả dụng, các phần khác vẫn chạy).
 2. Thứ tự: frontend trước (đọc `details.code` có dự phòng câu cũ), rồi user-service (endpoint nội bộ mới), rồi access-service.
 3. Route `/point-management/*` của bản demo dừng mở công khai ngay khi frontend mới lên; báo trước cho người đang dùng bản demo.
 4. Luật "chặn key chưa phát" (D2) chỉ áp cho key có `batch_code`; chưa có đợt nào trước khi phát hành nên không ảnh hưởng key đang lưu hành.

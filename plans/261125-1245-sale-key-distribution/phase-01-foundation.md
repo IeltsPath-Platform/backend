@@ -12,7 +12,7 @@ Theo quyết định D1, D2, D3, D4 (xem `plan.md`). Phủ: S20, S21. Đọc tr�
 
 ## Việc làm
 
-1. **Migration V13 (access-service)**: bảng `key_audit_log` (`id`, `action` `REVEAL|EXPORT|ALLOCATE|REASSIGN|WITHDRAW|REVOKE|ISSUE`,
+1. **Migration V14 (access-service)**: bảng `key_audit_log` (`id`, `action` `REVEAL|EXPORT|ALLOCATE|REASSIGN|WITHDRAW|REVOKE|ISSUE`,
    `actor_id`, `key_id` nullable, `batch_code` nullable, `quantity`, `detail JSONB` không chứa mã, `created_at`); bảng
    `key_issue_requests` (`idempotency_key` khóa chính, `sale_id`, `product_id`, `key_id`, `created_at`) cho việc phát key; chỉ mục
    theo `(key_id, created_at)` và `(actor_id, created_at)`. Migration mới, không sửa V12.
@@ -38,7 +38,7 @@ Theo quyết định D1, D2, D3, D4 (xem `plan.md`). Phủ: S20, S21. Đọc tr�
 
 ## File
 
-- `backend/services/access-service/src/main/resources/db/migration/V13__key_distribution.sql` (mới)
+- `backend/services/access-service/src/main/resources/db/migration/V14__key_distribution_audit_and_issue_requests.sql` (mới)
 - `.../application/port/KeyCodeCipher.java`, `SaleDirectory.java`; `.../infrastructure/crypto/AesGcmKeyCodeCipher.java`;
   `.../infrastructure/client/RestSaleDirectory.java`; cấu hình `access.key-code.*`
 - `backend/services/user-service/.../InternalUserController.java` + use case liệt kê theo role

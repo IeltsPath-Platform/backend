@@ -90,10 +90,10 @@ Mọi câu hiển thị cho người dùng là tiếng Việt có dấu.
 ## Idempotency
 
 - Phát key (`/issue`) bắt buộc `Idempotency-Key` (≤100 ký tự). Cùng khóa, cùng người gọi, cùng gói trả lại đúng key đã phát;
-  khác người hoặc khác gói trả `IDEMPOTENCY_KEY_REUSED`. Bảng `key_issue_requests` (V13).
+  khác người hoặc khác gói trả `IDEMPOTENCY_KEY_REUSED`. Bảng `key_issue_requests` (V14).
 - Hai lần phát cùng lúc lấy hai key khác nhau (`FOR UPDATE SKIP LOCKED`).
 
-## Nhật ký (`key_audit_log`, V13)
+## Nhật ký (`key_audit_log`, V14)
 
 Mỗi hành động tạo đợt, giao, cân lại, rút, thu hồi, phát, xem mã và xuất có một dòng: `action`, `actor_id`, `key_id`,
 `batch_code`, `quantity`, `detail` (JSON đếm, không chứa mã). Không log mã key ở bất kỳ đâu.
