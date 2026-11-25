@@ -4,6 +4,9 @@ import com.ieltspath.events.messaging.InvalidDeadLetterBatchException;
 import com.ieltspath.events.messaging.UnknownDeadLetterQueueException;
 import com.ieltspath.access.domain.exception.*;
 import com.ieltspath.access.application.exception.InvalidIdempotencyKeyException;
+import com.ieltspath.access.application.exception.KeyDistributionException;
+import com.ieltspath.commonresilience.DownstreamUnavailableException;
+import com.ieltspath.commonsecurity.error.VietnameseErrorMessages;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,12 +41,34 @@ public class GlobalExceptionHandler {
     }
     @ExceptionHandler({
         PlanNotFoundException.class,
-        KeyProductNotFoundException.class,
-        ActivationKeyNotFoundException.class
+        KeyProductNotFoundException.class
     })
     public ResponseEntity<ErrorResponse> handleNotFound(RuntimeException ex, HttpServletRequest request) {
         log.warn("Resource not found: {}", ex.getMessage());
         return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage(), request.getRequestURI(), null);
+    }
+
+    /**
+     * A code the learner typed that cannot be used. A key nobody has handed out yet gets the same answer as a code that
+     * does not exist, so the response never says that such a key is real.
+     */
+    @ExceptionHandler({ActivationKeyNotFoundException.class, KeyNotIssuedException.class})
+    public ResponseEntity<ErrorResponse> handleKeyNotFound(RuntimeException ex, HttpServletRequest request) {
+        log.warn("Activation key not usable: {}", ex.getClass().getSimpleName());
+        return buildResponse(HttpStatus.NOT_FOUND, "Mã kích hoạt không hợp lệ", request.getRequestURI(), null, "KEY_NOT_FOUND");
+    }
+
+    @ExceptionHandler(KeyDistributionException.class)
+    public ResponseEntity<ErrorResponse> handleKeyDistribution(KeyDistributionException ex, HttpServletRequest request) {
+        return buildResponse(ex.status(), ex.getMessage(), request.getRequestURI(), ex.details(), ex.code());
+    }
+
+    @ExceptionHandler(DownstreamUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleDownstreamUnavailable(DownstreamUnavailableException ex,
+                                                                      HttpServletRequest request) {
+        log.warn("Downstream service unavailable: {}", ex.getMessage());
+        return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, "Chưa lấy được danh sách nhân viên bán hàng, vui lòng thử lại.",
+                request.getRequestURI(), null, "USER_SERVICE_UNAVAILABLE");
     }
 
     @ExceptionHandler(EmailNotVerifiedException.class)
@@ -60,7 +85,15 @@ public class GlobalExceptionHandler {
     })
     public ResponseEntity<ErrorResponse> handleBadRequest(RuntimeException ex, HttpServletRequest request) {
         log.warn("Bad request: {}", ex.getMessage());
-        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI(), null);
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI(), null, keyErrorCode(ex));
+    }
+
+    /** A stable code for the reasons a learner's key is refused; other bad requests carry none. */
+    private static String keyErrorCode(RuntimeException ex) {
+        if (ex instanceof KeyAlreadyRedeemedException) return "KEY_ALREADY_REDEEMED";
+        if (ex instanceof KeyExpiredException) return "KEY_EXPIRED";
+        if (ex instanceof KeyRevokedException) return "KEY_REVOKED";
+        return null;
     }
 
     @ExceptionHandler({
@@ -90,7 +123,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponse> handleUnreadableRequest(HttpMessageNotReadableException ex,
                                                                    HttpServletRequest request) {
-        return buildResponse(HttpStatus.BAD_REQUEST, "Malformed request body", request.getRequestURI(), null);
+        return buildResponse(HttpStatus.BAD_REQUEST, "Nội dung gửi lên không đọc được", request.getRequestURI(), null);
     }
 
     @ExceptionHandler(MissingRequestHeaderException.class)
@@ -100,7 +133,7 @@ public class GlobalExceptionHandler {
             return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI(), null);
         }
         return ResponseEntity.badRequest().body(new ErrorResponse(LocalDateTime.now(), 400, "Bad Request",
-                "Idempotency-Key is required", request.getRequestURI(), null, "IDEMPOTENCY_KEY_REQUIRED"));
+                "Thiếu mã chống gửi trùng (Idempotency-Key)", request.getRequestURI(), null, "IDEMPOTENCY_KEY_REQUIRED"));
     }
 
     @ExceptionHandler(InvalidIdempotencyKeyException.class)
@@ -134,13 +167,24 @@ public class GlobalExceptionHandler {
     }
 
     private ResponseEntity<ErrorResponse> buildResponse(HttpStatus status, String message, String path, Map<String, String> details) {
+        return buildResponse(status, message, path, details, null);
+    }
+
+    /** Every message a client reads is Vietnamese; an English one is logged and replaced by the sentence for its status. */
+    private ResponseEntity<ErrorResponse> buildResponse(HttpStatus status, String message, String path,
+                                                        Map<String, String> details, String code) {
+        String userMessage = VietnameseErrorMessages.userFacing(status.value(), message);
+        if (!userMessage.equals(message)) {
+            log.warn("Replaced a non-Vietnamese error message for status {}: {}", status.value(), message);
+        }
         ErrorResponse response = new ErrorResponse(
                 LocalDateTime.now(),
                 status.value(),
                 status.getReasonPhrase(),
-                message,
+                userMessage,
                 path,
-                details
+                details,
+                code
         );
         return ResponseEntity.status(status).body(response);
     }

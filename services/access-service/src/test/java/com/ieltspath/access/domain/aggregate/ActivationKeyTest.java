@@ -85,7 +85,7 @@ class ActivationKeyTest {
 
         assertThatThrownBy(key::redeem)
                 .isInstanceOf(KeyExpiredException.class)
-                .hasMessage("Activation key has expired");
+                .hasMessage("Mã kích hoạt đã hết hạn.");
         assertThat(key.getStatus()).isEqualTo(KeyStatus.EXPIRED);
     }
 
