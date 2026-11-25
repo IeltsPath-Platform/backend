@@ -22,7 +22,7 @@ Hợp đồng đầy đủ, trạng thái key và mã lỗi: `docs/contracts/key
 - Đợt tối đa 1000 key, key mã hóa AES-256-GCM. Khóa `ACCESS_KEY_CODE_SECRET` (Base64 của 32 byte) chỉ đặt trong `.env`;
   thiếu thì không tạo được đợt, kích hoạt key vẫn chạy.
 - Key của đợt chỉ kích hoạt được sau khi đã phát (`issued_at`). Key sinh từ `/admin/keys/generate` không thuộc đợt, kích hoạt như cũ.
-- Mọi lần xem mã, xuất CSV, giao, cân lại, thu hồi, phát được ghi vào `key_audit_log` (V13). Nhật ký không chứa mã.
+- Mọi lần xem mã, xuất CSV, giao, cân lại, thu hồi, phát được ghi vào `key_audit_log` (V14). Nhật ký không chứa mã.
 - Danh sách sale lấy từ user-service qua `USER_SERVICE_URL` (`GET /internal/users/sales-staff`).
 
 ## Luật của `/internal/access/**`
