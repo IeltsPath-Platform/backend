@@ -5,8 +5,11 @@ import com.ieltspath.content.domain.entity.ContentSection;
 import com.ieltspath.content.domain.exception.ContentSectionNotFoundException;
 import com.ieltspath.content.domain.exception.DraftVersionExistsException;
 import com.ieltspath.content.domain.exception.InvalidPackageLessonException;
+import com.ieltspath.content.domain.exception.PackageArchiveNotSupportedException;
+import com.ieltspath.content.domain.exception.PlacementPoolLockedException;
 import com.ieltspath.content.domain.exception.PackageVersionNotFoundException;
 import com.ieltspath.content.domain.vo.PackageType;
+import com.ieltspath.content.domain.vo.PlacementPool;
 import com.ieltspath.content.domain.vo.PublicationStatus;
 
 import java.time.Instant;
@@ -27,6 +30,7 @@ public class ContentPackage {
     private final UUID lessonId;
     private final UUID courseId;
     private final UUID topicId;
+    private PlacementPool placementPool;
 
     /** {@code lessonId} makes a practice set part of that lesson's Practice; other package types have none. */
     public ContentPackage(UUID id, String code, String title, PackageType packageType,
@@ -58,6 +62,19 @@ public class ContentPackage {
                           UUID currentPublishedVersionId, Instant createdAt, Instant updatedAt,
                           List<ContentPackageVersion> versions, UUID lessonId, UUID courseId, String sourceCode,
                           UUID topicId) {
+        this(id, code, title, packageType, requiredFeatureKey, status, currentPublishedVersionId, createdAt, updatedAt,
+                versions, lessonId, courseId, sourceCode, topicId, null);
+    }
+
+    public ContentPackage(UUID id, String code, String title, PackageType packageType,
+                          String requiredFeatureKey, PublicationStatus status,
+                          UUID currentPublishedVersionId, Instant createdAt, Instant updatedAt,
+                          List<ContentPackageVersion> versions, UUID lessonId, UUID courseId, String sourceCode,
+                          UUID topicId, PlacementPool placementPool) {
+        if (placementPool != null && packageType != PackageType.PLACEMENT_TEST) {
+            throw new IllegalArgumentException("Nhóm đề xếp lớp chỉ dùng cho đề xếp lớp (PLACEMENT_TEST)");
+        }
+        this.placementPool = placementPool;
         this.id = Objects.requireNonNull(id, "id must not be null");
         this.code = Objects.requireNonNull(code, "code must not be null");
         this.title = Objects.requireNonNull(title, "title must not be null");
@@ -70,11 +87,11 @@ public class ContentPackage {
         this.updatedAt = updatedAt != null ? updatedAt : this.createdAt;
         this.versions = versions != null ? new ArrayList<>(versions) : new ArrayList<>();
         if (lessonId != null && packageType != PackageType.PRACTICE_SET) {
-            throw new InvalidPackageLessonException("Only a PRACTICE_SET package can belong to a lesson");
+            throw new InvalidPackageLessonException("Chỉ gói luyện tập (PRACTICE_SET) mới gắn vào bài học được");
         }
         this.lessonId = lessonId;
         if (packageType == PackageType.COURSE_TEST && courseId == null) {
-            throw new IllegalArgumentException("A COURSE_TEST package must belong to a course");
+            throw new IllegalArgumentException("Đề cuối khóa (COURSE_TEST) phải thuộc một khóa học");
         }
         this.courseId = courseId;
         this.topicId = topicId;
@@ -91,16 +108,21 @@ public class ContentPackage {
 
     public static ContentPackage create(String code, String title, PackageType packageType, String requiredFeatureKey,
                                         UUID lessonId, String sourceCode) {
+        return create(code, title, packageType, requiredFeatureKey, lessonId, sourceCode, null);
+    }
+
+    public static ContentPackage create(String code, String title, PackageType packageType, String requiredFeatureKey,
+                                        UUID lessonId, String sourceCode, PlacementPool placementPool) {
         Instant now = Instant.now();
         return new ContentPackage(UUID.randomUUID(), code, title, packageType, requiredFeatureKey,
-                PublicationStatus.DRAFT, null, now, now, new ArrayList<>(), lessonId, null, sourceCode);
+                PublicationStatus.DRAFT, null, now, now, new ArrayList<>(), lessonId, null, sourceCode, null, placementPool);
     }
 
     /** A final test is bound to its topic or course when created and stays bound. */
     public static ContentPackage createFinalTest(String code, String title, PackageType packageType,
                                                  String requiredFeatureKey, UUID topicId, UUID courseId) {
         if (packageType == PackageType.TOPIC_TEST && topicId == null) {
-            throw new IllegalArgumentException("A TOPIC_TEST package must belong to a topic");
+            throw new IllegalArgumentException("Đề cuối chủ đề (TOPIC_TEST) phải thuộc một chủ đề");
         }
         Instant now = Instant.now();
         return new ContentPackage(UUID.randomUUID(), code, title, packageType, requiredFeatureKey,
@@ -111,11 +133,76 @@ public class ContentPackage {
         Objects.requireNonNull(versionId, "versionId must not be null");
         boolean exists = versions.stream().anyMatch(v -> v.getId().equals(versionId));
         if (!exists) {
-            throw new IllegalArgumentException("Version does not belong to package: " + versionId);
+            throw new IllegalArgumentException("Phiên bản không thuộc gói: " + versionId);
         }
         this.currentPublishedVersionId = versionId;
         this.status = PublicationStatus.PUBLISHED;
         this.updatedAt = Instant.now();
+    }
+
+    public void rename(String newTitle) {
+        if (newTitle == null || newTitle.isBlank()) {
+            throw new IllegalArgumentException("Tiêu đề không được để trống");
+        }
+        this.title = newTitle.strip();
+        this.updatedAt = Instant.now();
+    }
+
+    /** A null key makes the package free; the Premium key makes it Premium. Takes effect for learners at once. */
+    public void changeRequiredFeatureKey(String newKey) {
+        this.requiredFeatureKey = newKey;
+        this.updatedAt = Instant.now();
+    }
+
+    /** Only a practice test has a source; a null source takes it out of the learner library. */
+    public void changeSource(String newSourceCode) {
+        if (packageType != PackageType.PRACTICE_TEST) {
+            throw new IllegalArgumentException("Nguồn đề chỉ dùng cho đề luyện tập");
+        }
+        this.sourceCode = newSourceCode;
+        this.updatedAt = Instant.now();
+    }
+
+    /** True while no version of the package has ever been published or archived. */
+    public boolean neverPublished() {
+        return currentPublishedVersionId == null && status == PublicationStatus.DRAFT
+                && versions.stream().allMatch(v -> v.getStatus() == PublicationStatus.DRAFT);
+    }
+
+    /** The band pool of a placement test changes only before its first publication. */
+    public void changePlacementPool(PlacementPool newPool) {
+        if (packageType != PackageType.PLACEMENT_TEST) {
+            throw new IllegalArgumentException("Kho band chỉ dùng cho đề đầu vào");
+        }
+        if (newPool == null) {
+            throw new IllegalArgumentException("Chọn kho band cho đề đầu vào");
+        }
+        if (newPool == placementPool) return;
+        if (!neverPublished()) {
+            throw new PlacementPoolLockedException();
+        }
+        this.placementPool = newPool;
+        this.updatedAt = Instant.now();
+    }
+
+    /** Practice tests and placement tests can be hidden from learners and brought back. */
+    public void archive() {
+        requireArchivable();
+        this.status = PublicationStatus.ARCHIVED;
+        this.updatedAt = Instant.now();
+    }
+
+    /** Back to published when a version was published, otherwise to draft. */
+    public void restore() {
+        requireArchivable();
+        this.status = currentPublishedVersionId != null ? PublicationStatus.PUBLISHED : PublicationStatus.DRAFT;
+        this.updatedAt = Instant.now();
+    }
+
+    private void requireArchivable() {
+        if (packageType != PackageType.PRACTICE_TEST && packageType != PackageType.PLACEMENT_TEST) {
+            throw new PackageArchiveNotSupportedException();
+        }
     }
 
     public void addVersion(ContentPackageVersion version) {
@@ -146,7 +233,7 @@ public class ContentPackage {
         boolean elsewhere = versions.stream()
                 .anyMatch(v -> v.getSections().stream().anyMatch(s -> s.getId().equals(sectionId)));
         if (elsewhere) {
-            throw new IllegalArgumentException("section " + sectionId + " does not belong to version " + versionId);
+            throw new IllegalArgumentException("Phần " + sectionId + " không thuộc phiên bản " + versionId);
         }
         throw new ContentSectionNotFoundException(sectionId);
     }
@@ -162,6 +249,7 @@ public class ContentPackage {
     public UUID getLessonId() { return lessonId; }
     public UUID getCourseId() { return courseId; }
     public UUID getTopicId() { return topicId; }
+    public PlacementPool getPlacementPool() { return placementPool; }
     public String getCode() { return code; }
     public String getTitle() { return title; }
     public PackageType getPackageType() { return packageType; }

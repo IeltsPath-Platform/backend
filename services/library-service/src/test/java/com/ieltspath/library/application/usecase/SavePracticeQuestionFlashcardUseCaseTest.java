@@ -131,4 +131,16 @@ class SavePracticeQuestionFlashcardUseCaseTest {
                 new SavePracticeQuestionFlashcardUseCase(repository).execute(userId, questionId, "Front", "Back"));
         assertSame(conflict, thrown);
     }
+
+    @Test
+    void aBlankFrontOrBackIsRefused() {
+        FlashcardRepository repository = mock(FlashcardRepository.class);
+        when(repository.findLivePracticeQuestionCard(userId, questionId)).thenReturn(Optional.empty());
+        var useCase = new SavePracticeQuestionFlashcardUseCase(repository);
+        assertEquals("front không hợp lệ", assertThrows(InvalidDataException.class,
+                () -> useCase.execute(userId, questionId, " ", "Back")).getMessage());
+        assertEquals("back không hợp lệ", assertThrows(InvalidDataException.class,
+                () -> useCase.execute(userId, questionId, "Front", " ")).getMessage());
+        org.mockito.Mockito.verify(repository, org.mockito.Mockito.never()).save(any(Flashcard.class));
+    }
 }

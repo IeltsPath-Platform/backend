@@ -38,14 +38,14 @@ public enum LessonBlockKind {
             return EXERCISE;
         }
         if (essays > 1 || questions.size() > 1) {
-            throw new InvalidLessonBlockException("An essay block must hold exactly one question");
+            throw new InvalidLessonBlockException("Khối bài viết phải có đúng một câu hỏi");
         }
         QuestionSpec essay = questions.get(0);
         requireValidPassBand(essay.passBand());
         if (TASK_1.equals(essay.task())) {
             requireTask1Chart(essay);
         } else if (!TASK_2.equals(essay.task())) {
-            throw new InvalidLessonBlockException("Essay task must be TASK_1 or TASK_2");
+            throw new InvalidLessonBlockException("Đề bài viết phải là TASK_1 hoặc TASK_2");
         }
         return ESSAY;
     }
@@ -54,10 +54,10 @@ public enum LessonBlockKind {
     private static void requireTask1Chart(QuestionSpec essay) {
         String facts = essay.chartFacts();
         if (facts == null || facts.isBlank() || facts.length() > MAX_CHART_FACTS) {
-            throw new InvalidLessonBlockException("Task 1 essay needs chartFacts of 1-2000 characters");
+            throw new InvalidLessonBlockException("Bài viết Task 1 cần số liệu biểu đồ dài từ 1 đến 2000 ký tự");
         }
         if (!essay.assetTypes().contains(AssetType.IMAGE)) {
-            throw new InvalidLessonBlockException("Task 1 essay needs at least one chart image");
+            throw new InvalidLessonBlockException("Bài viết Task 1 cần ít nhất một ảnh biểu đồ");
         }
     }
 
@@ -70,7 +70,7 @@ public enum LessonBlockKind {
         }
         if (band == null || band.compareTo(MIN_PASS_BAND) < 0 || band.compareTo(MAX_PASS_BAND) > 0
                 || band.remainder(HALF_BAND).signum() != 0) {
-            throw new InvalidLessonBlockException("Essay passBand must be 4.0-9.0 in steps of 0.5");
+            throw new InvalidLessonBlockException("Band đạt của bài viết phải từ 4.0 đến 9.0, bước 0.5");
         }
     }
 }

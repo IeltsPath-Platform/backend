@@ -18,7 +18,7 @@ public record BandRange(BigDecimal min, BigDecimal max) {
         min = normalize(min, "bandMin");
         max = normalize(max, "bandMax");
         if (min != null && max != null && min.compareTo(max) > 0) {
-            throw new IllegalArgumentException("bandMin must not be greater than bandMax");
+            throw new IllegalArgumentException("Band thấp nhất không được lớn hơn band cao nhất");
         }
     }
 
@@ -36,10 +36,10 @@ public record BandRange(BigDecimal min, BigDecimal max) {
             return null;
         }
         if (band.compareTo(LOWEST) < 0 || band.compareTo(HIGHEST) > 0) {
-            throw new IllegalArgumentException(name + " must be between 0.0 and 9.0");
+            throw new IllegalArgumentException(name + " phải từ 0.0 đến 9.0");
         }
         if (band.multiply(TWO).stripTrailingZeros().scale() > 0) {
-            throw new IllegalArgumentException(name + " must be a multiple of 0.5");
+            throw new IllegalArgumentException(name + " phải là bội số của 0.5");
         }
         return band.setScale(1, RoundingMode.UNNECESSARY);
     }

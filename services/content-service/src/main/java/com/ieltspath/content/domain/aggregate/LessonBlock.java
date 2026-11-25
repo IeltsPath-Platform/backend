@@ -55,7 +55,7 @@ public class LessonBlock {
             case EXERCISE -> text == null && asset == null && !safeQuestions.isEmpty() && safeSenses.isEmpty()
                     && safePoints.isEmpty();
         };
-        if (!valid) throw new LessonBlockInvalidException("Block fields do not match its block type");
+        if (!valid) throw new LessonBlockInvalidException("Các trường của khối không khớp với loại khối");
         this.textContent = text;
         this.assetId = asset;
         this.vocabularySenseIds = safeSenses;
@@ -64,7 +64,7 @@ public class LessonBlock {
     }
 
     private static int requireOrder(int order) {
-        if (order < 0) throw new LessonBlockInvalidException("Block sortOrder must be non-negative");
+        if (order < 0) throw new LessonBlockInvalidException("Thứ tự của khối không được âm");
         return order;
     }
 

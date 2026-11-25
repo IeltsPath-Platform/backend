@@ -158,4 +158,116 @@ class Mp1MasteryCalculatorTest {
                 point(false, EvidenceSource.PRACTICE_SET, Duration.ofDays(1))), NOW);
         assertThat(examWrong.mastery()).isLessThan(practiceWrong.mastery());
     }
+
+    /** Defaults with a half-life so long that age changes nothing, to read counts straight from the score. */
+    private static Mp1MasteryCalculator withoutDecay() {
+        Mp1Params d = Mp1Params.defaults();
+        return new Mp1MasteryCalculator(new Mp1Params(d.window(), d.maxPracticeInWindow(), 1e12, d.minEvidence(),
+                d.minDistinctDays(), d.minConfidence(), d.hysteresis(), d.sameItemDays(), d.weights()));
+    }
+
+    @Test
+    void theSameQuestionExactlySevenDaysLaterCountsAgain() {
+        UUID question = UUID.randomUUID();
+        var result = withoutDecay().compute(List.of(
+                point(false, EvidenceSource.REVIEW_SET, Duration.ofDays(8), question),
+                point(true, EvidenceSource.REVIEW_SET, Duration.ofDays(1), question)), NOW);
+        assertThat(result.mastery()).isCloseTo(0.5, within(1e-9));
+    }
+
+    @Test
+    void repeatsAreMeasuredFromTheLastAnswerThatCounted() {
+        UUID question = UUID.randomUUID();
+        // day 0 wrong (counts), day 5 right (repeat), day 8 right (counts), day 12 wrong (repeat of day 8)
+        var result = withoutDecay().compute(List.of(
+                point(false, EvidenceSource.REVIEW_SET, Duration.ofDays(12), question),
+                point(true, EvidenceSource.REVIEW_SET, Duration.ofDays(7), question),
+                point(true, EvidenceSource.REVIEW_SET, Duration.ofDays(4), question),
+                point(false, EvidenceSource.REVIEW_SET, Duration.ZERO, question)), NOW);
+        assertThat(result.mastery()).isCloseTo(0.5, within(1e-9));
+    }
+
+    @Test
+    void evidenceDatedInTheFutureIsLeftOutAndTakesNoWindowSlot() {
+        List<EvidencePoint> valid = new ArrayList<>();
+        for (int day = 8; day >= 1; day--) valid.add(point(true, EvidenceSource.REVIEW_SET, Duration.ofDays(day)));
+        List<EvidencePoint> withFuture = new ArrayList<>(valid);
+        withFuture.add(new EvidencePoint(false, EvidenceSource.ASSESSMENT, NOW.plus(Duration.ofHours(1)), null));
+        var expected = calculator.compute(valid, NOW);
+        var actual = calculator.compute(withFuture, NOW);
+        assertThat(actual.mastery()).isEqualTo(1.0);
+        assertThat(actual.confidence()).isCloseTo(expected.confidence(), within(1e-12));
+    }
+
+    @Test
+    void anAnswerExactlyOneHalfLifeOldWeighsHalf() {
+        var result = calculator.compute(List.of(point(true, EvidenceSource.REVIEW_SET, Duration.ofDays(30))), NOW);
+        assertThat(result.confidence()).isCloseTo(0.5, within(1e-12));
+    }
+
+    @Test
+    void aConfidenceExactlyAtTheFloorIsEnough() {
+        List<EvidencePoint> history = List.of(
+                point(true, EvidenceSource.PRACTICE_SET, Duration.ofDays(2)),
+                point(true, EvidenceSource.PRACTICE_SET, Duration.ofDays(1)),
+                point(true, EvidenceSource.REVIEW_SET, Duration.ofHours(1)));
+        double total = calculator.compute(history, NOW).confidence();
+        Mp1Params d = Mp1Params.defaults();
+        var atFloor = new Mp1MasteryCalculator(new Mp1Params(d.window(), d.maxPracticeInWindow(), d.halfLifeDays(),
+                d.minEvidence(), d.minDistinctDays(), total, d.hysteresis(), d.sameItemDays(), d.weights()));
+        var justAbove = new Mp1MasteryCalculator(new Mp1Params(d.window(), d.maxPracticeInWindow(), d.halfLifeDays(),
+                d.minEvidence(), d.minDistinctDays(), total + 1e-9, d.hysteresis(), d.sameItemDays(), d.weights()));
+        assertThat(atFloor.compute(history, NOW).sufficient()).isTrue();
+        assertThat(justAbove.compute(history, NOW).sufficient()).isFalse();
+    }
+
+    @Test
+    void aSourceWeightOfZeroGivesZeroAndNeverNotANumber() {
+        Mp1Params d = Mp1Params.defaults();
+        var w = d.weights();
+        var zeroPractice = new Mp1MasteryCalculator(new Mp1Params(d.window(), d.maxPracticeInWindow(), d.halfLifeDays(),
+                d.minEvidence(), d.minDistinctDays(), d.minConfidence(), d.hysteresis(), d.sameItemDays(),
+                new Mp1Params.SourceWeights(w.exam(), w.review(), w.probe(), 0.0, w.essay(), w.errorTrap(), w.humanReview())));
+        var result = zeroPractice.compute(List.of(
+                point(true, EvidenceSource.PRACTICE_SET, Duration.ofDays(2)),
+                point(true, EvidenceSource.PRACTICE_SET, Duration.ofDays(1)),
+                point(true, EvidenceSource.PRACTICE_SET, Duration.ofHours(1))), NOW);
+        assertThat(result.mastery()).isZero();
+        assertThat(Double.isNaN(result.mastery())).isFalse();
+        assertThat(result.confidence()).isZero();
+        assertThat(result.sufficient()).isFalse();
+    }
+
+    @Test
+    void theParametersRefuseImpossibleValues() {
+        var w = Mp1Params.defaults().weights();
+        for (Runnable invalid : List.<Runnable>of(
+                () -> new Mp1Params(0, 3, 30, 3, 2, 1.0, 0.03, 7, w),
+                () -> new Mp1Params(8, 3, 0, 3, 2, 1.0, 0.03, 7, w),
+                () -> new Mp1Params(8, 3, 30, 3, 2, 1.0, 0.1, 7, w),
+                () -> new Mp1Params(8, 3, 30, 3, 2, 1.0, 0.03, -1, w))) {
+            org.assertj.core.api.Assertions.assertThatThrownBy(invalid::run)
+                    .isInstanceOf(IllegalArgumentException.class).hasMessage("Invalid MP-1.0 parameters");
+        }
+        assertThat(new Mp1Params(8, 3, 30, 3, 2, 1.0, 0.099, 7, w).hysteresis()).isEqualTo(0.099);
+    }
+
+    @Test
+    void masteryStaysBetweenZeroAndOneForAnyHistory() {
+        java.util.Random random = new java.util.Random(20261113L);
+        EvidenceSource[] sources = EvidenceSource.values();
+        for (int run = 0; run < 500; run++) {
+            List<EvidencePoint> history = new ArrayList<>();
+            int size = random.nextInt(20);
+            for (int i = 0; i < size; i++) {
+                history.add(new EvidencePoint(random.nextBoolean(), sources[random.nextInt(sources.length)],
+                        NOW.minus(Duration.ofHours(random.nextInt(24 * 200))),
+                        random.nextInt(3) == 0 ? null : new UUID(0, random.nextInt(4))));
+            }
+            history.sort(java.util.Comparator.comparing(EvidencePoint::occurredAt));
+            var result = calculator.compute(history, NOW);
+            assertThat(result.mastery()).as("run %d", run).isBetween(0.0, 1.0);
+            assertThat(result.confidence()).isGreaterThanOrEqualTo(0.0);
+        }
+    }
 }

@@ -101,6 +101,44 @@ class EssayGraderTaskChecksTest {
     }
 
     @Test
+    void aWrongSentenceWithoutACorrectionGetsAnEntryWithAnEmptyReplacementAndTheExplanation() {
+        llm.reply(reply("TA", "\"corrections\":[],\"taskChecks\":{\"dataChecks\":["
+                + "{\"excerpt\":\"Sales fell to 10 in 2021.\",\"verdict\":\"WRONG\",\"expected\":\"Doanh số giảm còn 15.\"}]}"));
+
+        WritingGrade grade = grader.grade(task1(), ESSAY_1).grade();
+
+        var entry = grade.corrections().getFirst();
+        assertEquals("T1_DATA_MISREPORTED", entry.errorCode());
+        assertEquals("Sales fell to 10 in 2021.", entry.suggestion());
+        assertEquals("Doanh số giảm còn 15.", entry.reason());
+    }
+
+    @Test
+    void aReplacementWrittenInVietnameseIsDroppedAndTheCorrectionKeepsItsExcerptAndReason() {
+        llm.reply(reply("TA", "\"corrections\":[{\"excerpt\":\"Sales fell to 10 in 2021.\",\"suggestion\":\"Bỏ đoạn này.\","
+                + "\"errorCode\":\"GRAMMAR\",\"reason\":\"Bỏ câu nêu ý kiến.\",\"certainty\":\"ERROR\"}],"
+                + "\"taskChecks\":{\"hasOverview\":false}"));
+
+        WritingGrade grade = grader.grade(task1(), ESSAY_1).grade();
+
+        var entry = grade.corrections().getFirst();
+        assertEquals("Sales fell to 10 in 2021.", entry.excerpt());
+        assertEquals("", entry.suggestion());
+        assertEquals("Bỏ câu nêu ý kiến.", entry.reason());
+    }
+
+    @Test
+    void theThirdTemplateIsGradedWithItsOwnPromptVersion() {
+        when(activations.activatedVersion("TASK_1")).thenReturn("IELTS_ESSAY@1+tplv3");
+        llm.reply(reply("TA", "\"corrections\":[],\"taskChecks\":{\"hasOverview\":false}"));
+
+        var graded = grader.grade(task1(), ESSAY_1);
+
+        assertEquals("IELTS_ESSAY@1+tplv3", graded.promptVersion());
+        assertEquals(Boolean.FALSE, graded.grade().task1Checks().hasOverview());
+    }
+
+    @Test
     void theFirstTemplateIgnoresTheChecks() {
         when(activations.activatedVersion("TASK_1")).thenReturn(null);
         llm.reply(reply("TA", "\"corrections\":[],\"taskChecks\":{\"hasOverview\":false}"));
@@ -122,9 +160,10 @@ class EssayGraderTaskChecksTest {
         var added = grade.corrections().getFirst();
         assertEquals("T1_DATA_MISREPORTED", added.errorCode());
         assertEquals("Sales fell to 10 in 2021.", added.excerpt());
-        assertEquals("Năm 2021 là 15.", added.suggestion());
+        assertEquals("Sales fell to 10 in 2021.", added.suggestion());
+        assertEquals("Năm 2021 là 15.", added.reason());
         assertEquals(3, added.severity());
-        assertFalse(added.isSuggestion());
+        assertFalse(added.suggestionOnly());
     }
 
     @Test
@@ -184,7 +223,7 @@ class EssayGraderTaskChecksTest {
 
     private EssayGrader capped(BigDecimal noOverview, BigDecimal partial, BigDecimal noPosition) {
         WritingSettings settings = new WritingSettings(3, 50, 1000, 10000, 20, 120, 10, "Asia/Ho_Chi_Minh", 2, true,
-                null, null, noOverview, partial, noPosition, 30);
+                null, null, noOverview, partial, noPosition, 30, "v1");
         return new EssayGrader(llm, new ObjectMapper(), content, activations, new EssayKnowledgeJudge(), "m", settings);
     }
 
@@ -201,6 +240,66 @@ class EssayGraderTaskChecksTest {
         assertEquals(0, new BigDecimal("5.0").compareTo(band(grade, "TA")));
         assertEquals("T1_NO_OVERVIEW", grade.bandLimits().getFirst().reason());
         assertNotNull(grade.task1Checks(), "the checks survive the cap and the knowledge judgment");
+    }
+
+    @Test
+    void grammarErrorsInMostSentencesCapGrammaticalRangeWhenTheCapIsOn() {
+        var density = new WritingSettings.Density(new BigDecimal("0.75"), new BigDecimal("0.5"), new BigDecimal("0.5"),
+                new BigDecimal("4.0"), null, null, null, null, null, null, null);
+        var settings = new WritingSettings(3, 50, 1000, 10000, 20, 120, 10, 20, "Asia/Ho_Chi_Minh", 2, true,
+                null, null, null, null, null, 30, "v1", density);
+        var densityGrader = new EssayGrader(llm, new ObjectMapper(), content, activations, new EssayKnowledgeJudge(), "m", settings);
+        llm.reply(reply("TA", "\"corrections\":["
+                + "{\"excerpt\":\"chart shows\",\"suggestion\":\"x\",\"errorCode\":\"GRAMMAR\",\"reason\":\"r\",\"certainty\":\"ERROR\"},"
+                + "{\"excerpt\":\"rose to 40\",\"suggestion\":\"x\",\"errorCode\":\"GRAMMAR\",\"reason\":\"r\",\"certainty\":\"ERROR\"},"
+                + "{\"excerpt\":\"fell to 10\",\"suggestion\":\"x\",\"errorCode\":\"GRAMMAR\",\"reason\":\"r\",\"certainty\":\"ERROR\"}],"
+                + "\"taskChecks\":{\"hasOverview\":true}"));
+
+        WritingGrade grade = densityGrader.grade(task1(), ESSAY_1).grade();
+
+        assertEquals(0, new BigDecimal("4.0").compareTo(band(grade, "GRA")));
+        assertEquals(0, new BigDecimal("7").compareTo(band(grade, "TA")), "only the criterion the rule names is capped");
+        assertEquals("DENSE_GRAMMAR", grade.bandLimits().getFirst().reason());
+    }
+
+    private EssayGrader impedingGrader() {
+        var density = new WritingSettings.Density(null, null, null, null, null, null, null, null, null,
+                new BigDecimal("0.5"), new BigDecimal("4.0"));
+        var settings = new WritingSettings(3, 50, 1000, 10000, 20, 120, 10, 20, "Asia/Ho_Chi_Minh", 2, true,
+                null, null, null, null, null, 30, "v1", density);
+        return new EssayGrader(llm, new ObjectMapper(), content, activations, new EssayKnowledgeJudge(), "m", settings);
+    }
+
+    private static String threeGrammarCorrections(String impedesMeaning) {
+        return "\"corrections\":["
+                + "{\"excerpt\":\"chart shows\",\"suggestion\":\"x\",\"errorCode\":\"GRAMMAR\",\"reason\":\"r\",\"certainty\":\"ERROR\"" + impedesMeaning + "},"
+                + "{\"excerpt\":\"rose to 40\",\"suggestion\":\"x\",\"errorCode\":\"GRAMMAR\",\"reason\":\"r\",\"certainty\":\"ERROR\"" + impedesMeaning + "},"
+                + "{\"excerpt\":\"fell to 10\",\"suggestion\":\"x\",\"errorCode\":\"GRAMMAR\",\"reason\":\"r\",\"certainty\":\"ERROR\"" + impedesMeaning + "}],"
+                + "\"taskChecks\":{\"hasOverview\":true}";
+    }
+
+    @Test
+    void grammarErrorsThatLeaveTheMeaningUnclearCapGraAndTheFlagIsKept() {
+        llm.reply(reply("TA", threeGrammarCorrections(",\"impedesMeaning\":true")));
+
+        WritingGrade grade = impedingGrader().grade(task1(), ESSAY_1).grade();
+
+        assertEquals(0, new BigDecimal("4.0").compareTo(band(grade, "GRA")));
+        assertEquals("DENSE_IMPEDING_GRAMMAR", grade.bandLimits().getFirst().reason());
+        assertTrue(grade.corrections().stream().allMatch(c -> Boolean.TRUE.equals(c.impedesMeaning())));
+    }
+
+    @Test
+    void grammarErrorsWithAClearMeaningOrNoFlagLeaveGraAlone() {
+        for (String flag : List.of(",\"impedesMeaning\":false", ",\"impedesMeaning\":\"yes\"", "")) {
+            llm.reply(reply("TA", threeGrammarCorrections(flag)));
+
+            WritingGrade grade = impedingGrader().grade(task1(), ESSAY_1).grade();
+
+            assertEquals(0, new BigDecimal("7").compareTo(band(grade, "GRA")), flag);
+            assertTrue(grade.bandLimits().isEmpty(), flag);
+            assertTrue(grade.corrections().stream().noneMatch(c -> Boolean.TRUE.equals(c.impedesMeaning())), flag);
+        }
     }
 
     @Test

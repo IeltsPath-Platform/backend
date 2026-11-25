@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
 public record LinkAssetRequest(
-        @NotNull(message = "assetId is required")
+        @NotNull(message = "Cần chọn tài nguyên")
         UUID assetId,
 
         UUID sectionId,

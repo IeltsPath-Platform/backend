@@ -52,38 +52,38 @@ public class RequestPracticeSetDraftUseCase {
         List<UUID> ids = request.knowledgePointIds() == null ? List.of() : request.knowledgePointIds().stream()
                 .distinct().toList();
         if (ids.isEmpty() || ids.size() > MAX_POINTS) {
-            throw new IllegalArgumentException("knowledgePointIds must contain between 1 and " + MAX_POINTS + " ids");
+            throw new IllegalArgumentException("Cần chọn từ 1 đến " + MAX_POINTS + " điểm kiến thức");
         }
         for (UUID id : ids) {
             KnowledgePoint point = knowledgePoints.findById(id).orElseThrow(() -> new KnowledgePointNotFoundException(id));
             if (point.getStatus() != ContentStatus.ACTIVE) {
-                throw new InvalidContentStateException("Knowledge point is not active");
+                throw new InvalidContentStateException("Điểm kiến thức đang ngừng dùng");
             }
             if (point.getSkill() != Skill.READING) {
-                throw new IllegalArgumentException("A practice set can be written by AI for reading knowledge points only");
+                throw new IllegalArgumentException("AI chỉ viết được bộ luyện tập cho điểm kiến thức Reading");
             }
         }
         if (request.questionType() == null || !QuestionDraftValidator.isChoice(request.questionType())) {
-            throw new IllegalArgumentException("questionType must be MULTIPLE_CHOICE or TRUE_FALSE_NOT_GIVEN");
+            throw new IllegalArgumentException("Loại câu hỏi phải là MULTIPLE_CHOICE hoặc TRUE_FALSE_NOT_GIVEN");
         }
         if (request.difficulty() == null) {
-            throw new IllegalArgumentException("difficulty is required");
+            throw new IllegalArgumentException("Cần chọn độ khó");
         }
         int maxQuestions = Math.min(MAX_QUESTIONS, properties.getAi().getMaxItemsPerRequest());
         if (request.count() < MIN_QUESTIONS || request.count() > maxQuestions) {
-            throw new IllegalArgumentException("count must be between " + MIN_QUESTIONS + " and " + maxQuestions);
+            throw new IllegalArgumentException("Số câu phải từ " + MIN_QUESTIONS + " đến " + maxQuestions);
         }
         if (request.instructions() != null && request.instructions().length() > MAX_INSTRUCTIONS) {
-            throw new IllegalArgumentException("instructions must not exceed " + MAX_INSTRUCTIONS + " characters");
+            throw new IllegalArgumentException("Hướng dẫn thêm không được dài quá " + MAX_INSTRUCTIONS + " ký tự");
         }
         if (request.lessonTitle() != null && request.lessonTitle().length() > MAX_LESSON_TITLE) {
-            throw new IllegalArgumentException("lessonTitle must not exceed " + MAX_LESSON_TITLE + " characters");
+            throw new IllegalArgumentException("Tên bài học không được dài quá " + MAX_LESSON_TITLE + " ký tự");
         }
         List<String> words = request.vocabulary().stream().map(String::strip).filter(word -> !word.isEmpty())
                 .distinct().toList();
         if (words.size() > MAX_VOCABULARY || words.stream().anyMatch(word -> word.length() > MAX_WORD)) {
-            throw new IllegalArgumentException("vocabulary must hold at most " + MAX_VOCABULARY + " words of at most "
-                    + MAX_WORD + " characters");
+            throw new IllegalArgumentException("Danh sách từ vựng tối đa " + MAX_VOCABULARY + " từ, mỗi từ dài tối đa "
+                    + MAX_WORD + " ký tự");
         }
         PracticeSetDraftRequest queued = new PracticeSetDraftRequest(ids, request.lessonTitle(), words,
                 request.questionType(), request.count(), request.difficulty(), request.instructions());
@@ -94,7 +94,7 @@ public class RequestPracticeSetDraftUseCase {
         try {
             return json.writeValueAsString(request);
         } catch (JsonProcessingException invalid) {
-            throw new IllegalStateException("Request could not be serialized", invalid);
+            throw new IllegalStateException("Không ghi được yêu cầu", invalid);
         }
     }
 }

@@ -49,24 +49,45 @@ class ReviewItemTest {
     }
 
     @Test
-    void aFailedReviewRepeatsNewSetsUntilItIsPassedAndOnlyTheFirstFailureAsksForTheory() {
+    void aBlockingReviewReturnsToTheoryAfterItsFirstAndThirdFailuresThenUnblocksAtFour() {
         ReviewItem review = pending(0);
 
-        assertThat(review.recordSetResult(assign(review), UUID.randomUUID(), 1, 4)).isEqualTo(ReviewStatus.PENDING);
+        assertThat(review.recordSetResult(assign(review), UUID.randomUUID(), 1, 4, 4)).isEqualTo(ReviewStatus.PENDING);
         assertThat(review.stage()).isEqualTo(ReviewStage.THEORY);
         review.completeTheory();
 
-        assertThat(review.recordSetResult(assign(review), UUID.randomUUID(), 0, 4)).isEqualTo(ReviewStatus.PENDING);
+        assertThat(review.recordSetResult(assign(review), UUID.randomUUID(), 0, 4, 4)).isEqualTo(ReviewStatus.PENDING);
         assertThat(review.failedSets()).isEqualTo(2);
         assertThat(review.stage()).as("a second failure goes straight to a new set").isEqualTo(ReviewStage.PRACTICE);
 
-        assertThat(review.recordSetResult(assign(review), UUID.randomUUID(), 2, 4)).isEqualTo(ReviewStatus.PENDING);
+        assertThat(review.recordSetResult(assign(review), UUID.randomUUID(), 2, 4, 4)).isEqualTo(ReviewStatus.PENDING);
         assertThat(review.failedSets()).isEqualTo(3);
-        assertThat(review.stage()).isEqualTo(ReviewStage.PRACTICE);
+        assertThat(review.stage()).isEqualTo(ReviewStage.THEORY);
+        assertThat(review.theoryReason()).isEqualTo(TheoryReason.REPEATED_FAIL);
         assertThat(review.theoryCompletedCount()).isEqualTo(1);
+        review.completeTheory();
 
-        assertThat(review.recordSetResult(assign(review), UUID.randomUUID(), 4, 4)).isEqualTo(ReviewStatus.DONE);
-        assertThat(review.failedSets()).isEqualTo(3);
+        assertThat(review.recordSetResult(assign(review), UUID.randomUUID(), 0, 4, 4)).isEqualTo(ReviewStatus.PENDING);
+        assertThat(review.failedSets()).isEqualTo(4);
+        assertThat(review.blocking()).isFalse();
+        assertThat(review.unblocked()).isTrue();
+        assertThat(review.stage()).isEqualTo(ReviewStage.PRACTICE);
+        assertThat(review.justUnblocked()).isTrue();
+    }
+
+    @Test
+    void anUnblockedPracticeSuggestionDoesNotBecomeBlockingAgainWhenItFails() {
+        ReviewItem review = optional("PRACTICE");
+        review.recordSetResult(assign(review), UUID.randomUUID(), 0, 2, 4);
+        review.completeTheory();
+        review.recordSetResult(assign(review), UUID.randomUUID(), 0, 2, 4);
+        review.recordSetResult(assign(review), UUID.randomUUID(), 0, 2, 4);
+        review.completeTheory();
+        review.recordSetResult(assign(review), UUID.randomUUID(), 0, 2, 4);
+
+        assertThat(review.blocking()).isFalse();
+        assertThat(review.recordSetResult(assign(review), UUID.randomUUID(), 0, 2, 4)).isEqualTo(ReviewStatus.SKIPPED);
+        assertThat(review.blocking()).isFalse();
     }
 
     @Test
@@ -112,6 +133,17 @@ class ReviewItemTest {
         var set = review.assignSet(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
         review.recordSetResult(set.id(), UUID.randomUUID(), 0, 2);
         assertEquals(TheoryReason.LOW_SCORE, review.theoryReason());
+    }
+
+    @Test
+    void aPracticeSuggestionWithPriorFailuresDoesNotBecomeBlocking() {
+        ReviewItem review = ReviewItem.restore(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                ReviewStatus.PENDING, null, 1, LearningSkill.READING, ReviewStage.PRACTICE, null, 0, "PRACTICE",
+                false);
+        var set = review.assignSet(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+
+        assertEquals(ReviewStatus.SKIPPED, review.recordSetResult(set.id(), UUID.randomUUID(), 0, 2, 4));
+        assertFalse(review.blocking());
     }
 
     @Test

@@ -11,6 +11,8 @@ import com.ieltspath.content.application.port.VocabularySenseWriter;
 import com.ieltspath.content.application.service.CourseDraftAnalysisService;
 import com.ieltspath.content.application.service.CourseDraftCodec;
 import com.ieltspath.content.application.service.CourseMaterializer;
+import com.ieltspath.content.application.command.CreateContentPackageCommand;
+import com.ieltspath.content.application.usecase.CodeSettingsUseCases;
 import com.ieltspath.content.domain.exception.CourseDraftErrorsException;
 import com.ieltspath.content.domain.exception.InvalidContentStateException;
 import com.ieltspath.content.domain.repository.AiDraftRepository;
@@ -19,7 +21,7 @@ import com.ieltspath.content.domain.vo.DraftStatus;
 import com.ieltspath.content.infrastructure.persistence.adapter.ContentPackageRepositoryAdapter;
 import com.ieltspath.content.infrastructure.persistence.adapter.CourseRepositoryAdapter;
 import com.ieltspath.content.infrastructure.persistence.adapter.JdbcAiDraftRepository;
-import com.ieltspath.content.infrastructure.persistence.adapter.JdbcCourseCandidateReader;
+import com.ieltspath.content.infrastructure.persistence.adapter.JdbcUnlinkedPracticeSetReader;
 import com.ieltspath.content.infrastructure.persistence.adapter.JdbcCourseCatalogReader;
 import com.ieltspath.content.infrastructure.persistence.adapter.JdbcLearningContentReader;
 import com.ieltspath.content.infrastructure.persistence.adapter.JdbcPracticeTestMilestoneRepository;
@@ -72,7 +74,7 @@ import static org.mockito.Mockito.doThrow;
 @DataJpaTest(properties = {"spring.cloud.config.enabled=false", "spring.jpa.hibernate.ddl-auto=none"})
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({ApproveCourseDraftUseCase.class, CourseDraftUseCases.class, CourseMaterializer.class, CourseDraftCodec.class,
-        CourseDraftAnalysisService.class, JdbcCourseCatalogReader.class, JdbcCourseCandidateReader.class, CreateCourseUseCase.class,
+        CourseDraftAnalysisService.class, JdbcCourseCatalogReader.class, JdbcUnlinkedPracticeSetReader.class, CreateCourseUseCase.class,
         UpdateCourseUseCase.class, CourseRepositoryAdapter.class, CoursePersistenceMapperImpl.class,
         CreateTopicUseCase.class, UpdateTopicUseCase.class, TopicRepositoryAdapter.class,
         TopicPersistenceMapper.class, LessonAuthoringUseCase.class, LessonAuthoringRepositoryAdapter.class,
@@ -93,6 +95,7 @@ class ApproveCourseDraftIntegrationTest {
         }
         @Bean Clock clock() { return Clock.systemUTC(); }
         @Bean FakeLibrary library() { return new FakeLibrary(); }
+        @Bean CodeSettingsUseCases codeSettings() { return org.mockito.Mockito.mock(CodeSettingsUseCases.class); }
     }
 
     /** The vocabulary library as the approval sees it: which senses are switched off, and the words it is given. */
@@ -142,7 +145,11 @@ class ApproveCourseDraftIntegrationTest {
     @Autowired AiDraftRepository draftStore;
     @Autowired FakeLibrary library;
     @Autowired JdbcLearningContentReader reader;
-    @Autowired JdbcCourseCandidateReader candidates;
+    @Autowired CodeSettingsUseCases codeSettings;
+    @Autowired CreateCourseUseCase createCourse;
+    @Autowired CreateTopicUseCase createTopic;
+    @Autowired LessonAuthoringUseCase lessonAuthoring;
+    @Autowired CreateContentPackageUseCase createPackage;
     @MockitoSpyBean CreateDraftPackageVersionUseCase draftVersions;
 
     private final UUID author = UUID.randomUUID();
@@ -156,6 +163,25 @@ class ApproveCourseDraftIntegrationTest {
 
     @BeforeEach
     void fixtures() {
+        org.mockito.Mockito.reset(codeSettings);
+        org.mockito.Mockito.when(codeSettings.createCourse(any()))
+                .thenAnswer(call -> createCourse.execute(call.getArgument(0)));
+        org.mockito.Mockito.when(codeSettings.createTopic(any()))
+                .thenAnswer(call -> createTopic.execute(call.getArgument(0)));
+        org.mockito.Mockito.when(codeSettings.createLesson(any(), any(), any(), any(), any(), any(), any()))
+                .thenAnswer(call -> lessonAuthoring.create(call.getArgument(0), call.getArgument(1),
+                        call.getArgument(2), call.getArgument(3), call.getArgument(4), call.getArgument(5),
+                        call.getArgument(6)));
+        org.mockito.Mockito.when(codeSettings.createPackage(any()))
+                .thenAnswer(call -> createPackage.executeAsAuthor(call.getArgument(0)));
+        org.mockito.Mockito.when(codeSettings.createGeneratedPackage(any(), any()))
+                .thenAnswer(call -> {
+                    CreateContentPackageCommand command = call.getArgument(0);
+                    String code = call.getArgument(1);
+                    return createPackage.executeAsAuthor(new CreateContentPackageCommand(code, command.title(),
+                            command.packageType(), command.requiredFeatureKey(), command.lessonId(),
+                            command.sourceCode(), command.topicId(), command.courseId(), command.placementPool()));
+                });
         library.inactive.clear();
         library.writes.clear();
         library.texts.clear();
@@ -169,8 +195,8 @@ class ApproveCourseDraftIntegrationTest {
         jdbc.update("INSERT INTO knowledge_point_prerequisites(knowledge_point_id,prerequisite_id) VALUES(?,?)",
                 kpAdvanced, kpFoundation);
         UUID question = UUID.randomUUID();
-        jdbc.update("INSERT INTO questions(id,question_type,skill,purpose,status,import_ref) "
-                + "VALUES(?,'MULTIPLE_CHOICE','READING','LEARNING','PUBLISHED',?)", question, tag + "-Q1");
+        jdbc.update("INSERT INTO questions(id,code,question_type,skill,purpose,status,import_ref) "
+                + "VALUES(?,'Q-' || replace(?::text,'-',''),'MULTIPLE_CHOICE','READING','LEARNING','PUBLISHED',?)", question, question, tag + "-Q1");
         questionVersion = UUID.randomUUID();
         jdbc.update("INSERT INTO question_versions(id,question_id,version_number,stem,status) "
                 + "VALUES(?,?,1,'Stem','PUBLISHED')", questionVersion, question);
@@ -447,8 +473,7 @@ class ApproveCourseDraftIntegrationTest {
     }
 
     @Test
-    void aQuestionThatAPackageHoldsIsNotOfferedAndIsAnErrorWhenADraftUsesIt() throws Exception {
-        assertThat(candidates.exerciseQuestions(List.of(kpFoundation), 10).get(kpFoundation)).containsExactly(questionVersion);
+    void aQuestionThatAPackageHoldsIsAnErrorWhenADraftUsesIt() throws Exception {
         UUID id = drafts.create(author, structure(goodDraft())).getId();
         assertThat(drafts.analyze(author, id).errors()).extracting("code").doesNotContain("QUESTION_ALREADY_OWNED");
 
@@ -458,7 +483,6 @@ class ApproveCourseDraftIntegrationTest {
         jdbc.update("INSERT INTO section_questions(section_id,question_version_id,sort_order) VALUES(?,?,2)",
                 section, questionVersion);
 
-        assertThat(candidates.exerciseQuestions(List.of(kpFoundation), 10)).doesNotContainKey(kpFoundation);
         var analysis = drafts.analyze(author, id);
         assertThat(analysis.errors()).extracting("code").contains("QUESTION_ALREADY_OWNED");
         assertThat(analysis.gaps()).extracting("reason").contains("NO_EXERCISE_QUESTION");
@@ -529,8 +553,8 @@ class ApproveCourseDraftIntegrationTest {
                 section, version);
         // A package holds a question of its own: the exercise question of a lesson belongs to that lesson alone.
         UUID ownQuestion = UUID.randomUUID();
-        jdbc.update("INSERT INTO questions(id,question_type,skill,purpose,status) "
-                + "VALUES(?,'MULTIPLE_CHOICE','READING','LEARNING','PUBLISHED')", ownQuestion);
+        jdbc.update("INSERT INTO questions(id,code,question_type,skill,purpose,status) "
+                + "VALUES(?,'Q-' || replace(?::text,'-',''),'MULTIPLE_CHOICE','READING','LEARNING','PUBLISHED')", ownQuestion, ownQuestion);
         UUID ownVersion = UUID.randomUUID();
         jdbc.update("INSERT INTO question_versions(id,question_id,version_number,stem,status) "
                 + "VALUES(?,?,1,'Package stem','PUBLISHED')", ownVersion, ownQuestion);

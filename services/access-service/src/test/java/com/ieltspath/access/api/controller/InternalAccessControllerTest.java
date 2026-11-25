@@ -9,6 +9,7 @@ import com.ieltspath.access.application.result.UserEntitlementResult;
 import com.ieltspath.access.application.usecase.ConsumeHumanGradingCreditUseCase;
 import com.ieltspath.access.application.usecase.DebitPointsUseCase;
 import com.ieltspath.access.application.usecase.GetUserEntitlementUseCase;
+import com.ieltspath.access.application.usecase.IsUserPremiumUseCase;
 import com.ieltspath.access.application.usecase.RefundPointsUseCase;
 import com.ieltspath.access.domain.exception.InsufficientPointsException;
 import com.ieltspath.access.domain.exception.PointsActorMismatchException;
@@ -42,7 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = {InternalAccessController.class, InternalPointsController.class,
-        InternalHumanGradingController.class}, properties = {
+        InternalHumanGradingController.class, InternalEntitlementController.class}, properties = {
         "spring.cloud.config.enabled=false",
         "app.auth.internal-jwt-issuer=urn:code-base:api-gateway"
 })
@@ -65,6 +66,7 @@ class InternalAccessControllerTest {
     @MockitoBean DebitPointsUseCase debitPointsUseCase;
     @MockitoBean RefundPointsUseCase refundPointsUseCase;
     @MockitoBean ConsumeHumanGradingCreditUseCase consumeHumanGradingCreditUseCase;
+    @MockitoBean IsUserPremiumUseCase isUserPremiumUseCase;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final UUID userId = UUID.randomUUID();
@@ -159,7 +161,20 @@ class InternalAccessControllerTest {
                 .andExpect(status().isForbidden());
         mockMvc.perform(post("/api/access/users/{id}/consume-human-grading", userId)).andExpect(status().isForbidden());
         mockMvc.perform(get("/api/access/users/{id}/entitlement", userId)).andExpect(status().isForbidden());
-        verifyNoInteractions(refundPointsUseCase, consumeHumanGradingCreditUseCase, getUserEntitlementUseCase);
+        verifyNoInteractions(refundPointsUseCase, consumeHumanGradingCreditUseCase, getUserEntitlementUseCase,
+                isUserPremiumUseCase);
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void premiumLookupAllowsWorkerCustomerForAnotherUserAndReturnsBoolean() throws Exception {
+        when(isUserPremiumUseCase.execute(userId)).thenReturn(true);
+
+        mockMvc.perform(get("/internal/access/users/{id}/premium", userId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.premium").value(true));
+
+        verify(isUserPremiumUseCase).execute(userId);
     }
 
     @Test

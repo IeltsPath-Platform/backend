@@ -4,6 +4,8 @@ import com.ieltspath.content.application.result.TopicSequenceResult;
 import com.ieltspath.content.domain.vo.PackageType;
 import com.ieltspath.content.infrastructure.persistence.adapter.JdbcLearningContentReader;
 import org.flywaydb.core.Flyway;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.junit.jupiter.api.*;
 import org.postgresql.ds.PGSimpleDataSource;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -34,6 +36,9 @@ class CourseSequenceIntegrationTest {
         dataSource.setUser(POSTGRES.getUsername());
         dataSource.setPassword(POSTGRES.getPassword());
         Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").target("52").load().migrate();
+        // Retain historical seed data while applying the current package reader schema.
+        new ResourceDatabasePopulator(new ClassPathResource("db/migration/V137__placement_pool.sql"))
+                .execute(dataSource);
         try (Connection connection = dataSource.getConnection(); var statement = connection.createStatement()) {
             statement.executeUpdate("DELETE FROM course_practice_test_milestones");
             statement.executeUpdate("DELETE FROM content_packages WHERE course_id IN (SELECT id FROM courses)");

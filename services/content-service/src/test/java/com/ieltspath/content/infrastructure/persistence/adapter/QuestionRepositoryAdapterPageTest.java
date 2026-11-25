@@ -50,9 +50,9 @@ class QuestionRepositoryAdapterPageTest {
 
     private UUID question(String skill, String purpose, String status, Instant createdAt) {
         UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO questions(id,question_type,skill,purpose,status,created_at) "
-                        + "VALUES(?,'MULTIPLE_CHOICE',?,?,?,?)",
-                id, skill, purpose, status, Timestamp.from(createdAt));
+        jdbc.update("INSERT INTO questions(id,code,question_type,skill,purpose,status,created_at) "
+                        + "VALUES(?,'Q-' || replace(?::text,'-',''),'MULTIPLE_CHOICE',?,?,?,?)",
+                id, id, skill, purpose, status, Timestamp.from(createdAt));
         return id;
     }
 
@@ -94,6 +94,20 @@ class QuestionRepositoryAdapterPageTest {
         });
         assertThat(questions.findPage(null, null, PublicationStatus.DRAFT, 0, 1).totalElements())
                 .isEqualTo(count("status = 'DRAFT'"));
+    }
+
+    @Test
+    void filtersQuestionsByCodeWithoutCaseSensitivity() {
+        Instant at = Instant.parse("2103-01-01T00:00:00Z");
+        UUID match = question("WRITING", "EXAM", "DRAFT", at);
+        jdbc.update("UPDATE questions SET code = 'Q-UNIQUE-LOOKUP' WHERE id = ?", match);
+        question("READING", "LEARNING", "DRAFT", at.plusSeconds(1));
+
+        QuestionRepository.Page page = questions.findPage(null, null, null, "unique-lookup", 0, 10);
+
+        assertThat(page.totalElements()).isEqualTo(1);
+        assertThat(page.items()).extracting(Question::getId).containsExactly(match);
+        assertThat(page.items().get(0).getCode()).isEqualTo("Q-UNIQUE-LOOKUP");
     }
 
     @Test

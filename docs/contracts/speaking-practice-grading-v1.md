@@ -15,6 +15,47 @@ from the wallet's owner, and a background job holds no learner token. The learne
 after a top-up settles it) and 503 `ACCESS_UNAVAILABLE` when points cannot be reached. The result page calls it by itself,
 so the learner presses nothing.
 
+Workers. Completing a submission wakes a grading worker at once (`learning.speaking.wake-on-submit`), and a periodic poll
+(`learning.speaking.job-delay-ms`) finds what a wake-up missed, including retryable and stalled submissions. An instance
+grades up to `learning.speaking.grading-workers` submissions at the same time and analyses the recordings of one submission
+at the same time (`learning.speaking.analysis-parallelism`); Azure's `learning.speech.max-concurrent` caps all analyses
+together and the `llm` bulkhead caps the model calls (a grading asks four at once), so these are raised together. The claim
+is `FOR UPDATE SKIP LOCKED`, so several workers or instances never take the same submission, and a worker touches its row at
+a third of `stale-after-seconds`, so a slow step is not taken over. No status or endpoint changes.
+
+Stopping an instance. A stopping instance claims nothing new and gives the submissions it is grading 25 seconds to finish
+(under the 30 s of Spring's shutdown phase and the container's 40 s grace). One that is still running after that is handed
+back: it becomes `FAILED_RETRYABLE` with failure code `INSTANCE_STOPPED` and the claim does not count as an attempt, so a
+deploy neither leaves a submission waiting for `stale-after-seconds` nor uses up its three attempts. If the hand-back cannot be
+saved, another instance takes the row over once it is stale, as before.
+
+Retry wait. A grading that failed for a reason that may pass (`FAILED_RETRYABLE`) waits `learning.speaking.retry-delay-seconds`
+(10 by default, `LEARNING_SPEAKING_RETRY_DELAY_SECONDS`) and is tried again, up to `max-attempts` (3); the poll adds up to
+`job-delay-ms` (5 s) to the wait. After the last attempt the submission is `NEEDS_EXAMINER` with `MAX_ATTEMPTS_REACHED`.
+
+Release order. The learner's result page in the frontend repository can ship before or after this change:
+it lays a weakness out by the labels `Sửa:` / `Quy tắc:` / `Luyện:` of prompt `spk7` and shows an older one, or one without
+the labels, as plain text; it also removes `SPK_*` codes from stored feedback. Backend first is the usual order. The
+`[speaking-timing]` console line of the frontend and the timing logs below are independent of each other.
+
+Timing logs. They name the submission and carry no learner words. Every line of a grading's worker thread, including the
+model calls, carries the `submissionId`.
+- Azure: `Speech analysis done: ... part, audioSeconds, analysisMs, outcome` for each recording (`outcome` is `ok` or the failure
+  code, such as `SPEECH_TIMEOUT`); `analysisMs` against `audioSeconds` shows whether analysing runs close to real time.
+- Model: `LLM call: model, task, submissionId, millis, promptTokens, completionTokens, reasoningTokens, finishReason` for every
+  attempt (`task` is FC, LR, GRA, OVERVIEW or SYNTHESIS; `-` where a value is unknown, for example a provider that reports no
+  usage), and `LLM call failed: ... millis, reason` when the provider fails or times out. `Speaking LLM calls done:
+  firstRoundMs, synthesisMs, totalMs` gives the two rounds of a grading. A `finishReason` of `length` means the answer was cut.
+- Whole grading: `Speaking submission graded: recordings, sinceCreatedMs, sinceQueuedMs, queueWaitMs, analysisMs, gradingMs,
+  totalMs`. `sinceCreatedMs` counts from the learner's browser opening the submission (so it holds the uploads), `sinceQueuedMs`
+  from the submission being completed, both up to the grade being stored; `queueWaitMs` is the wait for a free worker.
+- Release: `Speaking grade released: sinceCreatedMs, sinceQueuedMs, waitedForLearnerMs`, written when the learner's own request
+  releases the grade. `waitedForLearnerMs` is how long the finished grade waited for the page to ask for it (its polling
+  interval). The timer `learning.speaking.stage` (stages `since_created`, `queue_wait`, `analysis`, `grading`, `total`) holds the
+  same numbers for Micrometer.
+- Browser: the learner's page writes `[speaking-timing] {...}` to the console when the grade is on screen: `openMs`, `uploadMs`,
+  `completeMs`, `gradingMs`, `releaseMs`, `totalMs` and `polls`, from the moment the learner pressed send.
+
 `GET /api/learning/speaking-practice/submissions/{id}` returns the learner-safe `display` object as `result` only once the
 submission is `GRADED`; a grade that is not yet paid for is never shown. It contains estimated criterion bands and
 comments, transcript quality, transcripts, rhythm, pronunciation summary, weak words, and criteria below the configured
@@ -44,10 +85,21 @@ Listing mistakes. The grader reports a mistake in `display.errors` only with an 
 vocabulary mistake it has to list needs one (V115 and V124: tense, verb form, agreement, plural and past endings, articles,
 prepositions, word order, missing subject or verb, run-on sentences, complex structures, word choice, word form, translation
 from Vietnamese, repeated words, misused idioms, register; V125 adds wandering sentence, repeated idea and undeveloped idea
-for coherence). Prompt version `spk5` asks each criterion call for every place a mistake happens, one entry per place with
+for coherence). Prompt version `spk7` is `spk6` with every weakness asked for in one fixed form: a title with how often and where,
+the learner's words in double quotes, then `Sửa:` (corrected words in double quotes), `Quy tắc:` (the rule) and `Luyện:` (one
+exercise). The result page lays a weakness out by these labels; a weakness without them is still shown, as plain text. Prompt
+version `spk6` is `spk5` with the shape of the reply written last, after the list of allowed codes, and
+with a sample band: with `deepseek-flash` about half of the criterion answers left the band out when the shape stood in the
+middle of the prompt, and an answer without a band is refused. A refused answer is asked again once with the rule it broke
+(`reason` in the log: `BAND_MISSING`, `WRONG_CRITERION`, ...), and a band written beside `criteria` instead of inside its entry
+is accepted. Whether a band may be a half band follows the rubric the grade is made against: when no band descriptor of the rubric
+is a half band (rubric v6, migration V143) the validator refuses a half band of FC, LR and GRA (`BAND_NOT_WHOLE`) and the
+call is asked again with the rule; while the first rubric (half bands described) is active a half band is accepted. So rolling
+the rubric back or forward needs no code change, and the Pronunciation band and the overall band may still be half bands.
+Prompt version `spk5` asks each criterion call for every place a mistake happens, one entry per place with
 its own part, exact excerpt and a solution, never only the fault: the corrected sentence and rule for GRA, the better word
 and alternatives for LR, and for FC how to cut, link, develop or replace the sentence, written about the learner's own topic.
-Up to 15 entries per criterion and 45 in all; a weakness may be up to 700 characters. Entries that carry a code, a part or an
+Up to 15 entries per criterion and 45 in all; a weakness may be up to 850 characters. Entries that carry a code, a part or an
 excerpt that is not valid are dropped as before. A code without a trap point only explains the result and adds no evidence.
 
 Busy provider. A grade is five model calls (FC, LR, GRA, overview, synthesis) and one failed call spoils it, so each call is
@@ -62,6 +114,10 @@ Recordings without speech. When the speech analysis finds no spoken word in any 
 Daily limit. One unit of `speaking_grading` is taken just before the LLM call and given back when that call produces no
 grade. A learner who has reached the limit has the submission wait (`FAILED_RETRYABLE`, `DAILY_LIMIT_REACHED`); that wait
 does not count as a grading attempt, so it never turns into `NEEDS_EXAMINER`.
+
+Premium grading. An active Premium learner's Speaking submission has `pointCost: 0`; creation does not check the point
+balance and settling the grade does not debit points. The daily limit is `learning.speaking.premium-daily-grading-limit`
+(default 10), compared with 5 for other learners. A failed background Premium lookup uses the normal limit.
 
 Transcript quality is `LOW` only when the mean ASR confidence is under 0.85. A high share of badly pronounced words keeps
 a transcript from being `HIGH` but does not make it `LOW`, so weak speakers' results still reach the learning path.
@@ -103,3 +159,7 @@ make an optional `ERROR_PATTERN` review of the error's parent point, by the rule
 heart, and is not part of the clearance of the lesson's Practice beyond the set's own score: the multiple-choice sets of the
 lesson remain a way to clear it. A practice outside the course (the catalogue's tests) has no lesson or attempt and never
 writes evidence or reviews.
+
+## Free Speaking practice tests
+
+Creating a Speaking submission for a tagged free practice test requires an active Premium subscription before a submission or upload is opened. A missing subscription returns HTTP 403 PREMIUM_REQUIRED; an unavailable entitlement lookup returns HTTP 503 ENTITLEMENT_UNAVAILABLE. Both responses contain details.code and a Vietnamese user message. Existing submission uploads, grading and settlement do not repeat the check.

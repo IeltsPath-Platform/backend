@@ -11,7 +11,7 @@ public class QuestionAlreadyOwnedException extends ContentDomainException {
     private final List<UUID> questionVersionIds;
 
     public QuestionAlreadyOwnedException(List<UUID> questionVersionIds) {
-        super("A question is already part of another lesson or of a package");
+        super("Câu hỏi đã thuộc một bài học khác hoặc một gói");
         this.questionVersionIds = List.copyOf(questionVersionIds);
     }
 

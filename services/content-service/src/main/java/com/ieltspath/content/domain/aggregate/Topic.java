@@ -39,10 +39,10 @@ public class Topic {
         this.parentTopicId = parentTopicId;
         this.courseId = courseId;
         if (code == null || code.isBlank()) {
-            throw new IllegalArgumentException("code must not be blank");
+            throw new IllegalArgumentException("Mã chủ đề không được để trống");
         }
         if (name == null || name.isBlank()) {
-            throw new IllegalArgumentException("name must not be blank");
+            throw new IllegalArgumentException("Tên chủ đề không được để trống");
         }
         this.code = code.trim();
         this.name = name.trim();
@@ -113,7 +113,7 @@ public class Topic {
 
     private static Skill requireSingleSkill(Skill skill) {
         if (skill == Skill.ALL) {
-            throw new IllegalArgumentException("A topic teaches one skill; ALL is not allowed");
+            throw new IllegalArgumentException("Một chủ đề chỉ dạy một kỹ năng, không chọn ALL được");
         }
         return skill;
     }
@@ -121,7 +121,7 @@ public class Topic {
     private static String normalizeDescription(String value) {
         if (value == null || value.isBlank()) return null;
         String trimmed = value.trim();
-        if (trimmed.length() > 2000) throw new IllegalArgumentException("description exceeds 2000 characters");
+        if (trimmed.length() > 2000) throw new IllegalArgumentException("Mô tả dài quá 2000 ký tự");
         return trimmed;
     }
 

@@ -23,12 +23,12 @@ public class AddContentSectionUseCase {
     public ContentSectionResult execute(AddContentSectionCommand command) {
         var targetPackage = contentPackageRepository.findByVersionId(command.packageVersionId())
                 .orElseThrow(() -> new ContentPackageNotFoundException(
-                        "Package version not found: " + command.packageVersionId()));
+                        "Không tìm thấy phiên bản của gói: " + command.packageVersionId()));
         var targetVersion = targetPackage.getVersions().stream()
                 .filter(version -> version.getId().equals(command.packageVersionId()))
                 .findFirst()
                 .orElseThrow(() -> new ContentPackageNotFoundException(
-                        "Package version not found: " + command.packageVersionId()));
+                        "Không tìm thấy phiên bản của gói: " + command.packageVersionId()));
 
         ContentSection section = ContentSection.create(
                 command.packageVersionId(),

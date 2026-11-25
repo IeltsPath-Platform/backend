@@ -18,7 +18,7 @@ public class ModerateCommentUseCase {
     public CommentResult execute(CommunityActor actor, ModerateCommentCommand command) {
         CommunityApplicationSupport.requireAdministrator(actor);
         var comment = comments.findById(command.commentId())
-                .orElseThrow(() -> new CommunityNotFoundException("Comment not found"));
+                .orElseThrow(() -> new CommunityNotFoundException("Không tìm thấy bình luận"));
         comment.moderate(command.status());
         return CommentResult.from(comments.save(comment));
     }

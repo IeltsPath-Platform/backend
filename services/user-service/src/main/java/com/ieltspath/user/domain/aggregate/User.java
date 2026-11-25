@@ -31,6 +31,7 @@ public class User {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime emailVerifiedAt;
+    private LocalDateTime passwordClearedAt;
 
     public void updateProfile(String fullName, PhoneNumber phoneNumber) {
         this.fullName = new FullName(fullName).value();
@@ -64,9 +65,19 @@ public class User {
         touch();
     }
 
+    /** Removes the password and remembers that it once existed, unlike an account that was created without one. */
     public void clearPassword() {
         this.passwordHash = null;
+        this.passwordClearedAt = LocalDateTime.now();
         touch();
+    }
+
+    /**
+     * True for an account that has no password and never had one, such as one created by Google sign-in. An account whose
+     * password was removed (see {@link #clearPassword()}) is not, so it can still choose a new password.
+     */
+    public boolean hasNeverHadPassword() {
+        return (passwordHash == null || passwordHash.isBlank()) && passwordClearedAt == null;
     }
 
     /** Marks the address as proven by the owner (verification link, completed reset, or Google sign-up). Idempotent. */

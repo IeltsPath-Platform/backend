@@ -16,8 +16,8 @@ public interface MasteryProfileRepository {
     List<MasteryProfile> findAll(UUID userId);
 
     /**
-     * How many of the learner's maintained points have reached their review date at {@code now}, counted where
-     * {@link #findAll} lists them: error-trap points are left out, and so are the {@code excludedKnowledgePointIds}.
+     * The due group size: maintained points past their review date plus up to ten oldest decayed points. Error-trap
+     * points and {@code excludedKnowledgePointIds} are left out, as they are by {@link #findAll}.
      */
     int countDue(UUID userId, Instant now, Collection<UUID> excludedKnowledgePointIds);
 

@@ -68,11 +68,14 @@ Requires role `CUSTOMER`, body `{"target":"LISTENING"}` (or `READING`, `WRITING`
 
 Lesson summaries include `paywall` and `freePreview`; `LOCKED` remains the progress status (previous lessons/reviews), so a paywall lock is represented separately. Access is granted in this order: the first three published lessons of each course skill, active skill/combo unlock, grandfathered progress that predates V39, then active Premium. A failed Premium lookup returns `503` only when none of those earlier rules grants access. `GET /lessons/{id}`, resources, practice-set listing, lesson submissions/completion, and free practice use this gate. Free practice refuses a paywalled knowledge point with `403 PAYWALL` before creating an attempt or charging hearts; knowledge tree points carry `locked` and disable free practice while gated. Topics without a course are not paywalled.
 
-### `GET /placement-test`
+### Placement assignment and retakes
 
-Available only to role `CUSTOMER`. Returns `{packageId, packageVersionId}` of the published `PLACEMENT_TEST` package. The learner then starts an Assessment attempt with that `packageVersionId` (`POST /api/assessments/attempts`, type `PLACEMENT`), sends the Writing essay and the Speaking recording through `POST /api/assessments/submissions`, and submits the attempt. A learner can sit the test once: when a placement exists the call returns `409 PLACEMENT_ALREADY_DONE`; without a published package it returns `404 NO_PLACEMENT_TEST`.
-
-No learning route requires a placement. The placement is stored when Assessment completes the attempt; poll `GET /api/assessments/attempts/{id}/placement-result` until it stops returning `404`, then `GET /courses` marks the recommended course.
+The placement assignment, attempt and retake contract is maintained in
+[placement-retake-v1](placement-retake-v1.md). The learner options route is
+`GET /api/learning/placement-test/options`; assignment and release use
+`POST /api/learning/placement-test/assignments` and
+`POST /api/learning/placement-test/assignments/{id}/release`. No learning route requires a placement. A completed
+Assessment result stores the latest diagnostic placement band and updates the optional course recommendation.
 
 ### `POST /courses/{id}/test-assignments`
 
@@ -193,7 +196,7 @@ and verdict appearing only once the newest recorded answer of this attempt is `G
 opens that answer (see [speaking-practice-grading-v1](speaking-practice-grading-v1.md)); submitting the attempt answers
 `409 SPEAKING_NOT_GRADED` until it is graded, and recorded items are not part of `answers[]`.
 
-`GET /practice-attempts/{id}/review` reopens a submitted attempt read-only and returns `{attempt, result}`: `attempt` is the question and essay view of the package version the attempt was pinned to (essays carry the learner's newest submission, graded or not), and `result` is the saved submission response. It exposes nothing the submission did not already show, and the learner's own selected answers are not stored. An attempt that is still open returns `409 ATTEMPT_NOT_SUBMITTED`; another learner's attempt returns 404. Starting the same set again ("Làm lại") is unchanged and creates a new attempt.
+`GET /practice-attempts/{id}/review` reopens a submitted attempt read-only and returns `{attempt, result}`: `attempt` is the question and essay view of the package version the attempt was pinned to (essays carry the learner's newest submission, graded or not), and `result` is the saved submission response. It exposes nothing the submission did not already show. Each entry of `result.results` carries `submittedAnswer`, the learner's own answer (trimmed, at most 500 characters), so the set can be shown as it was filled in; it is kept in the stored response of Practice and free practice submissions and is absent for a question left unanswered and for an attempt submitted before it was kept, where the client knows a right answer was the right option and has no choice to show for a wrong one. An attempt that is still open returns `409 ATTEMPT_NOT_SUBMITTED`; another learner's attempt returns 404. Starting the same set again ("Làm lại") is unchanged and creates a new attempt.
 
 `POST /practice-attempts/{id}/submissions` takes `{requestId, answers:[{questionVersionId, answer}]}` with exactly one answer per question. It returns `{attemptId, correct, total, percent, passed, countedAsEvidence, results, transcript?, reviewsCreated}`; each result contains `questionVersionId`, `correct`, `correctAnswer`, `explanation`, and `hint:null`. A Listening transcript appears after submission. A repeated `requestId` returns the saved result; another request for a submitted attempt returns `409 ATTEMPT_ALREADY_SUBMITTED`. Passing is at least 70%. Only the first submission of an unrevealed package writes `practice_set` evidence and can give `FIRST_SUBMISSION`; subsequent practice of that package, including after a submitted review set, is graded and revealed but writes no evidence or review. `reviewsCreated` is a list of `{reviewId, knowledgePointId, stage, blocking}`. A knowledge point is weak in a counted submission below 70% when it has at least 2 wrong answers in that set and its own share is under 70%. A weak point with no pending review and an unrevealed eligible set gets a suggested `PRACTICE` review, listed with `blocking: false`; the next lesson stays open. A point that is weak again in another counted set while its suggestion (or an `ERROR_PATTERN` review) is still pending has that review promoted to blocking, listed with `blocking: true`. A point with any other pending optional review (for example one picked from the basket) gets no new review. Lesson completion itself creates no review.
 
@@ -225,12 +228,19 @@ updates the mastery profile.
 - `required`: the blocking reviews that are `PENDING`.
 - `consolidate`: points at the consolidate tier (mastery 60–79%). `due`: points at the maintain tier whose `dueAt`
   (`next_review_at`) has passed. A point with a blocking review is only listed under `required`.
+- A `PRIORITY` point with no open review is also listed in `weak`, reason `PRIORITY`, only when a completed lesson
+  teaches it and the number of unseen sets exceeds `learning.free-practice.reserve`. Starting it creates an optional
+  review and preserves the reserved sets for required reviews.
+- A point is `DECAYED` only when MP-1.0 decay changes a previously `CONSOLIDATE` or `MAINTAIN` profile to
+  `INSUFFICIENT`. It appears in `due`, reason `DECAYED`; at most the ten oldest evidence dates are included. This
+  marker is recorded after deployment and is not backfilled.
 - `hasUnrevealedSet` is true when Content still has a set the learner has not seen, or the point already has an optional
   review in progress (`reviewId`).
 - `weak` is an additive array of points with an optional `PENDING` review that appear in none of the other groups,
   sorted by mastery ascending, then KP code. It includes weak Writing criterion points even when their tier is
   `PRIORITY` or they have no review date. `reason` is the review's trigger kind; Writing criterion reviews use
-  `WRITING_CRITERION`; Speaking criterion reviews use `SPEAKING_CRITERION`. Existing groups keep their shapes and rules.
+  `WRITING_CRITERION`; Speaking criterion reviews use `SPEAKING_CRITERION`. A review made optional after four failed
+  blocking sets uses `UNBLOCKED`. Existing groups keep their shapes and rules.
 
 A counted recorded answer of a lesson Practice can do the same for the Speaking criteria (FC, LR, GRA, PR) below the item's
 pass band: `skill = SPEAKING`, `trigger_kind = SPEAKING_CRITERION`, at most two per submission, weakest first. These reviews
@@ -255,8 +265,9 @@ Role `CUSTOMER`. The counts of the basket without its items, for a badge that is
 ```
 
 - `required`: the learner's `PENDING` blocking reviews, the size of `required` in `GET /review-basket`.
-- `due`: maintained points whose `dueAt` (`next_review_at`) has come and that no blocking review holds, the size of `due`
-  in `GET /review-basket`. Error-trap child points are not counted, as in the basket.
+- `due`: maintained points whose `dueAt` (`next_review_at`) has come plus up to ten `DECAYED` points, when no blocking
+  review holds. It equals the size of `due` in `GET /review-basket`. Error-trap child points are not counted, as in the
+  basket.
 - `consolidate` and `weak` are not counted: they stay for as long as the learner is unsure and would keep the number high.
 - It reads only the learner's own mastery profiles and reviews in Learning's database and never asks Content, so it has
   no `hasUnrevealedSet`: a counted due point may have no unseen set left, which `GET /review-basket` shows.
@@ -267,10 +278,14 @@ Role `CUSTOMER`. Starts an optional review of the point and returns it like `GET
 
 - The point already has a `PENDING` review (blocking or optional): that review is returned and nothing is created.
   This includes a `WRITING_CRITERION` or `SPEAKING_CRITERION` review at `PRIORITY`; it does not require a lesson teaching that criterion.
-- Otherwise the point must be at the consolidate tier, or at the maintain tier and due; any other point answers
-  `409 NOT_IN_REVIEW_BASKET`. A point no completed lesson teaches answers `409 NO_LESSON_FOR_KNOWLEDGE_POINT`. When
-  Content has no set the learner has not seen, `409 NO_UNREVEALED_SET` is returned and nothing is created.
-- The review has `trigger_kind` `CONSOLIDATE` or `MAINTAIN` and is not blocking.
+- Otherwise the point must be at the consolidate tier, at the maintain tier and due, or be an eligible `PRIORITY` or
+  `DECAYED` point; any other point answers `409 NOT_IN_REVIEW_BASKET`. A point no completed lesson teaches answers
+  `409 NO_LESSON_FOR_KNOWLEDGE_POINT`. A new `PRIORITY` or `DECAYED` review requires more unseen sets than
+  `learning.free-practice.reserve`; otherwise `409 NO_UNREVEALED_SET` is returned, preserving those sets for required
+  reviews. Without Premium, packages with a `requiredFeatureKey` are skipped; if no eligible package remains, the same
+  `409` is returned.
+- The review has `trigger_kind` `CONSOLIDATE`, `MAINTAIN`, `PRIORITY` or `DECAYED`, as appropriate, and is not
+  blocking. A `DECAYED` profile's mastery tier is `INSUFFICIENT`, so its trigger is written explicitly.
 
 An error-trap child at `PRIORITY` can create an optional parent review with `trigger_kind: ERROR_PATTERN` after a
 lesson, counted Practice, review, counted free-practice or diagnostic submission records its evidence and refreshes mastery.
@@ -291,9 +306,9 @@ rule.
 
 ### `GET /reviews/{reviewId}`
 
-`reviewId` is a UUID. An unknown review or another learner's review returns `404 NOT_FOUND`. Besides `reviewId`, `reviewStatus`, `lessonId`, `theory` and `set`, the response has `knowledgePointId`, `skill`, `stage` (`PRACTICE` or `THEORY`), nullable `theoryReason` (`SECOND_FAIL`, `LOW_SCORE`, `WRONG_IN_LESSON`), `theoryScope`, `failedSets`, `maxFailedSets` (always `null`: there is no limit) and `quickCheck`.
+`reviewId` is a UUID. An unknown review or another learner's review returns `404 NOT_FOUND`. Besides `reviewId`, `reviewStatus`, `lessonId`, `theory` and `set`, the response has `knowledgePointId`, `skill`, `stage` (`PRACTICE` or `THEORY`), nullable `theoryReason` (`SECOND_FAIL`, `LOW_SCORE`, `WRONG_IN_LESSON`, `REPEATED_FAIL`), `theoryScope`, `failedSets`, `maxFailedSets` (4 while the review blocks; `null` for optional reviews) and `quickCheck`.
 
-- `theory` is the text of the lesson's TEXT blocks that teach the review's knowledge point (`theoryScope: KNOWLEDGE_POINT`), or every TEXT block when the lesson tags none (`LESSON_FALLBACK`). Audio transcripts are never part of it.
+- `theory` is the text of the lesson's TEXT blocks that teach the review's knowledge point (`theoryScope: KNOWLEDGE_POINT`), or every TEXT block when the lesson tags none (`LESSON_FALLBACK`). A `DIAGNOSTIC` review whose point is not taught by that lesson has `theory: []` and `theoryScope: NO_LESSON`; if it is still at `THEORY`, GET completes that step and returns a practice set. Audio transcripts are never part of it.
 - At `PRACTICE`, the response has the one open review set, preferring its lesson and excluding every package the learner was given in a review or whose answers were seen in submitted practice. Repeated GETs return the same open set. If no such package remains, the review becomes `SKIPPED` with no set. Set questions use the lesson allowlist with their `hint`; a Listening set adds `audio: {mediaUrl, durationSeconds}` next to `passage` (no transcript). `quickCheck` is empty.
 - At `THEORY`, `set` is null and `quickCheck` lists up to 3 auto-graded questions of that lesson tagged with the knowledge point (lesson order, same allowlist with `hint`, no answers). The learner answers them through `theory-check`.
 - A review starts at `THEORY` when the knowledge point scored below 40% in the practice attempt that created it (`LOW_SCORE`), or when the learner answered it wrong on the first submission of the lesson's exercises (`WRONG_IN_LESSON`). Practice reviews decide this when created; reviews from assessment results decide it the first time they are opened.
@@ -325,20 +340,22 @@ Review states (a review repeats new sets until one is passed; Practice and revie
    GET: one unrevealed set with hints         GET: KP theory blocks + quick check
    submit set -- >= 70% --> DONE              POST theory-check --> PRACTICE
         `-- fail -- 1st failed set --> THEORY (read the theory once, then a new set)
-                 `-- later failed sets --> a new set at once (stage stays PRACTICE)
+                 `-- 2nd failed set --> a new set; GET opens prerequisite diagnosis
+                 `-- 3rd failed set --> THEORY (REPEATED_FAIL)
+                 `-- 4th failed set --> remains PENDING, blocking=false, optional practice
    no unrevealed package left --> SKIPPED (the only way a review ends without a pass)
 ```
 
 ### `POST /reviews/{reviewId}/submissions`
 
-Request: `{reviewSetId, requestId, answers}` with the same answer array shape as a lesson submission and all set questions required. A review at `THEORY` returns `409 THEORY_REQUIRED`. Only the owned, currently open set may be submitted; a different or closed set gives `409 REVIEW_SET_CLOSED`. A set is submitted once, and its first answers write `review_set` mastery evidence. At least 70% makes the review `DONE`. A failed set moves the review to `THEORY` (`LOW_SCORE` below 40%, otherwise `SECOND_FAIL`); the second failed set makes it `SKIPPED`. The response has `reviewStatus`, `stage`, `failedSets`, `results` with `correctAnswer` and `explanation` for every set, passed or not, and the section `transcript` for a Listening set.
+Request: `{reviewSetId, requestId, answers}` with the same answer array shape as a lesson submission and all set questions required. A review at `THEORY` returns `409 THEORY_REQUIRED`. Only the owned, currently open set may be submitted; a different or closed set gives `409 REVIEW_SET_CLOSED`. A set is submitted once, and its first answers write `review_set` mastery evidence. At least 70% makes the review `DONE`. For a blocking review, failed set 1 moves it to `THEORY` (`LOW_SCORE` below 40%, otherwise `SECOND_FAIL`); failed set 2 leaves it at `PRACTICE` and the next GET opens prerequisite diagnosis; failed set 3 moves it to `THEORY` (`REPEATED_FAIL`); failed set 4 leaves it `PENDING` but changes `blocking` to `false`. Its old failures remain in history but no longer count toward the threshold if a later event promotes it back to blocking. An optional `PRACTICE` suggestion becomes blocking only on its first failed set and only if it has never been unblocked. Other optional reviews become `SKIPPED` when their set fails. The response includes `blocking` (nullable only for replay responses written before this field existed), along with `reviewStatus`, `stage`, `failedSets`, `results` with `correctAnswer` and `explanation` for every set, passed or not, and the section `transcript` for a Listening set.
 
 ```json
 {"reviewSetId":"20000000-0000-4000-8000-000000000902","requestId":"20000000-0000-4000-8000-000000000803","answers":[{"questionVersionId":"20000000-0000-4000-8000-000000000051","answer":"B"},{"questionVersionId":"20000000-0000-4000-8000-000000000052","answer":"A"},{"questionVersionId":"20000000-0000-4000-8000-000000000053","answer":"A"},{"questionVersionId":"20000000-0000-4000-8000-000000000054","answer":"A"}]}
 ```
 
 ```json
-{"reviewStatus":"DONE","results":[{"questionVersionId":"20000000-0000-4000-8000-000000000051","correct":true,"hint":null,"correctAnswer":"B","explanation":"Đoạn A: đang phát triển; B: lợi ích; C: rủi ro."},{"questionVersionId":"20000000-0000-4000-8000-000000000052","correct":true,"hint":null,"correctAnswer":"A","explanation":"Cả đoạn giải thích vì sao ong thành phố phát triển tốt."},{"questionVersionId":"20000000-0000-4000-8000-000000000053","correct":true,"hint":null,"correctAnswer":"A","explanation":"\"However… can harm wild bees\" là mặt trái."},{"questionVersionId":"20000000-0000-4000-8000-000000000054","correct":true,"hint":null,"correctAnswer":"A","explanation":"Tiêu đề phải bao cả lợi ích lẫn rủi ro."}]}
+{"reviewStatus":"DONE","blocking":true,"stage":"PRACTICE","failedSets":0,"results":[{"questionVersionId":"20000000-0000-4000-8000-000000000051","correct":true,"hint":null,"correctAnswer":"B","explanation":"Đoạn A: đang phát triển; B: lợi ích; C: rủi ro."},{"questionVersionId":"20000000-0000-4000-8000-000000000052","correct":true,"hint":null,"correctAnswer":"A","explanation":"Cả đoạn giải thích vì sao ong thành phố phát triển tốt."},{"questionVersionId":"20000000-0000-4000-8000-000000000053","correct":true,"hint":null,"correctAnswer":"A","explanation":"\"However… can harm wild bees\" là mặt trái."},{"questionVersionId":"20000000-0000-4000-8000-000000000054","correct":true,"hint":null,"correctAnswer":"A","explanation":"Tiêu đề phải bao cả lợi ích lẫn rủi ro."}]}
 ```
 
 ### `POST /topics/{id}/test-assignments`
@@ -377,8 +394,10 @@ New learning-gate errors use `{ "detail": string, "code": string, "reviews"?: ar
 | HTTP | Code | JSON example |
 | --- | --- | --- |
 | 403 | `REVIEW_REQUIRED` | `{"detail":"Complete the pending review first","code":"REVIEW_REQUIRED","reviews":[{"reviewId":"20000000-0000-4000-8000-000000000901","lessonId":"20000000-0000-4000-8000-000000000102","knowledgePointId":"10000000-0000-4000-8000-000000000002"}]}` |
-| 409 | `PLACEMENT_ALREADY_DONE` | `{"detail":"The placement test was already taken","code":"PLACEMENT_ALREADY_DONE"}` |
-| 404 | `NO_PLACEMENT_TEST` | `{"detail":"No placement test is published","code":"NO_PLACEMENT_TEST"}` |
+| 400 | `INVALID_PLACEMENT_POOL` | `{"detail":"Placement pool is invalid","code":"INVALID_PLACEMENT_POOL"}` |
+| 404 | `NO_PLACEMENT_TEST` | `{"detail":"No published placement test is available","code":"NO_PLACEMENT_TEST"}` |
+| 404 | `PLACEMENT_ASSIGNMENT_NOT_FOUND` | Assignment is not open, not owned by the caller, or already completed. |
+| 429 | `PLACEMENT_LIMIT_REACHED` | Three Learning assignments or three started Assessment placement attempts remain in the rolling 24-hour window. |
 | 403 | `TOPIC_LOCKED` | `{"detail":"Topic is locked","code":"TOPIC_LOCKED"}` (opening, submitting or completing a lesson of a locked topic; listing its lessons is allowed) |
 | 403 | `LESSON_LOCKED` | `{"detail":"Complete L1 before L2","code":"LESSON_LOCKED"}` |
 | 403 | `PRACTICE_REQUIRED` | `{"detail":"Complete practice of the earlier lessons first.","code":"PRACTICE_REQUIRED","lessonIds":["20000000-0000-4000-8000-000000000101"]}` (lesson gate; the same code is `409` when asking for a topic test, below) |
@@ -536,3 +555,7 @@ omit the field. `answerSpec` is never returned. Essay results are not tagged by 
 `GET /reviews/{reviewId}` and responses from review-basket start include `blocking`, copied from the stored review item.
 The review detail uses the stored value for both required and optional reviews. A review triggered as `ERROR_PATTERN`
 also has optional `errorTrap: {code, name, fixHint}` for the parent's current main error; ordinary reviews omit it.
+
+## Premium free practice tests
+
+A `PRACTICE_TEST` package with a non-null `requiredFeatureKey` requires an active Premium subscription before Assessment creates an `OFFICIAL_PRACTICE` attempt. Starting a tagged test without Premium returns HTTP 403 with `details.code = PREMIUM_REQUIRED`; if Access cannot confirm the subscription, it returns HTTP 503 with `details.code = ENTITLEMENT_UNAVAILABLE`. Free tests do not call Access. Existing owner-scoped attempt reads and answers use the snapshot captured at start.

@@ -35,6 +35,18 @@ final class SpeakingTestData {
                 List.of());
     }
 
+    /** Like {@link #rubric()} but the descriptors include a half band, as the first Speaking rubric's do. */
+    static Rubric rubricWithHalfBands() {
+        List<RubricCriterion> criteria = rubric().criteria().stream()
+                .map(base -> new RubricCriterion(base.code(), base.name(), base.description(), base.sortOrder(),
+                        List.of(new RubricBandDescriptor(new BigDecimal("5.0"), "weak"),
+                                new RubricBandDescriptor(new BigDecimal("5.5"), "between"),
+                                new RubricBandDescriptor(new BigDecimal("6.0"), "fair")),
+                        base.knowledgePointId(), List.of()))
+                .toList();
+        return new Rubric("IELTS_SPEAKING", "SPEAKING", 1, "test", "Be a careful examiner.", criteria, List.of());
+    }
+
     static RubricCriterion criterion(String code, String name, UUID knowledgePointId) {
         return new RubricCriterion(code, name, name + " description", 1,
                 List.of(new RubricBandDescriptor(new BigDecimal("4.0"), "weak"),

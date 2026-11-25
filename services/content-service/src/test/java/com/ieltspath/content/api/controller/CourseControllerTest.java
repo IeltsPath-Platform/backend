@@ -5,6 +5,9 @@ import com.ieltspath.content.application.usecase.*;
 import com.ieltspath.content.domain.aggregate.Course;
 import com.ieltspath.content.domain.repository.CourseRepository;
 import com.ieltspath.content.domain.vo.MediaReferencePolicy;
+import com.ieltspath.content.application.port.CodeSettingsStore;
+import com.ieltspath.content.application.result.CodeSetting;
+import com.ieltspath.content.domain.service.CodePattern;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -23,12 +26,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class CourseControllerTest {
     private final CourseRepository repository = mock(CourseRepository.class);
+    private final CodeSettingsStore codeStore = mock(CodeSettingsStore.class);
+    private final CodeSettingsUseCases codeSettings = new CodeSettingsUseCases(codeStore, new CodePattern(), repository,
+            new CreateCourseUseCase(repository));
     private MockMvc mvc;
 
     @BeforeEach
     void setup() {
-        mvc = MockMvcBuilders.standaloneSetup(new CourseController(new CreateCourseUseCase(repository),
-                        new UpdateCourseUseCase(repository), new ListCoursesUseCase(repository),
+        when(codeStore.find("COURSE")).thenReturn(Optional.of(new CodeSetting("COURSE", false, "COURSE_{SEQ:3}", 1, true)));
+        mvc = MockMvcBuilders.standaloneSetup(new CourseController(codeSettings,
+                        new UpdateCourseUseCase(repository), new DeleteCourseUseCase(repository),
+                        new ListCoursesUseCase(repository),
                         new MediaReferencePolicy("https://media.example.test/storage/v1/object/public/media")))
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
     }
@@ -40,6 +48,37 @@ class CourseControllerTest {
                         .content("{\"code\":\"IELTS_5_5\",\"name\":\"IELTS 5.5\",\"bandLevel\":5.5}"))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.code").value("IELTS_5_5"))
                 .andExpect(jsonPath("$.bandLevel").value(5.5)).andExpect(jsonPath("$.status").value("ACTIVE"));
+    }
+
+    @Test
+    void refusesMissingCodeWhenAutogenerationIsNotApplied() throws Exception {
+        mvc.perform(post("/api/content/admin/courses").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"IELTS 5.5\",\"bandLevel\":5.5}"))
+                .andExpect(status().isBadRequest());
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void returnsConflictCodeWhenAClientChangesALockedSuggestion() throws Exception {
+        when(codeStore.find("COURSE")).thenReturn(Optional.of(new CodeSetting("COURSE", true, "COURSE_{SEQ:3}", 1, false)));
+        when(codeStore.allocate("COURSE", "", 1)).thenReturn(1L);
+        mvc.perform(post("/api/content/admin/courses").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"MANUAL\",\"name\":\"IELTS 5.5\",\"bandLevel\":5.5}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.details.code").value("CODE_LOCKED"))
+                .andExpect(jsonPath("$.message").exists());
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void createsAnInactiveCourseWhenAskedAndRefusesAnUnknownStatus() throws Exception {
+        when(repository.save(any())).thenAnswer(call -> call.getArgument(0));
+        mvc.perform(post("/api/content/admin/courses").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"IELTS_6_0\",\"name\":\"IELTS 6.0\",\"bandLevel\":6.0,\"status\":\"INACTIVE\"}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("INACTIVE"));
+        mvc.perform(post("/api/content/admin/courses").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"IELTS_6_5\",\"name\":\"IELTS 6.5\",\"bandLevel\":6.5,\"status\":\"DRAFT\"}"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -199,5 +238,25 @@ class CourseControllerTest {
                         .content("{\"name\":\"Updated\",\"bandLevel\":5.5}"))
                 .andExpect(status().isNotFound());
         verify(repository, never()).save(any());
+    }
+
+    @Test
+    void deletesAnEmptyCourse() throws Exception {
+        Course course = Course.create("IELTS", "Empty", new BigDecimal("5.5"));
+        when(repository.findById(course.getId())).thenReturn(Optional.of(course));
+        when(repository.hasContent(course.getId())).thenReturn(false);
+        mvc.perform(delete("/api/content/admin/courses/{id}", course.getId())).andExpect(status().isNoContent());
+        verify(repository).deleteById(course.getId());
+    }
+
+    @Test
+    void refusesToDeleteACourseWithContentOrAnUnknownCourse() throws Exception {
+        Course course = Course.create("IELTS", "Busy", new BigDecimal("5.5"));
+        when(repository.findById(course.getId())).thenReturn(Optional.of(course));
+        when(repository.hasContent(course.getId())).thenReturn(true);
+        mvc.perform(delete("/api/content/admin/courses/{id}", course.getId()))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.details.code").value("COURSE_NOT_EMPTY"));
+        mvc.perform(delete("/api/content/admin/courses/{id}", UUID.randomUUID())).andExpect(status().isNotFound());
+        verify(repository, never()).deleteById(any());
     }
 }

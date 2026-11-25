@@ -73,21 +73,25 @@ class PaywallGateTest {
         var request = gate.forLearner(user);
         assertTrue(request.lessonOpen(lesson(4), null));
         assertFalse(request.lessonOpen(lesson(4, LearningSkill.WRITING), null));
-        verify(access).premium();
+        verify(access, never()).premium();
     }
 
     @Test
-    void premiumIsMemoizedPerRequestAndOutagePropagatesForLockedLesson() {
+    void premiumDoesNotOpenPaidLessonsOrCallAccess() {
         when(unlocks.findActive(user, course)).thenReturn(List.of());
         when(access.premium()).thenReturn(true);
         var request = gate.forLearner(user);
-        assertTrue(request.lessonOpen(lesson(4), null));
-        assertTrue(request.lessonOpen(lesson(5), null));
-        verify(access).premium();
+        assertFalse(request.lessonOpen(lesson(4), null));
+        assertFalse(request.lessonOpen(lesson(5), null));
+        verify(access, never()).premium();
+    }
 
-        when(access.premium()).thenThrow(new AccessUnavailableException(503));
-        assertThrows(AccessUnavailableException.class,
-                () -> gate.forLearner(user).requireLessonOpen(lesson(4), null, Set.of(LearningSkill.READING)));
+    @Test
+    void aLessonAlreadyStartedRemainsOpenWithoutPremium() {
+        when(unlocks.findActive(user, course)).thenReturn(List.of());
+
+        assertTrue(gate.forLearner(user).lessonOpen(course, 4, Set.of(LearningSkill.READING), true));
+        verify(access, never()).premium();
     }
 
     @Test

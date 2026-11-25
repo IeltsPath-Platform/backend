@@ -1,0 +1,108 @@
+{
+  "code": "PLACEMENT-B03-A",
+  "pool": "BAND_0_3",
+  "title": "IELTS placement test, band 0-3 (A)",
+  "listening": [
+    {
+      "title": "Listening Part 1: joining an English class",
+      "instructions": "Questions 1–10. Complete the form. Write ONE WORD AND/OR A NUMBER for each answer. For question 10, choose A, B or C.",
+      "voices": "Receptionist (woman) and Caller (young woman); slow, clear telephone call",
+      "transcript": "Receptionist: Hello, Bright Language School.\nCaller: Hello. I want to join an English class.\nReceptionist: Good. What is your name, please?\nCaller: My name is Anna Lopez. That is L, O, P, E, Z.\nReceptionist: Thank you, Anna. Is this your first English class?\nCaller: Yes, it is.\nReceptionist: Then you can join the beginner class. It is on Monday and Wednesday.\nCaller: What time is the class?\nReceptionist: It starts at six o'clock in the evening.\nCaller: That is good. I finish work at five. How much is it?\nReceptionist: It is eighty pounds for one month.\nCaller: OK. Can I pay by card?\nReceptionist: Yes, you can. And what is your phone number?\nCaller: My number is five, five, one, two, nine, eight.\nReceptionist: Thank you. Please bring a pen and a notebook. The first class is on the third of March.\nCaller: Thank you very much. Goodbye.",
+      "questions": [
+        { "q": "Student's family name: Anna ______", "fill": ["lopez"], "why": "She spells L, O, P, E, Z." },
+        { "q": "Level of the class: ______", "fill": ["beginner"], "why": "It is her first class, so she joins the beginner class." },
+        { "q": "Days of the class: Monday and ______", "fill": ["wednesday"], "why": "The class is on Monday and Wednesday." },
+        { "q": "Start time: ______ in the evening", "fill": ["6", "six", "6.00", "6:00", "6 o'clock", "six o'clock"], "why": "It starts at six o'clock in the evening." },
+        { "q": "Price for one month: £______", "fill": ["80", "eighty"], "why": "It is eighty pounds for one month." },
+        { "q": "The student will pay by ______.", "fill": ["card"], "why": "She asks if she can pay by card, and the answer is yes." },
+        { "q": "Phone number: ______", "fill": ["551298", "5 5 1 2 9 8"], "why": "The number is five, five, one, two, nine, eight." },
+        { "q": "Please bring a pen and a ______.", "fill": ["notebook"], "why": "The receptionist says to bring a pen and a notebook." },
+        { "q": "Date of the first class: ______ March", "fill": ["3", "3rd", "third", "the 3rd", "the third"], "why": "The first class is on the third of March." },
+        { "q": "What time does Anna finish work?", "options": ["Four o'clock", "Five o'clock", "Six o'clock"], "answer": "B", "why": "She says she finishes work at five." }
+      ]
+    },
+    {
+      "title": "Listening Part 2: a visit to Green Park",
+      "instructions": "Questions 11–20. Choose the correct letter, A, B or C, or write ONE WORD AND/OR A NUMBER where you see a line.",
+      "voices": "Guide (man), one speaker; friendly and slow, like a welcome talk",
+      "transcript": "Guide: Welcome to Green Park. My name is Ben and I work here. The park opens at eight o'clock every morning and closes at six in the evening. It is free, so you do not need to pay.\nGuide: There is a big lake in the middle of the park. You can walk around the lake in twenty minutes. Many ducks live there, so please do not give them bread. It is bad for them.\nGuide: On the left, you can see the café. It sells coffee, tea and cakes. A small cake costs two pounds. The toilets are next to the café.\nGuide: On Saturdays there is a children's football game at ten o'clock. On Sundays there is a market near the gate, with fruit and flowers.\nGuide: You can bring your dog, but it must stay on a lead. You cannot ride a bike on the grass. There are bike paths at the side of the park.\nGuide: If you need help, my office is next to the main gate. Enjoy your day!",
+      "questions": [
+        { "q": "The park opens at ______ o'clock in the morning.", "fill": ["8", "eight", "8.00", "8:00"], "why": "The park opens at eight o'clock." },
+        { "q": "How much does it cost to enter the park?", "options": ["Nothing", "Two pounds", "Five pounds"], "answer": "A", "why": "It is free." },
+        { "q": "It takes about ______ minutes to walk around the lake.", "fill": ["20", "twenty"], "why": "You can walk around the lake in twenty minutes." },
+        { "q": "What should visitors not give to the ducks?", "options": ["Bread", "Water", "Cake"], "answer": "A", "why": "Please do not give them bread." },
+        { "q": "A small cake in the café costs £______.", "fill": ["2", "two"], "why": "A small cake costs two pounds." },
+        { "q": "Where are the toilets?", "options": ["Next to the café", "Near the lake", "By the main gate"], "answer": "A", "why": "The toilets are next to the café." },
+        { "q": "What happens on Saturdays at ten o'clock?", "options": ["A market", "A football game", "A music show"], "answer": "B", "why": "There is a children's football game at ten o'clock." },
+        { "q": "On Sundays there is a ______ near the gate.", "fill": ["market"], "why": "On Sundays there is a market near the gate." },
+        { "q": "Dogs must stay ...", "options": ["at home", "on a lead", "outside the park"], "answer": "B", "why": "You can bring your dog, but it must stay on a lead." },
+        { "q": "Where is the guide's office?", "options": ["Next to the café", "By the lake", "Next to the main gate"], "answer": "C", "why": "His office is next to the main gate." }
+      ]
+    }
+  ],
+  "reading": [
+    {
+      "title": "Reading Passage 1: Maria's bakery",
+      "instructions": "Questions 21–24: Do the statements agree with the information in the passage? Choose TRUE, FALSE or NOT GIVEN. Questions 25–27: Choose the correct letter, A, B or C. Questions 28–30: Complete the sentences. Write ONE WORD OR A NUMBER from the passage.",
+      "minutes": 10,
+      "passage": "Maria's Bakery\n\nMaria has a small bakery in the centre of a town called Oakfield. She opens the shop at six o'clock every morning, six days a week. The shop is closed on Mondays.\n\nMaria learned to bake bread from her grandmother when she was twelve years old. Now she makes about fifty loaves of bread every day, and also cakes and biscuits. Her most popular cake is the apple cake. A slice costs two pounds.\n\nMost customers live near the shop. In the morning, many people buy bread on their way to work. At lunchtime, students from the school next door come in and buy sandwiches.\n\nLast year, Maria started selling her bread online. People can order bread on her website, and a young man called Ali brings it to their homes by bicycle. Maria says the online shop is small, but it is growing every month.\n\nMaria would like to open a second shop in the future, but she says she needs to find a good baker to help her.",
+      "questions": [
+        { "q": "Maria's bakery is in a town called Oakfield.", "tfng": "TRUE", "why": "The bakery is in the centre of a town called Oakfield." },
+        { "q": "The shop is open on Mondays.", "tfng": "FALSE", "why": "The shop is closed on Mondays." },
+        { "q": "Maria learned to bake at school.", "tfng": "FALSE", "why": "She learned from her grandmother." },
+        { "q": "Maria sells more cakes than bread.", "tfng": "NOT_GIVEN", "why": "The passage does not compare how many cakes and loaves she sells." },
+        { "q": "How old was Maria when she learned to bake?", "options": ["Six", "Twelve", "Twenty"], "answer": "B", "why": "She learned when she was twelve years old." },
+        { "q": "Which cake is the most popular?", "options": ["The apple cake", "The chocolate cake", "The lemon cake"], "answer": "A", "why": "Her most popular cake is the apple cake." },
+        { "q": "Who comes to the shop at lunchtime?", "options": ["People going to work", "Students", "Tourists"], "answer": "B", "why": "At lunchtime, students from the school next door come in." },
+        { "q": "Maria makes about ______ loaves of bread every day.", "fill": ["50", "fifty"], "why": "She makes about fifty loaves every day." },
+        { "q": "Ali takes the bread to people's homes by ______.", "fill": ["bicycle"], "why": "Ali brings the bread to homes by bicycle." },
+        { "q": "Maria needs to find a good ______ to help her.", "fill": ["baker"], "why": "She says she needs to find a good baker to help her." }
+      ]
+    },
+    {
+      "title": "Reading Passage 2: Riverside Library",
+      "instructions": "Questions 31–34: Do the statements agree with the information in the passage? Choose TRUE, FALSE or NOT GIVEN. Questions 35–37: Choose the correct letter, A, B or C. Questions 38–40: Complete the sentences. Write ONE WORD OR A NUMBER from the passage.",
+      "minutes": 10,
+      "passage": "Welcome to Riverside Library\n\nThe library is open from Monday to Saturday. On weekdays it opens at nine in the morning and closes at seven in the evening. On Saturdays it closes earlier, at four o'clock. It is closed on Sundays.\n\nEveryone can join the library for free. You only need a photo and a letter with your address. With your library card you can borrow up to six books for three weeks. If you keep a book for longer, you must pay fifty pence for each extra week.\n\nThe library has a children's room on the first floor. Every Saturday morning at eleven o'clock, a teacher reads stories there for young children. There is also a quiet room on the second floor where students can study. You can use the computers for one hour a day. This is free, but you must ask the librarian first.\n\nYou cannot eat in the library, but there is a small café outside the front door.\n\nFor more information, please phone the library or visit our website.",
+      "questions": [
+        { "q": "The library is open on Sundays.", "tfng": "FALSE", "why": "It is closed on Sundays." },
+        { "q": "It costs money to join the library.", "tfng": "FALSE", "why": "Everyone can join for free." },
+        { "q": "The library has many books in other languages.", "tfng": "NOT_GIVEN", "why": "The passage does not say anything about other languages." },
+        { "q": "The library has a room for children.", "tfng": "TRUE", "why": "There is a children's room on the first floor." },
+        { "q": "On Saturdays the library closes at ...", "options": ["four o'clock", "seven o'clock", "nine o'clock"], "answer": "A", "why": "On Saturdays it closes at four o'clock." },
+        { "q": "How many books can a member borrow?", "options": ["Three", "Six", "Ten"], "answer": "B", "why": "Members can borrow up to six books." },
+        { "q": "What happens on Saturdays at eleven o'clock?", "options": ["A film for adults", "Stories for young children", "A class for students"], "answer": "B", "why": "A teacher reads stories for young children." },
+        { "q": "A late book costs ______ pence for each extra week.", "fill": ["50", "fifty"], "why": "You must pay fifty pence for each extra week." },
+        { "q": "The quiet room is on the ______ floor.", "fill": ["second", "2nd"], "why": "The quiet room is on the second floor." },
+        { "q": "Members can use the computers for ______ hour a day.", "fill": ["1", "one"], "why": "You can use the computers for one hour a day." }
+      ]
+    }
+  ],
+  "writing": [
+    {
+      "title": "Writing: city or village",
+      "instructions": "Spend about 20 minutes on this task. Write at least 80 words. Use simple sentences.",
+      "minutes": 20,
+      "task": "TASK_2",
+      "minWords": 80,
+      "passBand": 3.0,
+      "stem": "Some people like to live in a city. Other people like to live in a village. Which do you prefer? Give reasons for your answer. Write at least 80 words."
+    }
+  ],
+  "speaking": [
+    {
+      "title": "Speaking Part 1: your family",
+      "instructions": "Answer the questions in a few short sentences.",
+      "questions": [
+        { "q": "Let's talk about your family. How many people are in your family? What do you like to do together?", "seconds": 45 }
+      ]
+    },
+    {
+      "title": "Speaking Part 2: your favourite food",
+      "instructions": "You have one minute to prepare, then speak for about one minute.",
+      "questions": [
+        { "q": "Describe your favourite food. You should say what it is, who makes it, when you eat it, and why you like it. Speak for about one minute.", "seconds": 60 }
+      ]
+    }
+  ]
+}

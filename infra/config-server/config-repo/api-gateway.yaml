@@ -157,7 +157,7 @@ spring:
                 connect-timeout: 2000
                 response-timeout: 210000
               predicates:
-                - Path=/api/content/admin/ai-drafts/courses,/api/content/admin/ai-drafts/practice-sets
+                - Path=/api/content/admin/ai-drafts/practice-sets
               filters:
                 - name: ClientRateLimit
                   args:
@@ -170,6 +170,15 @@ spring:
                 response-timeout: 120000
               predicates:
                 - Path=/api/content/admin/media/audio,/api/content/admin/media/image,/api/content/admin/media/document
+              filters:
+                - name: ClientRateLimit
+                  args:
+                    tier: upload
+
+            - id: content-course-import-limited
+              uri: lb://CONTENT-SERVICE
+              predicates:
+                - Path=/api/content/admin/course-import/**
               filters:
                 - name: ClientRateLimit
                   args:

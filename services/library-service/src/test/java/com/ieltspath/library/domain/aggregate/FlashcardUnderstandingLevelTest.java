@@ -56,4 +56,9 @@ class FlashcardUnderstandingLevelTest {
         assertNull(card.getNextReviewAt());
         assertNull(card.getLastReviewRequestId());
     }
+
+    @Test void boxSixIsNotALevel() {
+        InvalidDataException error = assertThrows(InvalidDataException.class, () -> UnderstandingLevel.fromBox(6));
+        assertEquals("Leitner box is invalid", error.getMessage());
+    }
 }

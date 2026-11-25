@@ -4,7 +4,7 @@ import java.util.UUID;
 
 public class QuestionNotFoundException extends ContentDomainException {
     public QuestionNotFoundException(UUID id) {
-        super("Question not found with id: " + id);
+        super("Không tìm thấy câu hỏi");
     }
 }
 

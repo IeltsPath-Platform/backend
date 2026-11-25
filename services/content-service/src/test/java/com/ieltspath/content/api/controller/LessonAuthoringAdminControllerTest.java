@@ -3,6 +3,7 @@ package com.ieltspath.content.api.controller;
 import com.ieltspath.commonsecurity.config.CommonSecurityAutoConfiguration;
 import com.ieltspath.content.application.result.LessonAuthoringResult;
 import com.ieltspath.content.application.usecase.LessonAuthoringUseCase;
+import com.ieltspath.content.application.usecase.CodeSettingsUseCases;
 import com.ieltspath.content.domain.exception.*;
 import com.ieltspath.content.domain.vo.LessonStatus;
 import org.junit.jupiter.api.Test;
@@ -35,6 +36,7 @@ class LessonAuthoringAdminControllerTest {
     }
     @Autowired MockMvc mvc;
     @MockitoBean LessonAuthoringUseCase authoring;
+    @MockitoBean CodeSettingsUseCases codeSettings;
     private final UUID lessonId = UUID.randomUUID();
 
     @Test @WithMockUser(roles="CUSTOMER") void customerIsForbidden() throws Exception {
@@ -47,9 +49,9 @@ class LessonAuthoringAdminControllerTest {
     @Test @WithMockUser(roles="CONTENT_AUTHOR") void contentAuthorCanCreateLesson() throws Exception {
         LessonAuthoringResult result = new LessonAuthoringResult(lessonId, UUID.randomUUID(), "L", "Lesson", null,
                 null, null, 0, LessonStatus.DRAFT, Instant.now(), Instant.now(), List.of(), List.of());
-        when(authoring.create(any(), eq("L"), eq("Lesson"), any(), any(), any(), any())).thenReturn(result);
+        when(codeSettings.createLesson(any(), eq(""), eq("Lesson"), any(), any(), any(), any())).thenReturn(result);
         mvc.perform(post("/api/content/admin/topics/{topicId}/lessons", UUID.randomUUID())
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"code\":\"L\",\"title\":\"Lesson\"}"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"code\":\"\",\"title\":\"Lesson\"}"))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.id").value(lessonId.toString()));
     }
 

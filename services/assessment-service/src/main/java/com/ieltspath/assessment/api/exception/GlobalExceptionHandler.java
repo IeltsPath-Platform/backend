@@ -1,5 +1,8 @@
 package com.ieltspath.assessment.api.exception;
 
+import com.ieltspath.commonsecurity.error.VietnameseErrorMessages;
+import com.ieltspath.assessment.application.exception.EntitlementUnavailableException;
+import com.ieltspath.assessment.application.exception.PremiumRequiredException;
 import com.ieltspath.assessment.application.exception.ContentUnavailableException;
 import com.ieltspath.assessment.application.exception.UnknownErrorCodeException;
 import com.ieltspath.assessment.application.exception.UserServiceUnavailableException;
@@ -26,6 +29,21 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @ExceptionHandler(PremiumRequiredException.class)
+    public ResponseEntity<ErrorResponse> premiumRequired(PremiumRequiredException exception, HttpServletRequest request) {
+        return build(HttpStatus.FORBIDDEN,
+                VietnameseErrorMessages.userFacing(HttpStatus.FORBIDDEN.value(), exception.getMessage()),
+                request.getRequestURI(), Map.of("code", "PREMIUM_REQUIRED"));
+    }
+
+    @ExceptionHandler(EntitlementUnavailableException.class)
+    public ResponseEntity<ErrorResponse> entitlementUnavailable(EntitlementUnavailableException exception,
+                                                                  HttpServletRequest request) {
+        return build(HttpStatus.SERVICE_UNAVAILABLE,
+                VietnameseErrorMessages.userFacing(HttpStatus.SERVICE_UNAVAILABLE.value(), exception.getMessage()),
+                request.getRequestURI(), Map.of("code", "ENTITLEMENT_UNAVAILABLE"));
+    }
 
     @ExceptionHandler(StorageException.class)
     public ResponseEntity<ErrorResponse> storageUnavailable(StorageException e, HttpServletRequest r) {
@@ -92,6 +110,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AttemptExpiredException.class)
     public ResponseEntity<ErrorResponse> expired(AttemptExpiredException e, HttpServletRequest r) {
         return build(HttpStatus.CONFLICT, e.getMessage(), r.getRequestURI(), null, "ATTEMPT_EXPIRED");
+    }
+
+    @ExceptionHandler(PlacementLimitReachedException.class)
+    public ResponseEntity<ErrorResponse> placementLimitReached(PlacementLimitReachedException e, HttpServletRequest r) {
+        return build(HttpStatus.TOO_MANY_REQUESTS, e.getMessage(), r.getRequestURI(), null, "PLACEMENT_LIMIT_REACHED");
     }
 
     @ExceptionHandler(PackageNotAttemptableException.class)

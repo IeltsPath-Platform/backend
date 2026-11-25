@@ -28,7 +28,8 @@ public record ReviewBasketResult(List<RequiredItem> required, List<OptionalItem>
                                LearningSkill skill) {}
 
     /**
-     * {@code reason} is {@code CONSOLIDATE}, {@code DUE}, or the pending review's trigger kind in {@code weak}.
+     * {@code reason} is {@code CONSOLIDATE}, {@code DUE}, the pending review's trigger kind in {@code weak}, or
+     * {@code UNBLOCKED} for a review made optional after repeated failures.
      * {@code reviewId} is set when the learner already started
      * an optional review of the point. {@code hasUnrevealedSet} says whether Content still has a set the learner has
      * not seen; without one the point cannot be started.

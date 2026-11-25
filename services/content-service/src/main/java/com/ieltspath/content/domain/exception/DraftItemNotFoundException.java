@@ -4,6 +4,6 @@ package com.ieltspath.content.domain.exception;
 public class DraftItemNotFoundException extends ContentDomainException {
 
     public DraftItemNotFoundException(int index) {
-        super("The draft has no item " + index);
+        super("Bản nháp không có câu hỏi này");
     }
 }

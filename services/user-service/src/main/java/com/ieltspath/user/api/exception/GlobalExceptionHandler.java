@@ -70,8 +70,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(PasswordChangeException.class)
     ResponseEntity<ErrorResponse> handlePasswordChange(PasswordChangeException exception, HttpServletRequest request) {
-        HttpStatus status = exception.isRateLimited() ? HttpStatus.TOO_MANY_REQUESTS
-                : "CURRENT_PASSWORD_INVALID".equals(exception.getCode()) ? HttpStatus.UNAUTHORIZED : HttpStatus.BAD_REQUEST;
+        HttpStatus status = exception.isRateLimited() ? HttpStatus.TOO_MANY_REQUESTS : HttpStatus.BAD_REQUEST;
         return error(status, exception.getMessage(), request, Map.of("code", exception.getCode()));
     }
 

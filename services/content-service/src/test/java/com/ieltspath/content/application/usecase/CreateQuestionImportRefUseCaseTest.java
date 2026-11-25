@@ -22,16 +22,19 @@ import static org.mockito.Mockito.when;
 class CreateQuestionImportRefUseCaseTest {
 
     private final QuestionRepository repository = mock(QuestionRepository.class);
-    private final CreateQuestionUseCase useCase = new CreateQuestionUseCase(repository);
+    private final QuestionCodeGenerator codes = mock(QuestionCodeGenerator.class);
+    private final CreateQuestionUseCase useCase = new CreateQuestionUseCase(repository, codes);
 
     @Test
     void newReferenceIsStoredAndReturned() {
         when(repository.findByImportRef("row-1")).thenReturn(Optional.empty());
+        when(codes.allocate()).thenReturn("Q-000001");
         when(repository.save(any(Question.class))).thenAnswer(call -> call.getArgument(0));
 
         QuestionResult result = useCase.execute(command("  row-1 "));
 
         assertEquals("row-1", result.importRef());
+        assertEquals("Q-000001", result.code());
     }
 
     @Test

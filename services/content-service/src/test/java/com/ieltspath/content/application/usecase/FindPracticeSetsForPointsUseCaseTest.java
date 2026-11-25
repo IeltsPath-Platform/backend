@@ -1,7 +1,7 @@
 package com.ieltspath.content.application.usecase;
 
-import com.ieltspath.content.application.port.CourseCandidateReader;
-import com.ieltspath.content.application.port.CourseCandidateReader.PracticeSetRef;
+import com.ieltspath.content.application.port.UnlinkedPracticeSetReader;
+import com.ieltspath.content.application.port.UnlinkedPracticeSetReader.PracticeSetRef;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -18,8 +18,8 @@ import static org.mockito.Mockito.when;
 
 class FindPracticeSetsForPointsUseCaseTest {
 
-    private final CourseCandidateReader candidates = mock(CourseCandidateReader.class);
-    private final FindPracticeSetsForPointsUseCase useCase = new FindPracticeSetsForPointsUseCase(candidates);
+    private final UnlinkedPracticeSetReader reader = mock(UnlinkedPracticeSetReader.class);
+    private final FindPracticeSetsForPointsUseCase useCase = new FindPracticeSetsForPointsUseCase(reader);
 
     @Test
     void listsEachSetOnceEvenWhenItMeasuresSeveralPoints() {
@@ -30,7 +30,7 @@ class FindPracticeSetsForPointsUseCaseTest {
         Map<UUID, List<PracticeSetRef>> found = new LinkedHashMap<>();
         found.put(first, List.of(shared));
         found.put(second, List.of(shared, only));
-        when(candidates.practiceSets(List.of(first, second), Integer.MAX_VALUE)).thenReturn(found);
+        when(reader.practiceSets(List.of(first, second), Integer.MAX_VALUE)).thenReturn(found);
 
         assertThat(useCase.execute(List.of(first, second))).containsExactly(shared.packageId(), only.packageId());
     }
@@ -39,7 +39,7 @@ class FindPracticeSetsForPointsUseCaseTest {
     void noPointsIsNoSetsWithoutAskingTheReader() {
         assertThat(useCase.execute(List.of())).isEmpty();
 
-        verifyNoInteractions(candidates);
+        verifyNoInteractions(reader);
     }
 
     @Test
@@ -48,6 +48,6 @@ class FindPracticeSetsForPointsUseCaseTest {
                 .mapToObj(index -> UUID.randomUUID()).toList();
 
         assertThatThrownBy(() -> useCase.execute(tooMany)).isInstanceOf(IllegalArgumentException.class);
-        verifyNoInteractions(candidates);
+        verifyNoInteractions(reader);
     }
 }

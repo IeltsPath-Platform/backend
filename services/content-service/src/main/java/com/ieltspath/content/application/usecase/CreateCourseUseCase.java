@@ -18,7 +18,7 @@ public class CreateCourseUseCase {
     public CourseResult execute(CreateCourseCommand command) {
         Course course = Course.create(command.code(), command.name(), command.bandLevel(), command.coverImageUrl(),
                 command.description(), command.skillUnlockPoints(), command.comboUnlockPoints(), command.free(),
-                command.bannerImageUrl());
+                command.bannerImageUrl(), command.status());
         if (repository.existsByCode(course.getCode())) {
             throw new DuplicateCourseException("code", course.getCode());
         }

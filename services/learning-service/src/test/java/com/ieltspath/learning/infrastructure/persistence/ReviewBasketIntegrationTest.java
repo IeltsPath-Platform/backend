@@ -6,6 +6,7 @@ import com.ieltspath.learning.application.command.AssessmentResult.KnowledgePoin
 import com.ieltspath.learning.application.command.SubmitExerciseCommand;
 import com.ieltspath.learning.application.command.SubmitReviewCommand;
 import com.ieltspath.learning.application.exception.LearningRequestException;
+import com.ieltspath.learning.application.port.AccessClient;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.port.LearningContentClient.*;
 import com.ieltspath.learning.application.result.ReviewBasketResult;
@@ -23,6 +24,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -37,6 +40,8 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
 
 /** The review basket, optional reviews, and the rule that only blocking reviews hold a learner back. */
 @SpringBootTest(properties = {
@@ -66,7 +71,7 @@ class ReviewBasketIntegrationTest {
     @Autowired GetReviewBasketUseCase basket;
     @Autowired GetReviewBasketSummaryUseCase summary;
     @Autowired StartBasketReviewUseCase start;
-    @Autowired GetReviewUseCase getReview;
+    @MockitoSpyBean GetReviewUseCase getReview;
     @Autowired SubmitReviewUseCase submitReview;
     @Autowired GetLessonUseCase getLesson;
     @Autowired CompleteLessonUseCase completeLesson;
@@ -74,6 +79,7 @@ class ReviewBasketIntegrationTest {
     @Autowired ErrorTrapReviews errorTrapReviews;
     @Autowired ApplyAssessmentResultUseCase apply;
     @MockitoBean LearningContentClient content;
+    @MockitoBean AccessClient access;
 
     private final UUID topic = UUID.randomUUID();
     private final UUID lesson = UUID.randomUUID();
@@ -83,6 +89,7 @@ class ReviewBasketIntegrationTest {
     private final UUID kpLater = UUID.randomUUID();
     private final UUID kpPriority = UUID.randomUUID();
     private final Map<UUID, PackageVersion> versions = new LinkedHashMap<>();
+    private final Map<UUID, String> requiredFeatures = new HashMap<>();
     private Map<UUID, Integer> availability = Map.of();
 
     @BeforeEach
@@ -105,17 +112,20 @@ class ReviewBasketIntegrationTest {
         when(content.getPackageVersion(any())).thenAnswer(invocation -> versions.get(invocation.<UUID>getArgument(0)));
         when(content.practiceSetAvailability(anyList(), anyList(), eq(3)))
                 .thenAnswer(invocation -> availability);
-        when(content.searchPracticeSets(any(), anyList(), eq(3), eq(1), any())).thenAnswer(invocation -> {
+        when(content.searchPracticeSets(any(), anyList(), eq(3), anyInt(), any())).thenAnswer(invocation -> {
             List<UUID> excluded = invocation.getArgument(1);
-            return versions.values().stream().filter(version -> !excluded.contains(version.packageId())).limit(1)
-                    .map(version -> new PracticeSet(version.packageId(), version.packageVersionId(), "PS", 2, 2))
+            return versions.values().stream().filter(version -> !excluded.contains(version.packageId()))
+                    .limit(invocation.<Integer>getArgument(3))
+                    .map(version -> new PracticeSet(version.packageId(), version.packageVersionId(), "PS", 2, 2,
+                            null, requiredFeatures.get(version.packageId()), 0))
                     .toList();
         });
-        when(content.searchPracticeSets(any(), anyList(), eq(3), eq(1), any(), any())).thenAnswer(invocation -> {
+        when(content.searchPracticeSets(any(), anyList(), eq(3), anyInt(), any(), any())).thenAnswer(invocation -> {
             List<UUID> excluded = invocation.getArgument(1);
-            return versions.values().stream().filter(version -> !excluded.contains(version.packageId())).limit(1)
+            return versions.values().stream().filter(version -> !excluded.contains(version.packageId()))
+                    .limit(invocation.<Integer>getArgument(3))
                     .map(version -> new PracticeSet(version.packageId(), version.packageVersionId(), "PS", 3, 3,
-                            null, null, 2))
+                            null, requiredFeatures.get(version.packageId()), 2))
                     .toList();
         });
     }
@@ -143,6 +153,14 @@ class ReviewBasketIntegrationTest {
                     success_streak, last_evidence_at, next_review_at)
                 VALUES (?, ?, ?::numeric, ?, 5, 1, now(), ?)
                 """, user, kp, mastery, tier, nextReviewAt == null ? null : Timestamp.from(nextReviewAt));
+    }
+
+    private void decayedProfile(UUID user, UUID kp, Instant lastEvidenceAt) {
+        jdbc.update("""
+                INSERT INTO kp_mastery_profiles (user_id, knowledge_point_id, mastery, tier, evidence_count,
+                    success_streak, last_evidence_at, next_review_at, decayed_from_tier)
+                VALUES (?, ?, 0.500, 'INSUFFICIENT', 8, 2, ?, NULL, 'MAINTAIN')
+                """, user, kp, Timestamp.from(lastEvidenceAt));
     }
 
     @Test
@@ -192,6 +210,180 @@ class ReviewBasketIntegrationTest {
         assertEquals(due, counts.due());
         assertEquals(result.required().size(), counts.required(), "required matches the basket group");
         assertEquals(result.due().size(), counts.due(), "due matches the basket group");
+    }
+
+    @Test
+    void anEligiblePriorityPointAppearsAsWeakAndStartsWithItsOwnTrigger() {
+        UUID user = learner();
+        availability = Map.of(kpPriority, 3);
+        PackageVersion set = practiceSet(kpPriority, kpPriority, kpPriority);
+
+        var weak = basket.execute(user).weak().stream()
+                .filter(item -> item.knowledgePointId().equals(kpPriority)).findFirst().orElseThrow();
+        var started = start.execute(user, kpPriority);
+
+        assertEquals("PRIORITY", weak.reason());
+        assertEquals(set.packageId(), started.set().packageId());
+        assertEquals("PRIORITY", jdbc.queryForObject("SELECT trigger_kind FROM review_items WHERE id = ?",
+                String.class, started.reviewId()));
+        assertEquals(false, started.blocking());
+    }
+
+    @Test
+    void aPriorityPointWithoutTeachingOrWithOnlyReservedSetsIsNotOffered() {
+        UUID user = learner();
+        availability = Map.of(kpPriority, 3);
+        jdbc.update("DELETE FROM lesson_progress WHERE user_id = ? AND lesson_id = ?", user, lesson);
+
+        assertFalse(basket.execute(user).weak().stream()
+                .anyMatch(item -> item.knowledgePointId().equals(kpPriority)));
+        assertEquals(1, summary.execute(user).due());
+
+        jdbc.update("INSERT INTO lesson_progress (user_id, lesson_id, topic_id, lesson_sort_order, knowledge_point_ids, completed_at) "
+                + "VALUES (?, ?, ?, 1, ARRAY[?]::uuid[], now())", user, lesson, topic, kpPriority);
+        availability = Map.of(kpPriority, 2);
+        assertFalse(basket.execute(user).weak().stream()
+                .anyMatch(item -> item.knowledgePointId().equals(kpPriority)));
+        assertEquals(1, summary.execute(user).due());
+        LearningRequestException error = assertThrows(LearningRequestException.class,
+                () -> start.execute(user, kpPriority));
+        assertEquals("NO_UNREVEALED_SET", error.getCode());
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM review_items WHERE user_id = ?", Integer.class, user));
+    }
+
+    @Test
+    void startingPriorityReviewsStopsWhenOnlyTheReservedSetsRemain() {
+        UUID user = learner();
+        practiceSet(kpPriority, kpPriority, kpPriority);
+        practiceSet(kpPriority, kpPriority, kpPriority);
+        practiceSet(kpPriority, kpPriority, kpPriority);
+        doAnswer(invocation -> {
+            List<UUID> excluded = invocation.getArgument(1);
+            return Map.of(kpPriority, 3 - excluded.size());
+        }).when(content).practiceSetAvailability(anyList(), anyList(), eq(3));
+
+        var first = start.execute(user, kpPriority);
+        jdbc.update("UPDATE review_items SET status = 'SKIPPED', done_at = now() WHERE id = ?", first.reviewId());
+        LearningRequestException error = assertThrows(LearningRequestException.class,
+                () -> start.execute(user, kpPriority));
+
+        assertEquals("NO_UNREVEALED_SET", error.getCode());
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM review_sets WHERE user_id = ?", Integer.class, user));
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM review_items WHERE user_id = ?", Integer.class, user));
+    }
+
+    @Test
+    void aFreeLearnerSkipsPremiumPackagesAndCanStartWithAFreePackage() {
+        UUID user = learner();
+        availability = Map.of(kpPriority, 3);
+        PackageVersion premium = practiceSet(kpPriority, kpPriority, kpPriority);
+        PackageVersion free = practiceSet(kpPriority, kpPriority, kpPriority);
+        requiredFeatures.put(premium.packageId(), "PREMIUM_READING");
+        when(access.premium()).thenReturn(false);
+
+        var started = start.execute(user, kpPriority);
+
+        assertEquals(free.packageId(), started.set().packageId());
+    }
+
+    @Test
+    void aFreeLearnerCannotStartWhenEveryPriorityPackageIsPremium() {
+        UUID user = learner();
+        availability = Map.of(kpPriority, 3);
+        PackageVersion premium = practiceSet(kpPriority, kpPriority, kpPriority);
+        requiredFeatures.put(premium.packageId(), "PREMIUM_READING");
+        when(access.premium()).thenReturn(false);
+
+        LearningRequestException error = assertThrows(LearningRequestException.class,
+                () -> start.execute(user, kpPriority));
+
+        assertEquals(409, error.getStatus());
+        assertEquals("NO_UNREVEALED_SET", error.getCode());
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM review_items WHERE user_id = ?", Integer.class, user));
+    }
+
+    @Test
+    void aFreeLearnerStartingADecayedPointAlsoReceivesOnlyAFreePackage() {
+        UUID user = learner();
+        jdbc.update("UPDATE kp_mastery_profiles SET tier = 'INSUFFICIENT', decayed_from_tier = 'MAINTAIN' "
+                + "WHERE user_id = ? AND knowledge_point_id = ?", user, kpDue);
+        availability = Map.of(kpDue, 3);
+        PackageVersion premium = practiceSet(kpDue, kpDue, kpDue);
+        PackageVersion free = practiceSet(kpDue, kpDue, kpDue);
+        requiredFeatures.put(premium.packageId(), "PREMIUM_READING");
+        when(access.premium()).thenReturn(false);
+
+        var started = start.execute(user, kpDue);
+
+        assertEquals(free.packageId(), started.set().packageId());
+        assertEquals("DECAYED", jdbc.queryForObject("SELECT trigger_kind FROM review_items WHERE id = ?",
+                String.class, started.reviewId()));
+    }
+
+    @Test
+    void aDecayedPointAppearsInDueAndStartsWithTheDecayedTrigger() {
+        UUID user = learner();
+        jdbc.update("UPDATE kp_mastery_profiles SET tier = 'INSUFFICIENT', decayed_from_tier = 'MAINTAIN' "
+                + "WHERE user_id = ? AND knowledge_point_id = ?", user, kpDue);
+        availability = Map.of(kpDue, 3);
+        PackageVersion set = practiceSet(kpDue, kpDue, kpDue);
+
+        var item = basket.execute(user).due().stream()
+                .filter(candidate -> candidate.knowledgePointId().equals(kpDue)).findFirst().orElseThrow();
+        var started = start.execute(user, kpDue);
+
+        assertEquals("DECAYED", item.reason());
+        assertEquals(set.packageId(), started.set().packageId());
+        assertEquals("DECAYED", jdbc.queryForObject("SELECT trigger_kind FROM review_items WHERE id = ?",
+                String.class, started.reviewId()));
+    }
+
+    @Test
+    void onlyTheTenOldestDecayedPointsAreListedAndCountedByTheBadge() {
+        UUID user = learner();
+        jdbc.update("UPDATE kp_mastery_profiles SET next_review_at = now() + interval '30 days' "
+                + "WHERE user_id = ? AND knowledge_point_id = ?", user, kpDue);
+        List<UUID> points = new ArrayList<>();
+        Instant now = Instant.now();
+        for (int index = 0; index < 15; index++) {
+            UUID point = UUID.randomUUID();
+            points.add(point);
+            decayedProfile(user, point, now.minus(index + 1L, ChronoUnit.DAYS));
+        }
+
+        ReviewBasketResult result = basket.execute(user);
+        var dueIds = result.due().stream().map(ReviewBasketResult.OptionalItem::knowledgePointId).toList();
+        var badge = summary.execute(user);
+
+        assertEquals(10, dueIds.size());
+        assertTrue(dueIds.containsAll(points.subList(5, 15)));
+        assertFalse(dueIds.stream().anyMatch(points.subList(0, 5)::contains));
+        assertTrue(result.due().stream().filter(item -> points.contains(item.knowledgePointId()))
+                .allMatch(item -> "DECAYED".equals(item.reason())));
+        assertEquals(10, badge.due());
+    }
+
+    @Test
+    void insufficientProfilesWithoutADecayMarkerAreNotClassifiedAsDecayed() {
+        UUID user = learner();
+        UUID newPoint = UUID.randomUUID();
+        profile(user, newPoint, "0.900", "INSUFFICIENT", null);
+
+        ReviewBasketResult result = basket.execute(user);
+
+        assertFalse(result.due().stream().anyMatch(item -> item.knowledgePointId().equals(newPoint)));
+        assertFalse(result.weak().stream().anyMatch(item -> item.knowledgePointId().equals(newPoint)));
+    }
+
+    @Test
+    void decayOriginConstraintAcceptsOnlyThePreviouslyJudgedTiers() {
+        UUID user = learner();
+        UUID point = UUID.randomUUID();
+        decayedProfile(user, point, Instant.now());
+
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class,
+                () -> jdbc.update("UPDATE kp_mastery_profiles SET decayed_from_tier = 'INSUFFICIENT' "
+                        + "WHERE user_id = ? AND knowledge_point_id = ?", user, point));
     }
 
     @Test
@@ -280,6 +472,10 @@ class ReviewBasketIntegrationTest {
     void startingAPointCreatesAnOptionalReviewWithOneSetThatBlocksNothing() {
         UUID user = learner();
         PackageVersion only = practiceSet(kpConsolidate, kpConsolidate);
+        doAnswer(invocation -> {
+            assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
+            return invocation.callRealMethod();
+        }).when(getReview).execute(eq(user), any(UUID.class));
 
         var review = start.execute(user, kpConsolidate);
 
@@ -293,6 +489,7 @@ class ReviewBasketIntegrationTest {
                 String.class, review.reviewId()));
         assertDoesNotThrow(() -> getLesson.execute(user, lesson), "an optional review never locks a lesson");
         assertEquals(review.reviewId(), basket.execute(user).consolidate().getFirst().reviewId());
+        verify(getReview).execute(eq(user), eq(review.reviewId()));
     }
 
     @Test
@@ -300,11 +497,13 @@ class ReviewBasketIntegrationTest {
         UUID user = learner();
         PackageVersion only = practiceSet(kpConsolidate, kpConsolidate);
         var review = start.execute(user, kpConsolidate);
+        org.mockito.Mockito.clearInvocations(content);
 
         var result = submitReview.execute(user, review.reviewId(), new SubmitReviewCommand(review.set().reviewSetId(),
                 UUID.randomUUID(), answers(items(only), "B", "B").answers()));
 
         assertEquals("SKIPPED", result.reviewStatus());
+        org.mockito.Mockito.verify(content).lessonPracticeSets(lesson);
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM review_items WHERE user_id = ? AND status = 'PENDING'",
                 Integer.class, user));
         assertEquals("PRACTICE", result.stage());
@@ -335,9 +534,11 @@ class ReviewBasketIntegrationTest {
                 + "trigger_kind) VALUES (?, ?, ?, ?, 'PENDING', 'READING', 'PRACTICE')", blockingId, user,
                 kpPriority, lesson);
 
+        var opened = getReview.execute(user, blockingId);
         var review = start.execute(user, kpPriority);
 
         assertEquals(blockingId, review.reviewId());
+        assertEquals(opened.set(), review.set());
         assertTrue(review.blocking());
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM review_items WHERE user_id = ?", Integer.class, user));
     }
@@ -360,7 +561,7 @@ class ReviewBasketIntegrationTest {
 
         assertEquals("NOT_IN_REVIEW_BASKET", assertThrows(LearningRequestException.class,
                 () -> start.execute(user, kpLater)).getCode());
-        assertEquals("NOT_IN_REVIEW_BASKET", assertThrows(LearningRequestException.class,
+        assertEquals("NO_UNREVEALED_SET", assertThrows(LearningRequestException.class,
                 () -> start.execute(user, kpPriority)).getCode());
         assertEquals("NOT_IN_REVIEW_BASKET", assertThrows(LearningRequestException.class,
                 () -> start.execute(user, UUID.randomUUID())).getCode());
@@ -479,6 +680,10 @@ class ReviewBasketIntegrationTest {
                     + "VALUES (?, ?, ?, FALSE, 'lesson_exercise', ?)", UUID.randomUUID(), user, kpConsolidate,
                     UUID.randomUUID());
         }
+        // Submissions record the profile together with the evidence before a re-evaluation; this test writes
+        // the evidence directly, so it lowers the stored score the way those answers would have.
+        jdbc.update("UPDATE kp_mastery_profiles SET mastery = 0.2, tier = 'PRIORITY', next_review_at = NULL "
+                + "WHERE user_id = ? AND knowledge_point_id = ?", user, kpConsolidate);
 
         reevaluation.execute(user, Set.of(kpConsolidate), Set.of(kpConsolidate));
 
@@ -491,6 +696,29 @@ class ReviewBasketIntegrationTest {
         assertDoesNotThrow(() -> getLesson.execute(user, lesson), "completed lessons stay readable for revision");
         assertEquals("REVIEW_REQUIRED", assertThrows(com.ieltspath.learning.domain.exception.LearningGateException.class,
                 () -> completeLesson.execute(user, lesson)).getCode());
+    }
+
+    @Test
+    void aReviewIsRaisedFromTheStoredMasteryScoreNotFromTheLatestAnswersAlone() {
+        UUID user = learner();
+        practiceSet(kpConsolidate, kpConsolidate);
+        for (int index = 0; index < 3; index++) {
+            jdbc.update("INSERT INTO kp_evidence (id, user_id, kp_id, correct, source, source_reference_id) "
+                    + "VALUES (?, ?, ?, FALSE, 'lesson_exercise', ?)", UUID.randomUUID(), user, kpConsolidate,
+                    UUID.randomUUID());
+        }
+
+        // The stored score (0.65) is above the priority threshold, so three recent wrong answers raise no review.
+        reevaluation.execute(user, Set.of(kpConsolidate), Set.of(kpConsolidate));
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM review_items WHERE user_id = ?",
+                Integer.class, user));
+
+        // The same evidence with a stored score under the threshold does raise one.
+        jdbc.update("UPDATE kp_mastery_profiles SET mastery = 0.2, tier = 'PRIORITY', next_review_at = NULL "
+                + "WHERE user_id = ? AND knowledge_point_id = ?", user, kpConsolidate);
+        reevaluation.execute(user, Set.of(kpConsolidate), Set.of(kpConsolidate));
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM review_items WHERE user_id = ? AND status = 'PENDING' "
+                + "AND blocking = TRUE AND knowledge_point_id = ?", Integer.class, user, kpConsolidate));
     }
 
     @Test

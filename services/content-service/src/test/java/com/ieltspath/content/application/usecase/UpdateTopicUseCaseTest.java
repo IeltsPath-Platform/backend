@@ -46,7 +46,7 @@ class UpdateTopicUseCaseTest {
 
         assertThatThrownBy(() -> new UpdateTopicUseCase(repository, courses).execute(new UpdateTopicCommand(
                 topic.getId(), null, "Changed", 1, null, BandRange.UNBOUNDED, null, null)))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("exactly one skill");
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("đúng một kỹ năng");
         verify(repository, never()).save(any());
     }
 

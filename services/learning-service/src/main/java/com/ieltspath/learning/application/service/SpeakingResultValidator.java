@@ -2,14 +2,17 @@ package com.ieltspath.learning.application.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ieltspath.learning.application.port.LearningContentClient;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * Checks what the model said before any of it is kept. A grade the model has to be trusted for (the three bands) is
@@ -29,8 +32,8 @@ public class SpeakingResultValidator {
     static final int MAX_ERRORS = 45;
     static final int MAX_EVIDENCE = 8;
     static final int MAX_POINTS = 6;
-    /** A weakness names one kind of mistake, how often it happens and quotes its places with their fixes, so it is long. */
-    static final int MAX_WEAKNESS_CHARS = 700;
+    /** A weakness names one kind of mistake, how often it happens and quotes its places with their fixes, gives the rule and an exercise, so it is long. */
+    static final int MAX_WEAKNESS_CHARS = 850;
     private static final int MAX_STRENGTH_CHARS = 300;
     static final int MAX_OBSERVATIONS = 12;
     private static final Set<String> RELIABILITY = Set.of("HIGH", "MEDIUM", "LOW");
@@ -64,8 +67,23 @@ public class SpeakingResultValidator {
                                  List<KpObservation> kpObservations, PersonalFeedback personalFeedback,
                                  List<PronunciationNote> pronunciationNotes) { }
 
-    /** The model's answer cannot be used as a grade. */
-    public static class InvalidSpeakingGradeException extends RuntimeException { }
+    /**
+     * The model's answer cannot be used as a grade. {@code reason} says which rule it broke (NOT_JSON, NO_CRITERIA,
+     * CRITERION_MISSING, WRONG_CRITERION, BAND_MISSING, BAND_NOT_A_NUMBER, BAND_OUT_OF_RANGE, BAND_NOT_HALF_STEP, BAND_NOT_WHOLE): it is
+     * logged and told to the model when it is asked again. It never holds text of the answer.
+     */
+    public static class InvalidSpeakingGradeException extends RuntimeException {
+        private final String reason;
+
+        public InvalidSpeakingGradeException() { this("UNSPECIFIED"); }
+
+        public InvalidSpeakingGradeException(String reason) {
+            super(reason);
+            this.reason = reason;
+        }
+
+        public String reason() { return reason; }
+    }
 
     private final ObjectMapper json;
 
@@ -78,11 +96,16 @@ public class SpeakingResultValidator {
      * @throws InvalidSpeakingGradeException when the answer is not a JSON object or its bands cannot be trusted
      */
     public ValidatedGrade validate(String raw, SpeakingGradingInput input, Set<String> allowedKpCodes) {
+        return validate(raw, input, allowedKpCodes, false);
+    }
+
+    /** @param wholeBands the rubric describes whole bands only (see {@link #wholeBandsOnly}), so a half band is refused */
+    public ValidatedGrade validate(String raw, SpeakingGradingInput input, Set<String> allowedKpCodes, boolean wholeBands) {
         JsonNode root = parse(raw);
         String transcript = SpeakingGradingInput.normalize(input.transcript());
         Set<Integer> parts = input.parts();
-        return new ValidatedGrade(criteria(root, transcript), partNotes(root.path("partNotes"), parts), flags(root.path("flags")),
-                reliability(root.path("transcriptReliability")), clean(root.path("summary").asText(""), 800),
+        return new ValidatedGrade(criteria(root, transcript, wholeBands), partNotes(root.path("partNotes"), parts), flags(root.path("flags")),
+                reliability(root.path("transcriptReliability")), cleanText(root.path("summary").asText(""), 800),
                 texts(root.path("focus"), 4, 200), errors(root.path("errors"), input, transcript, parts),
                 observations(root.path("kpObservations"), allowedKpCodes, transcript, parts),
                 personalFeedback(root.path("personalFeedback"), allowedKpCodes, transcript),
@@ -97,12 +120,12 @@ public class SpeakingResultValidator {
         } catch (Exception ignored) {
             // falls through to the same refusal as any other unusable answer
         }
-        throw new InvalidSpeakingGradeException();
+        throw new InvalidSpeakingGradeException("NOT_JSON");
     }
 
-    private static List<Criterion> criteria(JsonNode root, String transcript) {
+    private static List<Criterion> criteria(JsonNode root, String transcript, boolean wholeBands) {
         JsonNode array = root.path("criteria");
-        if (!array.isArray()) throw new InvalidSpeakingGradeException();
+        if (!array.isArray()) throw new InvalidSpeakingGradeException("NO_CRITERIA");
         Map<String, JsonNode> byCode = new LinkedHashMap<>();
         for (JsonNode item : array) {
             String code = item.path("code").asText("");
@@ -111,8 +134,8 @@ public class SpeakingResultValidator {
         List<Criterion> criteria = new ArrayList<>();
         for (String code : SpeakingPromptAssembler.GRADED_CRITERIA) {
             JsonNode item = byCode.get(code);
-            if (item == null) throw new InvalidSpeakingGradeException();
-            criteria.add(new Criterion(code, band(item.path("band")), clean(item.path("comment").asText(""), 1000),
+            if (item == null) throw new InvalidSpeakingGradeException("CRITERION_MISSING");
+            criteria.add(new Criterion(code, band(item.path("band"), wholeBands), cleanText(item.path("comment").asText(""), 1200),
                     texts(item.path("strengths"), MAX_POINTS, MAX_STRENGTH_CHARS),
                     texts(item.path("weaknesses"), MAX_POINTS, MAX_WEAKNESS_CHARS),
                     evidence(item.path("evidence"), transcript)));
@@ -122,12 +145,38 @@ public class SpeakingResultValidator {
 
     /** A JSON number from 0 to 9 in steps of 0.5; anything else, including a missing field, is not a band. */
     static BigDecimal band(JsonNode node) {
-        if (!node.isNumber()) throw new InvalidSpeakingGradeException();
+        return band(node, false);
+    }
+
+    /**
+     * Like {@link #band(JsonNode)}; with {@code wholeBands} a band must also be a whole number (5, 6, 7), as the descriptors of
+     * a whole-band rubric are. A half band there has no descriptor to be judged against, so it is refused and asked for again.
+     */
+    static BigDecimal band(JsonNode node, boolean wholeBands) {
+        if (!node.isNumber()) throw new InvalidSpeakingGradeException(node.isMissingNode() ? "BAND_MISSING" : "BAND_NOT_A_NUMBER");
         BigDecimal band = node.decimalValue();
-        if (band.compareTo(BigDecimal.ZERO) < 0 || band.compareTo(NINE) > 0 || band.remainder(HALF).signum() != 0) {
-            throw new InvalidSpeakingGradeException();
-        }
+        if (band.compareTo(BigDecimal.ZERO) < 0 || band.compareTo(NINE) > 0) throw new InvalidSpeakingGradeException("BAND_OUT_OF_RANGE");
+        if (band.remainder(HALF).signum() != 0) throw new InvalidSpeakingGradeException("BAND_NOT_HALF_STEP");
+        if (wholeBands && band.remainder(BigDecimal.ONE).signum() != 0) throw new InvalidSpeakingGradeException("BAND_NOT_WHOLE");
         return band.stripTrailingZeros().scale() < 1 ? band.setScale(1) : band;
+    }
+
+    /**
+     * Whether the rubric describes whole bands only. The rubric is what the model grades against, so it also says what a band
+     * can be: the half bands of the first Speaking rubric stay valid while it is active, and stop being valid with the rubric
+     * that has no descriptor for them. Nothing here depends on which version of the code is deployed.
+     */
+    static boolean wholeBandsOnly(LearningContentClient.Rubric rubric) {
+        if (rubric == null || rubric.criteria() == null) return false;
+        boolean any = false;
+        for (LearningContentClient.RubricCriterion criterion : rubric.criteria()) {
+            if (criterion.bandDescriptors() == null) continue;
+            for (LearningContentClient.RubricBandDescriptor descriptor : criterion.bandDescriptors()) {
+                any = true;
+                if (descriptor.band().remainder(BigDecimal.ONE).signum() != 0) return false;
+            }
+        }
+        return any;
     }
 
     private static List<Evidence> evidence(JsonNode node, String transcript) {
@@ -198,7 +247,7 @@ public class SpeakingResultValidator {
     /** The advice written for this learner. A wrong shape drops this part alone; the code then writes a stock note. */
     private static PersonalFeedback personalFeedback(JsonNode node, Set<String> allowedKps, String transcript) {
         if (!node.isObject()) return null;
-        String note = clean(node.path("note").asText(""), 600);
+        String note = cleanText(node.path("note").asText(""), 600);
         List<PriorityKp> priority = new ArrayList<>();
         if (node.path("priorityKps").isArray()) {
             for (JsonNode item : node.path("priorityKps")) {
@@ -262,10 +311,45 @@ public class SpeakingResultValidator {
         return kept;
     }
 
+    /**
+     * Like {@link #clean} for feedback that is shown in paragraphs and lists (a criterion's comment, the summary, the note to the
+     * learner): the line breaks the model wrote stay, with at most one blank line between paragraphs, so a long comment is not
+     * flattened into one block. Spaces inside a line are still collapsed, and markup and links are still removed.
+     */
+    static String cleanText(String value, int limit) {
+        if (value == null) return "";
+        String safe = withoutCodes(value).replaceAll("<[^>]*>", "").replaceAll("https?://\\S+", "")
+                .replace("\r\n", "\n").replace('\r', '\n')
+                .replaceAll("[ \\t\\u00A0]+", " ")
+                .replaceAll(" ?\\n ?", "\n")
+                .replaceAll("\\n{3,}", "\n\n").strip();
+        if (safe.length() <= limit) return safe;
+        String cut = safe.substring(0, limit);
+        int end = 0;
+        for (String mark : new String[] {". ", "! ", "? ", ".\n", "!\n", "?\n"}) end = Math.max(end, cut.lastIndexOf(mark));
+        return end >= limit * 6 / 10 ? cut.substring(0, end + 1).strip() : cut.strip();
+    }
+
+    /** An error code written inside a sentence, with the bracket, dash or colon that set it off: "SPK_PLURAL_ENDING — thiếu ...". */
+    private static final Pattern ERROR_CODE = Pattern.compile("[(\\[]?\\bSPK_[A-Z0-9_]+\\b[)\\]]?(?:\\s*[:\\u2014\\u2013-]+)?\\s*");
+
+    /**
+     * The text without error codes. The codes belong to the errors list and mean nothing to the learner; a model that was given
+     * the list of allowed codes sometimes starts a weakness with one. A line that started with a code begins with a capital
+     * letter again once the code is gone.
+     */
+    static String withoutCodes(String value) {
+        if (value == null || !value.contains("SPK_")) return value;
+        String out = ERROR_CODE.matcher(value).replaceAll("").strip();
+        return LINE_START.matcher(out).replaceAll((start) -> start.group().toUpperCase(Locale.ROOT));
+    }
+
+    private static final Pattern LINE_START = Pattern.compile("(?m)^\\p{Ll}");
+
     /** Text for display: no markup, no links, cut to the limit at the end of a sentence where there is one. */
     static String clean(String value, int limit) {
         if (value == null) return "";
-        String safe = value.replaceAll("<[^>]*>", "").replaceAll("https?://\\S+", "").replaceAll("\\s+", " ").strip();
+        String safe = withoutCodes(value).replaceAll("<[^>]*>", "").replaceAll("https?://\\S+", "").replaceAll("\\s+", " ").strip();
         if (safe.length() <= limit) return safe;
         String cut = safe.substring(0, limit);
         int end = Math.max(cut.lastIndexOf(". "), Math.max(cut.lastIndexOf("! "), cut.lastIndexOf("? ")));

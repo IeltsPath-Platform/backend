@@ -64,8 +64,8 @@ public class CommunityQueriesUseCase {
  }
  public PageResult<CommentResult> thread(CommunityActor actor,UUID post,UUID parent,PageQuery query) {
  if(parent!=null) {
- var comment=comments.findById(parent).orElseThrow(()->new CommunityNotFoundException("Comment not found"));
- if(comment.getStatus()!=ContentStatus.ACTIVE)throw new CommunityNotFoundException("Comment not found");
+ var comment=comments.findById(parent).orElseThrow(()->new CommunityNotFoundException("Không tìm thấy bình luận"));
+ if(comment.getStatus()!=ContentStatus.ACTIVE)throw new CommunityNotFoundException("Không tìm thấy bình luận");
  post=comment.getPostId();
  parent=comment.getParentCommentId()==null?comment.getId():comment.getParentCommentId();
  }
@@ -85,6 +85,6 @@ public class CommunityQueriesUseCase {
  }
  public Relationship relationship(CommunityActor actor,UUID user) {return reads.relationship(actor.userId(),user);}
  public void requireVisibleUser(CommunityActor actor,UUID user) {
- if(!profiles.findProfiles(Set.of(user)).containsKey(user))throw new CommunityNotFoundException("User not found");
+ if(!profiles.findProfiles(Set.of(user)).containsKey(user))throw new CommunityNotFoundException("Không tìm thấy người dùng");
  }
 }

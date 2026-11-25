@@ -15,7 +15,7 @@ public class GetProgressMetadataUseCase {
     @Transactional(readOnly = true)
     public ProgressMetadataResult execute(List<UUID> courseIds) {
         if (courseIds == null || courseIds.isEmpty() || courseIds.size() > 100 || courseIds.stream().anyMatch(java.util.Objects::isNull))
-            throw new IllegalArgumentException("Between 1 and 100 course ids are required");
+            throw new IllegalArgumentException("Cần từ 1 đến 100 khóa học");
         return reader.progressMetadata(courseIds.stream().distinct().toList());
     }
 }

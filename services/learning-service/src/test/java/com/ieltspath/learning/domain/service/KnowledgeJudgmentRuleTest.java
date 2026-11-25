@@ -9,6 +9,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 class KnowledgeJudgmentRuleTest {
     private static final UUID POINT = UUID.randomUUID();
@@ -166,5 +167,69 @@ class KnowledgeJudgmentRuleTest {
                 List.of(new WritingGrade.KnowledgeJudgment(POINT, "LINKING", "Linking",
                         WritingGrade.Judgment.NOT_ASSESSED, null, null)));
         assertEquals(List.of(), rule.studyPoints(List.of(criterion), List.of(), ignored -> POINT));
+    }
+
+    private final KnowledgeJudgmentRule.Candidate taskCandidate =
+            new KnowledgeJudgmentRule.Candidate(null, POINT, "LINKING", "Linking", "Use linkers");
+
+    @Test
+    void aQuestionPointMatchesByCodeWhateverCriterionTheEntryNames() {
+        var raws = List.of(new KnowledgeJudgmentRule.Raw("TR", "LINKING", "PASS", "linking words", "Reason"));
+
+        assertEquals(WritingGrade.Judgment.PASS,
+                rule.judgeByCode(List.of(taskCandidate), raws, ESSAY, List.of()).getFirst().judgment());
+        assertEquals(WritingGrade.Judgment.NOT_ASSESSED,
+                rule.judge(List.of(candidate), raws, ESSAY, List.of()).getFirst().judgment(),
+                "a criterion's point still needs the criterion it was asked under");
+    }
+
+    @Test
+    void aQuestionPointWithNoEntryIsNotAssessed() {
+        assertEquals(WritingGrade.Judgment.NOT_ASSESSED,
+                rule.judgeByCode(List.of(taskCandidate), List.of(), ESSAY, List.of()).getFirst().judgment());
+    }
+
+    @Test
+    void aValidatedCorrectionLowersAQuestionPointPassAndRaisesNotAssessed() {
+        var correction = new KnowledgeJudgmentRule.CorrectionEvidence(POINT, "linking words", "Hint");
+
+        var lowered = rule.judgeByCode(List.of(taskCandidate), List.of(new KnowledgeJudgmentRule.Raw(null, "LINKING",
+                "PASS", "linking words", "Reason")), ESSAY, List.of(correction)).getFirst();
+        var raised = rule.judgeByCode(List.of(taskCandidate), List.of(), ESSAY, List.of(correction)).getFirst();
+
+        assertEquals(WritingGrade.Judgment.NOT_ASSESSED, lowered.judgment());
+        assertNull(lowered.excerpt());
+        assertEquals(WritingGrade.Judgment.FAIL, raised.judgment());
+        assertEquals("Hint", raised.reason());
+    }
+
+    @Test
+    void failedQuestionPointsBecomeStudyPointsAfterTheCriterionPointsAndBeforeTheFocus() {
+        var criterionPoint = new WritingGrade.StudyPoint(WritingGrade.StudyPoint.CRITERION, "CC", new BigDecimal("5.0"),
+                OTHER_POINT, "CRIT", "Criterion", "Criterion", null);
+        var focus = new WritingGrade.StudyPoint(WritingGrade.StudyPoint.AI, null, null, null, null, null, "Focus", null);
+        var failed = new WritingGrade.KnowledgeJudgment(POINT, "LINKING", "Linking", WritingGrade.Judgment.FAIL,
+                "linking words", "Reason");
+        var passed = new WritingGrade.KnowledgeJudgment(OTHER_POINT, "OTHER", "Other", WritingGrade.Judgment.PASS,
+                "x", "Reason");
+
+        var ordered = rule.withTaskStudyPoints(List.of(criterionPoint, focus), List.of(failed, passed), ignored -> null);
+
+        assertEquals(List.of("CRITERION", "KNOWLEDGE_POINT", "AI"),
+                ordered.stream().map(WritingGrade.StudyPoint::kind).toList());
+        var point = ordered.get(1);
+        assertNull(point.criterionCode());
+        assertNull(point.band());
+        assertEquals("linking words", point.excerpt());
+        assertNull(point.practiceKnowledgePointId());
+    }
+
+    @Test
+    void withNoFailedQuestionPointTheStudyPointsStayAsTheyWere() {
+        var existing = List.<WritingGrade.StudyPoint>of();
+        var passed = new WritingGrade.KnowledgeJudgment(POINT, "LINKING", "Linking", WritingGrade.Judgment.PASS,
+                "x", "Reason");
+
+        assertSame(existing, rule.withTaskStudyPoints(existing, List.of(passed), ignored -> null));
     }
 }

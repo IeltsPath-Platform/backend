@@ -69,8 +69,13 @@ public interface LearningContentClient {
     record PracticeTestMilestone(UUID packageId, UUID packageVersionId, String code, String title,
                                  int afterTopicSequence) {}
 
-    /** Published placement tests, ordered by package id. */
-    List<TestPackage> getPlacementTestPackages();
+    /** Published placement tests of every pool, each with its pool. A missing pool is not inferred by consumers. */
+    default List<PlacementPackage> getPlacementPackages() {
+        return List.of();
+    }
+
+    record PlacementPackage(UUID packageId, UUID packageVersionId, String code,
+                            com.ieltspath.learning.domain.vo.PlacementPool pool) {}
 
     List<LessonPracticeSet> lessonPracticeSets(UUID lessonId);
 
@@ -148,8 +153,13 @@ public interface LearningContentClient {
     record SuggestionCandidates(List<PackageCandidate> packages, List<LessonCandidate> lessons) {}
     record PackageCandidate(UUID packageId, UUID packageVersionId, String type, String title,
                             List<UUID> knowledgePointIds, BigDecimal band, String skill) {}
+    /**
+     * {@code courseId}, {@code skillPosition} and {@code skills} are null from an older Content; a null course is open to
+     * everyone. {@code skills} is the reading gate's set, which the paywall checks; {@code skill} is for display.
+     */
     record LessonCandidate(UUID lessonId, UUID topicId, String title, List<UUID> knowledgePointIds, BigDecimal band,
-                           String skill, int sortOrder) {}
+                           String skill, int sortOrder, UUID courseId, Integer skillPosition,
+                           Set<LearningSkill> skills) {}
 
     /** Active grading rubric for a writing task. */
     Rubric getActiveRubric(String task);
@@ -193,9 +203,41 @@ public interface LearningContentClient {
     record SubKnowledgePoint(UUID id, String code, String name, String description) {}
     record RubricBandDescriptor(java.math.BigDecimal band, String descriptor) {}
     record RubricExample(java.math.BigDecimal band, String prompt, String essay, String commentary) {}
-    record ErrorType(String code, String name, String category, int severity, String fixHint, UUID knowledgePointId) {
+    /**
+     * {@code modelDefinition} is the English definition shown to the grader model, null when Content has none.
+     * {@code writingTasks} lists TASK_1 or TASK_2; an empty list (also what an older Content sends) means both tasks.
+     */
+    record ErrorType(String code, String name, String category, int severity, String fixHint, UUID knowledgePointId,
+                     String modelDefinition, List<String> writingTasks, Boolean modelSelectable) {
+        public ErrorType {
+            writingTasks = writingTasks == null ? List.of() : List.copyOf(writingTasks);
+        }
+
+        /** An older Content that does not send the flag leaves it null, which reads as selectable. */
+        public ErrorType(String code, String name, String category, int severity, String fixHint, UUID knowledgePointId,
+                         String modelDefinition, List<String> writingTasks) {
+            this(code, name, category, severity, fixHint, knowledgePointId, modelDefinition, writingTasks, null);
+        }
+
+        /**
+         * False for a code that describes the whole essay (no overview, no position, a part of the question missed): the
+         * model is not offered it, because it has no passage to quote and the essay-level checks report it.
+         */
+        public boolean selectableByModel() {
+            return !Boolean.FALSE.equals(modelSelectable);
+        }
+
+        public ErrorType(String code, String name, String category, int severity, String fixHint, UUID knowledgePointId) {
+            this(code, name, category, severity, fixHint, knowledgePointId, null, List.of());
+        }
+
         public ErrorType(String code, String name, String category, int severity, String fixHint) {
             this(code, name, category, severity, fixHint, null);
+        }
+
+        /** Whether a Writing grader for the given task (TASK_1 or TASK_2) may use this code. */
+        public boolean appliesToWritingTask(String task) {
+            return writingTasks.isEmpty() || writingTasks.contains(task);
         }
     }
 
@@ -448,7 +490,11 @@ public interface LearningContentClient {
     }
 
     record PackageVersion(UUID packageVersionId, UUID packageId, String packageType, UUID topicId,
-                          Map<String, Object> rules, List<Section> sections) {
+                          Map<String, Object> rules, List<Section> sections, String requiredFeatureKey) {
+        public PackageVersion(UUID packageVersionId, UUID packageId, String packageType, UUID topicId,
+                              Map<String, Object> rules, List<Section> sections) {
+            this(packageVersionId, packageId, packageType, topicId, rules, sections, null);
+        }
     }
 
     record Section(UUID sectionId, String title, String skill, String instructions, int sortOrder,

@@ -14,6 +14,8 @@ spring:
     locations: classpath:db/migration,classpath:db/callback
     placeholders:
       demoData: ${DEMO_DATA_ENABLED:false}
+      # The learner the demo data belongs to: h2 by default; set DEMO_LEARNER_ID to give it to an existing account.
+      demoUserId: ${DEMO_LEARNER_ID:00000000-0000-0000-0000-000000000003}
   # Learning sends the points it owes (streak, quests, badges, mastered points) over RabbitMQ; Access answers on the same broker.
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
@@ -34,6 +36,13 @@ access:
       max-attempts: 20
       poll-interval: PT2S
       confirm-timeout: PT5S
+  # The user service lists the sales accounts that keys are handed to (GET /internal/users/sales-staff).
+  user:
+    base-url: ${USER_SERVICE_URL:http://localhost:8085}
+  # Base64 of 32 random bytes. Keeps the full code of each batch key encrypted so a sale can look at it again and a manager
+  # can export a batch. No default: without it no batch can be made, but keys still activate (activation compares a hash).
+  key-code:
+    secret: ${ACCESS_KEY_CODE_SECRET:}
 
 app:
   auth:

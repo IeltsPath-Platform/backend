@@ -16,7 +16,7 @@ public class DeleteCommentUseCase {
     @Transactional
     public void execute(CommunityActor actor, DeleteCommentCommand command) {
         var comment = comments.findById(command.commentId())
-                .orElseThrow(() -> new CommunityNotFoundException("Comment not found"));
+                .orElseThrow(() -> new CommunityNotFoundException("Không tìm thấy bình luận"));
         comment.delete(actor.userId(), actor.administrator());
         comments.save(comment);
     }

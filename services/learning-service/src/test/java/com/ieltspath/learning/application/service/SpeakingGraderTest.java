@@ -7,6 +7,7 @@ import com.ieltspath.learning.application.port.LlmClient;
 import com.ieltspath.learning.application.service.SpeakingResultValidator.InvalidSpeakingGradeException;
 import com.ieltspath.learning.domain.vo.SpeakingScope;
 import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -91,6 +92,27 @@ class SpeakingGraderTest {
     }
 
     @Test
+    void aHalfBandIsAskedForAgainWithAWholeBandReminderUnderAWholeBandRubric() {
+        // The usual answers hold half bands too, so every criterion is answered with a whole band except LR's first answer.
+        Scripted llm = good().answer("FC", criterion("FC", "6.0", "")).answer("GRA", criterion("GRA", "6.0", ""))
+                .answerFirst("LR", criterion("LR", "6.5", "")).answer("LR", criterion("LR", "6.0", ""));
+
+        grader(llm).grade(preparedWholeBands(llm), input);
+
+        assertThat(llm.calls).filteredOn("LR"::equals).hasSize(2);
+        assertThat(llm.systems.get("LR").get(1)).contains("must be a whole number such as 5, 6 or 7");
+    }
+
+    @Test
+    void aHalfBandIsAcceptedAsItIsWhileTheRubricStillDescribesHalfBands() {
+        Scripted llm = good().answerFirst("LR", criterion("LR", "6.5", ""));
+        var assembled = grader(llm).grade(prepared(llm), input);
+
+        assertThat(llm.calls).filteredOn("LR"::equals).hasSize(1);
+        assertThat(assembled.result()).containsKeys("display", "signals");
+    }
+
+    @Test
     void aCriterionCallThatAnswersForAnotherCriterionIsUnusable() {
         Scripted llm = good().answerFirst("LR", criterion("FC", "6.0", ""));
 
@@ -130,6 +152,25 @@ class SpeakingGraderTest {
     }
 
     @Test
+    void everyCallCarriesTheSubmissionAndItsTaskInTheLoggingContextAndLeavesNothingBehind() {
+        Scripted llm = good();
+        MDC.put("submissionId", "sub-42");
+        try {
+            grader(llm).grade(prepared(llm), input);
+            // The last call runs on the calling thread: it must not leave its task behind.
+            assertThat(MDC.get("llmTask")).isNull();
+            assertThat(MDC.get("submissionId")).isEqualTo("sub-42");
+        } finally {
+            MDC.clear();
+        }
+
+        for (String task : List.of("FC", "LR", "GRA", "OVERVIEW", "SYNTHESIS")) {
+            assertThat(llm.loggedTask).containsEntry(task, task);
+            assertThat(llm.loggedSubmission).containsEntry(task, "sub-42");
+        }
+    }
+
+    @Test
     void theErrorsOfTheCriteriaAreTakenInTurnAndTheSameFindingIsKeptOnce() throws Exception {
         JsonNode fc = JSON.readTree("[" + ERROR + ",{\"code\":\"SPK_A\",\"excerpt\":\"fc2\"},{\"code\":\"SPK_A\",\"excerpt\":\"fc3\"}]");
         JsonNode lr = JSON.readTree("[{\"code\":\"SPK_B\",\"excerpt\":\"lr1\"}]");
@@ -146,7 +187,12 @@ class SpeakingGraderTest {
                 new SpeakingResultAssembler(SpeakingSettingsFixture.enabled()), JSON);
     }
 
+    /** The usual answers hold half bands, so they are graded against a rubric that describes them. */
     private SpeakingPromptAssembler.Prepared prepared(LlmClient llm) {
+        return grader(llm).prepare(SpeakingTestData.rubricWithHalfBands(), input);
+    }
+
+    private SpeakingPromptAssembler.Prepared preparedWholeBands(LlmClient llm) {
         return grader(llm).prepare(SpeakingTestData.rubric(), input);
     }
 
@@ -158,6 +204,9 @@ class SpeakingGraderTest {
         final Map<String, List<String>> systems = new java.util.concurrent.ConcurrentHashMap<>();
         final Map<String, String> users = new java.util.concurrent.ConcurrentHashMap<>();
         final List<Budget> budgets = Collections.synchronizedList(new ArrayList<>());
+        /** What the logging context held at the moment of each call: the task and the submission it names. */
+        final Map<String, String> loggedTask = new java.util.concurrent.ConcurrentHashMap<>();
+        final Map<String, String> loggedSubmission = new java.util.concurrent.ConcurrentHashMap<>();
         private CountDownLatch together;
         volatile boolean firstRoundWasConcurrent;
 
@@ -180,6 +229,8 @@ class SpeakingGraderTest {
         public String completeJson(String system, String user, Budget budget) {
             String task = task(system);
             budgets.add(budget);
+            loggedTask.put(task, String.valueOf(MDC.get("llmTask")));
+            loggedSubmission.put(task, String.valueOf(MDC.get("submissionId")));
             systems.computeIfAbsent(task, key -> Collections.synchronizedList(new ArrayList<>())).add(system);
             users.put(task, user);
             if (together != null && !task.equals("SYNTHESIS") && together.getCount() > 0) {

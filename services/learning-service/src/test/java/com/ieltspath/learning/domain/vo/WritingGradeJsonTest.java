@@ -9,6 +9,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Stored grades are JSON; ones written before criteria carried a knowledge point must still read. */
 class WritingGradeJsonTest {
@@ -77,9 +78,60 @@ class WritingGradeJsonTest {
     }
 
     @Test
+    void aCorrectionKeepsItsSuggestedTextThroughStorage() throws Exception {
+        var correction = new WritingGrade.Correction("It have", "It has", "GRAMMAR", "SUBJECT_VERB_AGREEMENT",
+                "Sai hòa hợp chủ ngữ và động từ", "hint", 2, null, null, "It is singular.",
+                WritingGrade.Correction.ERROR);
+
+        var stored = json.writeValueAsString(correction);
+
+        assertTrue(json.readTree(stored).path("suggestion").isTextual(), stored);
+        assertEquals(correction, json.readValue(stored, WritingGrade.Correction.class));
+    }
+
+    @Test
+    void aSuggestionKeepsItsTextAndItsCertaintyThroughStorage() throws Exception {
+        var correction = new WritingGrade.Correction("big", "considerable", "VOCABULARY", "WORD_CHOICE", "Word choice",
+                "hint", 1, null, null, "More precise.", WritingGrade.Correction.SUGGESTION);
+
+        var restored = json.readValue(json.writeValueAsString(correction), WritingGrade.Correction.class);
+
+        assertEquals("considerable", restored.suggestion());
+        assertTrue(restored.suggestionOnly());
+    }
+
+    @Test
     void aGradeStoredWithoutJudgmentVersionReadsAsNull() throws Exception {
         var grade = json.readValue("{\"criteria\":[],\"corrections\":[],\"summary\":\"x\",\"overallBand\":6.0}",
                 WritingGrade.class);
         assertNull(grade.judgmentVersion());
+    }
+
+    @Test
+    void theJudgmentsOfTheQuestionPointsSurviveStorage() throws Exception {
+        var judgment = new WritingGrade.KnowledgeJudgment(UUID.randomUUID(), "TOPIC", "Topic sentence",
+                WritingGrade.Judgment.FAIL, "a quote", "reason");
+        var grade = new WritingGrade(List.of(), List.of(), "Summary", new BigDecimal("6.0"), List.of(), "kpj3", null,
+                List.of(), List.of(), List.of(), null, null, List.of(judgment));
+
+        var restored = json.readValue(json.writeValueAsString(grade), WritingGrade.class);
+
+        assertEquals(List.of(judgment), restored.taskKnowledgePointJudgments());
+        assertEquals("kpj3", restored.judgmentVersion());
+    }
+
+    @Test
+    void aGradeOfTheOlderKindKeepsItsCriterionJudgmentsAndHasNoQuestionPointJudgments() throws Exception {
+        var point = UUID.randomUUID();
+        var stored = "{\"criteria\":[{\"code\":\"CC\",\"band\":6.0,\"strengths\":[],\"improvements\":[],"
+                + "\"knowledgePointJudgments\":[{\"knowledgePointId\":\"" + point + "\",\"code\":\"LINKING\","
+                + "\"name\":\"Linking\",\"judgment\":\"FAIL\",\"excerpt\":\"however\",\"reason\":\"r\"}]}],"
+                + "\"corrections\":[],\"summary\":\"x\",\"overallBand\":6.0,\"judgmentVersion\":\"kpj2\"}";
+
+        var grade = json.readValue(stored, WritingGrade.class);
+
+        assertEquals("kpj2", grade.judgmentVersion());
+        assertEquals(point, grade.criteria().getFirst().knowledgePointJudgments().getFirst().knowledgePointId());
+        assertEquals(List.of(), grade.taskKnowledgePointJudgments());
     }
 }

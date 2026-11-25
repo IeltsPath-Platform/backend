@@ -1,5 +1,6 @@
 package com.ieltspath.content.api.dto.internal;
 
+import com.ieltspath.content.domain.vo.PlacementPool;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonRawValue;
 import com.ieltspath.content.application.result.PackageVersionContentResult;
@@ -14,10 +15,18 @@ public record PackageVersionContentResponse(
         UUID packageVersionId,
         UUID packageId,
         PackageType packageType,
+        String requiredFeatureKey,
         UUID topicId,
         @JsonRawValue String rules,
-        List<Section> sections
+        List<Section> sections,
+        PlacementPool placementPool
 ) {
+    public PackageVersionContentResponse(UUID packageVersionId, UUID packageId, PackageType packageType,
+                                         UUID topicId, String rules, List<Section> sections,
+                                         PlacementPool placementPool) {
+        this(packageVersionId, packageId, packageType, null, topicId, rules, sections, placementPool);
+    }
+
     /** {@code audio} appears only on sections with an AUDIO asset; its transcript is internal-only. */
     public record Section(UUID sectionId, String title, Skill skill, String instructions, int sortOrder,
                           Integer partNo, Integer timeLimitSeconds, String passage,
@@ -47,7 +56,7 @@ public record PackageVersionContentResponse(
 
     public static PackageVersionContentResponse from(PackageVersionContentResult result) {
         return new PackageVersionContentResponse(result.packageVersionId(), result.packageId(), result.packageType(),
-                result.topicId(), result.rulesJson(),
+                result.requiredFeatureKey(), result.topicId(), result.rulesJson(),
                 result.sections().stream()
                         .map(s -> new Section(s.sectionId(), s.title(), s.skill(), s.instructions(), s.sortOrder(),
                                 s.partNo(), s.timeLimitSeconds(),
@@ -62,6 +71,6 @@ public record PackageVersionContentResponse(
                                                 .toList(), i.guide(), i.images().stream()
                                                 .map(image -> new Image(image.mediaUrl(), image.altText())).toList()))
                                 .toList()))
-                        .toList());
+                        .toList(), result.placementPool());
     }
 }

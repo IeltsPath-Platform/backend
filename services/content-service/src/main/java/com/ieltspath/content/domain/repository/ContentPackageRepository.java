@@ -36,4 +36,7 @@ public interface ContentPackageRepository {
 
     List<ContentPackage> findAll(Boolean featureRequired, PublicationStatus status);
     boolean existsByCode(String code);
+
+    /** Published placement tests in a band pool, not counting the given package. */
+    long countPublishedPlacementInPool(com.ieltspath.content.domain.vo.PlacementPool pool, UUID excludedPackageId);
 }

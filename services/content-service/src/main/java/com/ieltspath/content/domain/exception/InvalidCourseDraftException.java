@@ -8,7 +8,7 @@ public class InvalidCourseDraftException extends ContentDomainException {
     private final List<Problem> issues;
 
     public InvalidCourseDraftException(List<Problem> issues) {
-        super("The course draft is not valid");
+        super("Bản nháp khóa học không hợp lệ");
         this.issues = List.copyOf(issues);
     }
 

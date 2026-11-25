@@ -93,6 +93,16 @@ class BandEstimatorTest {
     }
 
     @Test
+    void placementFallbackDoesNotClaimSpeakingWasIncludedWithoutAGradedSpeakingBand() {
+        List<Point> speaking = points("SPEAKING", B60, INSUFFICIENT, INSUFFICIENT);
+
+        Estimate estimate = estimate(speaking, B55);
+
+        assertThat(estimate.skillBands()).doesNotContainKey("SPEAKING");
+        assertThat(estimate.speakingIncluded()).isFalse();
+    }
+
+    @Test
     void aSkillBandIsTheHighestBandWhereEightyPercentOfPointsMaintain() {
         List<Point> reading = join(
                 points("READING", B60, MAINTAIN, MAINTAIN, MAINTAIN, MAINTAIN, CONSOLIDATE),
@@ -184,6 +194,13 @@ class BandEstimatorTest {
         assertThat(estimate.hints().get(0).skill()).isEqualTo("READING");
         assertThat(estimate.hints().get(0).nextBand()).isEqualByComparingTo(B65);
         assertThat(estimate.hints().get(0).pointIds()).hasSize(5);
+    }
+
+    @Test
+    void anAverageBetweenQuartersRoundsToTheNearestHalf() {
+        List<Point> all = join(points("LISTENING", B65, MAINTAIN), points("READING", B65, MAINTAIN),
+                points("WRITING", new BigDecimal("7.0"), MAINTAIN));
+        assertThat(estimate(all, null).overall()).as("6.667 rounds to 6.5").isEqualByComparingTo(B65);
     }
 
     @Test

@@ -160,4 +160,10 @@ class ResolveVocabularyUseCaseTest {
         item.addSense(sense);
         return sense.getId();
     }
+
+    @Test
+    void anEmptyRequestResolvesNothing() {
+        assertThat(useCase.execute(new ResolveVocabularyCommand(List.of()))).isEmpty();
+        verify(vocabulary, never()).save(any(VocabularyItem.class));
+    }
 }

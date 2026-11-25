@@ -1,0 +1,48 @@
+package com.ieltspath.content.application.usecase;
+
+import com.ieltspath.content.application.command.CreateCourseCommand;
+import com.ieltspath.content.domain.aggregate.Course;
+import com.ieltspath.content.domain.exception.DuplicateCourseException;
+import com.ieltspath.content.domain.repository.CourseRepository;
+import com.ieltspath.content.domain.vo.ContentStatus;
+import org.junit.jupiter.api.Test;
+
+import java.math.BigDecimal;
+import java.util.Map;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+class CreateCourseUseCaseTest {
+    private final CourseRepository courses = mock(CourseRepository.class);
+    private final CreateCourseUseCase useCase = new CreateCourseUseCase(courses);
+
+    @Test
+    void aCodeOrABandLevelAlreadyUsedIsRefused() {
+        Course existing = Course.create("IELTS_5_5", "IELTS 5.5", new BigDecimal("5.5"));
+        when(courses.existsByCode("IELTS_5_5")).thenReturn(true);
+        when(courses.findByBandLevel(new BigDecimal("5.5"))).thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> useCase.execute(new CreateCourseCommand("IELTS_5_5", "Again", new BigDecimal("6.0"))))
+                .isInstanceOf(DuplicateCourseException.class).hasMessageContaining("Mã khóa học");
+        assertThatThrownBy(() -> useCase.execute(new CreateCourseCommand("NEW", "New", new BigDecimal("5.5"))))
+                .isInstanceOf(DuplicateCourseException.class).hasMessageContaining("Band 5.5");
+        verify(courses, never()).save(any());
+    }
+
+    @Test
+    void aCourseIsCreatedActiveUnlessTheCommandSaysInactive() {
+        when(courses.save(any())).thenAnswer(call -> call.getArgument(0));
+
+        assertThat(useCase.execute(new CreateCourseCommand("A", "A", new BigDecimal("5.0"))).status())
+                .isEqualTo(ContentStatus.ACTIVE);
+        assertThat(useCase.execute(new CreateCourseCommand("B", "B", new BigDecimal("5.5"), null, null, Map.of(), null,
+                false, null, ContentStatus.INACTIVE)).status()).isEqualTo(ContentStatus.INACTIVE);
+    }
+}

@@ -3,11 +3,13 @@ package com.ieltspath.content.api.controller;
 import com.ieltspath.content.api.exception.GlobalExceptionHandler;
 import com.ieltspath.content.application.usecase.AddSectionQuestionUseCase;
 import com.ieltspath.content.application.usecase.RemoveAndReorderSectionQuestionsUseCase;
+import com.ieltspath.content.application.usecase.CodeSettingsUseCases;
 import com.ieltspath.content.application.usecase.CreateContentPackageUseCase;
 import com.ieltspath.content.application.usecase.CreateContentSectionUseCase;
 import com.ieltspath.content.application.usecase.ListAuthorPackagesUseCase;
 import com.ieltspath.content.domain.exception.InvalidPackageCourseException;
 import com.ieltspath.content.domain.exception.InvalidPackageTopicException;
+import com.ieltspath.content.domain.exception.InvalidContentStateException;
 import com.ieltspath.content.application.usecase.CreateDraftPackageVersionUseCase;
 import com.ieltspath.content.application.usecase.DeleteContentSectionUseCase;
 import com.ieltspath.content.application.usecase.GetAuthorPackageUseCase;
@@ -37,8 +39,13 @@ class ContentPackageAuthoringErrorTest {
     private final CreateDraftPackageVersionUseCase createDraft = mock(CreateDraftPackageVersionUseCase.class);
     private final UpdateContentSectionUseCase updateSection = mock(UpdateContentSectionUseCase.class);
     private final ReorderContentSectionsUseCase reorderSections = mock(ReorderContentSectionsUseCase.class);
-    private final CreateContentPackageUseCase createPackage = mock(CreateContentPackageUseCase.class);
+    private final CodeSettingsUseCases codeSettings = mock(CodeSettingsUseCases.class);
 
+    private final ListAuthorPackagesUseCase listPackages = mock(ListAuthorPackagesUseCase.class);
+    private final com.ieltspath.content.application.usecase.UpdatePackageInfoUseCase updatePackageInfo =
+            mock(com.ieltspath.content.application.usecase.UpdatePackageInfoUseCase.class);
+    private final com.ieltspath.content.application.usecase.ChangePackageVisibilityUseCase packageVisibility =
+            mock(com.ieltspath.content.application.usecase.ChangePackageVisibilityUseCase.class);
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -47,13 +54,85 @@ class ContentPackageAuthoringErrorTest {
                         mock(GetAuthorPackageUseCase.class), createDraft, mock(CreateContentSectionUseCase.class),
                         updateSection, mock(DeleteContentSectionUseCase.class), reorderSections,
                         mock(AddSectionQuestionUseCase.class), mock(RemoveAndReorderSectionQuestionsUseCase.class),
-                        mock(ListAuthorPackagesUseCase.class), createPackage))
+                        listPackages, codeSettings, updatePackageInfo, packageVisibility))
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
     }
 
     @Test
+    void authorListSerializesPoolInEachSummary() throws Exception {
+        var summary = new com.ieltspath.content.application.result.AuthorPackageSummary(UUID.randomUUID(),
+                "POOL", "Placement", com.ieltspath.content.domain.vo.PackageType.PLACEMENT_TEST, null,
+                com.ieltspath.content.domain.vo.PublicationStatus.DRAFT, null, null, null, null, null,
+                java.time.Instant.now(), java.time.Instant.now(), null, false,
+                com.ieltspath.content.domain.vo.PlacementPool.BAND_3_5, "READING", java.util.List.of(1), 1, 10);
+        when(listPackages.execute(any())).thenReturn(java.util.List.of(summary));
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/content/admin/packages"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].placementPool").value("BAND_3_5"));
+    }
+
+    @Test
+    void placementRequiresPoolAndOtherTypesRejectPool() throws Exception {
+        for (String body : java.util.List.of(
+                "{\"code\":\"P\",\"title\":\"Placement\",\"packageType\":\"PLACEMENT_TEST\"}",
+                "{\"code\":\"P\",\"title\":\"Practice\",\"packageType\":\"PRACTICE_SET\",\"placementPool\":\"BAND_0_3\"}")) {
+            mockMvc.perform(post("/api/content/admin/packages").contentType("application/json").content(body))
+                    .andExpect(status().isBadRequest());
+        }
+        org.mockito.Mockito.verifyNoInteractions(codeSettings);
+    }
+
+    @Test
+    void blankCodeWithoutAppliedSettingReturnsVietnameseValidationError() throws Exception {
+        when(codeSettings.createPackage(any()))
+                .thenThrow(new IllegalArgumentException("Mã gói đề không được để trống."));
+
+        mockMvc.perform(post("/api/content/admin/packages").contentType("application/json")
+                        .content("{\"code\":\"\",\"title\":\"Practice\",\"packageType\":\"PRACTICE_SET\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Mã gói đề không được để trống."));
+        org.mockito.Mockito.verify(codeSettings).createPackage(any());
+    }
+
+    @Test
+    void lockedPackageCodeReturnsConflict() throws Exception {
+        when(codeSettings.createPackage(any())).thenThrow(InvalidContentStateException.codeLocked());
+
+        mockMvc.perform(post("/api/content/admin/packages").contentType("application/json")
+                        .content("{\"code\":\"MANUAL\",\"title\":\"Practice\",\"packageType\":\"PRACTICE_SET\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.details.code").value("CODE_LOCKED"));
+    }
+
+    @Test
+    void placementPoolIsStoredAndReturned() throws Exception {
+        var repository = mock(com.ieltspath.content.domain.repository.ContentPackageRepository.class);
+        when(repository.save(any())).thenAnswer(call -> call.getArgument(0));
+        var useCase = new CreateContentPackageUseCase(repository,
+                mock(com.ieltspath.content.application.port.LearningContentReader.class));
+        when(codeSettings.createPackage(any())).thenAnswer(call -> useCase.executeAsAuthor(call.getArgument(0)));
+        mockMvc.perform(post("/api/content/admin/packages").contentType("application/json")
+                        .content("{\"code\":\"P\",\"title\":\"Placement\",\"packageType\":\"PLACEMENT_TEST\",\"placementPool\":\"BAND_3_5\"}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.placementPool").value("BAND_3_5"));
+        var saved = org.mockito.ArgumentCaptor.forClass(com.ieltspath.content.domain.aggregate.ContentPackage.class);
+        org.mockito.Mockito.verify(repository).save(saved.capture());
+        org.assertj.core.api.Assertions.assertThat(saved.getValue().getPlacementPool().name()).isEqualTo("BAND_3_5");
+    }
+
+    @Test
+    void authorListForwardsPoolAndRejectsUnknownPool() throws Exception {
+        when(listPackages.execute(any())).thenReturn(java.util.List.of());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/content/admin/packages")
+                        .param("placementPool", "BAND_5_9")).andExpect(status().isOk());
+        var filter = org.mockito.ArgumentCaptor.forClass(com.ieltspath.content.application.port.AuthorPackageReader.Filter.class);
+        org.mockito.Mockito.verify(listPackages).execute(filter.capture());
+        org.assertj.core.api.Assertions.assertThat(filter.getValue().placementPool().name()).isEqualTo("BAND_5_9");
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/content/admin/packages")
+                        .param("placementPool", "UNKNOWN")).andExpect(status().isBadRequest());
+    }
+
+    @Test
     void finalTestWithoutItsTopicIsBadRequestWithItsCode() throws Exception {
-        when(createPackage.executeAsAuthor(any())).thenThrow(new InvalidPackageTopicException("topic missing"));
+        when(codeSettings.createPackage(any())).thenThrow(new InvalidPackageTopicException("topic missing"));
 
         mockMvc.perform(post("/api/content/admin/packages").contentType("application/json")
                         .content("{\"code\":\"X\",\"title\":\"T\",\"packageType\":\"TOPIC_TEST\"}"))
@@ -63,12 +142,44 @@ class ContentPackageAuthoringErrorTest {
 
     @Test
     void courseTestWithoutItsCourseIsBadRequestWithItsCode() throws Exception {
-        when(createPackage.executeAsAuthor(any())).thenThrow(new InvalidPackageCourseException("course missing"));
+        when(codeSettings.createPackage(any())).thenThrow(new InvalidPackageCourseException("course missing"));
 
         mockMvc.perform(post("/api/content/admin/packages").contentType("application/json")
                         .content("{\"code\":\"X\",\"title\":\"T\",\"packageType\":\"COURSE_TEST\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.details.code").value("INVALID_PACKAGE_COURSE"));
+    }
+
+    @Test
+    void lockedPlacementPoolReturnsConflictWithItsCode() throws Exception {
+        when(updatePackageInfo.execute(any()))
+                .thenThrow(new com.ieltspath.content.domain.exception.PlacementPoolLockedException());
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .patch("/api/content/admin/packages/{id}", UUID.randomUUID())
+                        .contentType("application/json").content("{\"placementPool\":\"BAND_0_3\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.details.code").value("PLACEMENT_POOL_LOCKED"));
+    }
+
+    @Test
+    void lastPublishedPlacementTestCannotBeArchived() throws Exception {
+        when(packageVisibility.archive(any()))
+                .thenThrow(new com.ieltspath.content.domain.exception.PlacementPoolLastPublishedException());
+
+        mockMvc.perform(post("/api/content/admin/packages/{id}/archive", UUID.randomUUID()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.details.code").value("PLACEMENT_POOL_LAST_PUBLISHED"));
+    }
+
+    @Test
+    void otherTypesCannotBeArchived() throws Exception {
+        when(packageVisibility.archive(any()))
+                .thenThrow(new com.ieltspath.content.domain.exception.PackageArchiveNotSupportedException());
+
+        mockMvc.perform(post("/api/content/admin/packages/{id}/archive", UUID.randomUUID()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.details.code").value("PACKAGE_ARCHIVE_NOT_SUPPORTED"));
     }
 
     @Test

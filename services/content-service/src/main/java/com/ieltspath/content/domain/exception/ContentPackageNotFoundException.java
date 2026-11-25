@@ -4,11 +4,11 @@ import java.util.UUID;
 
 public class ContentPackageNotFoundException extends ContentDomainException {
     public ContentPackageNotFoundException(UUID id) {
-        super("Content package not found with id: " + id);
+        super("Không tìm thấy gói nội dung");
     }
 
     public ContentPackageNotFoundException(String code) {
-        super("Content package not found with code: " + code);
+        super("Không tìm thấy gói nội dung");
     }
 }
 

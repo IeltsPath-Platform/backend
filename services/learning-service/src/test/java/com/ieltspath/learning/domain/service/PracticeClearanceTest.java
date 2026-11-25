@@ -71,6 +71,17 @@ class PracticeClearanceTest {
     }
 
     @Test
+    void anUnblockedPendingReviewDoesNotHoldBackPracticeOrLessonClearance() {
+        var unblocked = new PracticeClearance.ReviewFact(ReviewStatus.PENDING, LearningSkill.READING, false, true);
+        // A review moved to the basket counts as finished, so the pass is the stored kind and does not lock again
+        // if the review is made blocking later.
+        assertEquals(PracticePassReason.REVIEW_FINISHED, reading(List.of(failed(readingSet)),
+                List.of(unblocked)).reason());
+        assertEquals(PracticePassReason.REVIEW_FINISHED, rule.derive(true, Set.of(set), List.of(), Set.of(),
+                List.of(unblocked), null).reason());
+    }
+
+    @Test
     void aFinishedReviewNextToASuggestionClearsSoftly() {
         assertEquals(PracticePassReason.ATTEMPT_NOT_BLOCKED, reading(List.of(failed(readingSet)), List.of(
                 new PracticeClearance.ReviewFact(ReviewStatus.DONE, LearningSkill.READING), pending(false))).reason());

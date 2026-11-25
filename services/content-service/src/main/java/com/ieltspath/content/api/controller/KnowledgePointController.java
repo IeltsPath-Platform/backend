@@ -8,7 +8,7 @@ import com.ieltspath.content.application.command.CreateKnowledgePointCommand;
 import com.ieltspath.content.application.command.UpdateKnowledgePointCommand;
 import com.ieltspath.content.application.result.KnowledgePointResult;
 import com.ieltspath.content.application.usecase.ActivateKnowledgePointUseCase;
-import com.ieltspath.content.application.usecase.CreateKnowledgePointUseCase;
+import com.ieltspath.content.application.usecase.CodeSettingsUseCases;
 import com.ieltspath.content.application.usecase.DeactivateKnowledgePointUseCase;
 import com.ieltspath.content.application.usecase.GetKnowledgePointPrerequisitesUseCase;
 import com.ieltspath.content.application.usecase.GetKnowledgePointsUseCase;
@@ -29,7 +29,7 @@ import java.util.UUID;
 public class KnowledgePointController {
 
     private final GetKnowledgePointsUseCase getKnowledgePointsUseCase;
-    private final CreateKnowledgePointUseCase createKnowledgePointUseCase;
+    private final CodeSettingsUseCases codeSettings;
     private final UpdateKnowledgePointUseCase updateKnowledgePointUseCase;
     private final DeactivateKnowledgePointUseCase deactivateKnowledgePointUseCase;
     private final ActivateKnowledgePointUseCase activateKnowledgePointUseCase;
@@ -49,7 +49,7 @@ public class KnowledgePointController {
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public KnowledgePointResponse createKnowledgePoint(@Valid @RequestBody CreateKnowledgePointRequest request) {
-        KnowledgePointResult result = createKnowledgePointUseCase.execute(new CreateKnowledgePointCommand(
+        CreateKnowledgePointCommand command = new CreateKnowledgePointCommand(
                 request.topicId(),
                 request.code(),
                 request.name(),
@@ -61,7 +61,8 @@ public class KnowledgePointController {
                 request.canDo(),
                 request.scopeIn(),
                 request.scopeOut()
-        ));
+        );
+        KnowledgePointResult result = codeSettings.createKnowledgePoint(command, request.codeLevel());
         return KnowledgePointResponse.from(result);
     }
 

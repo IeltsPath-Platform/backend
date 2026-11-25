@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
 public record PublishPackageRequest(
-        @NotNull(message = "versionId is required")
+        @NotNull(message = "Cần chọn phiên bản")
         UUID versionId
 ) {}
 

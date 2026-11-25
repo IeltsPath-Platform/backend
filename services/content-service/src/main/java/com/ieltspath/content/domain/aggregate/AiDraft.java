@@ -110,7 +110,7 @@ public class AiDraft {
 
     private void requireStatus(DraftStatus expected) {
         if (status != expected) {
-            throw new InvalidContentStateException("AI draft is " + status + ", expected " + expected);
+            throw new InvalidContentStateException("Bản nháp AI đang ở trạng thái " + status + ", cần ở trạng thái " + expected);
         }
     }
 

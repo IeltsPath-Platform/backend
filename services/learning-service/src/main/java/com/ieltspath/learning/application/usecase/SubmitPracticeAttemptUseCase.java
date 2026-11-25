@@ -18,6 +18,7 @@ import com.ieltspath.learning.application.service.HeartsService;
 import com.ieltspath.learning.application.service.SpeakingPracticeBand;
 import com.ieltspath.learning.application.service.SpeakingPracticeSettings;
 import com.ieltspath.learning.application.service.SpeakingResultSignals;
+import com.ieltspath.learning.application.service.SubmittedAnswers;
 import com.ieltspath.learning.application.service.WritingCriterionReviews;
 import com.ieltspath.learning.application.service.ErrorTrapEvidence;
 import com.ieltspath.learning.application.service.ErrorTrapCatalog;
@@ -165,6 +166,7 @@ public class SubmitPracticeAttemptUseCase {
         List<KnowledgeEvidence> firstAnswers = new ArrayList<>();
         // Logged for every submission; a repeat of an already counted package is marked first_submission=false.
         Map<UUID, Long> durations = AnswerDurations.of(command.answers());
+        Map<UUID, String> submittedAnswers = SubmittedAnswers.of(command.answers());
         List<QuestionAttemptEvent> events = new ArrayList<>();
         List<PracticeReviewRule.ItemOutcome> outcomes = new ArrayList<>();
         List<PracticeSubmission.Answer> results = new ArrayList<>();
@@ -245,7 +247,8 @@ public class SubmitPracticeAttemptUseCase {
             results.add(new PracticeSubmission.Answer(item.questionVersionId(), grade.correct(),
                     grade.correctAnswer(), item.explanation(),
                     hints.afterAnswer(grade.correct(), item.answerSpec(), item.options(), item.hint()),
-                    errorTrapEvidence.practiceFeedback(errorCode, errorTexts)));
+                    errorTrapEvidence.practiceFeedback(errorCode, errorTexts),
+                    submittedAnswers.get(item.questionVersionId())));
         }
         criterionOnly.removeAll(itemKps);
         List<PracticeReviewCandidate> candidates = List.of();

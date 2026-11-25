@@ -28,7 +28,7 @@ class KnowledgePointTest {
     void activeKnowledgePointRequiresCefrLevelAndCanDo() {
         assertThatThrownBy(() -> KnowledgePoint.create(UUID.randomUUID(), "KP-1", "Example",
                 KnowledgePointKind.GRAMMAR, LearningType.CONCEPT, null, null, null, "Do something.", null, null))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("cefrLevel");
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("cấp CEFR");
         assertThatThrownBy(() -> KnowledgePoint.create(UUID.randomUUID(), "KP-1", "Example",
                 KnowledgePointKind.GRAMMAR, LearningType.CONCEPT, null, null, CefrLevel.B1, null, null, null))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -56,7 +56,7 @@ class KnowledgePointTest {
                 LearningType.PROCEDURE, Skill.SPEAKING, null, ContentStatus.INACTIVE, null, null);
 
         assertThatThrownBy(draft::activate).isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("cefrLevel");
+                .hasMessageContaining("cấp CEFR");
         assertThat(draft.getStatus()).isEqualTo(ContentStatus.INACTIVE);
 
         draft.update(draft.getTopicId(), draft.getCode(), draft.getName(), draft.getKind(), draft.getLearningType(),

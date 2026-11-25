@@ -94,7 +94,7 @@ public class SpeakingSubmission {
                                            SpeakingScope scope, int pointCost, Instant consentAt,
                                            List<SpeakingRecording> expected, Instant now) {
         if (expected.isEmpty()) throw new IllegalArgumentException("a Speaking submission needs at least one question");
-        if (pointCost <= 0) throw new IllegalArgumentException("pointCost must be positive");
+        if (pointCost < 0) throw new IllegalArgumentException("pointCost must not be negative");
         return new SpeakingSubmission(id, userId, requestId, packageVersionId, scope, SpeakingSubmissionStatus.UPLOADING,
                 pointCost, consentAt, null, now, now, null, expected, true, null, null, null,
                 null, null, null, null, 0, null, null, null);
@@ -231,6 +231,9 @@ public class SpeakingSubmission {
     public void graded(UUID ledgerEntryId, Instant now) {
         if (status != SpeakingSubmissionStatus.PAYMENT_PENDING || result == null) {
             throw new IllegalStateException("a graded submission needs a saved grade and completed payment");
+        }
+        if (pointCost > 0 && ledgerEntryId == null) {
+            throw new IllegalArgumentException("A paid Speaking grade needs a debit ledger entry");
         }
         debitLedgerEntryId = ledgerEntryId;
         status = SpeakingSubmissionStatus.GRADED;

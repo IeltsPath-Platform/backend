@@ -9,11 +9,11 @@ import com.ieltspath.content.application.result.CourseResult;
 import com.ieltspath.content.application.result.LessonAuthoringResult;
 import com.ieltspath.content.application.port.VocabularySenseLookup.SenseText;
 import com.ieltspath.content.application.result.TopicResult;
-import com.ieltspath.content.application.usecase.CreateContentPackageUseCase;
-import com.ieltspath.content.application.usecase.CreateCourseUseCase;
+import com.ieltspath.content.application.usecase.CodeSettingsUseCases;
 import com.ieltspath.content.application.usecase.CreateDraftPackageVersionUseCase;
-import com.ieltspath.content.application.usecase.CreateTopicUseCase;
 import com.ieltspath.content.application.usecase.LessonAuthoringUseCase;
+
+
 import com.ieltspath.content.application.usecase.UpdateCourseUseCase;
 import com.ieltspath.content.application.usecase.UpdateTopicUseCase;
 import com.ieltspath.content.domain.exception.InvalidPackageLessonException;
@@ -55,33 +55,32 @@ import java.util.UUID;
 @Service
 public class CourseMaterializer {
 
-    private final CreateCourseUseCase createCourse;
+    private final CodeSettingsUseCases codeSettings;
     private final UpdateCourseUseCase updateCourse;
-    private final CreateTopicUseCase createTopic;
+
     private final UpdateTopicUseCase updateTopic;
     private final LessonAuthoringUseCase lessons;
+
     private final ContentPackageRepository packages;
-    private final CreateContentPackageUseCase createPackage;
     private final CreateDraftPackageVersionUseCase createDraftVersion;
     private final PracticeTestMilestoneRepository milestones;
     private final CreateLessonResourceUseCase lessonResources;
     private final PracticeSetMaterializer practiceSets;
 
     /** {@code practiceSets} is resolved on first use: only a plan with sets the model wrote needs it. */
-    public CourseMaterializer(CreateCourseUseCase createCourse, UpdateCourseUseCase updateCourse,
-                              CreateTopicUseCase createTopic, UpdateTopicUseCase updateTopic,
-                              LessonAuthoringUseCase lessons, ContentPackageRepository packages,
-                              CreateContentPackageUseCase createPackage,
+    public CourseMaterializer(CodeSettingsUseCases codeSettings, UpdateCourseUseCase updateCourse,
+                              UpdateTopicUseCase updateTopic, LessonAuthoringUseCase lessons,
+                              ContentPackageRepository packages,
                               CreateDraftPackageVersionUseCase createDraftVersion,
                               PracticeTestMilestoneRepository milestones, CreateLessonResourceUseCase lessonResources,
                               @Lazy PracticeSetMaterializer practiceSets) {
-        this.createCourse = createCourse;
+        this.codeSettings = codeSettings;
         this.updateCourse = updateCourse;
-        this.createTopic = createTopic;
+
         this.updateTopic = updateTopic;
         this.lessons = lessons;
+
         this.packages = packages;
-        this.createPackage = createPackage;
         this.createDraftVersion = createDraftVersion;
         this.milestones = milestones;
         this.lessonResources = lessonResources;
@@ -118,7 +117,7 @@ public class CourseMaterializer {
     public Created create(CourseDraftStructure plan, Map<String, UUID> questionVersionsByRef,
                           Map<String, UUID> senseByLemma, Map<UUID, SenseText> senseTexts) {
         BigDecimal band = plan.course().bandLevel();
-        CourseResult course = createCourse.execute(new CreateCourseCommand(plan.course().code(),
+        CourseResult course = codeSettings.createCourse(new CreateCourseCommand(plan.course().code(),
                 plan.course().name(), band));
         updateCourse.execute(new UpdateCourseCommand(course.id(), plan.course().name(), band, ContentStatus.INACTIVE));
 
@@ -129,7 +128,7 @@ public class CourseMaterializer {
         Map<String, UUID> lessonsByCode = new LinkedHashMap<>();
         BandRange topicBand = BandRange.of(band, band);
         for (TopicPlan topicPlan : plan.topicsInOrder()) {
-            TopicResult topic = createTopic.execute(new CreateTopicCommand(null, topicPlan.code(), topicPlan.name(),
+            TopicResult topic = codeSettings.createTopic(new CreateTopicCommand(null, topicPlan.code(), topicPlan.name(),
                     topicPlan.sortOrder(), topicBand, topicPlan.skill(), course.id()));
             updateTopic.execute(new UpdateTopicCommand(topic.id(), null, topicPlan.name(), topicPlan.sortOrder(),
                     ContentStatus.INACTIVE, topicBand, topicPlan.skill(), course.id()));
@@ -159,7 +158,7 @@ public class CourseMaterializer {
                             Map<String, UUID> lessonsByCode) {
         int position = 1;
         for (LessonPlan lessonPlan : topic.lessons()) {
-            LessonAuthoringResult lesson = lessons.create(topicId, lessonPlan.code(), lessonPlan.title(),
+            LessonAuthoringResult lesson = codeSettings.createLesson(topicId, lessonPlan.code(), lessonPlan.title(),
                     lessonPlan.summary(), summaryWithVocabulary(lessonPlan, senseTexts), lessonPlan.estimatedMinutes(),
                     position++);
             lessonIds.add(lesson.id());
@@ -178,8 +177,8 @@ public class CourseMaterializer {
             }
             for (UUID practiceSet : lessonPlan.practiceSetPackageIds()) {
                 if (!packages.attachPracticeSetToLesson(practiceSet, lesson.id())) {
-                    throw new InvalidPackageLessonException("Package " + practiceSet
-                            + " is not a practice set that is free to join a lesson");
+                    throw new InvalidPackageLessonException("Gói " + practiceSet
+                            + " không phải là bộ luyện tập còn trống để gắn vào bài học");
                 }
             }
         }
@@ -202,7 +201,7 @@ public class CourseMaterializer {
         for (NewWord word : lessonPlan.newVocabulary()) {
             UUID sense = senseByLemma.get(word.normalizedLemma());
             if (sense == null) {
-                throw new IllegalStateException("No library sense was resolved for the word " + word.lemma());
+                throw new IllegalStateException("Không xác định được nghĩa trong thư viện cho từ " + word.lemma());
             }
             if (!senses.contains(sense)) senses.add(sense);
         }
@@ -232,8 +231,8 @@ public class CourseMaterializer {
     }
 
     private UUID createFinalTest(PackageType type, FinalTestPlan test, UUID topicId, UUID courseId) {
-        var created = createPackage.executeAsAuthor(new CreateContentPackageCommand(test.code(), test.title(), type,
-                null, null, null, topicId, courseId));
+        var created = codeSettings.createPackage(new CreateContentPackageCommand(test.code(), test.title(), type,
+                null, null, null, topicId, courseId, null));
         createDraftVersion.execute(created.id(), null);
         return created.id();
     }

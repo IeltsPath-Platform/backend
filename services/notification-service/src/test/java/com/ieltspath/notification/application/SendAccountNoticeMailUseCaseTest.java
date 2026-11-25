@@ -1,6 +1,7 @@
 package com.ieltspath.notification.application;
 
 import com.ieltspath.events.user.GoogleAccountLinkedV1;
+import com.ieltspath.events.user.PasswordResetGoogleOnlyV1;
 import com.ieltspath.events.user.PasswordChangedV1;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,6 +36,7 @@ class SendAccountNoticeMailUseCaseTest {
         useCase = new SendAccountNoticeMailUseCase(renderer, sender, deliveries);
         ReflectionTestUtils.setField(useCase, "passwordChangedEnabled", true);
         ReflectionTestUtils.setField(useCase, "googleAccountLinkedEnabled", true);
+        ReflectionTestUtils.setField(useCase, "passwordResetGoogleOnlyEnabled", true);
     }
 
     @Test
@@ -70,6 +72,31 @@ class SendAccountNoticeMailUseCaseTest {
         when(deliveries.exists(eventId, "google-account-linked")).thenReturn(true);
         useCase.googleAccountLinked(googleLinked(eventId));
         verify(sender, org.mockito.Mockito.times(1)).send(any(), any());
+    }
+
+
+    @Test
+    void passwordResetGoogleOnlySendsTheGoogleNoticeOnceAndSkipsDuplicate() {
+        UUID eventId = UUID.randomUUID();
+        var event = new PasswordResetGoogleOnlyV1(eventId, PasswordResetGoogleOnlyV1.EVENT_TYPE, Instant.now(),
+                UUID.randomUUID(), "learner@example.test", "An");
+        when(deliveries.exists(eventId, "password-reset-google-only")).thenReturn(false);
+        useCase.passwordResetGoogleOnly(event);
+        verify(renderer).render(eq(MailTemplate.PASSWORD_RESET_GOOGLE_ONLY), anyMap());
+        verify(sender).send("learner@example.test", RENDERED);
+
+        when(deliveries.exists(eventId, "password-reset-google-only")).thenReturn(true);
+        useCase.passwordResetGoogleOnly(event);
+        verify(sender, org.mockito.Mockito.times(1)).send(any(), any());
+    }
+
+    @Test
+    void passwordResetGoogleOnlyRejectsAnEventWithoutAddress() {
+        var noAddress = new PasswordResetGoogleOnlyV1(UUID.randomUUID(), PasswordResetGoogleOnlyV1.EVENT_TYPE,
+                Instant.now(), UUID.randomUUID(), " ", "An");
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                () -> useCase.passwordResetGoogleOnly(noAddress));
+        verify(sender, never()).send(any(), any());
     }
 
     @Test

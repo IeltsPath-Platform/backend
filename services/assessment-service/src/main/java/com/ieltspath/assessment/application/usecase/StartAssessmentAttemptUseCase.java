@@ -2,6 +2,8 @@ package com.ieltspath.assessment.application.usecase;
 
 import com.ieltspath.assessment.application.command.StartAssessmentAttemptCommand;
 import com.ieltspath.assessment.application.port.ContentPackageProvider;
+import com.ieltspath.assessment.application.port.LearnerEntitlement;
+import com.ieltspath.assessment.application.exception.PremiumRequiredException;
 import com.ieltspath.assessment.application.result.AssessmentAttemptResult;
 import com.ieltspath.assessment.domain.exception.AssessmentNotFoundException;
 import com.ieltspath.assessment.domain.vo.AttemptType;
@@ -21,10 +23,13 @@ import org.springframework.stereotype.Service;
 public class StartAssessmentAttemptUseCase {
     private final ContentPackageProvider content;
     private final AttemptCreator creator;
+    private final LearnerEntitlement entitlement;
 
-    public StartAssessmentAttemptUseCase(ContentPackageProvider content, AttemptCreator creator) {
+    public StartAssessmentAttemptUseCase(ContentPackageProvider content, AttemptCreator creator,
+                                         LearnerEntitlement entitlement) {
         this.content = content;
         this.creator = creator;
+        this.entitlement = entitlement;
     }
 
     public AssessmentAttemptResult execute(StartAssessmentAttemptCommand command) {
@@ -32,6 +37,9 @@ public class StartAssessmentAttemptUseCase {
                 .orElseThrow(() -> new AssessmentNotFoundException("Package version not found"));
         AttemptType type = AttemptType.forContentPackageType(packageVersion.packageType());
         boolean practiceTest = type == AttemptType.OFFICIAL_PRACTICE;
+        if (practiceTest && packageVersion.requiredFeatureKey() != null && !entitlement.premium()) {
+            throw new PremiumRequiredException();
+        }
         List<ContentPackageProvider.Section> allSections = packageVersion.sections();
         List<ContentPackageProvider.Section> selected = allSections;
         if (command.sectionIds() != null && !command.sectionIds().isEmpty()) {
@@ -68,6 +76,7 @@ public class StartAssessmentAttemptUseCase {
             long seconds = selected.stream().mapToLong(ContentPackageProvider.Section::timeLimitSeconds).sum();
             expiresAt = Instant.now().plusSeconds(seconds);
         }
-        return creator.create(command, type, packageVersion, selected, scope, skill, expiresAt);
+        return creator.create(command, type, packageVersion, selected, scope, skill, expiresAt,
+                type == AttemptType.PLACEMENT ? packageVersion.placementPool() : null);
     }
 }

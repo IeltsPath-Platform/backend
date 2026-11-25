@@ -167,8 +167,8 @@ class PracticeTestPersistenceTest {
         jdbc.update("INSERT INTO content_sections(id, package_version_id, title, skill, sort_order, part_no) " +
                         "VALUES (?, ?, 'Reading', 'READING', 1, NULL), (?, ?, 'Listening', 'LISTENING', 2, 1)",
                 readingSection, versionId, listeningSection, versionId);
-        jdbc.update("INSERT INTO questions(id, question_type, skill, purpose, status) VALUES (?, 'MULTIPLE_CHOICE', 'READING', 'EXAM', 'PUBLISHED')",
-                questionId);
+        jdbc.update("INSERT INTO questions(id, code, question_type, skill, purpose, status) VALUES (?, 'Q-' || replace(?::text,'-',''), 'MULTIPLE_CHOICE', 'READING', 'EXAM', 'PUBLISHED')",
+                questionId, questionId);
         jdbc.update("INSERT INTO question_versions(id, question_id, version_number, stem, answer_spec, status) " +
                         "VALUES (?, ?, 1, 'Question', '{\"type\":\"CHOICE\",\"correct\":\"A\"}'::jsonb, 'PUBLISHED')",
                 questionVersionId, questionId);

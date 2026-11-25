@@ -37,7 +37,7 @@ class CoursePersistenceTest {
                     new ConstraintViolationException("Duplicate", new SQLException("Duplicate", "23505"), constraint)));
             assertThatThrownBy(() -> new CourseRepositoryAdapter(jpa, mapper).save(course))
                     .isInstanceOf(DuplicateCourseException.class)
-                    .hasMessageContaining(constraint.equals("courses_code_key") ? "code 'IELTS'" : "bandLevel '5.5'");
+                    .hasMessageContaining(constraint.equals("courses_code_key") ? "Mã khóa học \"IELTS\"" : "Band 5.5");
             verify(jpa).saveAndFlush(any());
         }
     }

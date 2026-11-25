@@ -211,7 +211,7 @@ class RubricRepositoryIntegrationTest {
                         criterion("LR", 3, "Full"), criterion("GRA", 4, "Full")), List.of());
         transactions.execute(status -> rubrics.create(wrongCriteria));
         assertThatThrownBy(() -> transactions.execute(status -> rubrics.activate(wrongCriteria.code(), 1)))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("requires criteria");
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("cần các tiêu chí");
 
         Rubric missingBand = draft("MISSING_HALF_BAND", "TASK_2", 1, "Source", "Full");
         Rubric.Criterion first = missingBand.criteria().getFirst();
@@ -223,7 +223,7 @@ class RubricRepositoryIntegrationTest {
         Rubric incompleteDraft = missingBand;
         transactions.execute(status -> rubrics.create(incompleteDraft));
         assertThatThrownBy(() -> transactions.execute(status -> rubrics.activate(incompleteDraft.code(), 1)))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("one descriptor for every band");
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("một mô tả cho mỗi mức band");
     }
 
     private static Rubric draft(String code, String task, int version, String sourceNote, String descriptor) {

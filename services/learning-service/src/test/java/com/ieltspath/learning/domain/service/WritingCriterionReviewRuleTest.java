@@ -42,4 +42,55 @@ class WritingCriterionReviewRuleTest {
     private static FailedWritingCriterion failed(String code, String band) {
         return new FailedWritingCriterion(UUID.randomUUID(), code, new BigDecimal(band));
     }
+
+    @Test void aWeakCriterionReviewsThePointOfItsMostFrequentError() {
+        UUID errorPoint = UUID.randomUUID();
+        var weak = lr.withReviewPoints(List.of(errorPoint));
+
+        var selected = rule.select(List.of(weak), Set.of(), Map.of(errorPoint, 1, lr.knowledgePointId(), 1), 2);
+
+        assertEquals(errorPoint, selected.getFirst().practisedPoint());
+        assertEquals(lr.knowledgePointId(), selected.getFirst().knowledgePointId(), "the criterion's own point is kept");
+    }
+
+    @Test void theNextErrorPointIsTriedWhenTheBestHasNoUnseenSetOrIsWaiting() {
+        UUID best = UUID.randomUUID(), second = UUID.randomUUID(), third = UUID.randomUUID();
+        var weak = lr.withReviewPoints(List.of(best, second, third));
+
+        assertEquals(second, rule.select(List.of(weak), Set.of(), Map.of(second, 2, third, 2), 2).getFirst().practisedPoint());
+        assertEquals(third, rule.select(List.of(weak), Set.of(second), Map.of(second, 2, third, 2), 2).getFirst().practisedPoint());
+    }
+
+    @Test void withNoErrorPointToPractiseTheCriterionReviewsItsOwnPoint() {
+        UUID errorPoint = UUID.randomUUID();
+        var weak = lr.withReviewPoints(List.of(errorPoint));
+
+        var selected = rule.select(List.of(weak), Set.of(), Map.of(lr.knowledgePointId(), 1), 2);
+
+        assertEquals(lr.knowledgePointId(), selected.getFirst().practisedPoint());
+        assertNull(selected.getFirst().reviewKnowledgePointId());
+    }
+
+    @Test void aCriterionWithNothingToPractiseIsLeftOut() {
+        UUID errorPoint = UUID.randomUUID();
+
+        assertTrue(rule.select(List.of(lr.withReviewPoints(List.of(errorPoint))), Set.of(), Map.of(), 2).isEmpty());
+    }
+
+    @Test void aWaitingReviewOfTheCriterionPointStopsTheCriterion() {
+        UUID errorPoint = UUID.randomUUID();
+
+        assertTrue(rule.select(List.of(lr.withReviewPoints(List.of(errorPoint))), Set.of(lr.knowledgePointId()),
+                Map.of(errorPoint, 3, lr.knowledgePointId(), 3), 2).isEmpty());
+    }
+
+    @Test void theErrorPointDoesNotChangeWhichCriteriaAreWeakest() {
+        UUID errorPoint = UUID.randomUUID();
+        var weakGra = gra.withReviewPoints(List.of(errorPoint));
+
+        var selected = rule.select(List.of(lr, weakGra, cc), Set.of(), Map.of(errorPoint, 1, lr.knowledgePointId(), 1,
+                cc.knowledgePointId(), 1), 2);
+
+        assertEquals(List.of("GRA", "CC"), selected.stream().map(FailedWritingCriterion::code).toList());
+    }
 }

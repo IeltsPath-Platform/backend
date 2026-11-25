@@ -1,5 +1,6 @@
 package com.ieltspath.content.api.dto.response;
 
+import com.ieltspath.content.domain.vo.PlacementPool;
 import com.ieltspath.content.api.AccessLevelCompatibility;
 import com.ieltspath.content.api.dto.AccessLevel;
 import com.ieltspath.content.application.result.AuthorPackageDetail;
@@ -34,7 +35,8 @@ public record AuthorPackageResponse(
         String sourceCode,
         Instant createdAt,
         Instant updatedAt,
-        List<Version> versions
+        List<Version> versions,
+        PlacementPool placementPool
 ) {
     public static AuthorPackageResponse from(AuthorPackageDetail detail) {
         return from(detail.pkg(), detail.extras());
@@ -50,7 +52,7 @@ public record AuthorPackageResponse(
                 AccessLevelCompatibility.toAccessLevel(result.requiredFeatureKey()), result.status(),
                 result.currentPublishedVersionId(), result.lessonId(), result.topicId(), result.courseId(),
                 result.sourceCode(), result.createdAt(), result.updatedAt(),
-                result.versions().stream().map(version -> Version.from(version, extras)).toList());
+                result.versions().stream().map(version -> Version.from(version, extras)).toList(), result.placementPool());
     }
 
     public record Version(

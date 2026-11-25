@@ -33,7 +33,7 @@ public class ReorderLessonResourcesUseCase {
                 .collect(Collectors.toMap(LessonResource::getId, Function.identity()));
         if (resourceIds == null || resourceIds.size() != ofType.size()
                 || !new HashSet<>(resourceIds).equals(ofType.keySet())) {
-            throw new IllegalArgumentException("resourceIds must list every " + type + " of the lesson exactly once");
+            throw new IllegalArgumentException("Danh sách phải gồm mọi tài nguyên loại " + type + " của bài học, mỗi tài nguyên đúng một lần");
         }
 
         resources.deferSortOrderCheck();

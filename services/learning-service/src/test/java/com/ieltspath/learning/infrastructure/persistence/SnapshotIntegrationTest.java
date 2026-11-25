@@ -132,6 +132,23 @@ class SnapshotIntegrationTest {
     }
 
     @Test
+    void theStoredPlacementBandRemainsTheEstimateFallbackForSnapshots() {
+        UUID user = UUID.randomUUID();
+        LocalDate week = service.lastWeekStart();
+        Instant midWeek = week.plusDays(3).atTime(12, 0).atZone(ZONE).toInstant();
+        event(user, true, 1_000, midWeek);
+        profile(user, readingA, "CONSOLIDATE", 0.5);
+        profile(user, listeningA, "CONSOLIDATE", 0.5);
+        jdbc.update("INSERT INTO learner_placements (user_id, band, attempt_id, completed_at, updated_at) "
+                + "VALUES (?, 5.0, ?, ?, ?)", user, UUID.randomUUID(), Timestamp.from(midWeek), Timestamp.from(midWeek));
+
+        service.snapshotWeek(week);
+
+        assertEquals(0, new BigDecimal("5.0").compareTo(
+                snapshots.find(Period.WEEK, user, week).orElseThrow().estimatedBand()));
+    }
+
+    @Test
     void purgeDropsOnlyWhatIsPastRetention() {
         UUID user = UUID.randomUUID();
         LocalDate today = LocalDate.now(ZONE);

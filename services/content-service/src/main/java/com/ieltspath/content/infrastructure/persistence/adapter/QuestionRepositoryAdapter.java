@@ -55,14 +55,20 @@ public class QuestionRepositoryAdapter implements QuestionRepository {
     }
 
     @Override
-    public Page findPage(Skill skill, QuestionPurpose purpose, PublicationStatus status, int page, int size) {
-        var result = questionJpaRepository.findPage(skill, purpose, status, PageRequest.of(page, size));
+    public Page findPage(Skill skill, QuestionPurpose purpose, PublicationStatus status, String code, int page, int size) {
+        var result = questionJpaRepository.findPage(skill, purpose, status, code == null ? "" : code,
+                PageRequest.of(page, size));
         return new Page(result.getTotalElements(), result.getContent().stream().map(mapper::toDomainSummary).toList());
     }
 
     @Override
     public Optional<Question> findByImportRef(String importRef) {
         return questionJpaRepository.findFirstByImportRef(importRef).map(mapper::toDomainSummary);
+    }
+
+    @Override
+    public boolean existsByCode(String code) {
+        return questionJpaRepository.existsByCode(code);
     }
 }
 

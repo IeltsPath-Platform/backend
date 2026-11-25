@@ -4,6 +4,7 @@ import com.ieltspath.content.application.port.AuthorPackageReader;
 import com.ieltspath.content.application.result.AuthorPackageExtras;
 import com.ieltspath.content.application.result.AuthorPackageSummary;
 import com.ieltspath.content.domain.vo.PackageType;
+import com.ieltspath.content.domain.vo.PlacementPool;
 import com.ieltspath.content.domain.vo.PublicationStatus;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -37,6 +38,10 @@ public class JdbcAuthorPackageReader implements AuthorPackageReader {
             where.append(" AND p.package_type = :type");
             params.addValue("type", filter.type().name());
         }
+        if (filter.placementPool() != null) {
+            where.append(" AND p.placement_pool = :placementPool");
+            params.addValue("placementPool", filter.placementPool().name());
+        }
         if (filter.status() != null) {
             where.append(" AND p.status = :status");
             params.addValue("status", filter.status().name());
@@ -53,6 +58,13 @@ public class JdbcAuthorPackageReader implements AuthorPackageReader {
             where.append(" AND p.course_id = :courseId");
             params.addValue("courseId", filter.courseId());
         }
+        if (filter.premium() != null) {
+            where.append(filter.premium() ? " AND p.required_feature_key IS NOT NULL" : " AND p.required_feature_key IS NULL");
+        }
+        if (filter.skill() != null) {
+            where.append(" AND shape.skill = :skill");
+            params.addValue("skill", filter.skill());
+        }
         if (filter.q() != null && !filter.q().isBlank()) {
             where.append(" AND (p.code ILIKE :q ESCAPE '\\' OR p.title ILIKE :q ESCAPE '\\')");
             params.addValue("q", "%" + escapeLike(filter.q().strip()) + "%");
@@ -60,12 +72,23 @@ public class JdbcAuthorPackageReader implements AuthorPackageReader {
         return jdbc.query("""
                 SELECT p.id, p.code, p.title, p.package_type, p.required_feature_key, p.status,
                        p.current_published_version_id, p.lesson_id, p.topic_id, p.course_id, p.source_code,
-                       p.created_at, p.updated_at,
+                       p.created_at, p.updated_at, p.placement_pool,
                        (SELECT MAX(v.version_number) FROM content_package_versions v
                         WHERE v.package_id = p.id) AS latest_version_number,
                        EXISTS (SELECT 1 FROM content_package_versions v
-                               WHERE v.package_id = p.id AND v.status = 'DRAFT') AS has_draft
+                               WHERE v.package_id = p.id AND v.status = 'DRAFT') AS has_draft,
+                       shape.skill, shape.part_nos, shape.section_count, shape.question_count
                 FROM content_packages p
+                LEFT JOIN LATERAL (SELECT v.id FROM content_package_versions v WHERE v.package_id = p.id
+                                   ORDER BY (v.id = p.current_published_version_id) DESC, v.version_number DESC
+                                   LIMIT 1) shown ON TRUE
+                LEFT JOIN LATERAL (SELECT COUNT(s.id)::int AS section_count,
+                                          CASE WHEN COUNT(DISTINCT s.skill) = 1 THEN MIN(s.skill) END AS skill,
+                                          array_remove(array_agg(DISTINCT s.part_no ORDER BY s.part_no), NULL) AS part_nos,
+                                          (SELECT COUNT(*)::int FROM section_questions sq
+                                           JOIN content_sections qs ON qs.id = sq.section_id
+                                           WHERE qs.package_version_id = shown.id) AS question_count
+                                   FROM content_sections s WHERE s.package_version_id = shown.id) shape ON TRUE
                 """ + where + """
 
                 ORDER BY p.updated_at DESC, p.id
@@ -76,7 +99,9 @@ public class JdbcAuthorPackageReader implements AuthorPackageReader {
                 uuid(rs, "current_published_version_id"), uuid(rs, "lesson_id"), uuid(rs, "topic_id"),
                 uuid(rs, "course_id"), rs.getString("source_code"), instant(rs, "created_at"),
                 instant(rs, "updated_at"), (Integer) rs.getObject("latest_version_number"),
-                rs.getBoolean("has_draft")));
+                rs.getBoolean("has_draft"), rs.getString("placement_pool") == null ? null
+                        : PlacementPool.valueOf(rs.getString("placement_pool")),
+                rs.getString("skill"), partNos(rs), rs.getInt("section_count"), rs.getInt("question_count")));
     }
 
     @Override
@@ -122,6 +147,13 @@ public class JdbcAuthorPackageReader implements AuthorPackageReader {
                     uuid(rs, "question_id"), rs.getString("stem"), rs.getString("status"), rs.getString("purpose")));
         });
         return new AuthorPackageExtras(sections, questions);
+    }
+
+    private static List<Integer> partNos(ResultSet rs) throws SQLException {
+        java.sql.Array array = rs.getArray("part_nos");
+        if (array == null) return List.of();
+        Object[] values = (Object[]) array.getArray();
+        return java.util.Arrays.stream(values).map(value -> ((Number) value).intValue()).toList();
     }
 
     private static String escapeLike(String text) {

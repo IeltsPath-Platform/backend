@@ -91,13 +91,13 @@ public class GameRoom {
 
     public void join(UUID memberId, UUID userId, Instant joinedAt) {
         requireWaiting();
-        if ("SOLO".equals(playerMode())) throw new InvalidGameRoomStateException("Solo rooms cannot be joined");
+        if ("SOLO".equals(playerMode())) throw new InvalidGameRoomStateException("Không thể tham gia phòng chơi một mình");
         Member existing = members.get(userId);
         if (existing != null && existing.status() != MemberStatus.LEFT) {
-            throw new InvalidGameRoomStateException("User is already a member of this room");
+            throw new InvalidGameRoomStateException("Bạn đã ở trong phòng này");
         }
         long activeMembers = members.values().stream().filter(Member::active).count();
-        if (activeMembers >= maxPlayers) throw new InvalidGameRoomStateException("Room is full");
+        if (activeMembers >= maxPlayers) throw new InvalidGameRoomStateException("Phòng đã đủ người");
         members.put(userId, new Member(existing == null ? memberId : existing.id(), userId,
                 MemberRole.PLAYER, MemberStatus.JOINED, joinedAt, nextSlot()));
         updatedAt = joinedAt;
@@ -106,7 +106,7 @@ public class GameRoom {
     public void setReady(UUID userId, boolean ready, Instant at) {
         requireWaiting();
         Member member = members.get(userId);
-        if (member == null || !member.active()) throw new InvalidGameRoomStateException("User is not an active room member");
+        if (member == null || !member.active()) throw new InvalidGameRoomStateException("Bạn không còn ở trong phòng này");
         members.put(userId, member.withStatus(ready ? MemberStatus.READY : MemberStatus.JOINED));
         updatedAt = at;
     }
@@ -122,9 +122,9 @@ public class GameRoom {
     /** A null filter keeps the current one; {@link com.ieltspath.game.domain.vo.WordFilter#ANY} clears it. */
     public void updateSettings(UUID actorId, int initialLives, Integer wordLimit, Boolean timeEnabled,
             com.ieltspath.game.domain.vo.WordFilter filter, Instant at) {
-        if (!hostUserId.equals(actorId)) throw new com.ieltspath.game.domain.exception.GameRoomForbiddenException("Only the host can edit room settings");
+        if (!hostUserId.equals(actorId)) throw new com.ieltspath.game.domain.exception.GameRoomForbiddenException("Chỉ chủ phòng mới được đổi cài đặt");
         requireWaiting();
-        if (!(settings instanceof WordlyRoomSettings wordly)) throw new InvalidGameRoomStateException("Room is not a Wordly room");
+        if (!(settings instanceof WordlyRoomSettings wordly)) throw new InvalidGameRoomStateException("Phòng này không phải Wordly");
         WordlyRoomSettings next = new WordlyRoomSettings(wordly.playerMode(), initialLives,
                 wordly.playMode(), wordLimit, timeEnabled == null ? wordly.timeEnabled() : timeEnabled,
                 filter == null ? wordly.wordFilter() : filter);
@@ -140,10 +140,10 @@ public class GameRoom {
     /** A null filter keeps the current one; {@link com.ieltspath.game.domain.vo.WordFilter#ANY} clears it. */
     public void updateRocketSettings(UUID actorId, int initialLives, Integer questionCount, Integer secondsPerQuestion,
             com.ieltspath.game.domain.vo.WordFilter filter, Instant at) {
-        if (!hostUserId.equals(actorId)) throw new com.ieltspath.game.domain.exception.GameRoomForbiddenException("Only the host can edit room settings");
+        if (!hostUserId.equals(actorId)) throw new com.ieltspath.game.domain.exception.GameRoomForbiddenException("Chỉ chủ phòng mới được đổi cài đặt");
         requireWaiting();
         if (!(settings instanceof com.ieltspath.game.domain.vo.RocketRoomSettings rocket))
-            throw new InvalidGameRoomStateException("Room is not a Rocket room");
+            throw new InvalidGameRoomStateException("Phòng này không phải Rocket");
         var next = new com.ieltspath.game.domain.vo.RocketRoomSettings(rocket.solo(),
                 questionCount == null ? rocket.questionCount() : questionCount, initialLives,
                 secondsPerQuestion == null ? rocket.secondsPerQuestion() : secondsPerQuestion,
@@ -178,10 +178,10 @@ public class GameRoom {
         requireWaiting();
 
         if (members.values().stream().filter(Member::active).count() < ("SOLO".equals(playerMode()) ? 1 : 2)) {
-            throw new InvalidGameRoomStateException("At least two active members are required to start");
+            throw new InvalidGameRoomStateException("Cần ít nhất 2 người chơi để bắt đầu");
         }
         if (members.values().stream().filter(Member::active).anyMatch(m -> m.status() != MemberStatus.READY)) {
-            throw new InvalidGameRoomStateException("Every active member must be ready before starting");
+            throw new InvalidGameRoomStateException("Mọi người chơi phải sẵn sàng trước khi bắt đầu");
         }
         status = GameRoomStatus.IN_MATCH;
         updatedAt = at;
@@ -190,18 +190,18 @@ public class GameRoom {
     public void leave(UUID userId, Instant leftAt) {
         requireWaiting();
         Member member = members.get(userId);
-        if (member == null || !member.active()) throw new InvalidGameRoomStateException("User is not an active room member");
+        if (member == null || !member.active()) throw new InvalidGameRoomStateException("Bạn không còn ở trong phòng này");
         members.put(userId, member.withStatus(MemberStatus.LEFT));
         updatedAt = leftAt;
         if (hostUserId.equals(userId)) status = GameRoomStatus.CLOSED;
     }
 
     public void kick(UUID actorId, UUID userId, Instant at) {
-        if (!hostUserId.equals(actorId)) throw new com.ieltspath.game.domain.exception.GameRoomForbiddenException("Only the host can kick room members");
+        if (!hostUserId.equals(actorId)) throw new com.ieltspath.game.domain.exception.GameRoomForbiddenException("Chỉ chủ phòng mới được mời người chơi ra");
         requireWaiting();
-        if (hostUserId.equals(userId)) throw new InvalidGameRoomStateException("The host cannot kick themselves");
+        if (hostUserId.equals(userId)) throw new InvalidGameRoomStateException("Chủ phòng không thể tự mời mình ra");
         Member member = members.get(userId);
-        if (member == null || !member.active()) throw new InvalidGameRoomStateException("User is not an active room member");
+        if (member == null || !member.active()) throw new InvalidGameRoomStateException("Bạn không còn ở trong phòng này");
         members.put(userId, member.withStatus(MemberStatus.LEFT));
         updatedAt = at;
     }
@@ -209,12 +209,12 @@ public class GameRoom {
     public void setMemberDisplayName(UUID userId, String name) {
         if (name == null || name.isBlank() || name.length() > 255) throw new IllegalArgumentException("Valid display name is required");
         Member member = members.get(userId);
-        if (member == null) throw new InvalidGameRoomStateException("User is not a room member");
+        if (member == null) throw new InvalidGameRoomStateException("Bạn không ở trong phòng này");
         members.put(userId, new Member(member.id(), userId, member.role(), member.status(), member.joinedAt(), member.slotNumber(), name.trim()));
     }
 
     private void requireWaiting() {
-        if (status != GameRoomStatus.WAITING) throw new InvalidGameRoomStateException("Room is not waiting for players");
+        if (status != GameRoomStatus.WAITING) throw new InvalidGameRoomStateException("Phòng đã bắt đầu hoặc đã đóng");
     }
 
     private Integer nextSlot() {
@@ -223,11 +223,11 @@ public class GameRoom {
             final int candidate = slot;
             if (members.values().stream().noneMatch(m -> m.active() && Integer.valueOf(candidate).equals(m.slotNumber()))) return slot;
         }
-        throw new InvalidGameRoomStateException("Room is full");
+        throw new InvalidGameRoomStateException("Phòng đã đủ người");
     }
 
     private void requireHost(UUID actorId) {
-        if (!hostUserId.equals(actorId)) throw new InvalidGameRoomStateException("Only the host can perform this action");
+        if (!hostUserId.equals(actorId)) throw new InvalidGameRoomStateException("Chỉ chủ phòng mới làm được thao tác này");
     }
 
     public UUID id() { return id; }

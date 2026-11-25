@@ -102,4 +102,13 @@ class MediaReferencePolicyTest {
         assertThatThrownBy(() -> noBase.resolve(AssetType.IMAGE, recording))
                 .isInstanceOf(InvalidMediaReferenceException.class);
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "listening/%2e%2e/x.mp3", "listening\\..\\x.mp3", "listening/a\u0000.mp3", "listening/x.mp3?sig=1"
+    })
+    void encodedBackslashControlAndQueryAudioKeysAreRejected(String reference) {
+        assertThatThrownBy(() -> policy.resolve(AssetType.AUDIO, reference))
+                .isInstanceOf(InvalidMediaReferenceException.class);
+    }
 }

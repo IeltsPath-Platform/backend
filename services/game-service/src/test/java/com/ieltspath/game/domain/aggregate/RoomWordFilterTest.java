@@ -69,6 +69,6 @@ class RoomWordFilterTest {
                 new WordlyRoomSettings(WordlyRoomSettings.PlayerMode.MULTIPLAYER, 4, WordlyRoomSettings.PlayMode.FINITE, 10), now);
         var error = assertThrows(InvalidGameRoomStateException.class,
                 () -> room.updateRocketSettings(wordlyHost, 4, null, null, b1, now));
-        assertEquals("Room is not a Rocket room", error.getMessage());
+        assertEquals("Phòng này không phải Rocket", error.getMessage());
     }
 }

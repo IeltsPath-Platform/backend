@@ -7,12 +7,14 @@ import com.ieltspath.assessment.domain.entity.AssessmentResult;
 import com.ieltspath.assessment.domain.entity.AttemptItem;
 import com.ieltspath.assessment.domain.entity.AttemptSection;
 import com.ieltspath.assessment.domain.entity.ItemResult;
+import com.ieltspath.assessment.domain.entity.SkillScore;
 import com.ieltspath.assessment.domain.repository.AssessmentAttemptRepository;
 import com.ieltspath.assessment.domain.repository.AssessmentResultRepository;
 import com.ieltspath.assessment.domain.repository.AttemptItemRepository;
 import com.ieltspath.assessment.domain.repository.AttemptResponseRepository;
 import com.ieltspath.assessment.domain.repository.AttemptSectionRepository;
 import com.ieltspath.assessment.domain.repository.ItemResultRepository;
+import com.ieltspath.assessment.domain.repository.SkillScoreRepository;
 import com.ieltspath.assessment.domain.vo.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -46,13 +48,14 @@ class PlacementGradingServiceTest {
     @Mock AttemptResponseRepository responses;
     @Mock AssessmentResultRepository results;
     @Mock ItemResultRepository itemResults;
+    @Mock SkillScoreRepository skillScores;
     @Mock AssessmentResultCompleter completer;
     @Mock GateEssayJobStore jobs;
     @Mock AutoGradeAttemptService autoGrader;
 
     private final Map<UUID, String> skillBySection = new java.util.HashMap<>();
     private final UUID userId = UUID.randomUUID();
-    private final AssessmentAttempt attempt = attempt();
+    private AssessmentAttempt attempt = attempt(null);
     private final AttemptItem listening = item("LISTENING", CORRECT_A);
     private final AttemptItem reading = item("READING", CORRECT_B);
     private final AttemptItem writing = item("WRITING", ESSAY);
@@ -66,11 +69,33 @@ class PlacementGradingServiceTest {
 
         service().onSubmit(attempt);
 
-        // listening all correct -> 9.0, reading none correct -> 0.0, writing none -> 0.0, speaking 0.0; mean 2.25 -> 2.5
-        assertThat(savedBand()).isEqualTo(2.5);
-        assertThat(gradedItems()).extracting(ItemResult::correct).containsExactly(true, false, false, true);
+        // Listening 9.0, Reading 0.0 and Writing 0.0 are averaged; ungraded Speaking is omitted.
+        assertThat(savedBand()).isEqualTo(3.0);
+        assertThat(savedSkillBands()).containsOnlyKeys(Skill.LISTENING, Skill.READING, Skill.WRITING);
+        assertThat(gradedItems()).extracting(ItemResult::correct).containsExactly(true, false, false, null);
         verify(jobs, never()).enqueueAi(any(), any());
         verify(completer).complete(eq(attempt), any(), eq(items), anyList());
+    }
+
+    @Test
+    void configuredSpeakingBandIsIncludedInTheFourSkillAverage() {
+        arrangeItems();
+        when(jobs.submittedEssays(List.of(writing.id()))).thenReturn(Map.of());
+        service(5.5).onSubmit(attempt);
+        assertThat(savedBand()).isEqualTo(3.5);
+        assertThat(savedSkillBands()).containsEntry(Skill.SPEAKING, 5.5);
+    }
+
+    @Test
+    void selectedPoolCapsTheStoredBandAndReportsThatTheCeilingWasReached() {
+        attempt = attempt(com.ieltspath.assessment.domain.vo.PlacementPool.BAND_0_3);
+        arrangeItems(true);
+        when(jobs.submittedEssays(List.of(writing.id()))).thenReturn(Map.of());
+        service().onSubmit(attempt);
+        AssessmentResult result = savedResult();
+        assertThat(result.overallBand()).isEqualTo(3.0);
+        assertThat(result.uncappedBand()).isGreaterThan(3.0);
+        assertThat(result.placementPool()).isEqualTo(com.ieltspath.assessment.domain.vo.PlacementPool.BAND_0_3);
     }
 
     @Test
@@ -95,9 +120,9 @@ class PlacementGradingServiceTest {
 
         assertThat(service().completeIfGraded(attempt.getId())).isTrue();
 
-        // (9.0 + 0.0 + 7.0 + 0.0) / 4 = 4.0
-        assertThat(savedBand()).isEqualTo(4.0);
-        assertThat(gradedItems()).extracting(ItemResult::correct).containsExactly(true, false, true, true);
+        // (9.0 + 0.0 + 7.0) / 3 = 5.5 after half-band rounding.
+        assertThat(savedBand()).isEqualTo(5.5);
+        assertThat(gradedItems()).extracting(ItemResult::correct).containsExactly(true, false, true, null);
     }
 
     @Test
@@ -116,7 +141,7 @@ class PlacementGradingServiceTest {
     }
 
     @Test
-    void anEssayJobWithoutBandTakesTheDefaultWritingBand() {
+    void anEssayJobWithoutBandIsNotGradedAndIsOmittedFromTheAverage() {
         arrangeItems();
         when(attempts.findById(attempt.getId())).thenReturn(Optional.of(attempt));
         when(results.findLatestForUpdateByAttemptId(attempt.getId())).thenReturn(Optional.empty());
@@ -125,25 +150,92 @@ class PlacementGradingServiceTest {
 
         service().completeIfGraded(attempt.getId());
 
-        // default writing 5.5: (9.0 + 0.0 + 5.5 + 0.0) / 4 = 3.625 -> 3.5
-        assertThat(savedBand()).isEqualTo(3.5);
+        AssessmentResult result = savedResult();
+        assertThat(result.overallBand()).isEqualTo(4.5);
+        assertThat(result.partial()).isTrue();
     }
 
     @Test
-    void skillBandsAreRecomputedFromTheStoredResultTheSameWayTheOverallBandWas() {
-        UUID resultId = UUID.randomUUID();
-        when(attemptItems.findByAttemptId(attempt.getId())).thenReturn(items);
-        when(sections.findByAttemptId(attempt.getId())).thenReturn(sectionRows());
-        when(itemResults.findByResultId(resultId)).thenReturn(List.of(
-                new ItemResult(UUID.randomUUID(), resultId, listening.id(), 1.0, 1.0, true, null, "{}"),
-                new ItemResult(UUID.randomUUID(), resultId, reading.id(), 0.0, 1.0, false, null, "{}")));
+    void aGradedTask1AndAnUngradedTask2LeaveWritingOutAltogether() {
+        AttemptItem task1 = item("WRITING", essay("TASK_1"));
+        AttemptItem task2 = item("WRITING", essay("TASK_2"));
+        arrangeCustomItems(List.of(listening, reading, task1, task2));
+        when(jobs.aiJobs(attempt.getId())).thenReturn(List.of(
+                new GateEssayJobStore.JobState(task1.id(), "COMPLETED", new BigDecimal("6.0")),
+                new GateEssayJobStore.JobState(task2.id(), "COMPLETED", null)));
+
+        service().completeIfGraded(attempt.getId());
+
+        // Task 1 alone must not stand in for Writing: Listening 9.0 and Reading 0.0 average to 4.5.
+        assertThat(savedSkillBands()).containsOnlyKeys(Skill.LISTENING, Skill.READING);
+        assertThat(savedResult().overallBand()).isEqualTo(4.5);
+        assertThat(savedResult().partial()).isTrue();
+    }
+
+    @Test
+    void anUnsentTask1DoesNotTurnAnUngradedTask2IntoAWritingBandOfZero() {
+        AttemptItem task1 = item("WRITING", essay("TASK_1"));
+        AttemptItem task2 = item("WRITING", essay("TASK_2"));
+        arrangeCustomItems(List.of(listening, reading, task1, task2));
+        when(jobs.aiJobs(attempt.getId())).thenReturn(List.of(
+                new GateEssayJobStore.JobState(task2.id(), "COMPLETED", null)));
+
+        service().completeIfGraded(attempt.getId());
+
+        assertThat(savedSkillBands()).containsOnlyKeys(Skill.LISTENING, Skill.READING);
+        assertThat(savedResult().partial()).isTrue();
+        assertThat(gradedItems()).extracting(ItemResult::correct).containsExactly(true, false, false, null);
+    }
+
+    @Test
+    void writingIsLabelledAsGradedByTheAiOnlyWhenAnEssayWasReallyGraded() {
+        // No essay sent: the zero is computed, not graded.
+        arrangeItems();
+        when(jobs.submittedEssays(List.of(writing.id()))).thenReturn(Map.of());
+        service().onSubmit(attempt);
+        assertThat(savedSources()).containsEntry(Skill.WRITING, GradingSource.AUTO)
+                .containsEntry(Skill.LISTENING, GradingSource.AUTO);
+    }
+
+    @Test
+    void aGradedEssayMakesTheWritingSourceAi() {
+        arrangeItems();
+        when(attempts.findById(attempt.getId())).thenReturn(Optional.of(attempt));
+        when(results.findLatestForUpdateByAttemptId(attempt.getId())).thenReturn(Optional.empty());
         when(jobs.aiJobs(attempt.getId())).thenReturn(List.of(
                 new GateEssayJobStore.JobState(writing.id(), "COMPLETED", new BigDecimal("7.0"))));
 
-        // Same inputs as completedLlmBandFeedsTheWritingSkillBand, whose overall band is 4.0.
+        service().completeIfGraded(attempt.getId());
+
+        assertThat(savedSources()).containsEntry(Skill.WRITING, GradingSource.AI);
+    }
+
+    @Test
+    void whenEverySentEssayIsGradedWritingCountsAndTheResultIsNotPartial() {
+        AttemptItem task1 = item("WRITING", essay("TASK_1"));
+        AttemptItem task2 = item("WRITING", essay("TASK_2"));
+        arrangeCustomItems(List.of(listening, reading, task1, task2));
+        when(jobs.aiJobs(attempt.getId())).thenReturn(List.of(
+                new GateEssayJobStore.JobState(task1.id(), "COMPLETED", new BigDecimal("5.0")),
+                new GateEssayJobStore.JobState(task2.id(), "COMPLETED", new BigDecimal("6.5"))));
+
+        service().completeIfGraded(attempt.getId());
+
+        // (5.0 x 1 + 6.5 x 2) / 3 = 6.0
+        assertThat(savedSkillBands()).containsEntry(Skill.WRITING, 6.0);
+        assertThat(savedResult().partial()).isFalse();
+    }
+
+    @Test
+    void skillBandsComeFromTheRowsSavedWhenTheResultWasGraded() {
+        UUID resultId = UUID.randomUUID();
+        when(skillScores.findByResultId(resultId)).thenReturn(List.of(
+                new SkillScore(UUID.randomUUID(), resultId, Skill.LISTENING, null, 9.0, GradingSource.AUTO, null),
+                new SkillScore(UUID.randomUUID(), resultId, Skill.READING, null, 0.0, GradingSource.AUTO, null),
+                new SkillScore(UUID.randomUUID(), resultId, Skill.WRITING, null, 7.0, GradingSource.AI, null)));
+        // These rows are immutable snapshots of the bands used at grading time.
         assertThat(service().skillBands(attempt.getId(), resultId)).containsExactly(
-                entry(Skill.LISTENING, 9.0), entry(Skill.READING, 0.0),
-                entry(Skill.WRITING, 7.0), entry(Skill.SPEAKING, 0.0));
+                entry(Skill.LISTENING, 9.0), entry(Skill.READING, 0.0), entry(Skill.WRITING, 7.0));
     }
 
     @Test
@@ -156,6 +248,17 @@ class PlacementGradingServiceTest {
 
         assertThat(service().skillBands(attempt.getId(), resultId)).containsEntry(Skill.WRITING, 0.0)
                 .containsEntry(Skill.LISTENING, 0.0).containsEntry(Skill.SPEAKING, 0.0);
+    }
+
+    @Test
+    void legacyResultWithoutStoredSkillRowsStillIncludesTheFormerSpeakingZero() {
+        UUID resultId = UUID.randomUUID();
+        when(skillScores.findByResultId(resultId)).thenReturn(List.of());
+        when(attemptItems.findByAttemptId(attempt.getId())).thenReturn(items);
+        when(sections.findByAttemptId(attempt.getId())).thenReturn(sectionRows());
+        when(itemResults.findByResultId(resultId)).thenReturn(List.of());
+        when(jobs.aiJobs(attempt.getId())).thenReturn(List.of());
+        assertThat(service().skillBands(attempt.getId(), resultId)).containsEntry(Skill.SPEAKING, 0.0);
     }
 
     @Test
@@ -181,13 +284,37 @@ class PlacementGradingServiceTest {
                 UUID.randomUUID(), 0, "{\"skill\":\"" + skillBySection.get(item.attemptSectionId()) + "\"}")).toList();
     }
 
+    private static String essay(String task) {
+        return "{\"answerSpec\":{\"type\":\"ESSAY\",\"task\":\"" + task + "\",\"passBand\":5.5},\"maxScore\":1.0}";
+    }
+
+    /** Arranges a completed-grading run over {@code custom}: Listening is correct, Reading wrong. */
+    private void arrangeCustomItems(List<AttemptItem> custom) {
+        when(attempts.findById(attempt.getId())).thenReturn(Optional.of(attempt));
+        when(results.findLatestForUpdateByAttemptId(attempt.getId())).thenReturn(Optional.empty());
+        when(attemptItems.findByAttemptId(attempt.getId())).thenReturn(custom);
+        when(sections.findByAttemptId(attempt.getId())).thenReturn(custom.stream()
+                .map(item -> new AttemptSection(item.attemptSectionId(), attempt.getId(), UUID.randomUUID(), 0,
+                        "{\"skill\":\"" + skillBySection.get(item.attemptSectionId()) + "\"}")).toList());
+        when(responses.findByAttemptItemIds(anyList())).thenReturn(List.of());
+        when(autoGrader.isCorrect(any(), any())).thenAnswer(invocation -> {
+            AnswerSnapshot answer = invocation.getArgument(0);
+            return "A".equals(answer.answerSpec().get("correct"));
+        });
+        when(results.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+    }
+
     private void arrangeItems() {
+        arrangeItems(false);
+    }
+
+    private void arrangeItems(boolean allCorrect) {
         when(attemptItems.findByAttemptId(attempt.getId())).thenReturn(items);
         when(sections.findByAttemptId(attempt.getId())).thenReturn(sectionRows());
         when(responses.findByAttemptItemIds(anyList())).thenReturn(List.of());
         when(autoGrader.isCorrect(any(), any())).thenAnswer(invocation -> {
             AnswerSnapshot answer = invocation.getArgument(0);
-            return "A".equals(answer.answerSpec().get("correct"));
+            return allCorrect || "A".equals(answer.answerSpec().get("correct"));
         });
         when(results.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
@@ -198,6 +325,26 @@ class PlacementGradingServiceTest {
         return captor.getValue().overallBand();
     }
 
+    private AssessmentResult savedResult() {
+        ArgumentCaptor<AssessmentResult> captor = ArgumentCaptor.forClass(AssessmentResult.class);
+        verify(results).save(captor.capture());
+        return captor.getValue();
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<Skill, Double> savedSkillBands() {
+        ArgumentCaptor<List<SkillScore>> captor = ArgumentCaptor.forClass(List.class);
+        verify(skillScores).saveAll(captor.capture());
+        return captor.getValue().stream().collect(java.util.stream.Collectors.toMap(SkillScore::skill, SkillScore::band));
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<Skill, GradingSource> savedSources() {
+        ArgumentCaptor<List<SkillScore>> captor = ArgumentCaptor.forClass(List.class);
+        verify(skillScores).saveAll(captor.capture());
+        return captor.getValue().stream().collect(java.util.stream.Collectors.toMap(SkillScore::skill, SkillScore::gradingSource));
+    }
+
     @SuppressWarnings("unchecked")
     private List<ItemResult> gradedItems() {
         ArgumentCaptor<List<ItemResult>> captor = ArgumentCaptor.forClass(List.class);
@@ -206,8 +353,12 @@ class PlacementGradingServiceTest {
     }
 
     private PlacementGradingService service() {
+        return service(null);
+    }
+
+    private PlacementGradingService service(Double configuredSpeakingBand) {
         return new PlacementGradingService(attempts, sections, attemptItems, responses, results, itemResults,
-                completer, jobs, autoGrader, new ObjectMapper(), 0.0, 5.5);
+                completer, jobs, autoGrader, new ObjectMapper(), skillScores, configuredSpeakingBand, 5.5);
     }
 
     private AttemptItem item(String skill, String answerSnapshot) {
@@ -216,9 +367,10 @@ class PlacementGradingServiceTest {
         return new AttemptItem(UUID.randomUUID(), sectionId, UUID.randomUUID(), 0, "{\"stem\":\"q\"}", answerSnapshot, null);
     }
 
-    private AssessmentAttempt attempt() {
+    private AssessmentAttempt attempt(com.ieltspath.assessment.domain.vo.PlacementPool pool) {
         Instant now = Instant.now();
         return new AssessmentAttempt(UUID.randomUUID(), userId, UUID.randomUUID(), AttemptType.PLACEMENT,
-                AttemptMode.STANDARD, AttemptChannel.WEB, AttemptStatus.SUBMITTED, now, now, null, 1, now, now);
+                AttemptMode.STANDARD, AttemptChannel.WEB, AttemptStatus.SUBMITTED, now, now, null, 1, now, now,
+                null, null, AttemptScope.FULL, null, pool);
     }
 }

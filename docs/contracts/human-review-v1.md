@@ -12,9 +12,11 @@ Role `CUSTOMER`, own essays only. Both calls forward the learner's bearer token.
 `POST /api/learning/writing-submissions/{id}/human-review` — body `{ "examinerId": "…" }` (required: the learner picks
 the examiner from `GET /api/users/examiners`, see [`user-internal-v1.md`](user-internal-v1.md)); `202`,
 `{ "reviewSubmissionId": "…", "status": "REQUESTED" }`.
-The essay (lesson block or Practice) must be `GRADED`. Learning spends one human-grading credit for the essay (Access is
-idempotent by essay id), then asks Assessment for the review below. The credit is given back only when this call spent
-it (`charged: true` in the Access answer) and Assessment refused the review outright (a 4xx answer: nothing was created,
+The essay (lesson block or Practice) must be `GRADED`. Learning asks Access to consume the human-grading entitlement for
+the essay (idempotent by essay id), then asks Assessment for the review below. Active Premium subscriptions enable
+unlimited examiner requests, so Access returns `charged: false` and spends no credit. A non-Premium subscription can use
+its existing human-grading credits. A credit is given back only when this call spent it (`charged: true` in the Access
+answer) and Assessment refused the review outright (a 4xx answer: nothing was created,
 for example `EXAMINER_UNAVAILABLE`: the learner then asks again with another examiner and the credit is spent again).
 A timeout, a server error or a lost connection may have left the review behind, so Learning asks once more with the same
 request id and, if that fails too, keeps the credit with the essay and answers `503`; asking again reuses it and spends
@@ -27,8 +29,8 @@ is derived from the essay id, so Assessment creates the review once.
 `POST /api/learning/free-writing/examiner-submissions` — sends a free-writing essay (a prompt of a practice test) to an
 examiner **instead of the AI grader**. Body `{ "requestId", "packageVersionId", "questionVersionId", "essayText",
 "examinerId" }`; `200` with the submission, status `AWAITING_EXAMINER` (no grade, `essayText` included). Nothing is graded
-by the AI and no point is charged: the learner needs **Premium with a grading credit left** (Access spends one credit,
-`402 HUMAN_GRADING_CREDIT_REQUIRED` otherwise) and the examiner must be able to take it (`409 EXAMINER_UNAVAILABLE`:
+by the AI and no point is charged: the learner needs an active **Premium subscription** (`402 HUMAN_GRADING_CREDIT_REQUIRED`
+without one; Premium requests spend no credit) and the examiner must be able to take it (`409 EXAMINER_UNAVAILABLE`:
 full for today, not accepting, or not an examiner; the credit is given back). The essay is checked like an AI-graded one
 (`422 ESSAY_EMPTY`, `ESSAY_TOO_SHORT`, `ESSAY_TOO_LONG`, `NOT_A_PRACTICE_TEST`, `404` for a prompt that is not an essay of
 the test). `requestId` makes the essay idempotent: sending again with the same id continues the same essay, and after a
@@ -59,8 +61,8 @@ refused does not hold the question. An attempt whose essay is with an examiner i
 what counts for that essay.
 
 The AI path (`POST /api/learning/free-writing/submissions`,
-points) is unchanged; the learner picks one or the other, and which one is open is decided by Premium credits (examiner)
-or the points balance (AI).
+points) is unchanged; the learner picks one or the other, and which one is open is decided by active Premium status
+(examiner) or the points balance (AI).
 
 Errors: `404 NOT_FOUND` (not the caller's), `404 NO_HUMAN_REVIEW` (nothing requested), `409 NOT_REVIEWABLE` (neither graded nor sent to an examiner),
 `402 HUMAN_GRADING_CREDIT_REQUIRED`, `409 HUMAN_GRADING_CONFLICT`, `409 EXAMINER_UNAVAILABLE` (the chosen examiner is

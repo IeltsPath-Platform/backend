@@ -8,12 +8,24 @@ import java.util.UUID;
 public record WritingGrade(List<Criterion> criteria, List<Correction> corrections, String summary,
                            BigDecimal overallBand, List<StudyPoint> studyPoints, String judgmentVersion, String model,
                            List<AppliedBandLimit> bandLimits, List<Priority> priorities,
-                           List<ErrorExample> errorExamples, Task1Checks task1Checks, Task2Checks task2Checks) {
+                           List<ErrorExample> errorExamples, Task1Checks task1Checks, Task2Checks task2Checks,
+                           List<KnowledgeJudgment> taskKnowledgePointJudgments) {
     public WritingGrade {
+        taskKnowledgePointJudgments = taskKnowledgePointJudgments == null
+                ? List.of() : List.copyOf(taskKnowledgePointJudgments);
         studyPoints = studyPoints == null ? List.of() : List.copyOf(studyPoints);
         bandLimits = bandLimits == null ? List.of() : List.copyOf(bandLimits);
         priorities = priorities == null ? List.of() : List.copyOf(priorities);
         errorExamples = errorExamples == null ? List.of() : List.copyOf(errorExamples);
+    }
+
+    /** Grades stored before the question's knowledge points were judged read with no such judgments. */
+    public WritingGrade(List<Criterion> criteria, List<Correction> corrections, String summary, BigDecimal overallBand,
+                        List<StudyPoint> studyPoints, String judgmentVersion, String model,
+                        List<AppliedBandLimit> bandLimits, List<Priority> priorities,
+                        List<ErrorExample> errorExamples, Task1Checks task1Checks, Task2Checks task2Checks) {
+        this(criteria, corrections, summary, overallBand, studyPoints, judgmentVersion, model, bandLimits, priorities,
+                errorExamples, task1Checks, task2Checks, List.of());
     }
 
     /** Grades stored before the task checks existed read with none; only the second prompt template returns them. */
@@ -54,25 +66,32 @@ public record WritingGrade(List<Criterion> criteria, List<Correction> correction
 
     public WritingGrade withModel(String model) {
         return new WritingGrade(criteria, corrections, summary, overallBand, studyPoints, judgmentVersion, model,
-                bandLimits, priorities, errorExamples, task1Checks, task2Checks);
+                bandLimits, priorities, errorExamples, task1Checks, task2Checks, taskKnowledgePointJudgments);
     }
 
     /** The same grade with the details only the second prompt template returns. */
     public WritingGrade withDetails(List<Priority> priorities, List<ErrorExample> errorExamples) {
         return new WritingGrade(criteria, corrections, summary, overallBand, studyPoints, judgmentVersion, model,
-                bandLimits, priorities, errorExamples, task1Checks, task2Checks);
+                bandLimits, priorities, errorExamples, task1Checks, task2Checks, taskKnowledgePointJudgments);
     }
 
     /** The same grade with other criteria, for example after their bands or next bands changed. */
     public WritingGrade withCriteria(List<Criterion> criteria) {
         return new WritingGrade(criteria, corrections, summary, overallBand, studyPoints, judgmentVersion, model,
-                bandLimits, priorities, errorExamples, task1Checks, task2Checks);
+                bandLimits, priorities, errorExamples, task1Checks, task2Checks, taskKnowledgePointJudgments);
     }
 
     /** The same grade with the whole-essay checks of its task; the other task's checks stay null. */
     public WritingGrade withChecks(Task1Checks task1Checks, Task2Checks task2Checks) {
         return new WritingGrade(criteria, corrections, summary, overallBand, studyPoints, judgmentVersion, model,
-                bandLimits, priorities, errorExamples, task1Checks, task2Checks);
+                bandLimits, priorities, errorExamples, task1Checks, task2Checks, taskKnowledgePointJudgments);
+    }
+
+    /** The same grade with the judgments of the question's own knowledge points. */
+    public WritingGrade withTaskKnowledgePointJudgments(List<KnowledgeJudgment> judgments, List<StudyPoint> studyPoints,
+                                                         String judgmentVersion) {
+        return new WritingGrade(criteria, corrections, summary, overallBand, studyPoints, judgmentVersion, model,
+                bandLimits, priorities, errorExamples, task1Checks, task2Checks, judgments);
     }
 
     /** One sentence of a Task 1 essay checked against the chart; {@code expected} is set only for WRONG. */
@@ -217,16 +236,28 @@ public record WritingGrade(List<Criterion> criteria, List<Correction> correction
     /** {@code practiceKnowledgePointCode} is set with {@code practiceKnowledgePointId}; null for grades stored before it. */
     public record Correction(String excerpt, String suggestion, String category, String errorCode, String errorName,
                              String fixHint, Integer severity, UUID practiceKnowledgePointId,
-                             String practiceKnowledgePointCode, String reason, String certainty) {
+                             String practiceKnowledgePointCode, String reason, String certainty,
+                             Boolean impedesMeaning) {
         public static final String ERROR = "ERROR";
         public static final String SUGGESTION = "SUGGESTION";
+
+        /**
+         * {@code impedesMeaning} is true when the error leaves the reader guessing what the writer means; null for grades
+         * made before the field existed, which therefore never count as impeding.
+         */
+        public Correction(String excerpt, String suggestion, String category, String errorCode, String errorName,
+                          String fixHint, Integer severity, UUID practiceKnowledgePointId,
+                          String practiceKnowledgePointCode, String reason, String certainty) {
+            this(excerpt, suggestion, category, errorCode, errorName, fixHint, severity, practiceKnowledgePointId,
+                    practiceKnowledgePointCode, reason, certainty, null);
+        }
 
         /** {@code reason} and {@code certainty} are only returned by the second prompt template; null reads as ERROR. */
         public Correction(String excerpt, String suggestion, String category, String errorCode, String errorName,
                           String fixHint, Integer severity, UUID practiceKnowledgePointId,
                           String practiceKnowledgePointCode) {
             this(excerpt, suggestion, category, errorCode, errorName, fixHint, severity, practiceKnowledgePointId,
-                    practiceKnowledgePointCode, null, null);
+                    practiceKnowledgePointCode, null, null, null);
         }
 
         public Correction(String excerpt, String suggestion, String category, String errorCode, String errorName,
@@ -242,8 +273,14 @@ public record WritingGrade(List<Criterion> criteria, List<Correction> correction
             this(excerpt, suggestion, category, errorCode, null, null, null, null, null);
         }
 
-        /** A suggestion is acceptable text with a better wording; it is not counted as an error. */
-        public boolean isSuggestion() { return SUGGESTION.equals(certainty); }
+        /**
+         * A suggestion is acceptable text with a better wording; it is not counted as an error. Not named
+         * {@code isSuggestion}: Jackson would store that as a boolean {@code suggestion} over the suggested text.
+         */
+        public boolean suggestionOnly() { return SUGGESTION.equals(certainty); }
+
+        /** True only when the model flagged the error; a missing flag never counts. Not named {@code isX}: see above. */
+        public boolean impeding() { return Boolean.TRUE.equals(impedesMeaning); }
     }
 
     /** A weak rubric criterion and its knowledge point, or a focus suggested by the grader's model. */

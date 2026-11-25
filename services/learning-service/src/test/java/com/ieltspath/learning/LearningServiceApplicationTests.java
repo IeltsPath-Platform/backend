@@ -18,6 +18,7 @@ import java.util.Base64;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -57,11 +58,45 @@ class LearningServiceApplicationTests {
 
     @Test
     void contextStartsWithMigratedSchemaAndPublicHealth() throws Exception {
-        assertEquals("52", flyway.info().current().getVersion().getVersion());
-        assertEquals(62, jdbc.queryForObject(
+        assertEquals("59", flyway.info().current().getVersion().getVersion());
+        assertEquals(63, jdbc.queryForObject(
                 "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' "
                         + "AND table_type = 'BASE TABLE' AND table_name <> 'flyway_schema_history'",
                 Integer.class));
         mockMvc.perform(get("/actuator/health")).andExpect(status().isOk());
+    }
+
+    @Test
+    void premiumGradingConstraintsAllowFreeRowsAndRejectPaidRowsWithoutALedgerEntry() {
+        UUID userId = UUID.randomUUID();
+        UUID writingId = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO lesson_writing_submissions
+                    (id,user_id,lesson_id,block_id,question_version_id,knowledge_point_ids,request_id,essay_text,
+                     word_count,prompt_snapshot,status,point_cost,result,overall_band,passed,grading_started_at,submitted_at)
+                VALUES (?,?,?,?,?,ARRAY[]::uuid[],?,'essay',1,'{}','GRADED',0,'{}',6.0,true,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+                """, writingId, userId, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM lesson_writing_submissions WHERE id=?", Integer.class,
+                writingId));
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class, () -> jdbc.update("""
+                INSERT INTO lesson_writing_submissions
+                    (id,user_id,lesson_id,block_id,question_version_id,knowledge_point_ids,request_id,essay_text,
+                     word_count,prompt_snapshot,status,point_cost,result,overall_band,passed,grading_started_at,submitted_at)
+                VALUES (?,?,?,?,?,ARRAY[]::uuid[],?,'essay',1,'{}','GRADED',3,'{}',6.0,true,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+                """, UUID.randomUUID(), userId, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()));
+
+        UUID speakingId = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO speaking_submissions
+                    (id,user_id,request_id,package_version_id,scope,status,point_cost,consent_at,created_at,updated_at,result)
+                VALUES (?,?,?,?,'PART','GRADED',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'{}')
+                """, speakingId, userId, UUID.randomUUID(), UUID.randomUUID());
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM speaking_submissions WHERE id=?", Integer.class,
+                speakingId));
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class, () -> jdbc.update("""
+                INSERT INTO speaking_submissions
+                    (id,user_id,request_id,package_version_id,scope,status,point_cost,consent_at,created_at,updated_at,result)
+                VALUES (?,?,?,?,'PART','GRADED',5,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'{}')
+                """, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()));
     }
 }

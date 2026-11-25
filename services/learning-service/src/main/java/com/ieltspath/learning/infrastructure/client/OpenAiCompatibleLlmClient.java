@@ -12,6 +12,7 @@ import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.port.LlmClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -35,7 +36,8 @@ import java.util.Locale;
 @Component
 public class OpenAiCompatibleLlmClient implements LlmClient {
     private static final Logger log = LoggerFactory.getLogger(OpenAiCompatibleLlmClient.class);
-    private static final int MAX_TOKENS = 4096;
+    /** Output budget of a call that names none, as {@code learning.llm.max-tokens} defaults to. */
+    static final int DEFAULT_MAX_TOKENS = 8192;
     private static final ObjectMapper ERROR_READER = new ObjectMapper();
     private static final int MESSAGE_EXCERPT = 300;
     /** Families that think by default and may spend the whole budget on it unless told not to. */
@@ -48,6 +50,7 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
     private final String model;
     private final String reasoningEffort;
     private final ResilientCall resilientCall;
+    private final int maxTokens;
 
     @Autowired
     public OpenAiCompatibleLlmClient(RestClient.Builder builder,
@@ -56,6 +59,7 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
                                      @Value("${learning.llm.model:}") String model,
                                      @Value("${learning.llm.reasoning-effort:}") String reasoningEffort,
                                      @Value("${learning.writing.grading-timeout-seconds:20}") int timeoutSeconds,
+                                     @Value("${learning.llm.max-tokens:8192}") int maxTokens,
                                      ResilientCall resilientCall) {
         String normalizedBaseUrl = baseUrl.isBlank() ? null : baseUrl.replaceAll("/+$", "");
         this.restClient = normalizedBaseUrl == null ? null : builder.clone()
@@ -64,11 +68,12 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
         this.model = model;
         this.reasoningEffort = reasoningEffort;
         this.resilientCall = resilientCall;
+        this.maxTokens = maxTokens;
     }
 
     OpenAiCompatibleLlmClient(RestClient.Builder builder, String baseUrl, String apiKey, String model,
                               String reasoningEffort, int timeoutSeconds) {
-        this(builder, baseUrl, apiKey, model, reasoningEffort, timeoutSeconds, null);
+        this(builder, baseUrl, apiKey, model, reasoningEffort, timeoutSeconds, DEFAULT_MAX_TOKENS, null);
     }
 
     /** {@code restClient} is null when no endpoint is configured. */
@@ -78,6 +83,7 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
         this.model = model;
         this.reasoningEffort = reasoningEffort;
         this.resilientCall = null;
+        this.maxTokens = DEFAULT_MAX_TOKENS;
     }
 
     OpenAiCompatibleLlmClient(RestClient restClient, String apiKey, String model, String reasoningEffort,
@@ -87,6 +93,7 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
         this.model = model;
         this.reasoningEffort = reasoningEffort;
         this.resilientCall = resilientCall;
+        this.maxTokens = DEFAULT_MAX_TOKENS;
     }
 
     private static SimpleClientHttpRequestFactory requestFactory(int timeoutSeconds) {
@@ -101,9 +108,13 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
         return restClient != null && !apiKey.isBlank() && !model.isBlank();
     }
 
+    /**
+     * Essay grading uses this. A template-v2 grade of a 200-word Task 1 already takes 4,200 to 4,700 output tokens, so a
+     * smaller fixed budget cut the JSON off and the grade failed as INVALID_GRADE.
+     */
     @Override
     public String completeJson(String systemPrompt, String userPrompt) {
-        return completeJson(systemPrompt, userPrompt, new Budget(MAX_TOKENS, 0));
+        return completeJson(systemPrompt, userPrompt, new Budget(maxTokens, 0));
     }
 
     /** A {@code timeoutSeconds} of 0 keeps the client's own read timeout. */
@@ -168,15 +179,53 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
     }
 
     private String requestContent(RestClient client, Request body) {
-        JsonNode response = client.post().uri("/chat/completions")
-                .headers(headers -> headers.setBearerAuth(apiKey))
-                .body(body).retrieve().body(JsonNode.class);
+        long begun = System.nanoTime();
+        JsonNode response;
+        try {
+            response = client.post().uri("/chat/completions")
+                    .headers(headers -> headers.setBearerAuth(apiKey))
+                    .body(body).retrieve().body(JsonNode.class);
+        } catch (RuntimeException failure) {
+            // How long the provider took before it failed or timed out; the cause is logged by the caller.
+            log.info("LLM call failed: model={}, task={}, submissionId={}, millis={}, reason={}", model, mdc("llmTask"),
+                    mdc("submissionId"), millisSince(begun), failure.getClass().getSimpleName());
+            throw failure;
+        }
+        logCall(response, millisSince(begun));
         JsonNode content = response == null ? null : response.path("choices").path(0).path("message").path("content");
         if (content == null || !content.isTextual()) {
             log.warn("LLM reply carried no text content");
             throw new LlmUnavailableException(null);
         }
         return content.asText();
+    }
+
+    /**
+     * One line per attempt: how long the provider took to answer and how much it read and wrote. Time follows the tokens
+     * written, so the numbers show whether a slow answer is a long answer or a slow model. It names the work (task) and the
+     * submission the thread is on, and carries nothing the learner said.
+     */
+    private void logCall(JsonNode response, long millis) {
+        JsonNode usage = response == null ? null : response.path("usage");
+        log.info("LLM call: model={}, task={}, submissionId={}, millis={}, promptTokens={}, completionTokens={}, reasoningTokens={}, finishReason={}",
+                model, mdc("llmTask"), mdc("submissionId"), millis,
+                count(usage, "prompt_tokens"), count(usage, "completion_tokens"),
+                usage == null ? "-" : count(usage.path("completion_tokens_details"), "reasoning_tokens"),
+                response == null ? "-" : identifier(response.path("choices").path(0).path("finish_reason")));
+    }
+
+    private static String count(JsonNode node, String field) {
+        JsonNode value = node == null ? null : node.path(field);
+        return value != null && value.isNumber() ? value.asText() : "-";
+    }
+
+    private static String mdc(String key) {
+        String value = MDC.get(key);
+        return value == null ? "-" : value;
+    }
+
+    private static long millisSince(long begunNanos) {
+        return (System.nanoTime() - begunNanos) / 1_000_000;
     }
 
     /** The {@code reasoning_effort} to send, or null to leave the field out. */

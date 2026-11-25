@@ -79,7 +79,7 @@ public class SoloGameplayUseCase {
             settle(s, "TIMED_OUT", w.attempts(), r.received());
             var body =
                     new LinkedHashMap<>(
-                            error(409, "WORD_EXPIRED", "Word deadline has passed", s.matchId())
+                            error(409, "WORD_EXPIRED", "Đã hết thời gian cho từ này", s.matchId())
                                     .body());
             State updated = store.lock(s.matchId(), s.userId());
             body.put("nextWord", current(updated));
@@ -97,7 +97,7 @@ public class SoloGameplayUseCase {
             return error(
                     400,
                     "WORD_NOT_FOUND",
-                    "Word was not found in this match's dictionary",
+                    "Từ này không có trong từ điển của ván chơi",
                     s.matchId());
         var letters = WordlyRoundRules.evaluate(w.answer(), r.guess());
         boolean solved = w.answer().equals(r.guess());

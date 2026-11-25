@@ -12,12 +12,19 @@ import java.util.stream.Collectors;
 public final class RubricPromptBuilder {
     public static final String TEMPLATE_VERSION = "v1";
     public static final String TEMPLATE_VERSION_2 = "v2";
+    public static final String TEMPLATE_VERSION_3 = "v3";
     private static final String TEMPLATE = loadTemplate(TEMPLATE_VERSION);
     private static final String TEMPLATE_2 = loadTemplate(TEMPLATE_VERSION_2);
+    private static final String TEMPLATE_3 = loadTemplate(TEMPLATE_VERSION_3);
     private RubricPromptBuilder() {}
 
     public static boolean isKnownTemplate(String version) {
-        return TEMPLATE_VERSION.equals(version) || TEMPLATE_VERSION_2.equals(version);
+        return TEMPLATE_VERSION.equals(version) || TEMPLATE_VERSION_2.equals(version) || TEMPLATE_VERSION_3.equals(version);
+    }
+
+    private static String templateOf(String version) {
+        if (TEMPLATE_VERSION_3.equals(version)) return TEMPLATE_3;
+        return TEMPLATE_VERSION_2.equals(version) ? TEMPLATE_2 : TEMPLATE;
     }
 
     public static String promptVersion(ActiveRubricProvider.Rubric rubric) {
@@ -36,15 +43,28 @@ public final class RubricPromptBuilder {
         return build(rubric, errorTypes, TEMPLATE_VERSION);
     }
 
+    /** The codes a grader for this rubric's task may use; a code without a task list applies to both tasks. */
+    public static List<ErrorTypeCatalog.ErrorType> applicableTo(ActiveRubricProvider.Rubric rubric,
+                                                                List<ErrorTypeCatalog.ErrorType> errorTypes) {
+        return errorTypes.stream().filter(java.util.Objects::nonNull).filter(error -> error.code() != null)
+                .filter(error -> error.appliesToWritingTask(rubric.task())).toList();
+    }
+
     public static String build(ActiveRubricProvider.Rubric rubric, List<ErrorTypeCatalog.ErrorType> errorTypes,
                                String templateVersion) {
         String criteria = rubric.criteria().stream().sorted(java.util.Comparator.comparingInt(ActiveRubricProvider.Criterion::sortOrder))
                 .map(RubricPromptBuilder::formatCriterion).collect(Collectors.joining("\n\n"));
+        // The rubric's own instructions (how to choose a band) come before its criteria when Content has them.
+        if (rubric.systemPrompt() != null && !rubric.systemPrompt().isBlank()) {
+            criteria = rubric.systemPrompt().trim() + "\n\n" + criteria;
+        }
         String task = "TASK_1".equals(rubric.task()) ? "Academic Writing Task 1" : "Writing Task 2";
-        String codes = errorTypes.stream().filter(java.util.Objects::nonNull).filter(error -> error.code() != null)
+        String codes = applicableTo(rubric, errorTypes).stream()
                 .sorted(java.util.Comparator.comparing(ErrorTypeCatalog.ErrorType::code))
-                .map(error -> error.code() + " — " + error.name() + ": " + error.fixHint()).collect(Collectors.joining("\n"));
-        String template = forTask(TEMPLATE_VERSION_2.equals(templateVersion) ? TEMPLATE_2 : TEMPLATE,
+                .map(error -> error.code() + " — " + error.name() + ": "
+                        + (error.modelDefinition() != null ? error.modelDefinition() : error.fixHint()))
+                .collect(Collectors.joining("\n"));
+        String template = forTask(templateOf(templateVersion),
                 "TASK_1".equals(rubric.task()));
         return template.replace("{{task}}", task).replace("{{criteria}}", criteria)
                 .replace("{{error_codes}}", codes.isBlank() ? "(none)" : codes);

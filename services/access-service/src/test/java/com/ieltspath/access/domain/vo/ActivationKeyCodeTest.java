@@ -39,4 +39,13 @@ class ActivationKeyCodeTest {
         assertThatThrownBy(() -> ActivationKeyCode.fromRawKey(null))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    @DisplayName("A key shorter than 4 characters is its own hint")
+    void shouldUseWholeShortKeyAsHint() {
+        ActivationKeyCode code = ActivationKeyCode.fromRawKey("ab3");
+
+        assertThat(code.codeHint()).isEqualTo("AB3");
+        assertThat(code.codeHash()).hasSize(64);
+    }
 }

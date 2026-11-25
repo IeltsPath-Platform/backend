@@ -40,4 +40,13 @@ class BandRangeTest {
     void rejectsAMinimumAboveTheMaximum() {
         assertThatThrownBy(() -> BandRange.of(band("7.0"), band("5.0"))).isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void theWholeScaleAndASingleBandAreValidRanges() {
+        BandRange whole = BandRange.of(band("0.0"), band("9.0"));
+        assertThat(whole.min()).isEqualByComparingTo("0.0");
+        assertThat(whole.max()).isEqualByComparingTo("9.0");
+        BandRange single = BandRange.of(band("6.0"), band("6.0"));
+        assertThat(single.min()).isEqualByComparingTo(single.max());
+    }
 }

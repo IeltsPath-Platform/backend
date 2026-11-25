@@ -10,6 +10,7 @@ public enum MailTemplate {
     PASSWORD_RESET("password-reset", Set.of("displayName", "resetLink", "expiresInMinutes")),
     PASSWORD_CHANGED("password-changed", Set.of("displayName", "changedAt")),
     GOOGLE_ACCOUNT_LINKED("google-account-linked", Set.of("displayName")),
+    PASSWORD_RESET_GOOGLE_ONLY("password-reset-google-only", Set.of("displayName")),
     EMAIL_VERIFICATION("email-verification", Set.of("displayName", "verifyLink", "expiresInMinutes")),
     SUBSCRIPTION_EXPIRING("subscription-expiring", Set.of("displayName", "endsAt")),
     SUBSCRIPTION_EXPIRED("subscription-expired", Set.of("displayName", "endsAt")),

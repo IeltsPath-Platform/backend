@@ -49,6 +49,53 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class InternalLearningContentControllerTest {
     @Test
+    void placementPoolFilterIsForwardedAndUnknownValueRejected() throws Exception {
+        var pool = com.ieltspath.content.domain.vo.PlacementPool.BAND_0_3;
+        when(placementTests.execute(pool)).thenReturn(List.of());
+        mockMvc.perform(get("/internal/learning-content/placement-packages").param("pool", "BAND_0_3"))
+                .andExpect(status().isOk());
+        verify(placementTests).execute(pool);
+        mockMvc.perform(get("/internal/learning-content/placement-packages").param("pool", "UNKNOWN"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void withoutAPoolOnlyTheFullLengthPoolIsRequestedSoALearningInstanceThatTakesTheFirstExamIsSafe() throws Exception {
+        when(placementTests.execute(com.ieltspath.content.domain.vo.PlacementPool.BAND_5_9)).thenReturn(List.of());
+        mockMvc.perform(get("/internal/learning-content/placement-packages")).andExpect(status().isOk());
+        verify(placementTests).execute(com.ieltspath.content.domain.vo.PlacementPool.BAND_5_9);
+        verify(placementTests, never()).execute(null);
+    }
+
+    @Test
+    void poolAllRequestsEveryPool() throws Exception {
+        when(placementTests.execute(null)).thenReturn(List.of());
+        mockMvc.perform(get("/internal/learning-content/placement-packages").param("pool", "ALL"))
+                .andExpect(status().isOk());
+        verify(placementTests).execute(null);
+    }
+
+    @Test
+    void nonPlacementVersionSerializesNullPool() throws Exception {
+        UUID version = UUID.randomUUID();
+        when(packageVersion.execute(version)).thenReturn(new PackageVersionContentResult(version, UUID.randomUUID(),
+                PackageType.PRACTICE_SET, null, "{}", List.of(), null));
+        mockMvc.perform(get("/internal/learning-content/package-versions/{id}", version))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.placementPool").value(org.hamcrest.Matchers.nullValue()));
+        verify(packageVersion).execute(version);
+    }
+
+    @Test
+    void placementVersionSerializesPool() throws Exception {
+        UUID version = UUID.randomUUID();
+        when(packageVersion.execute(version)).thenReturn(new PackageVersionContentResult(version, UUID.randomUUID(),
+                PackageType.PLACEMENT_TEST, null, "{}", List.of(), com.ieltspath.content.domain.vo.PlacementPool.BAND_3_5));
+        mockMvc.perform(get("/internal/learning-content/package-versions/{id}", version))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.placementPool").value("BAND_3_5"));
+    }
+
+    @Test
     void practiceSkillFilterIsForwardedAndSetSkillsAreSerialized() throws Exception {
         UUID lessonId = UUID.randomUUID();
         var filter = java.util.Optional.of(Skill.READING);
@@ -107,12 +154,14 @@ class InternalLearningContentControllerTest {
     void placementPackagesUseTheExistingPackageShape() throws Exception {
         UUID pkg = UUID.randomUUID();
         UUID version = UUID.randomUUID();
-        when(placementTests.execute()).thenReturn(List.of(
-                new com.ieltspath.content.application.result.TopicTestPackageResult(pkg, version, "PLACEMENT")));
+        when(placementTests.execute(com.ieltspath.content.domain.vo.PlacementPool.BAND_5_9)).thenReturn(List.of(
+                new com.ieltspath.content.application.result.PlacementPackageResult(pkg, version, "PLACEMENT",
+                        com.ieltspath.content.domain.vo.PlacementPool.BAND_5_9)));
         mockMvc.perform(get("/internal/learning-content/placement-packages"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$[0].packageId").value(pkg.toString()))
                 .andExpect(jsonPath("$[0].packageVersionId").value(version.toString()))
-                .andExpect(jsonPath("$[0].code").value("PLACEMENT"));
+                .andExpect(jsonPath("$[0].code").value("PLACEMENT"))
+                .andExpect(jsonPath("$[0].pool").value("BAND_5_9"));
     }
 
     @Test
@@ -444,5 +493,24 @@ class InternalLearningContentControllerTest {
                         com.ieltspath.content.application.command.SearchPracticeSetsCommand.class);
         verify(search).execute(command.capture());
         org.assertj.core.api.Assertions.assertThat(command.getValue().trapErrorCode()).isEqualTo("TFNG_NG_AS_FALSE");
+    }
+
+    @Test
+    void errorTypesTellWhetherTheModelMayPickThem() throws Exception {
+        var wholeEssay = new com.ieltspath.content.domain.aggregate.ErrorType(UUID.randomUUID(), "T1_NO_OVERVIEW",
+                "Thiếu overview", com.ieltspath.content.domain.vo.ErrorCategory.TASK, 3, null, null, "Viết overview.",
+                com.ieltspath.content.domain.vo.ContentStatus.ACTIVE,
+                com.ieltspath.content.domain.vo.ErrorReviewStatus.APPROVED, null, null, List.of("WRITING"), false,
+                "The essay has no overview.", List.of("TASK_1"), false);
+        var quotable = com.ieltspath.content.domain.aggregate.ErrorType.create("TENSE", "Tense",
+                com.ieltspath.content.domain.vo.ErrorCategory.GRAMMAR, 1, null, "Use the right tense.");
+        when(errorTypes.executeApprovedActive("WRITING")).thenReturn(List.of(wholeEssay, quotable));
+
+        mockMvc.perform(get("/internal/learning-content/error-types").param("skill", "WRITING"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].code").value("T1_NO_OVERVIEW"))
+                .andExpect(jsonPath("$[0].modelSelectable").value(false))
+                .andExpect(jsonPath("$[1].code").value("TENSE"))
+                .andExpect(jsonPath("$[1].modelSelectable").value(true));
     }
 }

@@ -220,7 +220,8 @@ public final class WritingSubmission {
     /** PAYMENT_PENDING → GRADED once the points are debited; the grade becomes visible. */
     public void markGraded(UUID ledgerEntryId) {
         require(PAYMENT_PENDING);
-        this.ledgerEntryId = Objects.requireNonNull(ledgerEntryId, "ledgerEntryId");
+        if (pointCost > 0) Objects.requireNonNull(ledgerEntryId, "ledgerEntryId");
+        this.ledgerEntryId = ledgerEntryId;
         failureCode = null;
         status = GRADED;
     }

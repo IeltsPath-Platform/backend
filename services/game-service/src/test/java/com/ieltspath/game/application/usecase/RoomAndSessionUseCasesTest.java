@@ -154,7 +154,7 @@ class RoomAndSessionUseCasesTest {
 
         var error = assertThrows(InvalidGameRoomStateException.class, () -> membership.close(room.id(), guest));
 
-        assertEquals("Only the host can perform this action", error.getMessage());
+        assertEquals("Chỉ chủ phòng mới làm được thao tác này", error.getMessage());
         verify(rooms, never()).save(any());
     }
 

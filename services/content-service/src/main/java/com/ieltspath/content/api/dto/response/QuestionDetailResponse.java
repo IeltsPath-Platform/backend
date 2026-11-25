@@ -22,7 +22,8 @@ public record QuestionDetailResponse(
         Instant createdAt,
         Instant updatedAt,
         List<QuestionVersionResponse> versions,
-        QuestionPurpose purpose
+        QuestionPurpose purpose,
+        String code
 ) {
     public static QuestionDetailResponse from(QuestionDetailResult result) {
         List<QuestionVersionResponse> versionResponses = result.versions() != null
@@ -38,7 +39,8 @@ public record QuestionDetailResponse(
                 result.createdAt(),
                 result.updatedAt(),
                 versionResponses,
-                result.purpose()
+                result.purpose(),
+                result.code()
         );
     }
 }

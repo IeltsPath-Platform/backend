@@ -26,8 +26,9 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Grades and records a free-practice attempt. It writes the answers, the question log and mastery evidence, and nothing
- * else: no review is created or promoted, no lesson or course score moves, and the result never blocks anything.
+ * Grades and records a free-practice attempt. It writes the answers, the question log and mastery evidence. The only
+ * review it can add is the optional error-pattern review of a point whose trap child has just reached the priority tier;
+ * no blocking review is created or promoted, no lesson or course score moves, and the result never blocks anything.
  */
 @Component
 public class FreePracticeSubmission {
@@ -70,6 +71,7 @@ public class FreePracticeSubmission {
         // Only the first answer to a set counts, as in lessons; a repeat is logged but adds no evidence.
         boolean counted = !attempts.revealedPackageIds(userId).contains(attempt.packageId());
         Map<UUID, Long> durations = AnswerDurations.of(command.answers());
+        Map<UUID, String> submitted = SubmittedAnswers.of(command.answers());
         List<KnowledgeEvidence> firstAnswers = new ArrayList<>();
         List<QuestionAttemptEvent> events = new ArrayList<>();
         List<PracticeSubmission.Answer> results = new ArrayList<>();
@@ -96,7 +98,8 @@ public class FreePracticeSubmission {
             results.add(new PracticeSubmission.Answer(item.questionVersionId(), grade.correct(),
                     grade.correctAnswer(), item.explanation(),
                     hints.afterAnswer(grade.correct(), item.answerSpec(), item.options(), item.hint()),
-                    errorTrapEvidence.practiceFeedback(graded.errorCodes().get(index), errorTexts)));
+                    errorTrapEvidence.practiceFeedback(graded.errorCodes().get(index), errorTexts),
+                    submitted.get(item.questionVersionId())));
         }
         GamificationSummary xp = counted
                 ? gamificationRecorder.recordCorrectAnswers(userId, command.requestId(), graded.correctQuestionIds())

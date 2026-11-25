@@ -1,9 +1,12 @@
 package com.ieltspath.content.api.exception;
 
+import com.ieltspath.commonsecurity.error.VietnameseErrorMessages;
 import com.ieltspath.commonstorage.StorageException;
 import com.ieltspath.commonstorage.UploadRejectedException;
 import com.ieltspath.content.domain.exception.*;
 import com.ieltspath.content.application.exception.VocabularyServiceUnavailableException;
+import com.ieltspath.content.application.exception.EntitlementUnavailableException;
+import com.ieltspath.content.application.exception.PremiumRequiredException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +31,19 @@ public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    @ExceptionHandler(PremiumRequiredException.class)
+    public ResponseEntity<ErrorResponse> premiumRequired(PremiumRequiredException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.FORBIDDEN, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "PREMIUM_REQUIRED"));
+    }
+
+    @ExceptionHandler(EntitlementUnavailableException.class)
+    public ResponseEntity<ErrorResponse> entitlementUnavailable(EntitlementUnavailableException ex,
+                                                                  HttpServletRequest request) {
+        return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "ENTITLEMENT_UNAVAILABLE"));
+    }
+
     @ExceptionHandler({
             TopicNotFoundException.class,
             CourseNotFoundException.class,
@@ -44,6 +60,7 @@ public class GlobalExceptionHandler {
             ContentSectionNotFoundException.class,
             SectionQuestionNotFoundException.class,
             AiDraftNotFoundException.class,
+            com.ieltspath.content.domain.exception.CourseImportDraftNotFoundException.class,
             DraftItemNotFoundException.class,
             RubricNotFoundException.class
     })
@@ -60,9 +77,12 @@ public class GlobalExceptionHandler {
     })
     public ResponseEntity<ErrorResponse> handleBadRequestException(Exception ex, HttpServletRequest request) {
         log.warn("Bad request: {}", ex.getMessage());
-        Map<String, Object> details = ex instanceof InvalidErrorTypeException
-                && "TRAP_KNOWLEDGE_POINT_NOT_ASSIGNABLE".equals(ex.getMessage())
-                ? Map.of("code", "TRAP_KNOWLEDGE_POINT_NOT_ASSIGNABLE") : null;
+        String code = ex instanceof InvalidErrorTypeException errorType ? errorType.getCode()
+                : ex instanceof InvalidContentStateException state ? state.getCode() : null;
+        Map<String, Object> details = code == null ? null : Map.of("code", code);
+        if (InvalidContentStateException.CODE_LOCKED.equals(code)) {
+            return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(), details);
+        }
         return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI(), details);
     }
 
@@ -92,6 +112,27 @@ public class GlobalExceptionHandler {
                                                                   HttpServletRequest request) {
         return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
                 Map.of("code", "IMPORT_REF_CONFLICT"));
+    }
+
+    @ExceptionHandler(com.ieltspath.content.domain.exception.PlacementPoolLockedException.class)
+    public ResponseEntity<ErrorResponse> handlePlacementPoolLocked(
+            com.ieltspath.content.domain.exception.PlacementPoolLockedException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "PLACEMENT_POOL_LOCKED"));
+    }
+
+    @ExceptionHandler(com.ieltspath.content.domain.exception.PlacementPoolLastPublishedException.class)
+    public ResponseEntity<ErrorResponse> handlePlacementPoolLastPublished(
+            com.ieltspath.content.domain.exception.PlacementPoolLastPublishedException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "PLACEMENT_POOL_LAST_PUBLISHED"));
+    }
+
+    @ExceptionHandler(com.ieltspath.content.domain.exception.PackageArchiveNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handlePackageArchiveNotSupported(
+            com.ieltspath.content.domain.exception.PackageArchiveNotSupportedException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "PACKAGE_ARCHIVE_NOT_SUPPORTED"));
     }
 
     @ExceptionHandler(DraftVersionExistsException.class)
@@ -224,6 +265,13 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(), null);
     }
 
+    @ExceptionHandler(CourseNotEmptyException.class)
+    public ResponseEntity<ErrorResponse> handleCourseNotEmpty(CourseNotEmptyException ex, HttpServletRequest request) {
+        log.warn("Course delete refused: {}", ex.getMessage());
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "COURSE_NOT_EMPTY"));
+    }
+
     @ExceptionHandler(DuplicateLessonResourceOrderException.class)
     public ResponseEntity<ErrorResponse> handleDuplicateLessonResourceOrder(DuplicateLessonResourceOrderException ex,
                                                                            HttpServletRequest request) {
@@ -274,7 +322,7 @@ public class GlobalExceptionHandler {
         for (FieldError error : ex.getBindingResult().getFieldErrors()) {
             details.put(error.getField(), error.getDefaultMessage());
         }
-        return buildResponse(HttpStatus.BAD_REQUEST, "Validation failed", request.getRequestURI(), details);
+        return buildResponse(HttpStatus.BAD_REQUEST, "Dữ liệu gửi lên không hợp lệ", request.getRequestURI(), details);
     }
 
     @ExceptionHandler(PrerequisiteCycleException.class)
@@ -316,20 +364,20 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleUnreadableRequest(HttpMessageNotReadableException ex,
                                                                    HttpServletRequest request) {
         log.warn("Malformed request body: {}", ex.getMessage());
-        return buildResponse(HttpStatus.BAD_REQUEST, "Malformed request body", request.getRequestURI(), null);
+        return buildResponse(HttpStatus.BAD_REQUEST, "Nội dung yêu cầu không đúng định dạng", request.getRequestURI(), null);
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ErrorResponse> handleInvalidParameter(MethodArgumentTypeMismatchException ex,
                                                                HttpServletRequest request) {
-        return buildResponse(HttpStatus.BAD_REQUEST, "Invalid value for request parameter " + ex.getName(),
+        return buildResponse(HttpStatus.BAD_REQUEST, "Giá trị của tham số " + ex.getName() + " không hợp lệ",
                 request.getRequestURI(), null);
     }
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleAccessDeniedException(AccessDeniedException ex, HttpServletRequest request) {
         log.warn("Access denied: {}", ex.getMessage());
-        return buildResponse(HttpStatus.FORBIDDEN, "Access denied", request.getRequestURI(), null);
+        return buildResponse(HttpStatus.FORBIDDEN, "Bạn không có quyền thực hiện thao tác này", request.getRequestURI(), null);
     }
 
     @ExceptionHandler(InvalidLessonBlockException.class)
@@ -380,14 +428,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleUploadRejected(UploadRejectedException ex, HttpServletRequest request) {
         boolean document = request.getRequestURI().endsWith("/media/document");
         return switch (ex.reason()) {
-            case TOO_LARGE -> buildResponse(HttpStatus.PAYLOAD_TOO_LARGE, "The file is larger than the limit",
+            case TOO_LARGE -> buildResponse(HttpStatus.PAYLOAD_TOO_LARGE, "Tệp lớn hơn giới hạn cho phép",
                     request.getRequestURI(), Map.of("code", document ? "DOCUMENT_TOO_LARGE" : "AUDIO_TOO_LARGE"));
-            case EMPTY -> buildResponse(HttpStatus.BAD_REQUEST, "The file is empty", request.getRequestURI(),
+            case EMPTY -> buildResponse(HttpStatus.BAD_REQUEST, "Tệp không có nội dung", request.getRequestURI(),
                     Map.of("code", "EMPTY_FILE"));
             case TYPE_NOT_ALLOWED, CONTENT_MISMATCH -> document
-                    ? buildResponse(HttpStatus.BAD_REQUEST, "The file is not a PDF", request.getRequestURI(),
+                    ? buildResponse(HttpStatus.BAD_REQUEST, "Tệp không phải là PDF", request.getRequestURI(),
                             Map.of("code", "UNSUPPORTED_DOCUMENT"))
-                    : buildResponse(HttpStatus.BAD_REQUEST, "The file is not a supported audio format",
+                    : buildResponse(HttpStatus.BAD_REQUEST, "Tệp không phải định dạng âm thanh được hỗ trợ",
                             request.getRequestURI(), Map.of("code", "UNSUPPORTED_AUDIO"));
         };
     }
@@ -398,21 +446,21 @@ public class GlobalExceptionHandler {
         String uri = request.getRequestURI();
         String code = uri.contains("/course-import") ? ImportFileRejectedException.FILE_TOO_LARGE
                 : uri.endsWith("/media/document") ? "DOCUMENT_TOO_LARGE" : "AUDIO_TOO_LARGE";
-        return buildResponse(HttpStatus.PAYLOAD_TOO_LARGE, "The file is larger than the limit",
+        return buildResponse(HttpStatus.PAYLOAD_TOO_LARGE, "Tệp lớn hơn giới hạn cho phép",
                 request.getRequestURI(), Map.of("code", code));
     }
 
     @ExceptionHandler(MissingServletRequestPartException.class)
     public ResponseEntity<ErrorResponse> handleMissingPart(MissingServletRequestPartException ex,
                                                            HttpServletRequest request) {
-        return buildResponse(HttpStatus.BAD_REQUEST, "The request part " + ex.getRequestPartName() + " is missing",
+        return buildResponse(HttpStatus.BAD_REQUEST, "Thiếu phần \"" + ex.getRequestPartName() + "\" trong yêu cầu",
                 request.getRequestURI(), Map.of("code", "MISSING_PART"));
     }
 
     @ExceptionHandler(StorageException.class)
     public ResponseEntity<ErrorResponse> handleStorage(StorageException ex, HttpServletRequest request) {
         log.error("Storage operation failed: operation={} reason={}", ex.operation(), ex.reason());
-        return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, "File storage is unavailable", request.getRequestURI(),
+        return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, "Kho lưu trữ tệp tạm thời chưa khả dụng, vui lòng thử lại sau", request.getRequestURI(),
                 Map.of("code", "STORAGE_UNAVAILABLE"));
     }
 
@@ -426,16 +474,21 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGenericException(Exception ex, HttpServletRequest request) {
         log.error("Unhandled exception processing request: {}", request.getRequestURI(), ex);
-        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected internal error occurred", request.getRequestURI(), null);
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Hệ thống gặp lỗi, vui lòng thử lại sau", request.getRequestURI(), null);
     }
 
     private ResponseEntity<ErrorResponse> buildResponse(HttpStatus status, String message, String path,
                                                         Map<String, Object> details) {
+        String userMessage = VietnameseErrorMessages.userFacing(status.value(), message);
+        if (!userMessage.equals(message)) {
+            log.warn("Error message without Vietnamese text replaced for the client: status={} path={} message={}",
+                    status.value(), path, message);
+        }
         ErrorResponse response = new ErrorResponse(
                 LocalDateTime.now(),
                 status.value(),
                 status.getReasonPhrase(),
-                message,
+                userMessage,
                 path,
                 details
         );

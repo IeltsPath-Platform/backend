@@ -1,6 +1,7 @@
 package com.ieltspath.content.infrastructure.persistence.entity;
 
 import com.ieltspath.content.domain.vo.PackageType;
+import com.ieltspath.content.domain.vo.PlacementPool;
 import com.ieltspath.content.domain.vo.PublicationStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -34,6 +35,10 @@ public class ContentPackageJpaEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "package_type", nullable = false, length = 50)
     private PackageType packageType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "placement_pool", length = 20)
+    private PlacementPool placementPool;
 
     @Column(name = "required_feature_key", length = 100)
     private String requiredFeatureKey;

@@ -15,6 +15,13 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+    # db/callback holds afterMigrate__demo_data.sql: demo learner data written only when DEMO_DATA_ENABLED=true
+    # (dev/demo databases).
+    locations: classpath:db/migration,classpath:db/callback
+    placeholders:
+      demoData: ${DEMO_DATA_ENABLED:false}
+      # The learner the demo data belongs to: h2 by default; set DEMO_LEARNER_ID to give it to an existing account.
+      demoUserId: ${DEMO_LEARNER_ID:00000000-0000-0000-0000-000000000003}
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
@@ -41,6 +48,13 @@ app:
           - /v3/api-docs/**
 
 learning:
+  review:
+    # After this many failed sets a blocking review remains available as optional practice.
+    unblock-after-failed-sets: 4
+  placement:
+    limit-per-24h: ${LEARNING_PLACEMENT_LIMIT_PER_24H:3}
+    reuse-window-minutes: ${LEARNING_PLACEMENT_REUSE_WINDOW_MINUTES:15}
+    catalog-cache-seconds: ${LEARNING_PLACEMENT_CATALOG_CACHE_SECONDS:30}
   assessment:
     base-url: ${ASSESSMENT_SERVICE_URL:http://localhost:8083}
   content:
@@ -60,10 +74,17 @@ learning:
     point-cost: ${LEARNING_WRITING_POINT_COST:3}
     # LLM gradings per learner and calendar day in quota-timezone.
     daily-grading-limit: ${LEARNING_WRITING_DAILY_GRADING_LIMIT:20}
+    premium-daily-grading-limit: ${LEARNING_WRITING_PREMIUM_DAILY_GRADING_LIMIT:20}
     quota-timezone: Asia/Ho_Chi_Minh
-    grading-timeout-seconds: 20
+    # Template v2 with deepseek-flash took 17 to 20 s for a 200-word Task 1; 25 is the most WritingSettings allows and
+    # stays under the Gateway's 60 s timeout for essay submissions.
+    grading-timeout-seconds: 25
     # Corrections kept per essay with the second prompt template; the first template keeps its own ceiling of 10.
     max-corrections: ${LEARNING_WRITING_MAX_CORRECTIONS:30}
+    # Prompt template when assessment has no activation for the task (an activation always wins). The product owner
+    # switched the default to v2 on 2026-11-12 and to v3 on 2026-11-14, both without an examiner gold set; set v2 or v1
+    # to roll back.
+    default-template: ${LEARNING_WRITING_DEFAULT_TEMPLATE:v3}
     # Thresholds follow the public band descriptors: band 6 TA/TR needs an overview, a clear position and every part of
     # the task, so those rules cap at 5.0; a tangential answer is band 4, and so is an essay that gives no position at
     # all when the question asks for one. Set by the product owner without a human examiner review. Caps stay off until prompt v2 returns the flags and an evaluation run with caps has been recorded.
@@ -74,6 +95,27 @@ learning:
     no-overview-band-cap: ${LEARNING_WRITING_NO_OVERVIEW_BAND_CAP:5.0}
     partial-answer-band-cap: ${LEARNING_WRITING_PARTIAL_ANSWER_BAND_CAP:5.0}
     no-position-band-cap: ${LEARNING_WRITING_NO_POSITION_BAND_CAP:4.0}
+    # Errors in most sentences, counted from the corrections: a share of 0.8 means errors in four sentences in five. A cap
+    # left blank switches its rule off. The values are proposals for an examiner to check against gold essays.
+    density:
+      grammar-share: ${LEARNING_WRITING_DENSE_GRAMMAR_SHARE:0.8}
+      # Off: grammar errors in most sentences also mark band 5 essays whose meaning stays clear, so the share alone
+      # cannot tell band 4 from band 5. Set a cap only after gold essays show a share that separates them.
+      grammar-band-cap: ${LEARNING_WRITING_DENSE_GRAMMAR_BAND_CAP:}
+      vocabulary-share: ${LEARNING_WRITING_DENSE_VOCABULARY_SHARE:0.5}
+      vocabulary-band-cap: ${LEARNING_WRITING_DENSE_VOCABULARY_BAND_CAP:4.0}
+      # Sentences with a coherence error (wrong linking word, unclear reference). On the calibration essays the share
+      # stays at 0.2 or below for intended CC 5 to 7, so 0.3 leaves them alone; examiner to confirm on gold essays.
+      coherence-share: ${LEARNING_WRITING_DENSE_COHERENCE_SHARE:0.3}
+      coherence-band-cap: ${LEARNING_WRITING_DENSE_COHERENCE_BAND_CAP:4.5}
+      # Sentences whose grammar error leaves the reader guessing the meaning (the model's impedesMeaning flag). Plain
+      # grammar errors cannot separate band 4 from band 5, this flag can: on the calibration essays the share was 0.55
+      # for the weak essay and 0.40 or less for band 5 and above. Examiner to confirm the share on gold essays.
+      impeding-grammar-share: ${LEARNING_WRITING_DENSE_IMPEDING_GRAMMAR_SHARE:0.5}
+      impeding-grammar-band-cap: ${LEARNING_WRITING_DENSE_IMPEDING_GRAMMAR_BAND_CAP:4.0}
+      wrong-data-share: ${LEARNING_WRITING_WRONG_DATA_SHARE:0.5}
+      wrong-data-band-cap: ${LEARNING_WRITING_WRONG_DATA_BAND_CAP:4.0}
+      wrong-data-overview-band-cap: ${LEARNING_WRITING_WRONG_DATA_OVERVIEW_BAND_CAP:3.0}
   # Azure Speech: transcript and pronunciation scores of a Speaking recording. The key lives only in .env. Blank key or
   # region turns the analysis off; storing recordings still works. locale en-US also gives an intonation score.
   speech:
@@ -81,6 +123,9 @@ learning:
     region: ${LEARNING_SPEECH_REGION:}
     locale: ${LEARNING_SPEECH_LOCALE:en-US}
     timeout-seconds: 180
+    # How many recordings Azure analyses at once on this instance, across all submissions. Several submissions and the
+    # recordings of each are analysed at the same time (speaking.grading-workers, speaking.analysis-parallelism), so this is
+    # what limits them: set it to what the Azure resource's tier allows for concurrent requests (the free tier allows very few).
     max-concurrent: 2
   # AI-graded Speaking practice. Recordings live in the shared bucket under practice/{userId}/{date}_{submissionId}/.
   speaking:
@@ -96,12 +141,24 @@ learning:
     retention-days: ${LEARNING_SPEAKING_RETENTION_DAYS:90}
     timezone: Asia/Ho_Chi_Minh
     daily-grading-limit: ${LEARNING_SPEAKING_DAILY_LIMIT:5}
-    # A row being graded that has not changed for this long is taken over. The job signals progress after every recording,
-    # so this only has to cover one step (analysing one recording, or the LLM call), not the whole submission.
+    premium-daily-grading-limit: ${LEARNING_SPEAKING_PREMIUM_DAILY_LIMIT:10}
+    # A row being graded that has not changed for this long is taken over. The job touches the row of every submission it
+    # works on at a third of this time and after every recording, so this only has to cover a stopped instance, not a slow step.
     stale-after-seconds: 300
+    # Submissions this instance grades at once. Each one asks the model four times at once, and the "llm" bulkhead in
+    # application.yaml (max-concurrent-calls, no waiting) rejects the calls above its limit, so workers x 4 must stay below it
+    # with room for Writing's gradings; Azure's speech.max-concurrent bounds the analyses. Raise them together.
+    grading-workers: ${LEARNING_SPEAKING_GRADING_WORKERS:2}
+    # Recordings of one submission analysed at the same time. Azure's speech.max-concurrent caps all analyses together, so keep
+    # this near it and raise both: an analysis that waits longer than speech.timeout-seconds for a free place fails as SPEECH_BUSY.
+    analysis-parallelism: ${LEARNING_SPEAKING_ANALYSIS_PARALLELISM:2}
+    # A completed submission starts a worker at once; the poll (job-delay-ms, 5000 by default) stays as the safety net.
+    wake-on-submit: true
     # A grading that failed for a reason that may pass (model or speech service unreachable) waits this long before it is
     # tried again. Kept short: the wait is what the learner sees, and the speech analysis is stored, so a retry is cheap.
-    retry-delay-seconds: 30
+    # Each model call already retries a 5xx or a dropped connection three times, 2 s apart, so this wait is for an outage that
+    # lasts longer than that. The job polls every 5 s, so a retry starts up to 5 s after this delay. Minimum 5.
+    retry-delay-seconds: ${LEARNING_SPEAKING_RETRY_DELAY_SECONDS:10}
     max-attempts: 3
     pass-band: 6.0
     max-input-chars: 60000

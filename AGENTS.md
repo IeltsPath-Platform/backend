@@ -1,7 +1,7 @@
 # AGENTS.md - Quy tắc bắt buộc cho AI Agent
 
 - Phiên bản: 2.3
-- Cập nhật lần cuối: 2026-11-12 (ngoại lệ `chartFacts`: học viên nhận phát biểu đúng cho câu số liệu viết sai); 2026-11-11 (ghi chú gamification học từ vựng mobile ở §3.8; thêm common-llm); 2026-11-02 (thêm §3.9 và nhóm điều cấm "Pattern hệ thống" ở §5: resilience, outbox, idempotency, scheduler, storage; bổ sung Redis, Resilience4j, Micrometer/OpenTelemetry, Supabase vào stack và hai module shared mới); 2026-10-30 (Content gọi Library một chiều, Library không gọi Content; Notification đã có DB, listener và API; mặc định DB của config-repo là `localhost:5440`); 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); dữ kiện khác giữ mốc kiểm 2026-10-07 sau course path, placement recommendation và course gate
+- Cập nhật lần cuối: 2026-11-18 (luật thang bài ôn, chẩn đoán dò ngược, giỏ ôn và nguồn điểm `ReviewReevaluation`; placement chia ba kho đề và cho làm lại, bỏ luật "chỉ làm một lần" ở §3.8); 2026-11-14 (bài ôn tiêu chí Writing ôn KP của mã lỗi gặp nhiều nhất); 2026-11-13 (khối `judgments` khi chấm Writing chỉ dùng KP của đề, `kpj3`); 2026-11-12 (ngoại lệ `chartFacts`: học viên nhận phát biểu đúng cho câu số liệu viết sai); 2026-11-11 (ghi chú gamification học từ vựng mobile ở §3.8; thêm common-llm); 2026-11-02 (thêm §3.9 và nhóm điều cấm "Pattern hệ thống" ở §5: resilience, outbox, idempotency, scheduler, storage; bổ sung Redis, Resilience4j, Micrometer/OpenTelemetry, Supabase vào stack và hai module shared mới); 2026-10-30 (Content gọi Library một chiều, Library không gọi Content; Notification đã có DB, listener và API; mặc định DB của config-repo là `localhost:5440`); 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); dữ kiện khác giữ mốc kiểm 2026-10-07 sau course path, placement recommendation và course gate
 - Dự án: `IELTSPath` (Maven coordinates: `com.ieltspath:code-base:1.0-SNAPSHOT`)
 - Kiến trúc chi tiết (sơ đồ, flow, data ownership, quyết định): [`docs/system-architecture.md`](docs/system-architecture.md)
 
@@ -25,7 +25,7 @@ suy diễn khả năng nghiệp vụ ngoài các module dưới đây.
 | `shared/common-llm` | Client OpenAI-compatible dùng chung cho Learning, Assessment và Content; luật model, lỗi an toàn, metric thời gian/token; không chứa prompt hay parser nghiệp vụ. |
 | `shared/common-observability` | Thư viện `correlationId` (MDC, header HTTP, header AMQP), metric outbox và DLQ, trace context cho outbox; không deploy độc lập. |
 | `services/user-service` | Tài khoản, role, auth token, hồ sơ học viên (có múi giờ). Mục tiêu học, activity và thời gian học do learning-service giữ; streak cũng vậy. |
-| `services/content-service` | Curriculum: topic, knowledge point, câu hỏi, gói nội dung, asset. Khu author: soạn gói và đề cuối, tải audio, bản nháp AI (câu hỏi, course), dựng course từ cây tri thức, import Excel. Nội dung AI luôn qua bản nháp (`ai_drafts`) và người duyệt; sinh course chỉ chọn từ kho. |
+| `services/content-service` | Curriculum: topic, knowledge point, câu hỏi, gói nội dung, asset. Khu author: soạn gói và đề cuối, tải audio, bản nháp AI (câu hỏi, bộ luyện tập), soạn course tay từ cây tri thức, import Excel. Nội dung AI luôn qua bản nháp (`ai_drafts`) và người duyệt; AI không dựng course. |
 | `services/library-service` | Cổng 8081, `library_db` (Compose PostgreSQL host 5440): catalog từ vựng/video và thư viện cá nhân; Gateway chuyển `/api/content/{videos,vocabulary}`, `/api/content/admin/vocabulary` và năm nhóm `/api/learning-support` tương ứng tới đây. |
 | `services/assessment-service` | Làm bài, chấm objective/LLM cho essay gate và EXAMINER, kết quả; phát `AssessmentCompleted.v2`. |
 | `services/access-service` | Gói, subscription, activation key, điểm. |
@@ -114,6 +114,12 @@ src/main/java/com/ieltspath/<service>
 - Mở rộng `GlobalExceptionHandler` → `ErrorResponse` của service thay vì trả error body tự phát.
 - Giữ và forward `X-Correlation-Id`. Không log credential, token, password, nội dung hội thoại, prompt hay API key.
 - Lấy danh tính bằng `CurrentUserProvider` (`common-security`); không tin header `X-User-*` do client gửi.
+- **Mọi thông báo lỗi trả về client MUST là tiếng Việt có dấu.** Frontend chỉ hiện nguyên `message` của backend lên toast, nên một câu tiếng Anh ở đây là người dùng đọc thấy tiếng Anh. Áp dụng cho: tham số của `super(...)` trong exception nghiệp vụ, `IllegalArgumentException`/`IllegalStateException` mà handler chuyển thành 400/409, chuỗi cố định trong `GlobalExceptionHandler` ("Dữ liệu gửi lên không hợp lệ", không phải "Validation failed"), và `message = "…"` của Bean Validation. Viết câu cho người dùng hành động được: nói ô hay thao tác nào sai và cách sửa, không nhét UUID, tên lớp hay tên trường kỹ thuật vào câu; dữ liệu máy đọc (id, danh sách) để trong `details`.
+  - Lỗi gắn với một trường hợp nghiệp vụ cần frontend xử lý riêng thì thêm `details.code` ổn định (chữ in hoa, gạch dưới); **không dùng chính mã làm `message`** (ví dụ `super("PLACEMENT_POOL_REQUIRED")`), và handler không so sánh `ex.getMessage()` để nhận ra loại lỗi.
+  - Lớp chốt chặn: `buildResponse` của mọi `GlobalExceptionHandler` MUST gọi `VietnameseErrorMessages.userFacing(status, message)` (`common-security`). Câu không có chữ cái tiếng Việt bị thay bằng câu chung theo mã trạng thái và bản gốc được ghi log; đây là lưới đỡ, không phải lý do để bỏ dịch tại nguồn, vì câu chung mất nội dung cụ thể.
+  - Bean Validation không đặt `message` thì lấy câu mặc định tiếng Việt từ `ValidationMessages.properties` (`common-security`); chỉ đặt `message` riêng khi câu cần nêu tên ô ("Mã kích hoạt không được để trống").
+  - Test dùng `hasMessageContaining`/`jsonPath("$.message")` MUST so khớp với câu tiếng Việt. Message log nội bộ (`log.warn`, `log.error`) không thuộc quy tắc này.
+  - Service mới có `GlobalExceptionHandler` mà chưa nối `VietnameseErrorMessages` là chưa xong.
 
 ### 3.4 Ranh giới bảo mật
 
@@ -177,10 +183,10 @@ src/main/java/com/ieltspath/<service>
   `CONTENT_LLM_MODEL` (khóa chỉ ở `.env` không commit; biến nào không đặt thì dùng giá trị `LEARNING_LLM_*` tương ứng,
   nên một cấu hình mô hình đủ cho cả hai service). Thiếu cấu hình thì bản nháp `FAILED` với `NOT_CONFIGURED`, service
   vẫn chạy. Nhóm `content.ai.*` (số bản nháp mỗi lượt, thời gian coi là treo, `daily-limit`, `max-items-per-request`,
-  `max-course-candidates`, `quota-zone`); import Excel dùng chung `daily-limit` nhưng đếm riêng (`kind = IMPORT`). Tải
+  `quota-zone`); import Excel dùng chung `daily-limit` nhưng đếm riêng (`kind = IMPORT`). Tải
   audio của author cần `SUPABASE_URL`/`SUPABASE_SECRET_KEY` và `CONTENT_MEDIA_BUCKET`, thiếu thì trả 503. Assessment đọc
   tên giám khảo từ user-service qua `assessment.user.base-url` (`USER_SERVICE_URL`).
-- Mọi nội dung AI sinh ra (câu hỏi, course) chỉ là bản nháp: người duyệt chọn rồi mới tạo nội dung `DRAFT` thường, còn phải
+- Mọi nội dung AI sinh ra (câu hỏi, bộ luyện tập) chỉ là bản nháp: người duyệt chọn rồi mới tạo nội dung `DRAFT` thường, còn phải
   xuất bản như mọi nội dung khác; không có đường nào từ bản nháp tới học viên. Nội dung nhập từ Excel đi qua cùng luật.
 - Chạy local bằng container: `docker compose up -d --build` khởi chạy PostgreSQL, RabbitMQ, Config Server, Eureka,
   Gateway và các service đã triển khai; Flyway của từng service tạo schema/seed trong database riêng. Để chạy Java từ
@@ -230,13 +236,29 @@ src/main/java/com/ieltspath/<service>
 - Skill của lesson suy ra từ câu hỏi trong các block; lesson có thể chứa nhiều skill. Khóa lesson, review và Practice
   được áp theo từng skill; bài học hoàn thành theo các block bắt buộc, Practice phải đạt riêng cho từng skill có yêu cầu.
 - Thứ tự topic theo user từ Content `topic-sequence`, không LLM/goal; mỗi course là một chuỗi chung mọi skill. Placement
-  không bắt buộc: mọi course luôn mở, placement chỉ làm được một lần (`409 PLACEMENT_ALREADY_DONE`); band chỉ gợi ý
-  course và không đổi trạng thái topic. Lesson sau chỉ mở khi mọi lesson trước đã hoàn thành **và** Practice của chúng đã đạt
+  không bắt buộc: mọi course luôn mở; band chỉ gợi ý course và không đổi trạng thái topic. Đề placement chia theo ba
+  kho (`BAND_0_3`, `BAND_3_5`, `BAND_5_9`, trần band 3.0/5.0/9.0) và học viên làm lại được: Learning cho tối đa 3
+  assignment trong mỗi 24 giờ trượt (assignment chưa hoàn thành có thể release, không tính vào hạn mức), Assessment độc
+  lập giới hạn 3 lượt placement đã bắt đầu trong mỗi 24 giờ trượt (vượt thì `429 PLACEMENT_LIMIT_REACHED`); kết quả mới
+  nhất thay band cũ (`docs/contracts/placement-retake-v1.md`). Lesson sau chỉ mở khi mọi lesson trước đã hoàn thành **và** Practice của chúng đã đạt
   (`403 PRACTICE_REQUIRED` + `lessonIds`); bài ôn còn chờ của lesson trước chặn lesson sau bất kể skill
-  (`403 REVIEW_REQUIRED`). Bài ôn lặp set mới đến khi đạt (chỉ lần trượt đầu quay lại theory), chỉ `SKIPPED` khi hết
-  package chưa lộ. Bài ôn **chặn** (`blocking = true`) vẫn chặn Practice và thi topic của cùng skill; bài ôn **tùy chọn**
-  (giỏ ôn) không bao giờ chặn. Practice test tự do (kho luyện tập 4 kỹ năng, không thuộc mốc course) không ghi bằng chứng,
-  không đổi mastery và không tạo bài ôn; chỉ practice test là mốc của course mới ghi bằng chứng. Thi cuối course không chặn tiến độ topic hay course khác.
+  (`403 REVIEW_REQUIRED`). Bài ôn chặn quay lại lý thuyết sau set trượt thứ nhất và thứ ba; set thứ ba dùng lý do
+  `REPEATED_FAIL`. Trượt set thứ hai mở chẩn đoán dò ngược ở lần GET bài ôn kế tiếp, không mở trong lúc nộp. Mỗi bài ôn gốc
+  chỉ có một phiên chẩn đoán; bài ôn sinh từ chẩn đoán không bị chẩn đoán lại. GET bài ôn có thể giao set, tự hoàn tất bước
+  lý thuyết không còn nội dung, đánh dấu `SKIPPED` khi không còn gói chưa xem, hoặc mở phiên chẩn đoán. `diagnosticSessionId`
+  là null khi phiên kết thúc mà không có probe. Phiên chẩn đoán chỉ được bỏ qua sau khi đã có ít nhất một probe `ANSWERED`;
+  probe `SKIPPED` hoặc `NO_SET` là chưa biết, không được tính là KP hổng; probe không có set ghi `content_gap_signals`.
+  Khi mở chẩn đoán, lỗi Content trả 503 và không giao set; không có KP tiên quyết thì phiên kết luận `NO_PREREQUISITES`
+  không có probe. Bài ôn `DIAGNOSTIC` cho KP không thuộc bài học trả lý thuyết rỗng (`NO_LESSON`) và bỏ qua bước đó.
+  Số set trượt được đếm từ `review_sets` sau mốc `review_items.failures_counted_from` (mốc null nghĩa là đếm toàn bộ);
+  nâng bài ôn lên chặn lại đặt mốc mới, không xóa lịch sử. Sau N set trượt (`learning.review.unblock-after-failed-sets`,
+  mặc định 4 và tối thiểu 4), bài ôn chuyển thành không chặn nhưng vẫn `PENDING`, vào giỏ ôn với lý do `UNBLOCKED`;
+  lesson sau, Practice và thi topic được mở. Nếu không chặn, bài ôn chỉ có một set: đạt thì `DONE`, trượt thì `SKIPPED`.
+  Bài ôn chỉ `SKIPPED` do hết gói khi không còn package chưa xem. Bài ôn **chặn** (`blocking = true`) vẫn chặn Practice
+  và thi topic của cùng skill; bài ôn **tùy chọn** không chặn.
+  Practice tự do không tạo bài ôn chặn; bằng chứng lỗi bẫy có thể tạo bài ôn tùy chọn `ERROR_PATTERN` khi KP cha thành
+  `PRIORITY`. Practice test tự do không ghi bằng chứng; bài luyện Practice thuộc lesson/course thì ghi bằng chứng như luật
+  trên. Thi cuối course không chặn tiến độ topic hay course khác.
   `LessonAccessGate` và use case trong `services/learning-service/src/main/java/com/ieltspath/learning/` quyết định cổng
   bài; trạng thái topic suy ra khi đọc. `GET /topics/{id}/lessons` của topic `LOCKED` vẫn trả danh sách bài, mọi bài
   `LOCKED` (để xem trước lộ trình); mở bài của topic đó vẫn `403 TOPIC_LOCKED`.
@@ -244,36 +266,50 @@ src/main/java/com/ieltspath/<service>
   từ 70%) và mở topic sau; course test mở khi mọi topic đã thi. Đạt khóa theo điểm tổng có trọng số (Process, giữa khóa,
   cuối khóa; Admin chỉnh ở `course_score_configs`), không theo course test riêng lẻ: dưới ngưỡng thì `REMEDIATION`, làm
   xong bài ôn thì thi lại (`CourseScoreCalculator`, `CourseOutcomeService`; contract `docs/contracts/course-score-v1.md`).
-- Chẩn đoán dò ngược: bài ôn chặn trượt set thứ hai hoặc hết gói thì thăm dò KP tiên quyết (tối đa 3 tầng, 6 lần), KP
-  gốc nhận bài ôn chặn `DIAGNOSTIC` và bài ôn gốc chờ chúng (`PrerequisiteDiagnosis`, `DiagnosticFlow`; contract
-  `diagnostics-v1.md`). Bài ôn sinh từ chẩn đoán không chẩn đoán lại.
+- Chẩn đoán dò ngược: sau set trượt thứ hai hoặc khi hết package, GET bài ôn kế tiếp chuẩn bị và mở phiên cho KP tiên
+  quyết (tối đa 3 tầng, 6 probe). Phiên chỉ được chẩn đoán một lần trên mỗi bài ôn gốc; KP gốc chỉ nhận bài ôn chặn
+  `DIAGNOSTIC` khi có kết luận tìm thấy KP hổng, và bài ôn gốc chờ các bài đó (`PrerequisiteDiagnosis`, `DiagnosticFlow`).
+  Bỏ qua cần ít nhất một probe đã trả lời; `SKIPPED`/`NO_SET` là kết quả chưa biết. Không có KP tiên quyết thì lưu phiên
+  `NO_PREREQUISITES` không probe và không đưa `diagnosticSessionId` vào response bài ôn. Probe không có gói ghi content gap;
+  replay probe trả response đã lưu trước khi gọi Content.
 - Mastery theo KP: `kp_mastery_profiles` ghi cùng transaction với bằng chứng (`MasteryProfileUpdater`), ba mức
-  `PRIORITY`/`CONSOLIDATE`/`MAINTAIN` và hạn ôn; Admin đổi ngưỡng ở `learning_rule_configs` và chạy lại nền. Mọi câu trả
-  lời ghi một dòng vào `question_attempt_events` (thời gian, mã lỗi). Báo cáo `GET /api/learning/report`.
+  `PRIORITY`/`CONSOLIDATE`/`MAINTAIN` và hạn ôn; Admin đổi ngưỡng ở `learning_rule_configs` và chạy lại nền.
+  `ReviewReevaluation` dùng điểm mastery lưu trong hồ sơ này theo `learning.mastery.policy`; `GET /api/learning/mastery`
+  tiếp tục dùng `MasteryCalculator` (SRS FT-26). `MasteryDecayJob` đánh dấu KP từng đủ dữ liệu nhưng decay xuống
+  `INSUFFICIENT` bằng `decayed_from_tier`; chỉ ghi từ lúc triển khai, không backfill. Giỏ ôn có tối đa 10 KP decay cũ nhất.
+  Mọi câu trả lời ghi một dòng vào `question_attempt_events` (thời gian, mã lỗi). Báo cáo `GET /api/learning/report`.
 - Khu quản trị: cờ bất thường (`learner_flags`, `FlagDetector` chạy sau commit, transaction riêng), hàng việc theo vai
   trò (`work_items`, `WorkItemSync` đồng bộ khi mở danh sách và mỗi 3 giờ qua `WorkItemSyncJob`, khóa advisory để chỉ một instance chạy), thống kê câu và chất lượng cây (`learning-staff-area-v1.md`).
 - Essay: sửa và nộp lại essay lesson tối đa 3 lần, chỉ từ bản mới nhất (`essay-revision-v1.md`); học viên có tín dụng
   nhờ Mentor chữa essay lesson/Practice đã chấm (`human-review-v1.md`), chỉ là phản hồi: không đổi bằng chứng, cổng hay bài ôn.
-- Bằng chứng essay (lesson và Practice): KP của đề nhận `passed`; mỗi tiêu chí rubric (TA/TR, CC, LR, GRA) là một bằng chứng
-  riêng cho KP tiêu chí được ánh xạ (`DEMO_WRITING_CRITERION_*`, bảng `writing_criterion_knowledge_points` ở Content), đúng khi
-  band tiêu chí >= `passBand`. Các KP con trong `subKnowledgePoints` được đánh giá cùng band trong đúng một request LLM
-  (`kpj2`, nối hướng dẫn vào template band `v1` nguyên vẹn): chỉ `PASS`/
-  `FAIL` có excerpt nguyên văn mới ghi evidence, không phụ thuộc passBand; `NOT_ASSESSED` không ghi. Correction có error type
-  gắn KP con có thể hạ `PASS` hoặc nâng `NOT_ASSESSED` thành `FAIL`. KP tiêu chí thắng nếu cùng ID; KP con thắng KP của đề.
-  `judgments` thiếu/sai thì giữ band hợp lệ, KP `NOT_ASSESSED` trừ `FAIL` từ correction đã kiểm tra. Hai phần đến từ cùng
-  output AI; đối chiếu correction là luật application. `EssayKnowledgeJudge` không dùng LLM/clock; catalog Content được
-  lấy khi cần qua supplier do grader cung cấp, tối đa một lần. Không có call
-  sửa JSON hay HTTP retry tự động cho 429/503; JSON/band sai là `INVALID_GRADE`, không thu points. Timeout chung
+- Bằng chứng essay (lesson và Practice): mỗi tiêu chí rubric (TA/TR, CC, LR, GRA) là một bằng chứng riêng cho KP tiêu
+  chí được ánh xạ (`DEMO_WRITING_CRITERION_*`, bảng `writing_criterion_knowledge_points` ở Content), đúng khi band tiêu chí
+  >= `passBand`. Khối `judgments` trong prompt chỉ chứa KP gắn với đề (`question_knowledge_points`, tối đa 4, theo thứ tự của
+  đề; KP mà catalog không tra được thì bỏ khỏi prompt) và được đánh giá cùng band trong đúng một request LLM (`kpj3`, file
+  `essay-kp-judgment-v3.txt`); đề không có KP thì không có khối `judgments` và `judgmentVersion` null. Không còn dùng KP con theo tiêu chí
+  (`subKnowledgePoints`) khi dựng prompt; dữ liệu và API cũ giữ nguyên để đọc bài `kpj2`. Chỉ `PASS`/`FAIL` có excerpt
+  nguyên văn mới được nhận. KP của đề có judgment `PASS` ghi đúng, `FAIL` ghi sai; `NOT_ASSESSED`, hoặc KP không có trong
+  prompt (bị bỏ, hoặc vượt 4), nhận đạt/trượt của cả bài như trước. Correction có error type gắn đúng KP của đề có thể hạ
+  `PASS` xuống `NOT_ASSESSED` hoặc nâng `NOT_ASSESSED` thành `FAIL`. KP tiêu chí thắng nếu cùng ID; judgment của KP đề thắng
+  kết quả cả bài. KP của mã lỗi trong correction không tạo bằng chứng. Bài `kpj2` cũ đi theo luật cũ (KP con theo tiêu chí).
+  Judgment của KP đề nằm ở trường `taskKnowledgePointJudgments` của grade (không thuộc tiêu chí nào; `criteria[].knowledgePointJudgments`
+  luôn rỗng với bài `kpj3`); bài cũ đọc thành `[]`. `judgments` thiếu/sai thì giữ band hợp lệ, KP `NOT_ASSESSED` trừ `FAIL` từ correction
+  đã kiểm tra. Hai phần đến từ cùng output AI; đối chiếu correction là luật application. `EssayKnowledgeJudge` không dùng
+  LLM/clock; catalog Content được lấy qua supplier do grader cung cấp, tối đa một lần mỗi lần chấm, và chỉ khi đề có KP.
+  Không có call sửa JSON hay HTTP retry tự động cho 429/503; JSON/band sai là `INVALID_GRADE`, không thu points. Timeout chung
   `learning.writing.grading-timeout-seconds` mặc định 20 giây, không còn timeout/skip riêng cho judgment; quota một lượt.
-  `promptVersion` vẫn `+tplv1` cho activation band; `judgmentVersion=kpj2` ở JSON lưu bất cứ khi nào rubric có KP con (prompt đã nối hướng dẫn),
-  kể cả khi mô hình không trả mảng judgments; không có KP con thì null và không cần mảng judgments.
-  API không phát `judgmentVersion`. KP tiêu chí / KP con lưu trong JSON grade; bài cũ chưa có judgments đọc thành `[]`.
+  `promptVersion` vẫn `+tplv1`/`+tplv2`/`+tplv3` cho activation band; `judgmentVersion=kpj3` ở JSON lưu bất cứ khi nào prompt có
+  khối `judgments`, kể cả khi mô hình không trả mảng. API không phát `judgmentVersion`. Luyện tập tự do (`PT-WRITING-*`, kho đề
+  `SubmitFreeWritingUseCase`) cũng nhận judgments và gợi ý học nhưng **không ghi mastery**.
   Event essay vẫn một dòng cho KP của đề, `error_code` là mã lỗi gặp nhiều nhất. Bằng chứng tiêu chí và KP con của essay
-  Practice không được XP mốc. Essay lesson/Practice tính evidence có thể tạo bài ôn tùy chọn `WRITING_CRITERION` cho KP
-  tiêu chí rớt (mặc định tối đa 2, `learning.writing.criterion-review-limit`); không tạo cho bài viết tự do, revision hay KP con.
+  Practice không được XP mốc. Essay lesson/Practice tính evidence có thể tạo bài ôn tùy chọn `WRITING_CRITERION` cho tiêu chí
+  rớt (mặc định tối đa 2, `learning.writing.criterion-review-limit`): tiêu chí rớt quyết định có bài ôn, còn nội dung ôn là KP của mã lỗi
+  gặp nhiều nhất thuộc tiêu chí đó (đếm từ corrections không phải `SUGGESTION`, hòa thì `severity` cao hơn rồi mã A→Z), dự phòng là KP tiêu
+  chí; `review_items.criterion_knowledge_point_id` giữ KP tiêu chí để Mentor nâng/đóng đúng bài ôn. Không tạo cho bài viết tự do, revision hay KP của đề.
   Mỗi KP tiêu chí có 3 bộ luyện tự do demo (`PS-WCR-*`, V70;
-  nội dung AI soạn, cần giám khảo IELTS duyệt). Kết quả chấm trả thêm `studyPoints` (KP tiêu chí yếu, KP con `FAIL` và `focus`
-  của LLM), tính một lần lúc chấm và lưu trong JSON bài chấm; bài cũ trả mảng rỗng.
+  nội dung AI soạn, cần giám khảo IELTS duyệt). Kết quả chấm trả thêm `studyPoints` (KP tiêu chí yếu, KP của đề có judgment
+  `FAIL`, đặt sau các gợi ý tiêu chí và trước `focus` của LLM, không có `criterionCode`/`band`; rồi `focus` của LLM), tính một
+  lần lúc chấm và lưu trong JSON bài chấm; bài cũ trả mảng rỗng.
 - Luyện tự do theo KP (`POST /knowledge-points/{id}/free-practice`) không bao giờ chặn đường học: trượt không sinh bài
   ôn chặn và không khóa gì; mỗi KP luôn giữ lại `learning.free-practice.reserve` gói chưa xem cho bài ôn
   (`free-practice-v1.md`). Bằng chứng luyện tự do là bằng chứng luyện tập (trọng số và trần 3 bài luyện của MP-1.0).
@@ -301,7 +337,7 @@ src/main/java/com/ieltspath/<service>
   vẫn chỉ có sau khi block đạt. Package đã nộp ở Practice hoặc đã giao trong
   bài ôn không bao giờ được giao lại làm set ôn cho chính học viên đó (hết package thì bài ôn `SKIPPED`).
 - Consumer không gọi HTTP; ACK sau khi transaction commit; vi phạm contract hoặc hết lượt thử → DLQ.
-- Tác vụ LLM mới cho học viên (chấm Writing) phải có hạn mức theo ngày (plan 0737).
+- Tác vụ LLM cho học viên phải có hạn mức theo ngày; Writing và Speaking áp dụng quota riêng cho Premium và không trừ điểm khi Premium được xác nhận.
 ### 3.9 Pattern hệ thống: bắt buộc áp dụng
 
 Mỗi thay đổi thuộc các tình huống dưới đây PHẢI dùng pattern đã có và đúng thư viện dùng chung; không tự dựng cơ chế
@@ -390,6 +426,7 @@ Khi không có convention cụ thể, theo code lân cận trong cùng module.
 
 - TUYỆT ĐỐI KHÔNG sửa, xóa hoặc rewrite migration đã áp dụng; thay đổi schema bằng migration mới.
 - TUYỆT ĐỐI KHÔNG destructive schema/data change khi chưa được phê duyệt rõ ràng.
+- TUYỆT ĐỐI KHÔNG trả thông báo lỗi tiếng Anh hoặc không dấu cho client (xem 3.3), và không dùng mã lỗi làm `message`.
 - TUYỆT ĐỐI KHÔNG expose JPA entity làm request/response DTO.
 - TUYỆT ĐỐI KHÔNG âm thầm đổi HTTP status, response schema, HTTP method hoặc inter-service/event contract.
 - TUYỆT ĐỐI KHÔNG filter, sort, phân trang tập không giới hạn trong bộ nhớ sau `findAll()`; không tạo N+1.
@@ -467,6 +504,6 @@ Những điểm ảnh hưởng trực tiếp tới quy tắc:
   `infrastructure` và không đưa dependency dạng này vào `domain`.
 - `CONTENT_SERVICE_URL` của game mặc định `http://content-service:8082` trong config-repo; khi chạy game trên host,
   đặt `http://localhost:8082`. `LIBRARY_SERVICE_URL` đã mặc định `http://localhost:8081`.
-- Content và game không còn bảng outbox (đã xóa). Access, assessment, community và learning (`reward_grants`) có outbox và relay.
+- Content và game không còn bảng outbox (đã xóa). Access, assessment, community, library (`outbox_events`, V43) và learning (`reward_grants`) có outbox và relay.
 - Config-repo yêu cầu JWT, mật khẩu DB, RabbitMQ và Redis qua biến môi trường; không thêm giá trị dự phòng. Thiếu biến bắt buộc thì service không khởi động; `.env.example` chỉ chứa tên và giá trị rỗng.
 - Chưa xác định: nơi lưu bản sao lưu DB ngoài VPS, tên miền production, frontend contract, API versioning. CD đã có (workflow chạy tay); chưa chạy lần nào.

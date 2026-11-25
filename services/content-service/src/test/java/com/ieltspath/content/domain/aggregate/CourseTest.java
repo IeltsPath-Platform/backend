@@ -53,7 +53,7 @@ class CourseTest {
     void aFreeCourseCannotHaveUnlockPricesAndARefusedUpdateChangesNothing() {
         Map<Skill, Integer> prices = Map.of(Skill.READING, 40);
         assertThatThrownBy(() -> Course.create("FREE", "Free", new BigDecimal("4.0"), null, null, prices, null, true))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("free course");
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Khóa học miễn phí");
 
         Course free = Course.create("FREE", "Free", new BigDecimal("4.0"), null, null, Map.of(), null, true);
         assertThatThrownBy(() -> free.update("Renamed", new BigDecimal("4.0"), null, null, null, prices, null, null))
@@ -105,5 +105,41 @@ class CourseTest {
                     .isInstanceOf(IllegalArgumentException.class);
         }
         assertThat(Course.create("BLANK", "Blank", new BigDecimal("5.5"), " ", null).getCoverImageUrl()).isNull();
+    }
+
+    @Test
+    void codeAndNameAreLimitedTo100And255Characters() {
+        Course longest = Course.create("C".repeat(100), "N".repeat(255), new BigDecimal("5.0"));
+        assertThat(longest.getCode()).hasSize(100);
+        assertThat(longest.getName()).hasSize(255);
+        assertThatThrownBy(() -> Course.create("C".repeat(101), "Name", new BigDecimal("5.0")))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("code dài quá 100 ký tự");
+        assertThatThrownBy(() -> Course.create("CODE", "N".repeat(256), new BigDecimal("5.0")))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("name dài quá 255 ký tự");
+    }
+
+    @Test
+    void theLowestAndHighestBandLevelsAreAccepted() {
+        assertThat(Course.create("IELTS_0", "Zero", new BigDecimal("0.0")).getBandLevel()).isEqualByComparingTo("0.0");
+        assertThat(Course.create("IELTS_9", "Nine", new BigDecimal("9.0")).getBandLevel()).isEqualByComparingTo("9.0");
+    }
+
+    @Test
+    void aComboPriceLiesBetweenTheHighestSkillPriceAndTheirSum() {
+        Map<Skill, Integer> prices = Map.of(Skill.READING, 40, Skill.LISTENING, 60);
+        assertThatThrownBy(() -> Course.create("P1", "Priced", new BigDecimal("6.0"), null, null, prices, 50, false))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Giá gói kết hợp không được thấp hơn giá kỹ năng cao nhất");
+        assertThatThrownBy(() -> Course.create("P2", "Priced", new BigDecimal("6.0"), null, null, prices, 120, false))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Giá gói kết hợp không được cao hơn tổng giá các kỹ năng");
+        assertThatThrownBy(() -> Course.create("P3", "Priced", new BigDecimal("6.0"), null, null,
+                Map.of(Skill.READING, 0), null, false))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Giá mở khóa kỹ năng phải là số nguyên dương");
+        assertThat(Course.create("P4", "Priced", new BigDecimal("6.0"), null, null, prices, 60, false)
+                .getComboUnlockPoints()).isEqualTo(60);
+        assertThat(Course.create("P5", "Priced", new BigDecimal("6.0"), null, null, prices, 100, false)
+                .getComboUnlockPoints()).isEqualTo(100);
     }
 }

@@ -74,7 +74,20 @@ public class EssaySubmissionFlow {
         if (!grader.available()) throw gradingUnavailable(null);
     }
 
-    public void requireBalance() {
+    public boolean premiumLearner() {
+        try {
+            return premiumStatus();
+        } catch (AccessUnavailableException exception) {
+            return false;
+        }
+    }
+
+    public boolean premiumStatus() {
+        return points.premium();
+    }
+
+    public void requireBalance(boolean premium) {
+        if (premium) return;
         long balance;
         try {
             balance = points.balance();
@@ -88,9 +101,10 @@ public class EssaySubmissionFlow {
     }
 
     /** Daily quota, then the LLM grade stored as PAYMENT_PENDING; no transaction or lock is held. */
-    public void grade(WritingSubmission grading) {
+    public void grade(WritingSubmission grading, boolean premium) {
         LocalDate quotaDay = LocalDate.now(clock.withZone(ZoneId.of(settings.quotaTimezone())));
-        if (!quota.tryConsume(grading.userId(), quotaDay, USAGE_KIND, settings.dailyGradingLimit())) {
+        int dailyLimit = premium ? settings.premiumDailyGradingLimit() : settings.dailyGradingLimit();
+        if (!quota.tryConsume(grading.userId(), quotaDay, USAGE_KIND, dailyLimit)) {
             grading.fail("DAILY_LIMIT_REACHED");
             essays.save(grading);
             recordOutcome("DAILY_LIMIT_REACHED", grading);
@@ -129,6 +143,7 @@ public class EssaySubmissionFlow {
      */
     public WritingSubmissionResult charge(WritingSubmission submission, String ledgerKey, String description,
                                           BiFunction<WritingSubmission, UUID, WritingSubmissionResult> finish) {
+        if (submission.pointCost() == 0) return finish.apply(submission, null);
         UUID ledgerEntryId;
         try {
             ledgerEntryId = points.debit(submission.userId(), submission.pointCost(), submission.id(), ledgerKey,
@@ -147,8 +162,8 @@ public class EssaySubmissionFlow {
         return finish.apply(submission, ledgerEntryId);
     }
 
-    public int pointCost() {
-        return settings.pointCost();
+    public int pointCost(boolean premium) {
+        return premium ? 0 : settings.pointCost();
     }
 
     public long staleGradingSeconds() {

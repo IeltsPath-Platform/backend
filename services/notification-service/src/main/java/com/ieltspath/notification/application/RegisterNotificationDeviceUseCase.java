@@ -19,7 +19,7 @@ public class RegisterNotificationDeviceUseCase {
         if (userId == null || installationId == null || !"FCM".equals(provider) || !"ANDROID".equals(platform)
                 || token == null || token.isBlank() || token.length() > 4096
                 || appVersion != null && appVersion.length() > 128) {
-            throw new IllegalArgumentException("Invalid device registration");
+            throw new IllegalArgumentException("Đăng ký thiết bị nhận thông báo không hợp lệ");
         }
         devices.register(userId, installationId, provider, platform, token, appVersion);
     }

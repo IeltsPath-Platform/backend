@@ -16,7 +16,15 @@ public interface WritingTaskReader {
     record WritingTask(UUID packageId, UUID packageVersionId, UUID sectionId, String packageTitle, String title,
                        Integer partNo, Integer timeLimitSeconds, String instructions, UUID questionVersionId,
                        String stem, String task, Integer minWords, String guide, String guideSteps,
-                       String sampleAnswer, List<Image> images) {}
+                       String sampleAnswer, List<Image> images, String requiredFeatureKey) {
+        public WritingTask(UUID packageId, UUID packageVersionId, UUID sectionId, String packageTitle, String title,
+                           Integer partNo, Integer timeLimitSeconds, String instructions, UUID questionVersionId,
+                           String stem, String task, Integer minWords, String guide, String guideSteps,
+                           String sampleAnswer, List<Image> images) {
+            this(packageId, packageVersionId, sectionId, packageTitle, title, partNo, timeLimitSeconds, instructions,
+                    questionVersionId, stem, task, minWords, guide, guideSteps, sampleAnswer, images, null);
+        }
+    }
 
     record Image(String mediaReference, String altText) {}
 }

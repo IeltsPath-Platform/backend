@@ -116,4 +116,51 @@ class StudyTimeUseCaseTest {
             assertEquals("COMPLETE",bucket.status());
         }
     }
+    @Test void anUnknownGrainIsRefused() {
+        var today=LocalDate.parse("2026-10-15");
+        var error=assertThrows(IllegalArgumentException.class,()->new GetStudyTimeStatisticsUseCase(sessions,timezones,clock)
+                .execute(user,today,today,"YEAR",null));
+        assertEquals("grain must be DAY, WEEK or MONTH",error.getMessage());
+        verify(sessions,never()).daily(any(),any(),any(),any());
+    }
+    @Test void aHeartbeatNeedsAnEpochAndASequenceOfAtLeastOne() {
+        var heartbeat=new RecordStudyHeartbeatUseCase(sessions,clock);
+        UUID session=UUID.randomUUID();
+        assertEquals("Invalid heartbeat",assertThrows(IllegalArgumentException.class,
+                ()->heartbeat.execute(user,session,0,1,List.of(),false)).getMessage());
+        assertEquals("Invalid heartbeat",assertThrows(IllegalArgumentException.class,
+                ()->heartbeat.execute(user,session,1,0,List.of(),false)).getMessage());
+        verifyNoInteractions(sessions);
+    }
+    @Test void aRangeEndingBeforeItStartsIsRefusedBeforeAnyQuery() {
+        var today=LocalDate.parse("2026-10-15");
+        var error=assertThrows(IllegalArgumentException.class,()->new GetStudyTimeStatisticsUseCase(sessions,timezones,clock)
+                .execute(user,today,today.minusDays(1),"DAY",null));
+        assertEquals("Study-time range must contain 1 to 366 days",error.getMessage());
+        verifyNoInteractions(sessions);
+    }
+    @Test void aWeekThatCrossesTwoMonthsIsOneWeekButTwoMonths() {
+        // Wednesday 30 September and Thursday 1 October 2026 fall in the same Monday-based week.
+        LocalDate first=LocalDate.parse("2026-09-30"), last=LocalDate.parse("2026-10-01");
+        when(sessions.trackingStartedAt()).thenReturn(Instant.parse("2026-09-01T00:00:00Z"));
+        when(sessions.daily(user,first,last,"ALL")).thenReturn(List.of(
+                new StudySessionRepository.Daily(first,"UTC",60_000),
+                new StudySessionRepository.Daily(last,"UTC",120_000)));
+        var useCase=new GetStudyTimeStatisticsUseCase(sessions,timezones,clock);
+
+        var weeks=useCase.execute(user,first,last,"WEEK",null).days();
+        assertEquals(1,weeks.size());
+        assertEquals(180L,weeks.getFirst().actualSeconds());
+        var months=useCase.execute(user,first,last,"MONTH",null).days();
+        assertEquals(2,months.size());
+        assertEquals(60L,months.get(0).actualSeconds());
+        assertEquals(120L,months.get(1).actualSeconds());
+    }
+    @Test void aRangeOfExactly366DaysIsAccepted() {
+        when(sessions.trackingStartedAt()).thenReturn(Instant.parse("2025-01-01T00:00:00Z"));
+        var today=LocalDate.parse("2026-10-15");
+        var result=new GetStudyTimeStatisticsUseCase(sessions,timezones,clock)
+                .execute(user,today.minusDays(365),today,"DAY",null);
+        assertEquals(366,result.days().size());
+    }
 }

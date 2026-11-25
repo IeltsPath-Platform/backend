@@ -45,6 +45,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Import({PracticeSetMaterializer.class, CreateContentPackageUseCase.class, CreateDraftPackageVersionUseCase.class,
         CreateContentSectionUseCase.class, SectionMediaUseCases.class, CreateQuestionUseCase.class,
         AddQuestionVersionUseCase.class, AddSectionQuestionUseCase.class, QuestionRepositoryAdapter.class,
+        com.ieltspath.content.application.usecase.QuestionCodeGenerator.class,
+        com.ieltspath.content.infrastructure.config.CodePatternConfiguration.class,
+        com.ieltspath.content.infrastructure.persistence.adapter.JdbcCodeSettingsStore.class,
         QuestionPersistenceMapper.class, ContentPackageRepositoryAdapter.class, ContentPackagePersistenceMapper.class,
         JdbcErrorTypeRepository.class, JdbcSectionMediaWriter.class, JdbcLearningContentReader.class,
         PracticeSetMaterializerIntegrationTest.Beans.class})

@@ -70,6 +70,18 @@ class PublishContentPackageUseCaseTest {
     }
 
     @Test
+    void placementWithoutPoolCannotPublish() {
+        var pkg = ContentPackage.create("OLD", "Legacy placement", PackageType.PLACEMENT_TEST, null);
+        var draft = ContentPackageVersion.create(pkg.getId(), 1, "{}");
+        pkg.addVersion(draft);
+        when(contentPackageRepository.findById(pkg.getId())).thenReturn(Optional.of(pkg));
+        assertThatThrownBy(() -> publishContentPackageUseCase.execute(
+                new PublishContentPackageCommand(pkg.getId(), draft.getId(), UUID.randomUUID())))
+                .hasFieldOrPropertyWithValue("code", "PLACEMENT_POOL_REQUIRED");
+        verify(contentPackageRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("Should publish content package version successfully")
     void shouldPublishPackageVersionSuccessfully() {
         when(contentPackageRepository.findById(contentPackage.getId())).thenReturn(Optional.of(contentPackage));
@@ -143,7 +155,8 @@ class PublishContentPackageUseCaseTest {
     @ParameterizedTest
     @CsvSource({"PRACTICE_SET,LEARNING", "TOPIC_TEST,LEARNING", "MOCK_TEST,EXAM", "PLACEMENT_TEST,PLACEMENT"})
     void questionsMustMatchThePackagesPurposeBeforePublishing(PackageType type, QuestionPurpose requiredPurpose) {
-        ContentPackage pkg = ContentPackage.create("PURPOSE-CHECK", "Purpose", type, null);
+        ContentPackage pkg = ContentPackage.create("PURPOSE-CHECK", "Purpose", type, null, null, null,
+                type == PackageType.PLACEMENT_TEST ? com.ieltspath.content.domain.vo.PlacementPool.BAND_5_9 : null);
         ContentPackageVersion draft = ContentPackageVersion.create(pkg.getId(), 1, "{}");
         pkg.addVersion(draft);
         UUID questionId = UUID.randomUUID();
@@ -196,7 +209,7 @@ class PublishContentPackageUseCaseTest {
         assertThatThrownBy(() -> publishContentPackageUseCase.execute(new PublishContentPackageCommand(
                 practice.getId(), practice.getVersions().getFirst().getId(), userId)))
                 .isInstanceOf(InvalidContentStateException.class)
-                .hasMessageContaining("supported test source");
+                .hasMessageContaining("nguồn đề được hỗ trợ");
         verify(contentPackageRepository, never()).save(any());
     }
 
@@ -271,7 +284,7 @@ class PublishContentPackageUseCaseTest {
         assertThatThrownBy(() -> publishContentPackageUseCase.execute(
                 new PublishContentPackageCommand(practice.getId(), draft.getId(), userId)))
                 .isInstanceOf(InvalidContentStateException.class)
-                .hasMessageContaining("auto-gradable");
+                .hasMessageContaining("chấm tự động được");
         verify(contentPackageRepository, never()).save(any());
     }
 
@@ -309,7 +322,7 @@ class PublishContentPackageUseCaseTest {
         assertThatThrownBy(() -> publishContentPackageUseCase.execute(
                 new PublishContentPackageCommand(practice.getId(), draft.getId(), userId)))
                 .isInstanceOf(InvalidContentStateException.class)
-                .hasMessageContaining("Writing essays");
+                .hasMessageContaining("bài viết có band đạt");
         verify(contentPackageRepository, never()).save(any());
     }
 
@@ -331,7 +344,7 @@ class PublishContentPackageUseCaseTest {
         assertThatThrownBy(() -> publishContentPackageUseCase.execute(
                 new PublishContentPackageCommand(practice.getId(), draft.getId(), userId)))
                 .isInstanceOf(InvalidContentStateException.class)
-                .hasMessageContaining("auto-gradable");
+                .hasMessageContaining("chấm tự động được");
         verify(contentPackageRepository, never()).save(any());
     }
 
@@ -368,6 +381,99 @@ class PublishContentPackageUseCaseTest {
         assertThatThrownBy(() -> publishContentPackageUseCase.execute(
                 new PublishContentPackageCommand(practice.getId(), draft.getId(), userId)))
                 .isInstanceOf(InvalidContentStateException.class);
+        verify(contentPackageRepository, never()).save(any());
+    }
+
+    @Test
+    void onlyTheFirstTenConflictsAreListed() {
+        when(contentPackageRepository.findById(contentPackage.getId())).thenReturn(Optional.of(contentPackage));
+        List<QuestionUsageConflict> eleven = new java.util.ArrayList<>();
+        for (int i = 1; i <= 11; i++) {
+            eleven.add(new QuestionUsageConflict(UUID.randomUUID(), QuestionUsageConflict.OwnerType.LESSON, "L" + i));
+        }
+        when(lessons.questionsUsedElsewhere(versionId)).thenReturn(eleven);
+
+        assertThatThrownBy(() -> publishContentPackageUseCase.execute(
+                new PublishContentPackageCommand(contentPackage.getId(), versionId, userId)))
+                .isInstanceOf(QuestionAlreadyUsedException.class)
+                .satisfies(error -> {
+                    assertThat(error.getMessage().split("\\(LESSON ", -1)).hasSize(11);
+                    assertThat(error.getMessage()).contains("LESSON L10)").doesNotContain("LESSON L11)");
+                });
+    }
+
+    @Test
+    void aPracticeSetThatPassesEveryCheckIsPublished() {
+        UUID lessonId = UUID.randomUUID();
+        ContentPackage practice = ContentPackage.create("PS-OK", "Practice", PackageType.PRACTICE_SET, null, lessonId);
+        ContentPackageVersion draft = ContentPackageVersion.create(practice.getId(), 1, "{}");
+        practice.addVersion(draft);
+        when(contentPackageRepository.findById(practice.getId())).thenReturn(Optional.of(practice));
+        when(lessons.packageVersionLeavesLessonSkills(draft.getId(), lessonId)).thenReturn(false);
+        when(lessons.questionsUsedElsewhere(draft.getId())).thenReturn(List.of());
+        when(lessons.questionsWithWrongPurpose(draft.getId(), QuestionPurpose.LEARNING)).thenReturn(List.of());
+        when(lessons.packageQuestionSpecs(draft.getId())).thenReturn(List.of(new PackageQuestionSpec(UUID.randomUUID(),
+                QuestionType.MULTIPLE_CHOICE, com.ieltspath.content.domain.vo.Skill.READING,
+                "{\"type\":\"CHOICE\",\"correct\":\"A\"}")));
+        when(contentPackageRepository.save(any(ContentPackage.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var result = publishContentPackageUseCase.execute(new PublishContentPackageCommand(practice.getId(), draft.getId(), userId));
+
+        assertThat(result.status()).isEqualTo(PublicationStatus.PUBLISHED);
+        assertThat(result.currentPublishedVersionId()).isEqualTo(draft.getId());
+    }
+
+    @Test
+    void aFailedSecondVersionLeavesTheFirstOneLive() {
+        version.publish(userId);
+        contentPackage.publishVersion(versionId);
+        ContentPackageVersion second = ContentPackageVersion.create(contentPackage.getId(), 2, "{}");
+        contentPackage.addVersion(second);
+        when(contentPackageRepository.findById(contentPackage.getId())).thenReturn(Optional.of(contentPackage));
+        when(lessons.questionsUsedElsewhere(second.getId())).thenReturn(List.of(
+                new QuestionUsageConflict(UUID.randomUUID(), QuestionUsageConflict.OwnerType.LESSON, "L1")));
+
+        assertThatThrownBy(() -> publishContentPackageUseCase.execute(
+                new PublishContentPackageCommand(contentPackage.getId(), second.getId(), userId)))
+                .isInstanceOf(QuestionAlreadyUsedException.class);
+
+        assertThat(contentPackage.getCurrentPublishedVersionId()).isEqualTo(versionId);
+        assertThat(contentPackage.getStatus()).isEqualTo(PublicationStatus.PUBLISHED);
+        assertThat(second.getStatus()).isEqualTo(PublicationStatus.DRAFT);
+        verify(contentPackageRepository, never()).save(any());
+    }
+
+    @Test
+    void aSecondVersionBecomesCurrentAndTheFirstStaysPublished() {
+        version.publish(userId);
+        contentPackage.publishVersion(versionId);
+        ContentPackageVersion second = ContentPackageVersion.create(contentPackage.getId(), 2, "{}");
+        contentPackage.addVersion(second);
+        when(contentPackageRepository.findById(contentPackage.getId())).thenReturn(Optional.of(contentPackage));
+        when(contentPackageRepository.save(any(ContentPackage.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var result = publishContentPackageUseCase.execute(
+                new PublishContentPackageCommand(contentPackage.getId(), second.getId(), userId));
+
+        assertThat(result.currentPublishedVersionId()).isEqualTo(second.getId());
+        assertThat(second.getStatus()).isEqualTo(PublicationStatus.PUBLISHED);
+        assertThat(version.getStatus()).isEqualTo(PublicationStatus.PUBLISHED);
+    }
+
+    @Test
+    void aFailedLessonSkillCheckStopsBeforeAnyQuestionIsLocked() {
+        UUID lessonId = UUID.randomUUID();
+        ContentPackage practice = ContentPackage.create("PS-SKILL", "Practice", PackageType.PRACTICE_SET, null, lessonId);
+        ContentPackageVersion draft = ContentPackageVersion.create(practice.getId(), 1, "{}");
+        practice.addVersion(draft);
+        when(contentPackageRepository.findById(practice.getId())).thenReturn(Optional.of(practice));
+        when(lessons.packageVersionLeavesLessonSkills(draft.getId(), lessonId)).thenReturn(true);
+
+        assertThatThrownBy(() -> publishContentPackageUseCase.execute(
+                new PublishContentPackageCommand(practice.getId(), draft.getId(), userId)))
+                .isInstanceOf(InvalidPackageLessonException.class);
+        verify(lessons, never()).lockQuestionsForPublishing(any());
+        verify(lessons, never()).questionsUsedElsewhere(any());
         verify(contentPackageRepository, never()).save(any());
     }
 }

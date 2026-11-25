@@ -90,8 +90,6 @@ class PracticeEssayIntegrationTest {
     private static final UUID CC_KP = UUID.randomUUID();
     private static final UUID LR_KP = UUID.randomUUID();
     private static final UUID GRA_KP = UUID.randomUUID();
-    private static final UUID SUB_LINK_KP = UUID.randomUUID();
-    private static final UUID SUB_TOPIC_KP = UUID.randomUUID();
     private static final UUID READING_SET = UUID.randomUUID();
     private static final UUID READING_VERSION = UUID.randomUUID();
     private static final UUID WRITING_SET = UUID.randomUUID();
@@ -236,7 +234,7 @@ class PracticeEssayIntegrationTest {
         when(access.debit(any(), anyInt(), any(), anyString(), any())).thenAnswer(invocation -> UUID.randomUUID());
         var essay = submitEssay.execute(USER, attempt, ESSAY, request, TEXT);
         assertTrue(essay.passed());
-        assertEquals("IELTS_WRITING@1+tplv1", jdbc.queryForObject(
+        assertEquals("IELTS_WRITING@1+tplv3", jdbc.queryForObject(
                 "SELECT prompt_version FROM lesson_writing_submissions", String.class));
         verify(llm, times(1)).completeJson(any(), any());
         var result = submitPractice.execute(USER, attempt, new SubmitExerciseCommand(UUID.randomUUID(), List.of()));
@@ -267,35 +265,50 @@ class PracticeEssayIntegrationTest {
     }
 
     @Test
-    void aFailedSubKnowledgePointAddsPracticeEvidenceAndAnUnassessedOneDoesNot() {
-        when(content.getActiveRubric(anyString())).thenReturn(rubricWithSubKnowledgePoints());
+    void aQuestionPointJudgedFailIsRecordedWrongOncePerSubmission() {
+        when(content.getActiveRubric(anyString())).thenReturn(rubricWithoutSubKnowledgePoints());
         when(content.getTopicSequence()).thenReturn(List.of(new Topic(TOPIC, "TREES", "Trees", 955, null, List.of(
                 new KnowledgePoint(KP_READING, "TR_R", "Scanning", "PROCEDURE", "READING", "d", true),
-                new KnowledgePoint(KP_WRITING, "TR_W", "Opinion", "PROCEDURE", "WRITING", "d", false),
-                new KnowledgePoint(SUB_LINK_KP, "DEMO_WRITING_LINKING", "Linking", "PROCEDURE", "WRITING",
-                        "Connect ideas", true),
-                new KnowledgePoint(SUB_TOPIC_KP, "DEMO_WRITING_TOPIC_SENTENCE", "Topic sentence", "PROCEDURE",
-                        "WRITING", "State the main idea", true)), null, true, null, Set.of(LearningSkill.READING,
-                LearningSkill.WRITING))));
+                new KnowledgePoint(KP_WRITING, "TR_W", "Opinion", "PROCEDURE", "WRITING", "State an opinion", true)),
+                null, true, null, Set.of(LearningSkill.READING, LearningSkill.WRITING))));
         var attempt = startPractice.execute(USER, LESSON, WRITING_SET).attemptId();
-        when(llm.completeJson(any(), any())).thenReturn(gradeWithBands("7.0", "5.5", "6.5", "6.0")
-                .replace("\"focus\":[]", "\"focus\":[],\"judgments\":[{\"criterion\":\"CC\","
-                + "\"code\":\"DEMO_WRITING_LINKING\",\"judgment\":\"FAIL\","
-                + "\"excerpt\":\"because real examples make lessons memorable\",\"reason\":\"Use a linker clearly.\"}]"));
+        when(llm.completeJson(any(), any())).thenReturn(gradeWithBands("7.0", "7.0", "7.0", "7.0")
+                .replace("\"focus\":[]", "\"focus\":[],\"judgments\":[{\"code\":\"TR_W\","
+                + "\"judgment\":\"FAIL\",\"excerpt\":\"because real examples make lessons memorable\","
+                + "\"reason\":\"Nêu rõ quan điểm.\"}]"));
         var essay = submitEssay.execute(USER, attempt, ESSAY, UUID.randomUUID(), TEXT);
         UUID requestId = UUID.randomUUID();
 
         submitPractice.execute(USER, attempt, new SubmitExerciseCommand(requestId, List.of()));
         submitPractice.execute(USER, attempt, new SubmitExerciseCommand(requestId, List.of()));
 
+        assertTrue(essay.passed(), "the essay passes, yet the point it was judged on is wrong");
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE source = 'practice_set' "
-                + "AND question_version_id = ? AND kp_id = ? AND correct = false", Integer.class, ESSAY, SUB_LINK_KP));
-        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE source = 'practice_set' "
-                + "AND question_version_id = ? AND kp_id = ?", Integer.class, ESSAY, SUB_TOPIC_KP));
+                + "AND question_version_id = ? AND kp_id = ? AND correct = false", Integer.class, ESSAY, KP_WRITING));
         assertTrue(essay.grade().studyPoints().stream().anyMatch(point ->
                 WritingGrade.StudyPoint.KNOWLEDGE_POINT.equals(point.kind())
-                        && SUB_LINK_KP.equals(point.practiceKnowledgePointId())));
+                        && KP_WRITING.equals(point.practiceKnowledgePointId())));
         verify(llm, times(1)).completeJson(any(), any());
+    }
+
+    @Test
+    void aQuestionPointTheModelCouldNotAssessTakesTheResultOfTheWholeEssay() {
+        when(content.getActiveRubric(anyString())).thenReturn(rubricWithoutSubKnowledgePoints());
+        when(content.getTopicSequence()).thenReturn(List.of(new Topic(TOPIC, "TREES", "Trees", 955, null, List.of(
+                new KnowledgePoint(KP_READING, "TR_R", "Scanning", "PROCEDURE", "READING", "d", true),
+                new KnowledgePoint(KP_WRITING, "TR_W", "Opinion", "PROCEDURE", "WRITING", "State an opinion", true)),
+                null, true, null, Set.of(LearningSkill.READING, LearningSkill.WRITING))));
+        var attempt = startPractice.execute(USER, LESSON, WRITING_SET).attemptId();
+        when(llm.completeJson(any(), any())).thenReturn(gradeWithBands("7.0", "7.0", "7.0", "7.0")
+                .replace("\"focus\":[]", "\"focus\":[],\"judgments\":[{\"code\":\"TR_W\","
+                + "\"judgment\":\"NOT_ASSESSED\",\"excerpt\":\"\",\"reason\":\"Chưa đủ dữ liệu.\"}]"));
+        var essay = submitEssay.execute(USER, attempt, ESSAY, UUID.randomUUID(), TEXT);
+
+        submitPractice.execute(USER, attempt, new SubmitExerciseCommand(UUID.randomUUID(), List.of()));
+
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE source = 'practice_set' "
+                + "AND question_version_id = ? AND kp_id = ? AND correct = ?", Integer.class, ESSAY, KP_WRITING,
+                Boolean.TRUE.equals(essay.passed())));
     }
 
     @Test
@@ -423,16 +436,10 @@ class PracticeEssayIntegrationTest {
         return new Rubric("IELTS_WRITING", "TASK_2", 1, "source", criteria, List.of());
     }
 
-    private static Rubric rubricWithSubKnowledgePoints() {
+    private static Rubric rubricWithoutSubKnowledgePoints() {
         var descriptor = new RubricBandDescriptor(new BigDecimal("6.0"), "Band six.");
-        Map<String, UUID> points = Map.of("TR", TR_KP, "CC", CC_KP, "LR", LR_KP, "GRA", GRA_KP);
         var criteria = List.of("TR", "CC", "LR", "GRA").stream()
-                .map(code -> new RubricCriterion(code, code, "Description", 1, List.of(descriptor), points.get(code),
-                        code.equals("CC") ? List.of(
-                                new LearningContentClient.SubKnowledgePoint(SUB_TOPIC_KP,
-                                        "DEMO_WRITING_TOPIC_SENTENCE", "Topic sentence", "State the main idea"),
-                                new LearningContentClient.SubKnowledgePoint(SUB_LINK_KP, "DEMO_WRITING_LINKING",
-                                        "Linking", "Connect ideas")) : List.of())).toList();
+                .map(code -> new RubricCriterion(code, code, "Description", 1, List.of(descriptor))).toList();
         return new Rubric("IELTS_WRITING", "TASK_2", 1, "source", criteria, List.of());
     }
 

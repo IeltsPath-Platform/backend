@@ -32,7 +32,7 @@ public class QuestionPersistenceMapper {
                 versions.add(toVersionDomain(v));
             }
         }
-        return new Question(
+        Question question = new Question(
                 entity.getId(),
                 entity.getQuestionType(),
                 entity.getSkill(),
@@ -45,6 +45,8 @@ public class QuestionPersistenceMapper {
                 entity.getPurpose(),
                 entity.getImportRef()
         );
+        if (entity.getCode() != null) question.assignCode(entity.getCode());
+        return question;
     }
 
     public QuestionJpaEntity toEntity(Question domain) {
@@ -62,6 +64,7 @@ public class QuestionPersistenceMapper {
                 .skill(domain.getSkill())
                 .requiredFeatureKey(domain.getRequiredFeatureKey())
                 .importRef(domain.getImportRef())
+                .code(domain.getCode())
                 .status(domain.getStatus())
                 .currentPublishedVersionId(domain.getCurrentPublishedVersionId())
                 .createdAt(domain.getCreatedAt())
@@ -72,9 +75,11 @@ public class QuestionPersistenceMapper {
 
     /** Catalog reads only need scalar question fields, avoiding traversal of lazy version relations. */
     public Question toDomainSummary(QuestionJpaEntity entity) {
-        return new Question(entity.getId(), entity.getQuestionType(), entity.getSkill(), entity.getRequiredFeatureKey(),
+        Question question = new Question(entity.getId(), entity.getQuestionType(), entity.getSkill(), entity.getRequiredFeatureKey(),
                 entity.getStatus(), entity.getCurrentPublishedVersionId(), entity.getCreatedAt(), entity.getUpdatedAt(),
                 List.of(), entity.getPurpose(), entity.getImportRef());
+        if (entity.getCode() != null) question.assignCode(entity.getCode());
+        return question;
     }
 
     public QuestionVersion toVersionDomain(QuestionVersionJpaEntity entity) {

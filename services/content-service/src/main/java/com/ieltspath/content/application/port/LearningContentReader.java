@@ -1,5 +1,7 @@
 package com.ieltspath.content.application.port;
 
+import com.ieltspath.content.domain.vo.PlacementPool;
+import com.ieltspath.content.application.result.PlacementPackageResult;
 import com.ieltspath.content.application.result.LessonContentResult;
 import com.ieltspath.content.application.result.LessonPracticeSetResult;
 import com.ieltspath.content.application.result.LessonPracticeSetsResult;
@@ -99,7 +101,7 @@ public interface LearningContentReader {
     List<TopicTestPackageResult> courseTestPackages(UUID courseId);
 
     /** Published placement tests with their current published version, ordered by package id. */
-    List<TopicTestPackageResult> placementTestPackages();
+    List<PlacementPackageResult> placementTestPackages(PlacementPool pool);
 
     /** All question versions of a package version, including drafts, loaded in one query for publish validation. */
     List<PackageQuestionSpec> packageQuestionSpecs(UUID packageVersionId);

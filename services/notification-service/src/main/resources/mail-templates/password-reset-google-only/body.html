@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Tài khoản IELTSPath của bạn đăng nhập bằng Google</title>
+</head>
+<body>
+<th:block th:replace="~{_layout :: header}"></th:block>
+  <p>Xin chào <span th:text="${displayName}">bạn</span>,</p>
+  <p>Có người vừa yêu cầu đặt lại mật khẩu cho tài khoản IELTSPath này. Tài khoản của bạn được tạo bằng Google nên không có mật khẩu để đặt lại. Bạn chỉ cần chọn "Tiếp tục với Google" ở màn hình đăng nhập.</p>
+  <p>Nếu không phải bạn yêu cầu, bạn không cần làm gì thêm: tài khoản vẫn an toàn.</p>
+<th:block th:replace="~{_layout :: footer}"></th:block>
+</body>
+</html>

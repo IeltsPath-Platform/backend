@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -103,7 +104,7 @@ class CourseImportControllerTest {
         UUID question = UUID.randomUUID();
         UUID pack = UUID.randomUUID();
         when(imports.execute(eq(author), eq("course.xlsx"), any())).thenReturn(new CourseImportUseCases.Imported(
-                course, List.of(topic), List.of(lesson), List.of(question), List.of(pack),
+                course, List.of(topic), List.of(lesson), List.of(question), List.of(pack), Map.of(pack, "Package title"),
                 List.of(new Issue("Lessons", 3, "knowledgePointCodes", "NO_PRACTICE_SET", "No practice."))));
 
         mockMvc.perform(multipart(BASE).file(workbook))
@@ -113,6 +114,7 @@ class CourseImportControllerTest {
                 .andExpect(jsonPath("$.lessonIds[0]").value(lesson.toString()))
                 .andExpect(jsonPath("$.questionIds[0]").value(question.toString()))
                 .andExpect(jsonPath("$.packageIds[0]").value(pack.toString()))
+                .andExpect(jsonPath("$.packageTitles['" + pack + "']").value("Package title"))
                 .andExpect(jsonPath("$.warnings[0].code").value("NO_PRACTICE_SET"));
     }
 

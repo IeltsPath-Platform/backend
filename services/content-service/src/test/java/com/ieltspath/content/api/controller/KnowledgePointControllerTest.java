@@ -4,7 +4,7 @@ import com.ieltspath.content.api.exception.GlobalExceptionHandler;
 import com.ieltspath.content.application.result.KnowledgePointResult;
 import com.ieltspath.content.application.command.CreateKnowledgePointCommand;
 import com.ieltspath.content.application.command.UpdateKnowledgePointCommand;
-import com.ieltspath.content.application.usecase.CreateKnowledgePointUseCase;
+import com.ieltspath.content.application.usecase.CodeSettingsUseCases;
 import com.ieltspath.content.application.usecase.ActivateKnowledgePointUseCase;
 import com.ieltspath.content.application.usecase.DeactivateKnowledgePointUseCase;
 import com.ieltspath.content.application.usecase.GetKnowledgePointPrerequisitesUseCase;
@@ -40,6 +40,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -51,7 +52,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ExtendWith(MockitoExtension.class)
 class KnowledgePointControllerTest {
     @Mock private GetKnowledgePointsUseCase getKnowledgePointsUseCase;
-    @Mock private CreateKnowledgePointUseCase createKnowledgePointUseCase;
+    @Mock private CodeSettingsUseCases codeSettings;
     @Mock private UpdateKnowledgePointUseCase updateKnowledgePointUseCase;
     @Mock private DeactivateKnowledgePointUseCase deactivateKnowledgePointUseCase;
     @Mock private ActivateKnowledgePointUseCase activateKnowledgePointUseCase;
@@ -65,7 +66,7 @@ class KnowledgePointControllerTest {
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
         mockMvc = MockMvcBuilders.standaloneSetup(
-                        new KnowledgePointController(getKnowledgePointsUseCase, createKnowledgePointUseCase,
+                        new KnowledgePointController(getKnowledgePointsUseCase, codeSettings,
                                 updateKnowledgePointUseCase, deactivateKnowledgePointUseCase, activateKnowledgePointUseCase,
                                 getKnowledgePointPrerequisitesUseCase, replaceKnowledgePointPrerequisitesUseCase))
                 .setControllerAdvice(new GlobalExceptionHandler())
@@ -130,7 +131,7 @@ class KnowledgePointControllerTest {
     @Test
     void acceptsGrammarKnowledgePointCodeAndAllSkill() throws Exception {
         UUID id = UUID.randomUUID();
-        when(createKnowledgePointUseCase.execute(any())).thenReturn(result(id, LearningType.CONCEPT));
+        when(codeSettings.createKnowledgePoint(any(), any())).thenReturn(result(id, LearningType.CONCEPT));
 
         mockMvc.perform(post("/api/content/knowledge-points")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -141,12 +142,12 @@ class KnowledgePointControllerTest {
                                 """.formatted(UUID.randomUUID())))
                 .andExpect(status().isCreated());
 
-        verify(createKnowledgePointUseCase).execute(any());
+        verify(codeSettings).createKnowledgePoint(any(), any());
     }
 
     @Test
     void acceptsSpeakingKnowledgePointCode() throws Exception {
-        when(createKnowledgePointUseCase.execute(any())).thenReturn(result(UUID.randomUUID(), LearningType.PROCEDURE));
+        when(codeSettings.createKnowledgePoint(any(), any())).thenReturn(result(UUID.randomUUID(), LearningType.PROCEDURE));
 
         mockMvc.perform(post("/api/content/knowledge-points")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -167,14 +168,14 @@ class KnowledgePointControllerTest {
                                  "learningType":"PROCEDURE","skill":"READING","cefrLevel":"B1"}
                                 """.formatted(UUID.randomUUID())))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.details.canDo").value("canDo is required"));
+                .andExpect(jsonPath("$.details.canDo").value("Cần nhập mô tả can-do"));
 
-        verify(createKnowledgePointUseCase, never()).execute(any());
+        verifyNoInteractions(codeSettings);
     }
 
     @Test
     void forwardsCefrCanDoAndScopeFieldsWhenCreatingKnowledgePoints() throws Exception {
-        when(createKnowledgePointUseCase.execute(any())).thenReturn(result(UUID.randomUUID(), LearningType.CONCEPT));
+        when(codeSettings.createKnowledgePoint(any(), any())).thenReturn(result(UUID.randomUUID(), LearningType.CONCEPT));
 
         mockMvc.perform(post("/api/content/knowledge-points")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -186,11 +187,11 @@ class KnowledgePointControllerTest {
                                 """.formatted(UUID.randomUUID())))
                 .andExpect(status().isCreated());
 
-        verify(createKnowledgePointUseCase).execute(argThat((CreateKnowledgePointCommand command) ->
+        verify(codeSettings).createKnowledgePoint(argThat((CreateKnowledgePointCommand command) ->
                 command.cefrLevel() == CefrLevel.B1
                         && "Connect events to a reference time.".equals(command.canDo())
                         && "Present perfect".equals(command.scopeIn())
-                        && "Perfect continuous forms".equals(command.scopeOut())));
+                        && "Perfect continuous forms".equals(command.scopeOut())), any());
     }
 
     @Test
@@ -202,7 +203,7 @@ class KnowledgePointControllerTest {
                                 """.formatted(UUID.randomUUID())))
                 .andExpect(status().isBadRequest());
 
-        verify(createKnowledgePointUseCase, never()).execute(any());
+        verifyNoInteractions(codeSettings);
     }
 
     @Test
@@ -214,12 +215,12 @@ class KnowledgePointControllerTest {
                                 """.formatted(UUID.randomUUID())))
                 .andExpect(status().isBadRequest());
 
-        verify(createKnowledgePointUseCase, never()).execute(any());
+        verifyNoInteractions(codeSettings);
     }
 
     @Test
     void ignoresLegacyBandFieldsOnKnowledgePointCreation() throws Exception {
-        when(createKnowledgePointUseCase.execute(any())).thenReturn(result(UUID.randomUUID(), LearningType.MEMORY));
+        when(codeSettings.createKnowledgePoint(any(), any())).thenReturn(result(UUID.randomUUID(), LearningType.MEMORY));
 
         mockMvc.perform(post("/api/content/knowledge-points")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -230,7 +231,7 @@ class KnowledgePointControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.bandMin").doesNotExist());
 
-        verify(createKnowledgePointUseCase).execute(any());
+        verify(codeSettings).createKnowledgePoint(any(), any());
     }
 
     @Test
@@ -242,7 +243,7 @@ class KnowledgePointControllerTest {
                                 """.formatted(UUID.randomUUID())))
                 .andExpect(status().isBadRequest());
 
-        verify(createKnowledgePointUseCase, never()).execute(any());
+        verifyNoInteractions(codeSettings);
     }
 
     @Test
@@ -312,7 +313,7 @@ class KnowledgePointControllerTest {
                 .andExpect(jsonPath("$.status").value("ACTIVE"));
 
         when(activateKnowledgePointUseCase.execute(id)).thenThrow(
-                new IllegalArgumentException("learningType is required for an active knowledge point"));
+                new IllegalArgumentException("Điểm kiến thức đang dùng cần có loại học (learningType)"));
         mockMvc.perform(post("/api/content/knowledge-points/{id}/activate", id))
                 .andExpect(status().isBadRequest());
     }

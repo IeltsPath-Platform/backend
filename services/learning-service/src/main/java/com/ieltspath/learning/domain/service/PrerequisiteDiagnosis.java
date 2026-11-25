@@ -1,5 +1,7 @@
 package com.ieltspath.learning.domain.service;
 
+import com.ieltspath.learning.domain.vo.DiagnosticSession.ConclusionKind;
+
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -14,13 +16,15 @@ public final class PrerequisiteDiagnosis {
     public static final int MAX_DEPTH = 3;
     public static final int MAX_PROBES = 6;
 
-    /** {@code passed} is null until the probe is answered, and for a probe without a set. */
+    /** {@code passed} is null until answered and for probes that are unknown or skipped. */
     public record ProbeFact(UUID knowledgePointId, UUID parentKnowledgePointId, int depth, Boolean passed) {
         boolean failed() { return Boolean.FALSE.equals(passed); }
     }
 
-    /** {@code knowledgePointIds} are the gap points, or the root point itself when no probe failed. */
-    public record Conclusion(List<UUID> knowledgePointIds, boolean rootIsGap) {}
+    /** {@code knowledgePointIds} are the gap points, or the root point when answered probes support that conclusion. */
+    public record Conclusion(List<UUID> knowledgePointIds, ConclusionKind kind) {
+        public boolean rootIsGap() { return kind == ConclusionKind.ROOT_IS_GAP; }
+    }
 
     /**
      * The prerequisites to probe next after {@code knowledgePointId} failed at {@code depth}: the ones not probed yet,
@@ -36,10 +40,14 @@ public final class PrerequisiteDiagnosis {
 
     /** Valid once every probe is answered or has no set. */
     public Conclusion conclude(UUID rootKnowledgePointId, List<ProbeFact> probes) {
+        if (probes.stream().noneMatch(probe -> probe.passed() != null)) {
+            return new Conclusion(List.of(), ConclusionKind.INCONCLUSIVE);
+        }
         List<UUID> gaps = probes.stream().filter(ProbeFact::failed)
                 .filter(probe -> probes.stream().noneMatch(child -> child.failed()
                         && child.parentKnowledgePointId().equals(probe.knowledgePointId())))
                 .map(ProbeFact::knowledgePointId).distinct().toList();
-        return gaps.isEmpty() ? new Conclusion(List.of(rootKnowledgePointId), true) : new Conclusion(gaps, false);
+        return gaps.isEmpty() ? new Conclusion(List.of(rootKnowledgePointId), ConclusionKind.ROOT_IS_GAP)
+                : new Conclusion(gaps, ConclusionKind.GAPS_FOUND);
     }
 }

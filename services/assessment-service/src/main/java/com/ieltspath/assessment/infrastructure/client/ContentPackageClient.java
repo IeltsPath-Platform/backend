@@ -3,6 +3,7 @@ package com.ieltspath.assessment.infrastructure.client;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.ieltspath.assessment.application.exception.ContentUnavailableException;
 import com.ieltspath.assessment.application.port.ContentPackageProvider;
+import com.ieltspath.assessment.domain.vo.PlacementPool;
 import com.ieltspath.commonresilience.CallKind;
 import com.ieltspath.commonresilience.DownstreamUnavailableException;
 import com.ieltspath.commonresilience.ResilientCall;
@@ -68,8 +69,14 @@ public class ContentPackageClient implements ContentPackageProvider {
                 || response.sections() == null) {
             throw invalid();
         }
+        PlacementPool pool = null;
+        if (response.placementPool() != null) {
+            try { pool = PlacementPool.valueOf(response.placementPool()); }
+            catch (IllegalArgumentException ignored) { throw invalid(); }
+        }
         return new PackageVersion(response.packageVersionId(), response.packageId(), response.packageType(),
-                response.sections().stream().map(ContentPackageClient::toSection).toList());
+                response.sections().stream().map(ContentPackageClient::toSection).toList(), pool,
+                response.requiredFeatureKey());
     }
 
     private static Section toSection(SectionResponse section) {
@@ -117,7 +124,9 @@ public class ContentPackageClient implements ContentPackageProvider {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    private record VersionResponse(UUID packageVersionId, UUID packageId, String packageType, List<SectionResponse> sections) {}
+    private record VersionResponse(UUID packageVersionId, UUID packageId, String packageType,
+                                   List<SectionResponse> sections, String placementPool,
+                                   String requiredFeatureKey) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record SectionResponse(UUID sectionId, String title, String skill, String instructions, int sortOrder,

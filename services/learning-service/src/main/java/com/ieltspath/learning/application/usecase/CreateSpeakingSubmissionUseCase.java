@@ -56,8 +56,10 @@ public class CreateSpeakingSubmissionUseCase {
         requireAvailable(consent);
         Optional<SpeakingSubmission> existing = submissions.findByRequestId(requestId);
         if (existing.isPresent()) return SpeakingSubmissionResult.from(replay(existing.get(), userId, packageVersionId, null));
-        requireBalance();
-        return open(userId, requestId, packageVersionId, questions.resolve(packageVersionId, partSectionIds), null, null);
+        Resolved resolved = questions.resolve(packageVersionId, partSectionIds);
+        boolean premium = premiumFor(resolved.requiredFeatureKey());
+        requireBalance(premium);
+        return open(userId, requestId, packageVersionId, resolved, null, null, pointCost(premium));
     }
 
     /**
@@ -72,8 +74,10 @@ public class CreateSpeakingSubmissionUseCase {
         if (existing.isPresent()) {
             return SpeakingSubmissionResult.from(replay(existing.get(), userId, packageVersionId, attemptId));
         }
-        requireBalance();
-        return open(userId, requestId, packageVersionId, questions.resolveSetItems(packageVersionId), lessonId, attemptId);
+        Resolved resolved = questions.resolveSetItems(packageVersionId);
+        boolean premium = premiumFor(resolved.requiredFeatureKey());
+        requireBalance(premium);
+        return open(userId, requestId, packageVersionId, resolved, lessonId, attemptId, pointCost(premium));
     }
 
     private void requireAvailable(boolean consent) {
@@ -87,14 +91,14 @@ public class CreateSpeakingSubmissionUseCase {
     }
 
     private SpeakingSubmissionResult open(UUID userId, UUID requestId, UUID packageVersionId, Resolved resolved,
-                                          UUID lessonId, UUID attemptId) {
+                                          UUID lessonId, UUID attemptId, int pointCost) {
         SpeakingSubmission created = transaction.execute(status -> start(userId, requestId, packageVersionId, resolved,
-                lessonId, attemptId));
+                lessonId, attemptId, pointCost));
         return SpeakingSubmissionResult.from(created);
     }
 
     private SpeakingSubmission start(UUID userId, UUID requestId, UUID packageVersionId, Resolved resolved,
-                                     UUID lessonId, UUID attemptId) {
+                                     UUID lessonId, UUID attemptId, int pointCost) {
         lock.lock(userId);
         Optional<SpeakingSubmission> existing = submissions.findByRequestId(requestId);
         if (existing.isPresent()) return replay(existing.get(), userId, packageVersionId, attemptId);
@@ -115,7 +119,7 @@ public class CreateSpeakingSubmissionUseCase {
             }
         }
         SpeakingSubmission submission = SpeakingSubmission.start(UUID.randomUUID(), userId, requestId, packageVersionId,
-                resolved.scope(), settings.pointCost(), now, resolved.questions(), now);
+                resolved.scope(), pointCost, now, resolved.questions(), now);
         if (attemptId != null) submission.forPracticeAttempt(lessonId, attemptId);
         submissions.save(submission);
         return submission;
@@ -130,7 +134,36 @@ public class CreateSpeakingSubmissionUseCase {
         return existing;
     }
 
-    private void requireBalance() {
+    private boolean premiumLearner() {
+        try {
+            return points.premium();
+        } catch (AccessUnavailableException exception) {
+            return false;
+        }
+    }
+
+    private boolean premiumFor(String requiredFeatureKey) {
+        if (requiredFeatureKey == null) return premiumLearner();
+        final boolean premium;
+        try {
+            premium = points.premium();
+        } catch (AccessUnavailableException exception) {
+            throw new LearningRequestException(503, "ENTITLEMENT_UNAVAILABLE",
+                    "Chưa kiểm tra được gói Premium. Vui lòng thử lại sau.");
+        }
+        if (!premium) {
+            throw new LearningRequestException(403, "PREMIUM_REQUIRED",
+                    "Đề này dành cho tài khoản Premium. Nâng cấp để luyện đề này.");
+        }
+        return true;
+    }
+
+    private int pointCost(boolean premium) {
+        return premium ? 0 : settings.pointCost();
+    }
+
+    private void requireBalance(boolean premium) {
+        if (premium) return;
         long balance;
         try {
             balance = points.balance();

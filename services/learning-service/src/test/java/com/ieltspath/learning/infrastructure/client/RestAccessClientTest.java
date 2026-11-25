@@ -37,7 +37,7 @@ class RestAccessClientTest {
     void setUp() {
         RestClient.Builder builder = RestClient.builder().baseUrl(BASE_URL);
         server = MockRestServiceServer.bindTo(builder).build();
-        client = new RestAccessClient(builder.build());
+        client = new RestAccessClient(builder.build(), () -> java.util.Optional.of("worker-token"));
         var jwt = Jwt.withTokenValue("learner-token").header("alg", "HS256").subject(UUID.randomUUID().toString())
                 .issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(60)).build();
         SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt, List.of()));
@@ -61,6 +61,21 @@ class RestAccessClientTest {
                 .andRespond(withSuccess("{\"userId\":\"%s\",\"balance\":7,\"totalCredited\":10}"
                         .formatted(UUID.randomUUID()), MediaType.APPLICATION_JSON));
         assertEquals(7, client.balance());
+    }
+
+    @Test
+    void backgroundPremiumLookupUsesWorkerTokenAndFailsClosed() {
+        UUID userId = UUID.randomUUID();
+        server.expect(requestTo(BASE_URL + "/internal/access/users/" + userId + "/premium"))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer worker-token"))
+                .andExpect(header(SecurityHeaders.CORRELATION_ID, "corr-1"))
+                .andRespond(withSuccess("{\"premium\":true}", MediaType.APPLICATION_JSON));
+        server.expect(times(2), requestTo(BASE_URL + "/internal/access/users/" + userId + "/premium"))
+                .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
+
+        assertTrue(client.premiumOf(userId));
+        assertFalse(client.premiumOf(userId));
     }
 
     @Test

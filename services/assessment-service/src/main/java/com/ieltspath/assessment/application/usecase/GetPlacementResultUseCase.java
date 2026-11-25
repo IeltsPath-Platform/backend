@@ -28,8 +28,8 @@ public class GetPlacementResultUseCase {
 
     @Transactional(readOnly = true)
     public PlacementResult execute(UUID userId, UUID attemptId) {
-        attempts.findByIdAndUserId(attemptId, userId)
-                .filter(attempt -> attempt.getAttemptType() == AttemptType.PLACEMENT)
+        var attempt = attempts.findByIdAndUserId(attemptId, userId)
+                .filter(candidate -> candidate.getAttemptType() == AttemptType.PLACEMENT)
                 .orElseThrow(() -> new AssessmentNotFoundException("Placement attempt not found"));
         var result = results.findLatestCompletedByAttemptId(attemptId)
                 .orElseThrow(() -> new AssessmentNotFoundException("Assessment result not found"));
@@ -37,6 +37,10 @@ public class GetPlacementResultUseCase {
                 .map(entry -> new PlacementResult.SkillBand(entry.getKey(), entry.getValue()))
                 .toList();
         return new PlacementResult(attemptId, result.overallBand(), result.completedAt(), skills,
-                report.sections(attemptId, result.id()));
+                report.sections(attemptId, result.id()), attempt.getPlacementPool(),
+                result.placementPool() == null ? null : result.placementPool().ceiling(),
+                result.placementPool() != null && result.placementPool() != com.ieltspath.assessment.domain.vo.PlacementPool.BAND_5_9
+                        && result.uncappedBand() != null && result.uncappedBand() >= result.placementPool().ceiling(),
+                result.partial());
     }
 }

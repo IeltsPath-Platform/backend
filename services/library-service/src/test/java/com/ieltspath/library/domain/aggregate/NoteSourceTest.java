@@ -1,5 +1,6 @@
 package com.ieltspath.library.domain.aggregate;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import com.ieltspath.library.domain.exception.InvalidDataException;
 import com.ieltspath.library.domain.vo.LibraryStatus;
 import com.ieltspath.library.domain.vo.NoteSourceType;
@@ -59,5 +60,13 @@ class NoteSourceTest {
         assertEquals(LibraryStatus.ARCHIVED, note.getStatus());
         assertEquals(NoteSourceType.KNOWLEDGE_POINT, note.getSourceType());
         assertEquals(sourceId, note.getSourceReferenceId());
+    }
+
+    @Test
+    void anUpdateThatStaysActiveHasNoLinksToRemove() {
+        Note note = Note.create(UUID.randomUUID(), "Lesson", "Keep this");
+        assertFalse(note.update("Lesson", "Updated", LibraryStatus.ACTIVE));
+        assertEquals(LibraryStatus.ACTIVE, note.getStatus());
+        assertEquals("Updated", note.getBody());
     }
 }

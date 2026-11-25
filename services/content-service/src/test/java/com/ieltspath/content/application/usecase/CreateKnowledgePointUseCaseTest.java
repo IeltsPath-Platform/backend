@@ -1,5 +1,7 @@
 package com.ieltspath.content.application.usecase;
 
+import static org.mockito.Mockito.never;
+import com.ieltspath.content.domain.exception.DuplicateCodeException;
 import com.ieltspath.content.application.command.CreateKnowledgePointCommand;
 import com.ieltspath.content.domain.aggregate.Course;
 import com.ieltspath.content.domain.aggregate.KnowledgePoint;
@@ -71,7 +73,7 @@ class CreateKnowledgePointUseCaseTest {
 
         assertThatThrownBy(() -> useCase.execute(new CreateKnowledgePointCommand(topicId, "S60_PART2_LONG_TURN",
                 "Long turn", KnowledgePointKind.STRATEGY, LearningType.PROCEDURE, Skill.SPEAKING, null)))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("must match its skill");
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("cùng kỹ năng với chủ đề");
     }
 
     @Test
@@ -93,7 +95,7 @@ class CreateKnowledgePointUseCaseTest {
         assertThatThrownBy(() -> useCase.execute(new CreateKnowledgePointCommand(topicId, "S60_PART2_LONG_TURN",
                 "Long turn", KnowledgePointKind.STRATEGY, LearningType.PROCEDURE, Skill.SPEAKING, null,
                 null, "Deliver a long turn.", null, null)))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("cefrLevel");
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("cấp CEFR");
     }
 
     @Test
@@ -103,5 +105,14 @@ class CreateKnowledgePointUseCaseTest {
 
         assertThatThrownBy(() -> useCase.execute(command))
                 .isInstanceOf(InvalidKnowledgePointCodeException.class);
+    }
+
+    @Test
+    void aCodeAlreadyUsedIsRefused() {
+        when(knowledgePointRepository.existsByCode("G60_COMPLEX_SENTENCES")).thenReturn(true);
+        assertThatThrownBy(() -> useCase.execute(new CreateKnowledgePointCommand(UUID.randomUUID(), "G60_COMPLEX_SENTENCES",
+                "Complex sentences", KnowledgePointKind.GRAMMAR, LearningType.CONCEPT, Skill.ALL, null)))
+                .isInstanceOf(DuplicateCodeException.class);
+        verify(knowledgePointRepository, never()).save(any());
     }
 }

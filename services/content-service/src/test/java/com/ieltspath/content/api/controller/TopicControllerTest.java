@@ -13,7 +13,7 @@ import com.ieltspath.content.api.exception.GlobalExceptionHandler;
 import com.ieltspath.content.application.command.CreateTopicCommand;
 import com.ieltspath.content.application.result.TopicResult;
 import com.ieltspath.content.application.result.TopicTreeResult;
-import com.ieltspath.content.application.usecase.CreateTopicUseCase;
+import com.ieltspath.content.application.usecase.CodeSettingsUseCases;
 import com.ieltspath.content.application.usecase.GetTopicTreeUseCase;
 import com.ieltspath.content.application.usecase.GetTopicUseCase;
 import com.ieltspath.content.application.usecase.UpdateTopicUseCase;
@@ -52,7 +52,7 @@ class TopicControllerTest {
         UUID id = UUID.randomUUID();
         TopicResult result = new TopicResult(id, null, "TOPIC", "Topic", 1, ContentStatus.ACTIVE,
                 Instant.now(), Instant.now(), BandRange.UNBOUNDED, Skill.READING, null, "Topic description");
-        when(createTopicUseCase.execute(any())).thenReturn(result);
+        when(codeSettings.createTopic(any())).thenReturn(result);
         when(updateTopicUseCase.execute(any())).thenReturn(result);
         when(getTopicUseCase.execute(id)).thenReturn(result);
         String body = "{\"code\":\"TOPIC\",\"name\":\"Topic\",\"sortOrder\":1,\"skill\":\"READING\",\"description\":\"  Topic description  \"}";
@@ -64,7 +64,7 @@ class TopicControllerTest {
                 .andExpect(jsonPath("$.description").value("Topic description"));
 
         ArgumentCaptor<CreateTopicCommand> create = ArgumentCaptor.forClass(CreateTopicCommand.class);
-        verify(createTopicUseCase).execute(create.capture());
+        verify(codeSettings).createTopic(create.capture());
         assertThat(create.getValue().description()).isEqualTo("  Topic description  ");
         ArgumentCaptor<UpdateTopicCommand> update = ArgumentCaptor.forClass(UpdateTopicCommand.class);
         verify(updateTopicUseCase).execute(update.capture());
@@ -77,7 +77,7 @@ class TopicControllerTest {
         UUID courseId = UUID.randomUUID();
         TopicResult result = new TopicResult(id, null, "TOPIC", "Topic", 1, ContentStatus.ACTIVE,
                 Instant.now(), Instant.now(), BandRange.UNBOUNDED, null, courseId);
-        when(createTopicUseCase.execute(any())).thenReturn(result);
+        when(codeSettings.createTopic(any())).thenReturn(result);
         when(updateTopicUseCase.execute(any())).thenReturn(result);
         when(getTopicUseCase.execute(id)).thenReturn(result);
         when(getTopicTreeUseCase.execute()).thenReturn(List.of(new TopicTreeResult(id, null, "TOPIC", "Topic", 1,
@@ -92,7 +92,7 @@ class TopicControllerTest {
         mockMvc.perform(get("/api/content/topics"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$[0].courseId").value(courseId.toString()));
         ArgumentCaptor<CreateTopicCommand> create = ArgumentCaptor.forClass(CreateTopicCommand.class);
-        verify(createTopicUseCase).execute(create.capture());
+        verify(codeSettings).createTopic(create.capture());
         assertThat(create.getValue().courseId()).isEqualTo(courseId);
         ArgumentCaptor<UpdateTopicCommand> update = ArgumentCaptor.forClass(UpdateTopicCommand.class);
         verify(updateTopicUseCase).execute(update.capture());
@@ -106,7 +106,7 @@ class TopicControllerTest {
     private GetTopicUseCase getTopicUseCase;
 
     @Mock
-    private CreateTopicUseCase createTopicUseCase;
+    private CodeSettingsUseCases codeSettings;
 
     @Mock
     private UpdateTopicUseCase updateTopicUseCase;
@@ -167,7 +167,7 @@ class TopicControllerTest {
                 Instant.now(), Instant.now(), BandRange.of(new BigDecimal("6.0"), null), Skill.WRITING
         );
 
-        when(createTopicUseCase.execute(any(CreateTopicCommand.class))).thenReturn(result);
+        when(codeSettings.createTopic(any(CreateTopicCommand.class))).thenReturn(result);
 
         mockMvc.perform(post("/api/content/topics")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -181,7 +181,7 @@ class TopicControllerTest {
                 .andExpect(jsonPath("$.skill").value("WRITING"));
 
         ArgumentCaptor<CreateTopicCommand> command = ArgumentCaptor.forClass(CreateTopicCommand.class);
-        verify(createTopicUseCase).execute(command.capture());
+        verify(codeSettings).createTopic(command.capture());
         assertThat(command.getValue().band()).isEqualTo(BandRange.of(new BigDecimal("6.0"), null));
         assertThat(command.getValue().skill()).isEqualTo(Skill.WRITING);
     }
@@ -196,13 +196,13 @@ class TopicControllerTest {
                     .andExpect(status().isBadRequest());
         }
 
-        verify(createTopicUseCase, never()).execute(any());
+        verify(codeSettings, never()).createTopic(any());
     }
 
     @Test
     void passesTheRequestedSkillToTheUseCaseAndMapsItsRejectionTo400() throws Exception {
         // The aggregate rejects ALL (see TopicTest); here the request reaches it unchanged and the refusal becomes 400.
-        when(createTopicUseCase.execute(any(CreateTopicCommand.class)))
+        when(codeSettings.createTopic(any(CreateTopicCommand.class)))
                 .thenThrow(new IllegalArgumentException("A topic teaches one skill; ALL is not allowed"));
         mockMvc.perform(post("/api/content/topics")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -210,7 +210,7 @@ class TopicControllerTest {
                 .andExpect(status().isBadRequest());
 
         ArgumentCaptor<CreateTopicCommand> command = ArgumentCaptor.forClass(CreateTopicCommand.class);
-        verify(createTopicUseCase).execute(command.capture());
+        verify(codeSettings).createTopic(command.capture());
         assertThat(command.getValue().skill()).isEqualTo(Skill.ALL);
     }
 
@@ -235,13 +235,13 @@ class TopicControllerTest {
     @DisplayName("POST /api/content/topics with duplicate code should return 400 Bad Request")
     void shouldReturn400OnDuplicateCode() throws Exception {
         CreateTopicRequest request = new CreateTopicRequest(null, "DUPLICATE", "Duplicate Topic", 1, null, null, null);
-        when(createTopicUseCase.execute(any(CreateTopicCommand.class)))
+        when(codeSettings.createTopic(any(CreateTopicCommand.class)))
                 .thenThrow(new DuplicateCodeException("Topic", "DUPLICATE"));
 
         mockMvc.perform(post("/api/content/topics")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Topic with code 'DUPLICATE' already exists"));
+                .andExpect(jsonPath("$.message").value("Mã \"DUPLICATE\" đã được dùng"));
     }
 }

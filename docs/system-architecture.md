@@ -1,6 +1,6 @@
 # Kiến trúc hệ thống IELTSPath (backend)
 
-- Cập nhật lần cuối: 2026-11-11 (common-llm); 2026-10-25; thêm KP con theo mã lỗi, bằng chứng `error_trap`, chọn bộ theo bẫy, phản hồi `fixHint` và `ERROR_PATTERN` cho Learning
+- Cập nhật lần cuối: 2026-11-18 (thang bài ôn, chẩn đoán dò ngược, giỏ ôn và mastery); 2026-11-11 (common-llm); 2026-10-25; thêm KP con theo mã lỗi, bằng chứng `error_trap`, chọn bộ theo bẫy, phản hồi `fixHint` và `ERROR_PATTERN` cho Learning
 - Đọc khi cần hiểu toàn hệ thống. Quy tắc bắt buộc nằm ở [`AGENTS.md`](../AGENTS.md); hướng dẫn chạy chi tiết ở
   [`local-development.md`](local-development.md); tổng quan và bảng pattern ở [`README.md`](../README.md).
   Code là nguồn đúng khi tài liệu này lệch.
@@ -63,7 +63,7 @@ after grading as a best-effort read. Report and tree responses nest children wit
 Chi tiết schema: [`.sdd/database/DATABASE_V5.md`](../.sdd/database/DATABASE_V5.md). Service Java tự chạy Flyway khi khởi
 động (`src/main/resources/db/migration`).
 Gateway giữ các path công khai nhưng trỏ từng nhóm tới chủ sở hữu mới; không còn route tổng quát
-`/api/learning-support/**`. Library V2 có bốn FK `ON DELETE RESTRICT` tới catalog; không có bảng `outbox_events`.
+`/api/learning-support/**`. Library V2 có bốn FK `ON DELETE RESTRICT` tới catalog. Library V43 thêm `outbox_events` và relay cho nhắc ôn từ vựng hằng ngày (`library.vocabulary-review-due.v1`).
 
 ## 3. Giao tiếp giữa service
 
@@ -71,6 +71,7 @@ Gateway giữ các path công khai nhưng trỏ từng nhóm tới chủ sở h�
 
 | Caller | Callee | Endpoint | Cấu hình base URL |
 | --- | --- | --- | --- |
+| content | access | `GET /api/access/me/subscription` (quyền Premium cho nội dung đề luyện, ngoài transaction) | `ACCESS_SERVICE_URL` (mặc định `http://localhost:8084`) |
 | assessment | content | `GET /internal/learning-content/package-versions/{id}` khi tạo attempt (ngoài transaction) | `CONTENT_SERVICE_URL` |
 | content | library | `GET /api/content/vocabulary/senses`, `POST /api/content/admin/vocabulary/bulk` khi duyệt course draft và soạn lesson, bearer của tác giả | `LIBRARY_SERVICE_URL` (khóa `content.library.base-url`, mặc định `http://localhost:8081`) |
 | community | user | `POST /internal/users/public-profiles`, `GET /internal/users/public-profiles/search`, bearer của người xem | `USER_SERVICE_URL` (khóa `community.user-service.base-url`) |
@@ -82,6 +83,8 @@ Gateway giữ các path công khai nhưng trỏ từng nhóm tới chủ sở h�
 | learning | assessment | `GET /api/assessments/me/statistics/study-context` xác minh bài thi của người học khi mở phiên học | `ASSESSMENT_SERVICE_URL` (mặc định `http://localhost:8083`) |
 | library | access | `GET /api/access/me/subscription` for cached Premium heart capacity; `POST /internal/access/points/debit` for durable vocabulary heart/freeze purchases, outside transactions and user locks | `ACCESS_SERVICE_URL` (key `library.access.base-url`, default `http://localhost:8084`) |
 | learning | access | `GET /api/access/me/points` (số dư), `POST /internal/access/points/debit` (AI grading and durable course-skill unlock purchases) | `ACCESS_SERVICE_URL` (mặc định `http://localhost:8084`) |
+| learning | access | `GET /internal/access/users/{userId}/premium` (quota job Speaking, ngoài transaction và khóa) | `ACCESS_SERVICE_URL` (mặc định `http://localhost:8084`) |
+| assessment | access | `GET /internal/access/users/{userId}/premium` (quota chấm essay nền, ngoài transaction và khóa) | `ACCESS_SERVICE_URL` |
 | learning | LLM (ngoài hệ thống) | `POST {base}/chat/completions` (OpenAI-compatible) khi chấm bài luận, ngoài mọi transaction | `LEARNING_LLM_BASE_URL`, `LEARNING_LLM_API_KEY`, `LEARNING_LLM_MODEL` |
 | learning | Azure Speech (ngoài hệ thống) | Speech SDK (`client-sdk` 1.53.0), một lượt nhận dạng liên tục cho cả ghi âm, đẩy audio qua stream (không ghi file); chạy ngoài transaction. Không qua `ResilientCall` (SDK tự mở kết nối); số phân tích chạy cùng lúc bị giới hạn bằng `learning.speech.max-concurrent` | `LEARNING_SPEECH_KEY`, `LEARNING_SPEECH_REGION`, `LEARNING_SPEECH_LOCALE` |
 | assessment | LLM (ngoài hệ thống) | `POST {base}/chat/completions` cho essay đã nộp trong `TOPIC_GATE`/`COURSE_GATE`, ngoài transaction | `ASSESSMENT_LLM_BASE_URL`, `ASSESSMENT_LLM_API_KEY`, `ASSESSMENT_LLM_MODEL`; quota ngày `ASSESSMENT_LLM_DAILY_LIMIT` |
@@ -156,6 +159,7 @@ Luồng `SubscriptionGranted` của Access thông báo cho người dùng khi ad
 | Producer | Consumer | Queue / retry / DLQ | Contract |
 | --- | --- | --- | --- |
 | Access `GrantSubscriptionUseCase` ghi `SubscriptionGranted` vào `outbox_events` cùng transaction; `AccessOutboxRelay` publish với confirm tới exchange `access.events`, routing key `access.subscription-granted.v1` | Notification `SubscriptionGrantedListener` gọi `RecordSubscriptionGrantedUseCase`; `eventId` chống ghi thông báo trùng | `notification.subscription-granted.v1`; retry `notification.subscription-granted.v1.retry`; DLQ `notification.subscription-granted.v1.dlq` | [`subscription-granted-v1.md`](contracts/subscription-granted-v1.md) |
+| Library `QueueVocabularyReviewDueUseCase` (lịch hằng ngày 08:00 giờ Việt Nam) ghi `VocabularyReviewDue` vào `outbox_events`, mỗi học viên một dòng mỗi ngày; `LibraryOutboxRelay` publish có confirm tới exchange `library.events`, routing key `library.vocabulary-review-due.v1` | Notification `VocabularyReviewDueListener` gọi `RecordVocabularyReviewDueUseCase`; `eventId` chống ghi thông báo trùng | `notification.vocabulary-review-due.v1`; retry `notification.vocabulary-review-due.v1.retry`; DLQ `notification.vocabulary-review-due.v1.dlq` | [`vocabulary-review-due-v1.md`](contracts/vocabulary-review-due-v1.md) |
 | User `ForgotPasswordUseCase` ghi token hash và `PasswordResetRequestedV1` trong cùng transaction; `UserOutboxRelay` publish có confirm, sau đó xóa payload | Notification `PasswordResetRequestedListener` gửi SMTP và deduplicates bằng `eventId` | `notification.password-reset-requested.v1` (+ retry, DLQ) | [`password-reset-requested-v1.md`](contracts/password-reset-requested-v1.md) |
 
 Lỗi xử lý tạm thời được chuyển qua retry queue; lỗi payload hoặc vi phạm contract được dead-letter. Retry queue trả message về đúng exchange nguồn với routing key ban đầu, nên consumer nhận lại đúng contract (`RetryTopologyTest`). Khi Community park message vào DLQ, consumer ghi routing key gốc vào header `x-original-routing-key`, vì routing key của dead-letter là tên DLQ; replay đọc header này để gửi lại đúng đường. Content và Game không có outbox: bảng đã bị xóa vì không có service nào đọc event của hai bên.
@@ -235,9 +239,10 @@ connect/read timeouts and does not replace the application's normal external `Jw
 ### Học topic và bài (Learning Service)
 
 ```text
-GET /api/learning/placement-test -> Content internal placement-packages -> {packageId, packageVersionId};
-  409 PLACEMENT_ALREADY_DONE khi learner_placements đã có dòng của user
-(placement không bắt buộc: không route học nào đòi learner_placements)
+GET /api/learning/placement-test/options -> Learning assignments + Content internal placement-packages?pool=...
+  -> số đề theo pool, quota 3 assignment/24h, band placement mới nhất, assignment đang mở
+POST /api/learning/placement-test/assignments -> gán đề theo pool; POST .../assignments/{id}/release -> bỏ assignment chưa làm
+(placement không bắt buộc: không route học nào đòi learner_placements; Assessment độc lập giới hạn 3 lượt bắt đầu/24h)
 GET /api/learning/courses -> refresh từ Content topic-sequence + course_progress + learner_placements
   -> danh sách course theo band, recommended lấy từ placement (chỉ gợi ý; mọi course luôn mở)
 GET /api/learning/topics -> một lần gọi Content topic-sequence -> knowledge_point_catalog + topic_progress (course_id,
@@ -253,16 +258,51 @@ POST /api/learning/lessons/{id}/practice-attempts -> nộp -> lời giải; lầ
   practice_set; < 70% tạo bài ôn cho KP < 70% (còn package chưa lộ); lưu lesson_practice_passes khi bài qua Practice
 GET /api/learning/topics/{id}/lessons -> topic LOCKED vẫn trả danh sách bài, mọi bài LOCKED (đọc trước lộ trình);
   mở bài của topic đó vẫn 403 TOPIC_LOCKED
-GET /api/learning/reviews/{id} -> lý thuyết của KP; PRACTICE: một set chưa giao/chưa lộ, có hint (hết -> SKIPPED);
-  THEORY: quick-check <= 3 câu của bài
-POST /api/learning/reviews/{id}/submissions -> mỗi set một lần, luôn có lời giải; >=70% -> DONE; trượt lần đầu -> THEORY;
-  các lần sau set mới đến khi đạt; SKIPPED chỉ khi hết package chưa lộ (bài ôn tùy chọn trượt -> SKIPPED)
-POST /api/learning/reviews/{id}/theory-check -> không ghi bằng chứng -> PRACTICE
+GET /api/learning/reviews/{id} -> có thể giao set, hoàn tất THEORY nếu không còn lý thuyết, hoặc chuyển SKIPPED nếu
+  không còn package chưa xem; GET sau set trượt thứ hai mở phiên chẩn đoán nếu chưa có phiên; session không có probe
+  được kết luận ngay và diagnosticSessionId trả null
+POST /api/learning/reviews/{id}/submissions -> mỗi set một lần, luôn có lời giải; đạt >=70% -> DONE;
+  bài ôn chặn trượt lần 1 hoặc 3 -> THEORY (lần 3: REPEATED_FAIL), lần 2 -> chờ GET kế tiếp để chẩn đoán;
+  tới N set trượt (learning.review.unblock-after-failed-sets, mặc định 4, tối thiểu 4) -> vẫn PENDING nhưng
+  blocking=false và vào giỏ ôn; bài ôn tùy chọn có một set, đạt -> DONE, trượt -> SKIPPED
+POST /api/learning/reviews/{id}/theory-check -> không ghi bằng chứng -> PRACTICE; bài học bị archive được xem như
+  không có lý thuyết để đọc, GET tự hoàn tất THEORY và theory-check vẫn hợp lệ
 POST /api/learning/topics/{id}/test-assignments -> REVIEW_REQUIRED, PRACTICE_REQUIRED (mọi bài phải qua Practice),
   TEST_LOCKED -> một mã đề dùng một lần, xoay vòng theo package
 POST /api/learning/courses/{id}/test-assignments -> cần mọi topic trong course PASSED -> một COURSE_TEST assignment
   -> Assessment attempt COURSE_GATE -> đạt >= 70% thì course_progress PASSED; không chặn topic khác
 ```
+
+Số set trượt được đếm từ các dòng `review_sets` đã nộp trượt sau `review_items.failures_counted_from`; null nghĩa là
+đếm toàn bộ lịch sử. Mỗi lần nâng lại bài ôn thành chặn tạo mốc mới, không xóa hay sửa `review_sets`. Hạ cấp giữ bài ôn
+`PENDING`, nhưng nó không chặn lesson sau, Practice hoặc thi topic; trong cùng transaction nó cũng được gỡ khỏi danh sách
+`waiting_on_review_ids` của bài ôn gốc. Một bài ôn chỉ thành `SKIPPED` do hết gói khi không còn package chưa xem.
+
+Chẩn đoán dò ngược bắt đầu cho bài ôn chặn sau set trượt thứ hai hoặc hết gói, tối đa ba tầng và sáu probe. Lỗi Content
+khi GET phải trả 503 trước khi giao set. Không có KP tiên quyết thì phiên kết luận `NO_PREREQUISITES` mà không tạo probe;
+probe thiếu set ghi `content_gap_signals`, còn `SKIPPED` và `NO_SET` có nghĩa là chưa biết, không phải KP hổng. Chỉ cho
+bỏ qua phiên sau ít nhất một probe `ANSWERED`; probe đang mở được đánh dấu `SKIPPED` và nhả package. Probe submission
+replay đọc response đã lưu trước mọi lời gọi Content. Bài ôn do chẩn đoán sinh ra không mở phiên chẩn đoán khác.
+Nếu KP chẩn đoán không thuộc bài học, theory rỗng, scope `NO_LESSON`, và bỏ qua bước THEORY.
+
+`GET /api/learning/review-basket` đặt bài ôn chặn ở `required`. Nhóm `weak` gồm bài ôn đã hạ cấp (`UNBLOCKED`), KP
+`PRIORITY` không có bài ôn đang mở nhưng có bài học hoàn thành dạy KP và còn package vượt reserve; nhóm `due` gồm KP
+đến hạn và tối đa 10 KP decay có `last_evidence_at` cũ nhất. Decay được đánh dấu ở `kp_mastery_profiles.decayed_from_tier`
+khi job chuyển KP đủ dữ liệu từ `CONSOLIDATE`/`MAINTAIN` sang `INSUFFICIENT`; chỉ ghi từ lúc triển khai, không backfill.
+Badge `due` đếm cùng tập với giỏ ôn. Start mới `PRIORITY`/`DECAYED` kiểm bài học, paywall, lọc package
+`requiredFeatureKey` nếu không Premium, và giữ reserve trước khi tạo bài ôn tùy chọn có trigger tương ứng; start
+`CONSOLIDATE`/`MAINTAIN` giữ luật lọc gói cũ. Start trả `409 NO_UNREVEALED_SET` nếu số package chưa xem không vượt reserve.
+
+`ReviewReevaluation` quyết định bài ôn sau thi bằng điểm lưu trong `kp_mastery_profiles` theo `learning.mastery.policy`;
+`GET /api/learning/mastery` vẫn dùng `MasteryCalculator` (SRS FT-26). Luyện tự do không tạo bài ôn chặn, nhưng có thể
+tạo bài ôn tùy chọn `ERROR_PATTERN` khi KP bẫy làm KP cha thành `PRIORITY`.
+
+Các use case `GetReview`, `SubmitReview`, `SubmitTheoryCheck`, `GetDiagnosticProbe`, `SubmitDiagnosticProbe`,
+`SkipDiagnostic`, `StartBasketReview` và `GetReviewBasket` chuẩn bị Content ngoài transaction/khóa học viên rồi khóa,
+đọc lại và kiểm tra dữ liệu trước khi ghi. Khi triển khai rollback image cũ sau V56/V57, trước tiên phải chạy
+[`rollback-data-fixup.sql`](../plans/261118-1825-adaptive-review-flow-fixes/reports/rollback-data-fixup.sql), vì binary cũ
+không đọc được các enum mới. V56–V58 thêm cột và nới CHECK; V56 cũng gán `NO_PREREQUISITES` cho các phiên đã kết luận
+không có probe. Flyway không rollback các migration này.
 
 Khi nộp `TOPIC_GATE`/`COURSE_GATE`, essay đã gửi qua `/api/assessments/submissions` được xếp thành grading job miễn phí.
 Scheduler claim job trong transaction ngắn, gọi Assessment LLM ngoài transaction rồi ghi band và hoàn tất result/outbox
@@ -303,9 +343,9 @@ Học viên lấy mã đề từ learning (`POST /api/learning/topics/{id}/test-
 
 Assessment không gọi User lấy goal; attempt mới và event có `learning_goal_id` null. Consumer Learning không gọi
 HTTP và không cần path hoặc trạng thái học có sẵn. Trong một transaction khóa theo user, version bằng/cũ bị bỏ qua;
-version cao hơn thay evidence của attempt. `PLACEMENT` lưu `overall_band` mới nhất (Assessment tự chấm đề placement 4 kỹ năng và tính band: Listening/Reading theo
-% đúng, Writing theo band LLM hoặc band mặc định khi LLM không chấm được, Speaking theo band cố định cấu hình; band tổng là
-trung bình làm tròn 0.5), không ghi mastery hay đổi trạng thái topic;
+version cao hơn thay evidence của attempt. `PLACEMENT` lưu `overall_band` mới nhất (Assessment tự chấm: Listening/Reading theo
+% đúng, Writing theo bài luận đã chấm, Speaking chỉ khi có cấu hình; kỹ năng chưa chấm được bị bỏ khỏi kết quả. Band tổng là
+trung bình các kỹ năng có band, làm tròn 0.5 rồi giới hạn theo pool 3.0/5.0/9.0), không ghi mastery hay đổi trạng thái topic;
 band chỉ dùng để đánh dấu course được gợi ý. `TOPIC_GATE` tìm assignment cùng user/package version, còn mở và đã giao
 trước khi attempt hoàn tất; lần giao được consume cả khi trượt; đạt ≥70% ghi `passed_at` một chiều. `COURSE_GATE` dùng
 quy tắc tương tự cho `course_test_assignments`; đạt ≥70% ghi `course_progress.passed_at`. ACK sau commit; topic kế trong
@@ -328,6 +368,8 @@ Backend hiện có 29 phương thức `@Scheduled` trong 28 file. Cơ chế ch�
 | access | `AccessOutboxRelayScheduler` | `FOR UPDATE SKIP LOCKED`; publish broker trong transaction ngắn | Broker trong transaction ngắn |
 | user | `UserOutboxRelayScheduler` | `FOR UPDATE SKIP LOCKED`; publish broker trong transaction ngắn | Broker trong transaction ngắn |
 | access | `SubscriptionExpiryNoticeScheduler` | Mỗi cặp (subscription, stage) được giành bằng `INSERT ... ON CONFLICT DO NOTHING` trước khi phát event; hai lịch trùng chỉ phát một lần | Không |
+| library | `VocabularyReviewDueScheduler` | Event id cố định theo (học viên, ngày) và `INSERT ... ON CONFLICT DO NOTHING` vào outbox; hai instance cùng chạy chỉ ghi một dòng | Không |
+| library | `LibraryOutboxRelayScheduler` | Giành dòng bằng `FOR UPDATE SKIP LOCKED`; publish có confirm, at-least-once | Không |
 | notification | `LearningMailScheduler` | Mỗi giám khảo được nhận job bằng một lệnh `DELETE ... RETURNING`; hai instance không nhận cùng job, job đến sau nằm cho lần sau | SMTP ngoài claim; job bị giữ lại nếu gửi lỗi hoặc chạm giới hạn ngày |
 | notification | `NotificationRetentionScheduler` | Xóa theo cutoff và lô giới hạn; chạy lặp an toàn | Không |
 | community | `CommunityOutboxRelayScheduler` | `FOR UPDATE SKIP LOCKED`; publish broker trong transaction ngắn | Broker trong transaction ngắn |
@@ -453,7 +495,7 @@ hoạt động upload.
 | Secret có giá trị fallback trong config-repo được track | Thiếu biến env thì service dùng secret công khai trong repo |
 | `.sdd/global/system-architecture.md`, `.sdd/constraints/global.md` (baseline 2026-09-18) ghi không có broker/outbox/learning service | Lỗi thời; `.sdd/global/constitution.md` vẫn là invariant cao nhất. Dữ kiện: code, `AGENTS.md`, tài liệu này |
 | Gateway CORS chỉ expose `Authorization`, `Content-Type` | Browser không đọc được header khác (ví dụ `Retry-After`) |
-| community có bảng `outbox_events` (V1) và relay (`CommunityOutboxRelay`) | Library không tạo bảng này; content và game đã bỏ bảng outbox |
+| community có bảng `outbox_events` (V1) và relay (`CommunityOutboxRelay`) | Library có bảng này từ V43 (`LibraryOutboxRelay`); content và game đã bỏ bảng outbox |
 | Consumer học chưa có automated integration test với RabbitMQ thật | Logic ack/nack/DLQ có unit test với channel giả; áp kết quả có test Postgres thật. [Live E2E 2026-10-02](../plans/260929-1640-lesson-learning-pipeline-mvp/reports/e2e-261002-foundation-learning-pipeline.md) đã kiểm outbox → broker → consumer và replay DLQ với broker thật |
 | Giá chấm Writing nằm ở hai nơi | Learning `learning.writing.point-cost` (3) cho bài luận trong bài học; assessment `grading_point_costs.WRITING` cho chấm qua `grading_jobs`. Đổi giá phải sửa cả hai |
 | Bài Writing lưu ở hai nơi | Bài luận trong bài học ở `learning_db.lesson_writing_submissions`; Writing trong đề (sau MVP) ở `assessment_db.learner_submissions` |
@@ -461,7 +503,8 @@ hoạt động upload.
 | Bản public cũ của audio `listening/demo/ls1.mp3` còn trong `media` | Lesson dùng chung audio đã chuyển sang `PREMIUM` và phát qua URL ký sau lesson gate; Placement dùng khóa public riêng. Xóa object public cũ còn chờ phê duyệt |
 | Writing trong Practice và gate dùng chính sách phí khác nhau | Practice trừ điểm; essay trong `TOPIC_GATE`/`COURSE_GATE` chấm miễn phí và có quota riêng ở Assessment |
 | Một số ghi Writing chưa theo quy tắc khóa mọi lượt ghi theo user | Bắt đầu/kết thúc chấm có transaction và advisory lock; quota, lưu grade và lỗi trung gian dùng SQL nguyên tử có điều kiện ngoài các transaction này. Dữ kiện hiện tại, không thay quy tắc AGENTS.md §3.8 |
-| Cổng bài học là authority cho luồng học | `LessonAccessGate` giữ tiến trình review/topic/bài; `PaywallGate` mở 3 bài đầu mỗi skill, unlock skill/combo, tiến độ grandfathered, rồi Premium. Access outage chỉ chặn nội dung cần kiểm tra Premium. |
+| Listener nhiệm vụ hằng ngày có thể gọi Content trong transaction | `QuestRecorder` chạy ở `BEFORE_COMMIT`; `QuestService.ensureToday` → `weaknessTarget` đọc `Content.getTopicSequence()`. Đây là ngoại lệ hiện hữu với quy tắc §3.9, cần tách bước lấy dữ liệu nếu sửa luồng này. |
+| Cổng bài học là authority cho luồng học | `LessonAccessGate` giữ tiến trình review/topic/bài; `PaywallGate` mở 3 bài đầu mỗi skill, skill/combo đã mua, course miễn phí và tiến độ grandfathered. Premium không tự mở bài trả phí. |
 | Sơ đồ §1 còn cạnh assessment → user từ baseline cũ | Tạo attempt hiện chỉ đọc Content; không gọi User để lấy goal (xem §3 và §6) |
 
 ### Mobile vocabulary study ownership

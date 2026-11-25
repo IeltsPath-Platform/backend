@@ -73,7 +73,7 @@ public class AllowedMediaPolicy implements MediaPolicy {
             }
         } else {
             if (!imageHosts.contains(u.getHost().toLowerCase(Locale.ROOT))) {
-                throw new CommunityException("Media URL must use HTTPS and an allowed host");
+                throw new CommunityException("Liên kết media không hợp lệ");
             }
         }
     }
@@ -82,7 +82,7 @@ public class AllowedMediaPolicy implements MediaPolicy {
     private void validateVideo(String value) {
         URI u = parseAndCheckBasic(value);
         if (isSupabaseHost(u) || !videoHosts.contains(u.getHost().toLowerCase(Locale.ROOT))) {
-            throw new CommunityException("Media URL must use HTTPS and an allowed host");
+            throw new CommunityException("Liên kết media không hợp lệ");
         }
     }
 
@@ -109,7 +109,7 @@ public class AllowedMediaPolicy implements MediaPolicy {
             if (e instanceof CommunityException) {
                 throw e;
             }
-            throw new CommunityException("Media URL must use HTTPS and an allowed host");
+            throw new CommunityException("Liên kết media không hợp lệ");
         }
     }
 

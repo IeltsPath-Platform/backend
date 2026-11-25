@@ -43,4 +43,11 @@ public class ActivationKeyJpaEntity {
 
     @Column(name = "redeemed_at")
     private Instant redeemedAt;
+
+    /** Read only here: batches and handing out write these columns with SQL, never through this entity. */
+    @Column(name = "batch_code", insertable = false, updatable = false)
+    private String batchCode;
+
+    @Column(name = "issued_at", insertable = false, updatable = false)
+    private Instant issuedAt;
 }

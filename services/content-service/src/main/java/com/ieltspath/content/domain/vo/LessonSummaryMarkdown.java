@@ -11,7 +11,7 @@ public final class LessonSummaryMarkdown {
     public static String normalize(String markdown) {
         if (markdown == null || markdown.isBlank()) return null;
         if (markdown.length() > MAX_LENGTH) {
-            throw new IllegalArgumentException("summaryMarkdown exceeds " + MAX_LENGTH + " characters");
+            throw new IllegalArgumentException("Tóm tắt dài quá " + MAX_LENGTH + " ký tự");
         }
         return markdown.strip();
     }

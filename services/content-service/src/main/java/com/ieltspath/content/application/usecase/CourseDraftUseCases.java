@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -23,6 +24,8 @@ import java.util.UUID;
  */
 @Service
 public class CourseDraftUseCases {
+
+    private static final Set<DraftStatus> DELETABLE = Set.of(DraftStatus.READY, DraftStatus.FAILED, DraftStatus.REJECTED);
 
     private final AiDraftRepository drafts;
     private final CourseDraftCodec codec;
@@ -58,13 +61,29 @@ public class CourseDraftUseCases {
         return analysis.analyze(codec.read(draft.getResultJson())).analysis();
     }
 
-    /** The author's own course draft, which must still be waiting for review. Another author's is not found. */
-    AiDraft ownReadyDraft(UUID author, UUID draftId) {
-        AiDraft draft = drafts.findById(draftId)
+    /**
+     * Deletes the author's own course draft. Only a draft that is waiting for review, failed or rejected can go: an
+     * approved one is the record of the course made from it, and a queued or generating one still belongs to the worker.
+     */
+    @Transactional
+    public void delete(UUID author, UUID draftId) {
+        AiDraft draft = ownDraft(author, draftId);
+        if (!DELETABLE.contains(draft.getStatus()) || drafts.deleteIfStatusIn(draftId, DELETABLE) == 0) {
+            throw new InvalidContentStateException("Bản nháp đang ở trạng thái " + draft.getStatus() + ", không xóa được");
+        }
+    }
+
+    private AiDraft ownDraft(UUID author, UUID draftId) {
+        return drafts.findById(draftId)
                 .filter(found -> found.getRequestedBy().equals(author) && found.getKind() == DraftKind.COURSE)
                 .orElseThrow(() -> new AiDraftNotFoundException(draftId));
+    }
+
+    /** The author's own course draft, which must still be waiting for review. Another author's is not found. */
+    AiDraft ownReadyDraft(UUID author, UUID draftId) {
+        AiDraft draft = ownDraft(author, draftId);
         if (draft.getStatus() != DraftStatus.READY) {
-            throw new InvalidContentStateException("Draft is " + draft.getStatus() + ", expected READY");
+            throw new InvalidContentStateException("Bản nháp đang ở trạng thái " + draft.getStatus() + ", cần ở trạng thái READY");
         }
         return draft;
     }

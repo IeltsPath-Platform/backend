@@ -1,5 +1,11 @@
 # Internal learning content API v1
 
+## Package-version entitlement metadata
+
+Package-version responses include nullable `requiredFeatureKey`, copied from the package's required feature. Learning and
+Assessment use it to gate tagged free-practice tests before returning a task or creating an attempt. Internal responses
+may still contain answer data and are never returned directly to learners.
+
 ## Course practice-test milestones
 
 `GET /internal/learning-content/courses/{id}/practice-test-milestones` returns up to 100 milestones for an ACTIVE
@@ -353,7 +359,7 @@ Response (illustrative IDs):
 ```json
 {
   "packages":[{"packageId":"20000000-0000-4000-8000-000000000301","packageVersionId":"20000000-0000-4000-8000-000000000401","type":"PRACTICE_SET","title":"Topic sentence practice","knowledgePointIds":["20000000-0000-4000-8000-000000000003"],"band":5.5,"skill":"READING"}],
-  "lessons":[{"lessonId":"20000000-0000-4000-8000-000000000101","topicId":"10000000-0000-4000-8000-000000000001","title":"Câu chủ đề nằm ở đâu","knowledgePointIds":["20000000-0000-4000-8000-000000000003"],"band":5.5,"skill":"READING","sortOrder":1}]
+  "lessons":[{"lessonId":"20000000-0000-4000-8000-000000000101","topicId":"10000000-0000-4000-8000-000000000001","title":"Câu chủ đề nằm ở đâu","knowledgePointIds":["20000000-0000-4000-8000-000000000003"],"band":5.5,"skill":"READING","sortOrder":1,"courseId":"20000000-0000-4000-8000-000000000501","skillPosition":1,"skills":["READING"]}]
 }
 ```
 
@@ -367,9 +373,38 @@ mapped KPs, or `null` for a mixed-skill item. Packages are ordered by band, type
 order, lesson order, then ID. Invalid input returns `400`. Learning chooses at most five, removes already attempted
 content, and builds learner-facing paths; this internal endpoint makes no learner-specific selection.
 
+Each lesson item also carries:
+
+- `courseId` (UUID of the topic's course);
+- `skillPosition` (integer, 1-based position of the lesson among the published lessons of that course and topic skill,
+  the same ranking lesson summaries report);
+- `skills` (array of skill names, sorted): the set the reading gate uses for this lesson, built from its exercise
+  questions and text-block points exactly as lesson summaries build theirs. It can differ from `skill`, which is the single
+  skill of the lesson's own points (or `null` when they disagree) and is for display.
+
+Learning uses these to apply the course paywall to suggestions. The fields are additive: a Learning that ignores them
+behaves as before. A Content that omits them makes Learning treat the lesson as open when `courseId` is null, and
+grant no skill otherwise.
+
+## `GET /placement-packages?pool=` (2026-11-17)
+
+Returns published placement packages with their current published version. Optional `pool` is one of
+`BAND_0_3`, `BAND_3_5`, `BAND_5_9` or `ALL`; an unknown value returns `400`. **Omitting it returns the
+`BAND_5_9` pool only**: a Learning instance from before the pools existed takes the first exam of the list, and during
+a release or a rollback it must never be handed a shortened exam. `pool=ALL` returns every pool, which is what the
+current Learning uses to read the catalogue in one call.
+Each item is `{packageId, packageVersionId, code, pool}` and rows are ordered by package ID. Both the
+package and its current version must be `PUBLISHED`; draft and archived packages are excluded. Learning treats a
+missing pool in a response as unavailable and groups the items by pool itself.
+An empty pool returns `200 []`. Topic and course test listings retain their existing response shape.
+
+The original `PLACEMENT-4SKILLS` package is backfilled to `BAND_5_9`, preserving its 9.0 ceiling.
+A placement pool is immutable after creation. Content reports the pool; Assessment applies its ceiling
+(3.0, 5.0 or 9.0).
+
 ## `GET /package-versions/{id}`
 
-Returns one PUBLISHED version with `{packageVersionId, packageId, packageType, topicId, rules, sections}`. `topicId` is required for `TOPIC_TEST` and nullable for other types. `rules` is the parsed version rules object; the V9 seed versions use `{}`. MVP final tests have no time limit: when `rules` has no time key, Assessment sets `expiresAt=null`. Defining a timed package rule is deferred beyond MVP. Sections have `{sectionId, title, skill, instructions, sortOrder, passage, audio?, items}`; `passage` is the full text of the attached `PASSAGE` asset or `null`. `audio` (added 2026-10-01, absent when the section has no `AUDIO` asset) is `{assetId, mediaUrl, durationSeconds, transcript}`, resolved like a lesson audio block; the transcript must not reach a learner before the result allows it. Items have `{questionVersionId, sortOrder, stem, options, answerSpec, explanation, maxScore, knowledgePointMappings}`. Each mapping has `{knowledgePointId, weight}`; weight does not affect grading or mastery.
+Returns one PUBLISHED version with `{packageVersionId, packageId, packageType, topicId, rules, sections, placementPool}`. `placementPool` (added 2026-11-17) is the placement package's pool, or null for other types; it is retained when resolving media. `topicId` is required for `TOPIC_TEST` and nullable for other types. `rules` is the parsed version rules object; the V9 seed versions use `{}`. MVP final tests have no time limit: when `rules` has no time key, Assessment sets `expiresAt=null`. Defining a timed package rule is deferred beyond MVP. Sections have `{sectionId, title, skill, instructions, sortOrder, passage, audio?, items}`; `passage` is the full text of the attached `PASSAGE` asset or `null`. `audio` (added 2026-10-01, absent when the section has no `AUDIO` asset) is `{assetId, mediaUrl, durationSeconds, transcript}`, resolved like a lesson audio block; the transcript must not reach a learner before the result allows it. Items have `{questionVersionId, sortOrder, stem, options, answerSpec, explanation, maxScore, knowledgePointMappings}`. Each mapping has `{knowledgePointId, weight}`; weight does not affect grading or mastery.
 
 Essay package items additionally carry `guide` (learner-facing Markdown or null) and
 `images: [{mediaUrl, altText}]` (added 2026-10-20). Images come from validated `IMAGE` assets linked to the question or
@@ -393,7 +428,7 @@ Package publishing enforces one owner per `question_id` across its versions: any
 
 ## Error types (phase 3a)
 
-`GET /internal/learning-content/error-types` returns error types with both `status=ACTIVE` and `review_status=APPROVED` as a JSON array of `{"code","name","category","severity","fixHint","knowledgePointId","skills","fallback"}`, ordered by code. The optional query parameter `skill` (`READING`, `LISTENING`, `WRITING` or `SPEAKING`; any other value is `400 INVALID_SKILL`) keeps only the codes whose `skills` contain it; without it the list is every approved code. `skills` is an array of those names, empty when no skill applies. `fallback` is true for a catch-all code (`GRAMMAR_OTHER`, `VOCABULARY_OTHER`, `COHERENCE_OTHER`, `TASK_OTHER`), which has no knowledge point and never creates evidence or a review item. Essay graders ask for `skill=WRITING`. `knowledgePointId` is nullable and identifies the knowledge point linked to the error type when one is configured. Assessment reads it to refuse any error analysis code that is not in the reviewed catalogue (`422`, `details.code = UNKNOWN_ERROR_CODE`). `category` is one of `GRAMMAR`, `VOCABULARY`, `COHERENCE`, `TASK`, `READING_STRATEGY`, `LISTENING_STRATEGY`, `SPELLING_NUMBER`. `severity` is 1 to 3. The public management endpoints are `GET`, `POST` and `PUT` under `/api/content/error-types`; the code cannot change after creation.
+`GET /internal/learning-content/error-types` returns error types with both `status=ACTIVE` and `review_status=APPROVED` as a JSON array of `{"code","name","category","severity","fixHint","knowledgePointId","skills","fallback","modelDefinition","writingTasks","modelSelectable"}`, ordered by code. The optional query parameter `skill` (`READING`, `LISTENING`, `WRITING` or `SPEAKING`; any other value is `400 INVALID_SKILL`) keeps only the codes whose `skills` contain it; without it the list is every approved code. `skills` is an array of those names, empty when no skill applies. `fallback` is true for a catch-all code (`GRAMMAR_OTHER`, `VOCABULARY_OTHER`, `COHERENCE_OTHER`, `TASK_OTHER`), which has no knowledge point and never creates evidence or a review item. Essay graders ask for `skill=WRITING`. Two fields were added for them: `modelDefinition` is the English definition the grader model reads in place of `fixHint` (null when the code has none), and `writingTasks` is an array of `TASK_1`/`TASK_2`, empty when the code applies to both tasks; a grader for one task uses only the codes that apply to it. `modelSelectable` (added 2026-11-14, boolean) is false for a code that describes the whole essay and has no passage to quote (`T1_NO_OVERVIEW`, `NO_CLEAR_POSITION`, `T2_PARTIAL_ANSWER`): the Learning essay grader does not offer such a code to the model and drops a correction that names it, because the essay-level `taskChecks` report these problems. A client that does not receive the field treats the code as selectable. Assessment does not read it yet. `knowledgePointId` is nullable and identifies the knowledge point linked to the error type when one is configured. Assessment reads it to refuse any error analysis code that is not in the reviewed catalogue (`422`, `details.code = UNKNOWN_ERROR_CODE`). `category` is one of `GRAMMAR`, `VOCABULARY`, `COHERENCE`, `TASK`, `READING_STRATEGY`, `LISTENING_STRATEGY`, `SPELLING_NUMBER`. `severity` is 1 to 3. The public management endpoints are `GET`, `POST` and `PUT` under `/api/content/error-types`; the code cannot change after creation.
 
 `GET /internal/learning-content/error-types/staff` returns every `ACTIVE` error type, whatever its review status, as a JSON array of `{"code","name","category","severity","fixHint","reviewStatus"}` (`reviewStatus` is `DRAFT` or `APPROVED`), ordered by code. A grader may record any of these codes; a learner is shown a code and its fix hint only when it is in the approved list above. Assessment uses it to check the codes of an independent human review.
 
@@ -433,7 +468,7 @@ The internal prompt projection is available to service callers using their forwa
 Each internal criterion also carries `knowledgePointId` (UUID, nullable, added 2026-10-21): the knowledge point that the
 criterion is evidence for, from `writing_criterion_knowledge_points` keyed by task and criterion code
 (`V69__writing_criterion_knowledge_points.sql`). It does not depend on the rubric version. The additive
-`subKnowledgePoints` field is an ordered array of `{id,code,name,description}` entries from
+`subKnowledgePoints` field (no longer read by the essay grader since 2026-11-13, which judges the question's own knowledge points; kept for grades stored as `kpj2`) is an ordered array of `{id,code,name,description}` entries from
 `writing_criterion_sub_knowledge_points` (`V71__writing_criterion_sub_knowledge_points.sql`), filtered to active
 knowledge points; it is `[]` when the criterion has none. For example, Task 2's CC criterion returns
 `[{"id":"…","code":"DEMO_WRITING_TOPIC_SENTENCE","name":"…","description":"…"},{"id":"…","code":"DEMO_WRITING_LINKING","name":"…","description":"…"}]`.

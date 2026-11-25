@@ -1,5 +1,6 @@
 package com.ieltspath.content.api.dto.response;
 
+import com.ieltspath.content.domain.vo.PlacementPool;
 import com.ieltspath.content.api.AccessLevelCompatibility;
 import com.ieltspath.content.api.dto.AccessLevel;
 import com.ieltspath.content.application.result.ContentPackageResult;
@@ -20,7 +21,8 @@ public record ContentPackageResponse(
         Instant createdAt,
         Instant updatedAt,
         UUID lessonId,
-        String sourceCode
+        String sourceCode,
+        PlacementPool placementPool
 ) {
     public static ContentPackageResponse from(ContentPackageResult result) {
         return new ContentPackageResponse(
@@ -34,7 +36,8 @@ public record ContentPackageResponse(
                 result.createdAt(),
                 result.updatedAt(),
                 result.lessonId(),
-                result.sourceCode()
+                result.sourceCode(),
+                result.placementPool()
         );
     }
 }

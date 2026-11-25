@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
 public class JdbcErrorTypeRepository implements ErrorTypeRepository {
     private static final String COLUMNS = "id, code, name, category, severity, knowledge_point_id, "
             + "trap_knowledge_point_id, fix_hint, status, "
-            + "review_status, created_at, updated_at, skills, fallback";
+            + "review_status, created_at, updated_at, skills, fallback, model_definition, writing_tasks, model_selectable";
 
     private final NamedParameterJdbcTemplate jdbc;
 
@@ -133,13 +133,16 @@ public class JdbcErrorTypeRepository implements ErrorTypeRepository {
         UUID knowledgePointId = rs.getObject("knowledge_point_id", UUID.class);
         java.sql.Array skills = rs.getArray("skills");
         List<String> skillValues = skills == null ? List.of() : List.of((String[]) skills.getArray());
+        java.sql.Array tasks = rs.getArray("writing_tasks");
+        List<String> taskValues = tasks == null ? List.of() : List.of((String[]) tasks.getArray());
         return new ErrorType(rs.getObject("id", UUID.class), rs.getString("code"), rs.getString("name"),
                 ErrorCategory.valueOf(rs.getString("category")), rs.getInt("severity"), knowledgePointId,
                 rs.getObject("trap_knowledge_point_id", UUID.class),
                 rs.getString("fix_hint"), ContentStatus.valueOf(rs.getString("status")),
                 ErrorReviewStatus.valueOf(rs.getString("review_status")),
                 rs.getTimestamp("created_at").toInstant(), rs.getTimestamp("updated_at").toInstant(),
-                skillValues, rs.getBoolean("fallback"));
+                skillValues, rs.getBoolean("fallback"), rs.getString("model_definition"), taskValues,
+                rs.getBoolean("model_selectable"));
     }
 
     /** PostgreSQL array text, for example {WRITING,SPEAKING}; skill names are checked by the aggregate, not here. */

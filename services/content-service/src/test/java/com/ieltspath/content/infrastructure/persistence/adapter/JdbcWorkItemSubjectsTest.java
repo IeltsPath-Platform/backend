@@ -53,8 +53,9 @@ class JdbcWorkItemSubjectsTest {
     @Test
     void questionsCarryTheirQuestionIdAndAStemCutAtOneHundredTwentyCharacters() {
         UUID questionId = UUID.randomUUID();
-        jdbc.update("INSERT INTO questions (id, question_type, skill, purpose, status) "
-                + "VALUES (:id, 'MULTIPLE_CHOICE', 'READING', 'LEARNING', 'DRAFT')", Map.of("id", questionId));
+        jdbc.update("INSERT INTO questions (id, code, question_type, skill, purpose, status) "
+                + "VALUES (:id, :code, 'MULTIPLE_CHOICE', 'READING', 'LEARNING', 'DRAFT')",
+                Map.of("id", questionId, "code", "Q-" + questionId.toString().replace("-", "")));
         UUID versionId = UUID.randomUUID();
         jdbc.update("INSERT INTO question_versions (id, question_id, version_number, stem) "
                         + "VALUES (:id, :question, 1, :stem)",

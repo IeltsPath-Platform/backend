@@ -7,6 +7,7 @@ import com.ieltspath.content.api.dto.response.SpeakingTaskResponse;
 import com.ieltspath.content.api.dto.response.WritingTaskResponse;
 import com.ieltspath.content.application.command.SearchPracticeTestsCommand;
 import com.ieltspath.content.application.port.PracticeTestCatalogReader;
+import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.content.application.usecase.GetSpeakingTaskUseCase;
 import com.ieltspath.content.application.usecase.GetWritingTaskUseCase;
 import com.ieltspath.content.application.usecase.ListPracticeTestFormatsUseCase;
@@ -30,13 +31,14 @@ public class PracticeTestController {
     private final ListPracticeTestFormatsUseCase formats;
     private final GetWritingTaskUseCase writingTask;
     private final GetSpeakingTaskUseCase speakingTask;
+    private final CurrentUserProvider currentUser;
 
     @PostMapping("/search")
     @PreAuthorize("hasAnyRole('CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
     public PracticeTestPageResponse search(@Valid @RequestBody SearchPracticeTestsRequest request) {
         Skill skill;
         try { skill = Skill.valueOf(request.skill()); }
-        catch (RuntimeException invalid) { throw new IllegalArgumentException("Unknown skill"); }
+        catch (RuntimeException invalid) { throw new IllegalArgumentException("Kỹ năng không hợp lệ"); }
         var command = new SearchPracticeTestsCommand(skill, request.scope(), request.partNo(), request.sources(),
                 request.query(), map(request.only()), map(request.exclude()), request.page() == null ? 0 : request.page(),
                 request.size() == null ? 12 : request.size(),
@@ -55,7 +57,7 @@ public class PracticeTestController {
     public List<PracticeTestCatalogReader.FormatCount> formats(@RequestParam("skill") String skill) {
         Skill parsed;
         try { parsed = Skill.valueOf(skill); }
-        catch (RuntimeException invalid) { throw new IllegalArgumentException("Unknown skill"); }
+        catch (RuntimeException invalid) { throw new IllegalArgumentException("Kỹ năng không hợp lệ"); }
         return formats.execute(parsed);
     }
 
@@ -64,7 +66,7 @@ public class PracticeTestController {
     @PreAuthorize("hasAnyRole('CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
     public WritingTaskResponse writingTask(@PathVariable("packageVersionId") UUID packageVersionId,
                                            @PathVariable("sectionId") UUID sectionId) {
-        return WritingTaskResponse.from(writingTask.execute(packageVersionId, sectionId));
+        return WritingTaskResponse.from(writingTask.execute(packageVersionId, sectionId, isLearner()));
     }
 
     /** The questions of one Speaking part (Part 1, 2 or 3), for the recording workspace. */
@@ -72,7 +74,12 @@ public class PracticeTestController {
     @PreAuthorize("hasAnyRole('CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
     public SpeakingTaskResponse speakingTask(@PathVariable("packageVersionId") UUID packageVersionId,
                                              @PathVariable("sectionId") UUID sectionId) {
-        return SpeakingTaskResponse.from(speakingTask.execute(packageVersionId, sectionId));
+        return SpeakingTaskResponse.from(speakingTask.execute(packageVersionId, sectionId, isLearner()));
+    }
+
+    private boolean isLearner() {
+        var roles = currentUser.requireRoles();
+        return roles.contains("CUSTOMER") && !roles.contains("CONTENT_AUTHOR") && !roles.contains("EXAMINER");
     }
 
     private static List<PracticeTestCatalogReader.Key> map(List<SearchPracticeTestsRequest.Key> keys) {

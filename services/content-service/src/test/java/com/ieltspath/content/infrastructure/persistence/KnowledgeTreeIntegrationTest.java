@@ -438,8 +438,8 @@ class KnowledgeTreeIntegrationTest {
         UUID questionId = UUID.randomUUID();
         UUID versionId = UUID.randomUUID();
         questionIds.add(questionId);
-        jdbc.update("INSERT INTO questions(id, question_type, skill, status) VALUES (?, 'MULTIPLE_CHOICE', 'READING', 'PUBLISHED')",
-                questionId);
+        jdbc.update("INSERT INTO questions(id, code, question_type, skill, status) VALUES (?, 'Q-' || replace(?::text,'-',''), 'MULTIPLE_CHOICE', 'READING', 'PUBLISHED')",
+                questionId, questionId);
         jdbc.update("INSERT INTO question_versions(id, question_id, version_number, stem, status) VALUES (?, ?, 1, 'Published question', 'PUBLISHED')",
                 versionId, questionId);
         jdbc.update("INSERT INTO question_knowledge_points(question_version_id, knowledge_point_id, weight) VALUES (?, ?, 1)",

@@ -1,5 +1,6 @@
 package com.ieltspath.learning.domain.repository;
 
+import com.ieltspath.learning.domain.vo.BlockingReviewSummary;
 import com.ieltspath.learning.domain.vo.FailedWritingCriterion;
 import com.ieltspath.learning.domain.aggregate.ReviewItem;
 import com.ieltspath.learning.domain.service.ReviewRule.ReviewCandidate;
@@ -14,6 +15,7 @@ import com.ieltspath.learning.domain.vo.PromotedReview;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -22,6 +24,13 @@ public interface ReviewItemRepository {
     Optional<ReviewItem> findOwned(UUID userId, UUID reviewId);
 
     List<PendingReview> findPending(UUID userId);
+
+    /**
+     * The learner's blocking review of each of these knowledge points, in whatever state it is, for the knowledge tree to keep
+     * a finished review on the map. A point holds at most one PENDING review; when it has none, the latest of its finished
+     * ones is returned. Points without a blocking review are absent.
+     */
+    Map<UUID, BlockingReviewSummary> findBlockingByPoint(UUID userId, Collection<UUID> knowledgePointIds);
 
     List<PracticeReviewState> findPracticeByLessons(UUID userId, Collection<UUID> lessonIds);
 

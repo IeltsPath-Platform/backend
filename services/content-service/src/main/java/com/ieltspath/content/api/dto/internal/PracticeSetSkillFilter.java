@@ -14,9 +14,9 @@ public final class PracticeSetSkillFilter {
         try {
             skill = Skill.valueOf(value);
         } catch (IllegalArgumentException ex) {
-            throw new IllegalArgumentException("skill must be LISTENING, READING, WRITING or SPEAKING");
+            throw new IllegalArgumentException("Kỹ năng phải là LISTENING, READING, WRITING hoặc SPEAKING");
         }
-        if (skill == Skill.ALL) throw new IllegalArgumentException("skill must select one skill");
+        if (skill == Skill.ALL) throw new IllegalArgumentException("Chỉ được chọn một kỹ năng");
         return Optional.of(skill);
     }
 }

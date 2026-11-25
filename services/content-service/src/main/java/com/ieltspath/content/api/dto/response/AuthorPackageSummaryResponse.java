@@ -1,5 +1,6 @@
 package com.ieltspath.content.api.dto.response;
 
+import com.ieltspath.content.domain.vo.PlacementPool;
 import com.ieltspath.content.api.AccessLevelCompatibility;
 import com.ieltspath.content.api.dto.AccessLevel;
 import com.ieltspath.content.application.result.AuthorPackageSummary;
@@ -7,6 +8,7 @@ import com.ieltspath.content.domain.vo.PackageType;
 import com.ieltspath.content.domain.vo.PublicationStatus;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 public record AuthorPackageSummaryResponse(
@@ -24,13 +26,19 @@ public record AuthorPackageSummaryResponse(
         Instant createdAt,
         Instant updatedAt,
         Integer latestVersionNumber,
-        boolean hasDraft
+        boolean hasDraft,
+        PlacementPool placementPool,
+        String skill,
+        List<Integer> partNos,
+        int sectionCount,
+        int questionCount
 ) {
     public static AuthorPackageSummaryResponse from(AuthorPackageSummary summary) {
         return new AuthorPackageSummaryResponse(summary.id(), summary.code(), summary.title(),
                 summary.packageType(), AccessLevelCompatibility.toAccessLevel(summary.requiredFeatureKey()),
                 summary.status(), summary.currentPublishedVersionId(), summary.lessonId(), summary.topicId(),
                 summary.courseId(), summary.sourceCode(), summary.createdAt(), summary.updatedAt(),
-                summary.latestVersionNumber(), summary.hasDraft());
+                summary.latestVersionNumber(), summary.hasDraft(), summary.placementPool(),
+                summary.skill(), summary.partNos(), summary.sectionCount(), summary.questionCount());
     }
 }

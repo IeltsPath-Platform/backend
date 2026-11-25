@@ -29,7 +29,8 @@ public interface UserJpaRepository extends JpaRepository<UserJpaEntity, UUID> {
     boolean existsByPhoneNumberAndIdNot(String phoneNumber, UUID id);
 
     @Modifying
-    @Query("update UserJpaEntity user set user.passwordHash = null where user.id = :userId")
+    @Query("update UserJpaEntity user set user.passwordHash = null, user.passwordClearedAt = current_timestamp "
+            + "where user.id = :userId")
     int clearPasswordHash(@Param("userId") UUID userId);
 
     @Query(value = """

@@ -216,7 +216,7 @@ class AddQuestionVersionUseCaseTest {
                 "Stem", null, null, null, null, QuestionDifficulty.MEDIUM,
                 List.of(new AddQuestionVersionCommand.KnowledgePointInput(null, trapPointId, BigDecimal.ONE)))))
                 .isInstanceOf(InvalidErrorTypeException.class)
-                .hasMessage("TRAP_KNOWLEDGE_POINT_NOT_ASSIGNABLE");
+                .hasFieldOrPropertyWithValue("code", "TRAP_KNOWLEDGE_POINT_NOT_ASSIGNABLE");
         verify(questionRepository, never()).save(any(Question.class));
     }
 

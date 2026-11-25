@@ -6,7 +6,7 @@ Request bodies are in the linked contracts.
 
 `ADMIN` (`admin@gmail.com`) must get `403` on every route below; check one of them first.
 
-**Model.** Steps 2 and 3 call a language model. With `CONTENT_LLM_BASE_URL`, `CONTENT_LLM_API_KEY` and
+**Model.** Step 2 calls a language model. With `CONTENT_LLM_BASE_URL`, `CONTENT_LLM_API_KEY` and
 `CONTENT_LLM_MODEL` set in the root `.env`, the real model answers. Without them the draft ends `FAILED` with
 `NOT_CONFIGURED` and the use is given back: that is the expected behaviour, not a fault. To run the script without a key,
 point `CONTENT_LLM_BASE_URL` at any OpenAI-compatible stub that answers with JSON in the shapes the contracts describe,
@@ -14,7 +14,7 @@ and say in the report that a stub, not a real model, was used. Never present a s
 
 Preparation: the seeded courses `IELTS_5_5` and `IELTS_6_5` already own bands 5.5 and 6.5, so a new course in steps 3
 and 4 needs a free band (for example 7.0 or 8.5) and topic sort orders no top-level topic uses; the knowledge points
-for the AI course request come from the seeded tree (`GET /api/content/knowledge-tree`). The account's daily allowance
+for the course draft come from the seeded tree (`GET /api/content/knowledge-tree`). The account's daily allowance
 is 20 AI uses and 20 imports.
 
 ## 1. A `TOPIC_TEST` for a topic, published, and the learner sees it
@@ -42,16 +42,15 @@ Contracts: [ai-drafts-v1](../contracts/ai-drafts-v1.md), [question-drafts-v1](..
    `importRef = ai-<draftId>-<index>`; they appear in the question bank as `DRAFT` and a learner cannot see them.
 5. Approving again answers `400` (the draft is `APPROVED`).
 
-## 3. An AI course for "6.5, Paraphrase and TFNG", approved as an inactive course
+## 3. A course draft written by hand, checked, approved as an inactive course
 
-Contracts: [course-drafts-v1](../contracts/course-drafts-v1.md), [ai-drafts-v1](../contracts/ai-drafts-v1.md).
+Contract: [course-drafts-v1](../contracts/course-drafts-v1.md). The model does not write courses.
 
-1. `POST /api/content/admin/ai-drafts/courses` — `{ bandLevel: 7.0, skills: ["READING"], topics: ["Paraphrase",
-   "True/False/Not Given"] }` (6.5 is taken by the seeded course); poll until `READY`.
-2. Read the draft: the lessons, `result.analysis.gaps` (practice material still missing), `warnings` and
-   `unmatchedTopics` (a phrase that matched nothing; nothing is invented for it).
-3. `GET /api/content/admin/course-drafts/{id}/analysis` shows coverage and any `PREREQUISITE_ORDER` error. Fix the draft
-   with `PUT …/course-drafts/{id}` if it has one.
+1. `POST /api/content/admin/course-drafts` with a `structure` — band 7.0 (6.5 is taken by the seeded course), one
+   `READING` topic for "Paraphrase" with a lesson that lists real knowledge point ids; `201`, the draft is `READY`.
+2. `GET /api/content/admin/course-drafts/{id}/analysis` shows coverage, `gaps` (practice material still missing),
+   warnings and any `PREREQUISITE_ORDER` error.
+3. Fix the draft with `PUT …/course-drafts/{id}` and read the analysis again until `valid = true`.
 4. `POST …/course-drafts/{id}/approve`: a course `INACTIVE` with `INACTIVE` topics, `DRAFT` lessons and empty `DRAFT`
    final tests. A band, code or topic sort order that is already used is refused with `409` and the list of conflicts, and
    nothing is created.

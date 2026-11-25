@@ -38,7 +38,7 @@ class GameRoomTest {
         var exception = assertThrows(InvalidGameRoomStateException.class,
                 () -> room.startMatch(host, Instant.EPOCH.plusSeconds(2)));
 
-        assertEquals("Every active member must be ready before starting", exception.getMessage());
+        assertEquals("Mọi người chơi phải sẵn sàng trước khi bắt đầu", exception.getMessage());
         assertEquals(GameRoom.GameRoomStatus.WAITING, room.status());
         assertEquals(2, room.members().size());
     }
@@ -58,7 +58,7 @@ class GameRoomTest {
         GameRoom room = new GameRoom(UUID.randomUUID(), "ABCD12", UUID.randomUUID(), 2, Instant.EPOCH);
         var error = assertThrows(InvalidGameRoomStateException.class,
                 () -> room.setReady(UUID.randomUUID(), true, Instant.EPOCH));
-        assertEquals("User is not an active room member", error.getMessage());
+        assertEquals("Bạn không còn ở trong phòng này", error.getMessage());
     }
 
     @Test

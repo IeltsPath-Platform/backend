@@ -23,8 +23,8 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Loads purchase and progress facts once per request, and asks Access for Premium only when required. A free course is
- * open to everyone, so it is checked before Premium and its lessons never reach the paywall.
+ * Loads purchase and progress facts once per request. Premium status is reserved for plan features and does not open
+ * paid course content. A free course is open to everyone.
  */
 @Component
 public class PaywallGate {
@@ -56,12 +56,7 @@ public class PaywallGate {
         private Request(UUID userId) { this.userId = userId; }
 
         public boolean lessonOpen(Lesson lesson, LessonProgress lessonProgress, Set<LearningSkill> skills) {
-            Ownership ownership = ownership(lesson.courseId());
-            if (PaywallPolicy.isOpen(lesson.courseId(), lesson.skillPosition(), skills, ownership.skills,
-                    ownership.combo, lessonProgress != null && lessonProgress.grandfathered(), false)) return true;
-            if (freeCourse(lesson.courseId())) return true;
-            return PaywallPolicy.isOpen(lesson.courseId(), lesson.skillPosition(), skills, ownership.skills,
-                    ownership.combo, lessonProgress != null && lessonProgress.grandfathered(), premium());
+            return lessonOpen(lesson.courseId(), lesson.skillPosition(), skills, grandfathered(lessonProgress));
         }
 
         public boolean lessonOpen(Lesson lesson, LessonProgress lessonProgress) {
@@ -69,13 +64,22 @@ public class PaywallGate {
         }
 
         public boolean lessonOpen(LessonSummary lesson, LessonProgress lessonProgress) {
-            Ownership ownership = ownership(lesson.courseId());
-            boolean grandfathered = lessonProgress != null && lessonProgress.grandfathered();
-            if (PaywallPolicy.isOpen(lesson.courseId(), lesson.skillPosition(), lesson.skills(), ownership.skills,
-                    ownership.combo, grandfathered, false)) return true;
-            if (freeCourse(lesson.courseId())) return true;
-            return PaywallPolicy.isOpen(lesson.courseId(), lesson.skillPosition(), lesson.skills(), ownership.skills,
-                    ownership.combo, grandfathered, premium());
+            return lessonOpen(lesson.courseId(), lesson.skillPosition(), lesson.skills(), grandfathered(lessonProgress));
+        }
+
+        /**
+         * The lesson rule on raw facts, for callers that hold only a catalog summary. A paid lesson whose Premium state
+         * Whether a learner is Premium does not affect this paywall; a purchase, free course, free preview or prior
+         * progress can open the lesson.
+         */
+        public boolean lessonOpen(UUID courseId, Integer skillPosition, Set<LearningSkill> skills, boolean grandfathered) {
+            Ownership ownership = ownership(courseId);
+            return PaywallPolicy.isOpen(courseId, skillPosition, skills, ownership.skills, ownership.combo,
+                    grandfathered, false) || freeCourse(courseId);
+        }
+
+        private static boolean grandfathered(LessonProgress lessonProgress) {
+            return lessonProgress != null && lessonProgress.grandfathered();
         }
 
         /** The first lessons of a skill that a paying course shows free; a free course has no preview, all is free. */
@@ -100,11 +104,18 @@ public class PaywallGate {
             if (skill == null) skill = topic.skill();
             Set<LearningSkill> pointSkills = skill == null ? Set.of() : Set.of(skill);
             Ownership ownership = ownership(courseId);
-            if (PaywallPolicy.isOpen(courseId, position, pointSkills, ownership.skills, ownership.combo,
-                    grandfathered, false)) return true;
-            if (freeCourse(courseId)) return true;
             return PaywallPolicy.isOpen(courseId, position, pointSkills, ownership.skills, ownership.combo,
-                    grandfathered, premium());
+                    grandfathered, false) || freeCourse(courseId);
+        }
+
+        /**
+         * Whether a paying course teaches the point in one of the first lessons of its skill, the ones it shows free: the same
+         * rule as {@link #freePreview} for a lesson, read from the earliest lesson that teaches the point. Whether this learner
+         * has paid does not matter, so a Premium learner still sees which points are the free ones; a free course has no preview.
+         */
+        public boolean knowledgePointFreePreview(Topic topic, KnowledgePoint point) {
+            UUID courseId = topic.course() == null ? null : topic.course().courseId();
+            return freePreview(courseId, point.earliestLessonPosition());
         }
 
         public void requireLessonOpen(Lesson lesson, LessonProgress lessonProgress, Set<LearningSkill> skills) {

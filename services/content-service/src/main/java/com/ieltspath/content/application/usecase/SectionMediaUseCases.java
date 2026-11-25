@@ -36,10 +36,10 @@ public class SectionMediaUseCases {
     /** @return the stored passage */
     public String setPassage(UUID packageId, UUID versionId, UUID sectionId, String text) {
         if (text == null || text.isBlank()) {
-            throw new IllegalArgumentException("passage text must not be blank");
+            throw new IllegalArgumentException("Nội dung đoạn văn không được để trống");
         }
         if (text.length() > MAX_PASSAGE_CHARS) {
-            throw new IllegalArgumentException("passage text must not exceed " + MAX_PASSAGE_CHARS + " characters");
+            throw new IllegalArgumentException("Nội dung đoạn văn không được dài quá " + MAX_PASSAGE_CHARS + " ký tự");
         }
         writer.setPassage(draftSection(packageId, versionId, sectionId), text);
         return text;
@@ -53,10 +53,10 @@ public class SectionMediaUseCases {
                                               Integer durationSeconds, String transcript) {
         ObjectKeys.requireSafe(mediaReference);
         if (durationSeconds == null || durationSeconds < 1 || durationSeconds > MAX_AUDIO_SECONDS) {
-            throw new IllegalArgumentException("durationSeconds must be between 1 and " + MAX_AUDIO_SECONDS);
+            throw new IllegalArgumentException("Thời lượng (giây) phải từ 1 đến " + MAX_AUDIO_SECONDS);
         }
         if (transcript != null && transcript.length() > MAX_TRANSCRIPT_CHARS) {
-            throw new IllegalArgumentException("transcript must not exceed " + MAX_TRANSCRIPT_CHARS + " characters");
+            throw new IllegalArgumentException("Bản chép lời không được dài quá " + MAX_TRANSCRIPT_CHARS + " ký tự");
         }
         UUID section = draftSection(packageId, versionId, sectionId);
         String storedTranscript = transcript == null || transcript.isBlank() ? null : transcript;

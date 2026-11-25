@@ -69,7 +69,7 @@ public class QuestionDraftGenerator implements AiDraftGenerator {
         KnowledgePoint point = knowledgePoints.findById(request.knowledgePointId())
                 .filter(found -> found.getStatus() == ContentStatus.ACTIVE)
                 .orElseThrow(() -> new ContentGenerationException(ContentGenerationException.FAILED,
-                        "Knowledge point is not available"));
+                        "Điểm kiến thức không còn khả dụng"));
 
         List<ErrorType> codes = errorTypes.findApprovedActive();
         Set<String> activeCodes = codes.stream().map(ErrorType::getCode).collect(Collectors.toSet());
@@ -101,7 +101,7 @@ public class QuestionDraftGenerator implements AiDraftGenerator {
                 rejected.size(), reasonCounts(rejected));
         if (accepted.isEmpty()) {
             throw new ContentGenerationException(ContentGenerationException.INVALID_REPLY,
-                    "No usable question in the reply");
+                    "Phản hồi của AI không có câu hỏi dùng được");
         }
 
         ObjectNode result = json.createObjectNode();
@@ -116,17 +116,17 @@ public class QuestionDraftGenerator implements AiDraftGenerator {
         int start = body.indexOf('{');
         int end = body.lastIndexOf('}');
         if (start < 0 || end <= start) {
-            throw new ContentGenerationException(ContentGenerationException.INVALID_REPLY, "Reply is not JSON");
+            throw new ContentGenerationException(ContentGenerationException.INVALID_REPLY, "Phản hồi của AI không phải JSON hợp lệ");
         }
         try {
             JsonNode root = json.readTree(body.substring(start, end + 1));
             JsonNode items = root.path("items");
             if (!items.isArray()) {
-                throw new ContentGenerationException(ContentGenerationException.INVALID_REPLY, "Reply has no items");
+                throw new ContentGenerationException(ContentGenerationException.INVALID_REPLY, "Phản hồi của AI không có câu hỏi nào");
             }
             return items;
         } catch (JsonProcessingException invalid) {
-            throw new ContentGenerationException(ContentGenerationException.INVALID_REPLY, "Reply is not JSON");
+            throw new ContentGenerationException(ContentGenerationException.INVALID_REPLY, "Phản hồi của AI không phải JSON hợp lệ");
         }
     }
 
@@ -166,7 +166,7 @@ public class QuestionDraftGenerator implements AiDraftGenerator {
         try {
             return json.readValue(text, QuestionDraftRequest.class);
         } catch (JsonProcessingException invalid) {
-            throw new ContentGenerationException(ContentGenerationException.FAILED, "Stored request is unreadable");
+            throw new ContentGenerationException(ContentGenerationException.FAILED, "Không đọc được yêu cầu đã lưu");
         }
     }
 
@@ -174,7 +174,7 @@ public class QuestionDraftGenerator implements AiDraftGenerator {
         try {
             return json.writeValueAsString(node);
         } catch (JsonProcessingException invalid) {
-            throw new ContentGenerationException(ContentGenerationException.FAILED, "Result could not be stored");
+            throw new ContentGenerationException(ContentGenerationException.FAILED, "Không lưu được kết quả");
         }
     }
 }

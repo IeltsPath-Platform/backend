@@ -77,7 +77,7 @@ public final class BandEstimator {
                 if (share(entry.getValue(), MasteryTier.MAINTAIN) < ENOUGH) break;
                 reached = entry.getKey();
             }
-            BigDecimal skillBand = reached != null ? reached : placementBand;
+            BigDecimal skillBand = reached != null ? reached : "SPEAKING".equals(skill) ? null : placementBand;
             if (skillBand != null) bands.put(skill, skillBand);
             hint(skill, skillBand, byBand).ifPresent(hints::add);
         }

@@ -84,12 +84,12 @@ mvn -q -pl services/<name>-service -am test     # test một service (Testcontai
 mvn -q -pl shared/common-security test
 mvn -q -pl shared/common-events test
 mvn -q -pl shared/common-storage test
-mvn -q -pl infra/api-gateway test
+mvn -q -pl infra/api-gateway test
 mvn -q -pl services/<name>-service -am -Dtest=ArchitectureTest -Dsurefire.failIfNoSpecifiedTests=false test
 mvn -q compile -DskipTests                       # cả reactor; tránh `clean` khi service đang chạy từ IDE
 docker compose config --quiet                    # kiểm compose + .env
 docker compose ps
-```
+```
 
 Kiểm tra kiến trúc (ArchUnit): sáu luật layer và pattern, vi phạm cũ nằm trong `src/test/resources/archunit_store`.
 Chỉ vi phạm mới làm đỏ. Không tự tạo hay cập nhật store khi chạy thường; xem `archunit.properties` của từng service.
@@ -124,7 +124,7 @@ CI (`.github/workflows/ci.yml`) chạy `mvn -B -ntp verify` cả reactor và `do
 - Essay đã nộp trong `TOPIC_GATE`/`COURSE_GATE` được chấm LLM miễn phí; thiếu cấu hình, LLM lỗi hoặc hết quota ngày thì
   chuyển sang hàng chờ EXAMINER. Essay không được nộp qua `/api/assessments/submissions` sẽ nhận 0 điểm và không tạo job.
   `MOCK` vẫn do EXAMINER chấm.
-- Content và game không còn bảng outbox (đã xóa). Access, assessment, community và learning (`reward_grants`) có outbox và relay.
+- Content và game không còn bảng outbox (đã xóa). Access, assessment, community, library (`outbox_events`, V43) và learning (`reward_grants`) có outbox và relay.
 - Role chuẩn là `ADMIN`, `CUSTOMER`, `CONTENT_AUTHOR`, `EXAMINER`, `SALES_STAFF` (`LEARNER` cũ đã đổi thành `CUSTOMER`).
 - `graphify-out/` không được commit.
 - Bài Listening seed (content V12, reference dạng key) trả 500 `INVALID_MEDIA_REFERENCE` khi thiếu `CONTENT_MEDIA_BASE_URL`;

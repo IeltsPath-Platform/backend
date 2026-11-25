@@ -9,7 +9,7 @@ import java.util.stream.Collectors;
 /** A package can only publish questions intended for its learning or exam purpose. */
 public class QuestionPurposeMismatchException extends ContentDomainException {
     public QuestionPurposeMismatchException(QuestionPurpose requiredPurpose, List<UUID> questionIds) {
-        super("Questions must have purpose " + requiredPurpose + ": " + questionIds.stream().limit(10)
+        super("Gói chỉ xuất bản được câu hỏi có mục đích " + requiredPurpose + ", có câu hỏi không đúng mục đích: " + questionIds.stream().limit(10)
                 .map(UUID::toString).collect(Collectors.joining(", ")));
     }
 }

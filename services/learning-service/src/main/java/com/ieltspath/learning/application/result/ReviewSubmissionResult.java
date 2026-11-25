@@ -6,17 +6,24 @@ import java.util.List;
 
 /**
  * Every answered set shows its solutions and audio transcript, passed or not. {@code stage} and {@code failedSets}
- * describe the review after this set; they are null in responses stored before they existed.
+ * describe the review after this set; they are null in responses stored before they existed. {@code blocking} is null
+ * only in responses stored before that field was added.
  */
 public record ReviewSubmissionResult(String reviewStatus, boolean setPassed,
                                      List<SubmissionResult.AnswerResult> results, String transcript,
-                                     String stage, Integer failedSets, GamificationSummary gamification) {
+                                     String stage, Integer failedSets, Boolean blocking,
+                                     GamificationSummary gamification) {
     public ReviewSubmissionResult(String reviewStatus, boolean setPassed, List<SubmissionResult.AnswerResult> results,
                                   String transcript, String stage, Integer failedSets) {
-        this(reviewStatus, setPassed, results, transcript, stage, failedSets, null);
+        this(reviewStatus, setPassed, results, transcript, stage, failedSets, null, null);
+    }
+    public ReviewSubmissionResult(String reviewStatus, boolean setPassed, List<SubmissionResult.AnswerResult> results,
+                                  String transcript, String stage, Integer failedSets,
+                                  GamificationSummary gamification) {
+        this(reviewStatus, setPassed, results, transcript, stage, failedSets, null, gamification);
     }
     public ReviewSubmissionResult(String reviewStatus, boolean setPassed, List<SubmissionResult.AnswerResult> results,
                                   String transcript) {
-        this(reviewStatus, setPassed, results, transcript, null, null, null);
+        this(reviewStatus, setPassed, results, transcript, null, null, null, null);
     }
 }

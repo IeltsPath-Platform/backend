@@ -12,20 +12,19 @@ import java.util.UUID;
 public record CreateTopicRequest(
         UUID parentTopicId,
 
-        @NotBlank(message = "code is required")
-        @Size(max = 100, message = "code must not exceed 100 characters")
+        @Size(max = 100, message = "Mã không được dài quá 100 ký tự")
         String code,
 
-        @NotBlank(message = "name is required")
-        @Size(max = 255, message = "name must not exceed 255 characters")
+        @NotBlank(message = "Tên không được để trống")
+        @Size(max = 255, message = "Tên không được dài quá 255 ký tự")
         String name,
 
         int sortOrder,
-        @DecimalMin(value = "0.0", message = "bandMin must be at least 0.0")
-        @DecimalMax(value = "9.0", message = "bandMin must be at most 9.0")
+        @DecimalMin(value = "0.0", message = "Band thấp nhất không được nhỏ hơn 0.0")
+        @DecimalMax(value = "9.0", message = "Band thấp nhất không được lớn hơn 9.0")
         BigDecimal bandMin,
-        @DecimalMin(value = "0.0", message = "bandMax must be at least 0.0")
-        @DecimalMax(value = "9.0", message = "bandMax must be at most 9.0")
+        @DecimalMin(value = "0.0", message = "Band cao nhất không được nhỏ hơn 0.0")
+        @DecimalMax(value = "9.0", message = "Band cao nhất không được lớn hơn 9.0")
         BigDecimal bandMax,
         // The skill the topic's lessons teach; optional, never ALL.
         Skill skill,

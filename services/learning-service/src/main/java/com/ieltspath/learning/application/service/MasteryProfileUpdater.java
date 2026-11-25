@@ -144,11 +144,13 @@ public class MasteryProfileUpdater {
             double mastery;
             MasteryTier tier;
             Double confidence = null;
+            boolean sufficient = true;
             List<Boolean> outcomes;
             if (mp1) {
                 var result = mp1Calculator.compute(pointEvidence, clock.instant());
                 mastery = MasteryPolicy.stored(result.mastery());
                 confidence = result.confidence();
+                sufficient = result.sufficient();
                 // A rebuild starts from scratch, so it is cut plainly; otherwise the held tier resists small moves.
                 tier = policy.tier(mastery, result.sufficient(), rebuild || before == null ? null : before.tier(),
                         formulas.params().hysteresis());
@@ -167,11 +169,18 @@ public class MasteryProfileUpdater {
             };
             Instant last = lastEvidence.get(pointId);
             EventStats pointStats = stats.get(pointId);
+            MasteryTier decayedFromTier = before == null ? null : before.decayedFromTier();
+            if (mode == Mode.DECAY && tier == MasteryTier.INSUFFICIENT && before != null
+                    && (before.tier() == MasteryTier.CONSOLIDATE || before.tier() == MasteryTier.MAINTAIN)) {
+                decayedFromTier = before.tier();
+            } else if (sufficient) {
+                decayedFromTier = null;
+            }
             updated.add(new MasteryProfile(userId, pointId, mastery, tier, (int) history.evidenceCount(), streak, last,
                     policy.nextReviewAt(tier, last, streak),
                     pointStats == null ? null : pointStats.medianDurationMs(),
                     pointStats == null ? List.of() : pointStats.errors().stream().map(ErrorCount::code).toList(),
-                    confidence));
+                    confidence, decayedFromTier));
         }
         profiles.upsert(updated);
         // Only live evidence pays milestone XP; a rebuild or decay re-derives scores that were already paid for.

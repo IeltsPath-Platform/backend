@@ -61,8 +61,8 @@ class JdbcQuestionStemReaderTest {
 
     private UUID question() {
         UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO questions(id,question_type,skill,purpose,status) "
-                + "VALUES(?,'MULTIPLE_CHOICE','READING','LEARNING','DRAFT')", id);
+        jdbc.update("INSERT INTO questions(id,code,question_type,skill,purpose,status) "
+                + "VALUES(?,'Q-' || replace(?::text,'-',''),'MULTIPLE_CHOICE','READING','LEARNING','DRAFT')", id, id);
         return id;
     }
 

@@ -17,7 +17,7 @@ public class EditCommentUseCase {
     @Transactional
     public CommentResult execute(CommunityActor actor, EditCommentCommand command) {
         var comment = comments.findById(command.commentId())
-                .orElseThrow(() -> new CommunityNotFoundException("Comment not found"));
+                .orElseThrow(() -> new CommunityNotFoundException("Không tìm thấy bình luận"));
         comment.edit(actor.userId(), command.body());
         return CommentResult.from(comments.save(comment));
     }

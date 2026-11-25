@@ -35,17 +35,17 @@ public class CreateLessonResourceUseCase {
         if (!lessons.lessonExists(command.lessonId())) throw new LessonNotFoundException(command.lessonId());
         // The key came back from the client: trust it only when this author uploaded it and it is really stored.
         if (uploaded && !files.exists(fileKey)) {
-            throw new IllegalArgumentException("the uploaded file was not found");
+            throw new IllegalArgumentException("Không tìm thấy tệp đã tải lên");
         }
         return LessonResourceResult.from(resources.save(resource), files);
     }
 
     private static LessonResource newFileResource(CreateLessonResourceCommand command, String fileKey) {
         if (command.resourceType() != LessonResourceType.DOCUMENT) {
-            throw new IllegalArgumentException("only a document can be an uploaded file");
+            throw new IllegalArgumentException("Chỉ tài liệu mới là tệp tải lên được");
         }
         if (command.url() != null && !command.url().isBlank()) {
-            throw new IllegalArgumentException("a resource needs either a url or a file, not both");
+            throw new IllegalArgumentException("Tài nguyên cần một đường dẫn hoặc một tệp, không được cả hai");
         }
         ObjectKeys.requireOwnedBy(fileKey, LessonResource.FILE_KEY_PREFIX, command.uploaderId());
         return LessonResource.createFile(command.lessonId(), command.title(), fileKey, command.sortOrder());

@@ -58,8 +58,7 @@ public class WritingCriterionReviews {
      */
     public Map<UUID, Integer> availabilityOf(UUID userId, Collection<FailedWritingCriterion> failedCriteria) {
         if (failedCriteria.isEmpty()) return Map.of();
-        List<UUID> pointIds = failedCriteria.stream().map(FailedWritingCriterion::knowledgePointId)
-                .distinct().sorted(Comparator.comparing(UUID::toString)).toList();
+        List<UUID> pointIds = candidatePoints(failedCriteria, Set.of());
         Set<UUID> excluded = new HashSet<>(attempts.revealedPackageIds(userId));
         excluded.addAll(reviews.assignedPackageIds(userId));
         Map<UUID, Integer> available = content.practiceSetAvailability(pointIds,
@@ -91,9 +90,7 @@ public class WritingCriterionReviews {
         if (lessonId == null || maxReviews <= 0 || failedCriteria.isEmpty()) return;
         Set<UUID> pending = reviews.findPending(userId).stream().map(review -> review.knowledgePointId())
                 .collect(Collectors.toSet());
-        List<UUID> pointIds = failedCriteria.stream().map(FailedWritingCriterion::knowledgePointId)
-                .filter(pointId -> !pending.contains(pointId)).distinct()
-                .sorted(Comparator.comparing(UUID::toString)).toList();
+        List<UUID> pointIds = candidatePoints(failedCriteria, pending);
         if (pointIds.isEmpty()) return;
         Set<UUID> excluded = new HashSet<>(attempts.revealedPackageIds(userId));
         excluded.addAll(reviews.assignedPackageIds(userId));
@@ -102,5 +99,14 @@ public class WritingCriterionReviews {
         List<FailedWritingCriterion> selected = rule.select(failedCriteria, pending,
                 available == null ? Map.of() : available, maxReviews);
         reviews.insertCriterionPending(userId, lessonId, skill, triggerKind, selected);
+    }
+
+    /** The points a review of these criteria could practise: their own and those of their errors, minus the waiting ones. */
+    private static List<UUID> candidatePoints(Collection<FailedWritingCriterion> failedCriteria, Set<UUID> pending) {
+        return failedCriteria.stream()
+                .flatMap(criterion -> java.util.stream.Stream.concat(criterion.reviewPoints().stream(),
+                        java.util.stream.Stream.of(criterion.knowledgePointId())))
+                .filter(pointId -> !pending.contains(pointId)).distinct()
+                .sorted(Comparator.comparing(UUID::toString)).toList();
     }
 }

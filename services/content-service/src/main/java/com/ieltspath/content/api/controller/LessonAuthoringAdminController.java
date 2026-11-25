@@ -4,6 +4,7 @@ import com.ieltspath.content.api.dto.request.*;
 import com.ieltspath.content.application.result.LessonAuthoringResult;
 import com.ieltspath.content.application.result.LessonAuthoringSummaryResult;
 import com.ieltspath.content.application.usecase.LessonAuthoringUseCase;
+import com.ieltspath.content.application.usecase.CodeSettingsUseCases;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -16,11 +17,15 @@ import java.util.UUID;
 @PreAuthorize("hasRole('CONTENT_AUTHOR')")
 public class LessonAuthoringAdminController {
     private final LessonAuthoringUseCase authoring;
-    public LessonAuthoringAdminController(LessonAuthoringUseCase authoring) { this.authoring = authoring; }
+    private final CodeSettingsUseCases codeSettings;
+    public LessonAuthoringAdminController(LessonAuthoringUseCase authoring, CodeSettingsUseCases codeSettings) {
+        this.authoring = authoring;
+        this.codeSettings = codeSettings;
+    }
 
     @GetMapping("/topics/{topicId}/lessons") public java.util.List<LessonAuthoringSummaryResult> list(@PathVariable("topicId") UUID topicId) { return authoring.list(topicId); }
     @PostMapping("/topics/{topicId}/lessons") @ResponseStatus(HttpStatus.CREATED)
-    public LessonAuthoringResult create(@PathVariable("topicId") UUID topicId, @Valid @RequestBody CreateLessonRequest r) { return authoring.create(topicId,r.code(),r.title(),r.summary(),r.summaryMarkdown(),r.estimatedMinutes(),r.sortOrder()); }
+    public LessonAuthoringResult create(@PathVariable("topicId") UUID topicId, @Valid @RequestBody CreateLessonRequest r) { return codeSettings.createLesson(topicId,r.code(),r.title(),r.summary(),r.summaryMarkdown(),r.estimatedMinutes(),r.sortOrder()); }
     @PutMapping("/topics/{topicId}/lessons/order") @ResponseStatus(HttpStatus.NO_CONTENT)
     public void reorder(@PathVariable("topicId") UUID topicId,@Valid @RequestBody UpdateLessonOrderRequest r){authoring.reorderLessons(topicId,r.lessonIds());}
     @GetMapping("/lessons/{lessonId}") public LessonAuthoringResult get(@PathVariable("lessonId") UUID id){return authoring.get(id);}

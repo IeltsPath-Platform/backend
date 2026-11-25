@@ -162,7 +162,7 @@ class MultiSkillContentIntegrationTest {
             UUID question = UUID.randomUUID();
             UUID questionVersion = UUID.randomUUID();
             boolean essay = skills[i].equals("WRITING");
-            sql.update("INSERT INTO questions(id,question_type,skill,status,purpose) VALUES (?,?,?,'PUBLISHED','LEARNING')", question, essay ? "ESSAY" : "MULTIPLE_CHOICE", skills[i]);
+            sql.update("INSERT INTO questions(id,code,question_type,skill,status,purpose) VALUES (?,'Q-' || replace(?::text,'-',''),?,?, 'PUBLISHED','LEARNING')", question, question, essay ? "ESSAY" : "MULTIPLE_CHOICE", skills[i]);
             String spec = essay ? "{\"type\":\"ESSAY\",\"task\":\"TASK_2\",\"passBand\":5.5}" : "{\"type\":\"CHOICE\",\"correct\":\"A\"}";
             sql.update("INSERT INTO question_versions(id,question_id,version_number,stem,answer_spec,status) VALUES (?,?,1,'Practice question',?::jsonb,'PUBLISHED')", questionVersion, question, spec);
             sql.update("INSERT INTO section_questions(section_id,question_version_id,sort_order) VALUES (?,?,?)", sectionId, questionVersion, i + 1);
@@ -178,7 +178,7 @@ class MultiSkillContentIntegrationTest {
         UUID question = UUID.randomUUID();
         UUID version = UUID.randomUUID();
         UUID block = UUID.randomUUID();
-        sql.update("INSERT INTO questions(id,question_type,skill,status,purpose) VALUES (?,'MULTIPLE_CHOICE',?,'PUBLISHED','LEARNING')", question, skill);
+        sql.update("INSERT INTO questions(id,code,question_type,skill,status,purpose) VALUES (?,'Q-' || replace(?::text,'-',''),'MULTIPLE_CHOICE',?,'PUBLISHED','LEARNING')", question, question, skill);
         sql.update("INSERT INTO question_versions(id,question_id,version_number,stem,answer_spec,status) VALUES (?,?,1,'Which statement is correct?','{\"type\":\"CHOICE\",\"correct\":\"A\"}'::jsonb,'PUBLISHED')", version, question);
         sql.update("INSERT INTO lesson_blocks(id,lesson_id,sort_order,block_type) VALUES (?,?,?,'EXERCISE')", block, ownerLesson, order);
         sql.update("INSERT INTO lesson_block_questions(block_id,question_version_id,sort_order) VALUES (?,?,1)", block, version);

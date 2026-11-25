@@ -21,6 +21,8 @@ import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
 import com.ieltspath.learning.domain.repository.MasteryProfileRepository;
 import com.ieltspath.learning.domain.vo.EvidenceSource;
 import com.ieltspath.learning.domain.vo.KnowledgeEvidence;
+import com.ieltspath.learning.domain.aggregate.MasteryProfile;
+import com.ieltspath.learning.domain.vo.MasteryTier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -195,6 +197,18 @@ class MasteryProfileIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT next_review_at = last_evidence_at + interval '3 days' "
                 + "FROM kp_mastery_profiles WHERE user_id = ? AND knowledge_point_id = ?", Boolean.class,
                 USER, KP_MIDDLE)).isTrue();
+    }
+
+    @Test
+    void aDecayOriginIsPersistedAndReadBackWithTheMasteryProfile() {
+        UUID point = UUID.randomUUID();
+        MasteryProfile decayed = new MasteryProfile(USER, point, 0.42, MasteryTier.INSUFFICIENT, 8, 2,
+                COMPLETED, null, null, List.of(), 0.42, MasteryTier.MAINTAIN);
+
+        profiles.upsert(List.of(decayed));
+
+        assertThat(profiles.find(USER, List.of(point)).get(point).decayedFromTier())
+                .isEqualTo(MasteryTier.MAINTAIN);
     }
 
     @Test

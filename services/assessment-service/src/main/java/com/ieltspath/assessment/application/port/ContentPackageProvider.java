@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import com.ieltspath.assessment.domain.vo.PlacementPool;
 
 /**
  * Reads one published package version from Content Service, including answer specs. The result is used only to
@@ -17,9 +18,17 @@ public interface ContentPackageProvider {
      */
     Optional<PackageVersion> findPackageVersion(UUID packageVersionId);
 
-    record PackageVersion(UUID packageVersionId, UUID packageId, String packageType, List<Section> sections) {
+    record PackageVersion(UUID packageVersionId, UUID packageId, String packageType, List<Section> sections,
+                          PlacementPool placementPool, String requiredFeatureKey) {
+        public PackageVersion(UUID packageVersionId, UUID packageId, String packageType, List<Section> sections,
+                              PlacementPool placementPool) {
+            this(packageVersionId, packageId, packageType, sections, placementPool, null);
+        }
+        public PackageVersion(UUID packageVersionId, UUID packageId, String packageType, List<Section> sections) {
+            this(packageVersionId, packageId, packageType, sections, null, null);
+        }
         public PackageVersion(UUID packageVersionId, String packageType, List<Section> sections) {
-            this(packageVersionId, null, packageType, sections);
+            this(packageVersionId, null, packageType, sections, null, null);
         }
     }
 

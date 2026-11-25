@@ -2,6 +2,7 @@ package com.ieltspath.content.api.controller;
 
 import com.ieltspath.commonsecurity.config.CommonSecurityAutoConfiguration;
 import com.ieltspath.content.application.usecase.CreateContentSectionUseCase;
+import com.ieltspath.content.application.usecase.CodeSettingsUseCases;
 import com.ieltspath.content.application.usecase.CreateDraftPackageVersionUseCase;
 import com.ieltspath.content.application.usecase.DeleteContentSectionUseCase;
 import com.ieltspath.content.application.usecase.GetAuthorPackageUseCase;
@@ -59,6 +60,9 @@ class ContentPackageAuthoringControllerTest {
     @MockitoBean com.ieltspath.content.application.usecase.RemoveAndReorderSectionQuestionsUseCase removeAndReorderQuestions;
     @MockitoBean com.ieltspath.content.application.usecase.ListAuthorPackagesUseCase listPackages;
     @MockitoBean com.ieltspath.content.application.usecase.CreateContentPackageUseCase createPackage;
+    @MockitoBean CodeSettingsUseCases codeSettings;
+    @MockitoBean com.ieltspath.content.application.usecase.UpdatePackageInfoUseCase updatePackageInfo;
+    @MockitoBean com.ieltspath.content.application.usecase.ChangePackageVisibilityUseCase packageVisibility;
 
     @Test
     @WithMockUser(roles = "CUSTOMER")
@@ -69,6 +73,14 @@ class ContentPackageAuthoringControllerTest {
 
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
                         .get("/api/content/admin/packages/{id}", packageId))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .patch("/api/content/admin/packages/{id}", packageId)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"x\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/content/admin/packages/{id}/archive", packageId))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/content/admin/packages/{id}/restore", packageId))
                 .andExpect(status().isForbidden());
         mockMvc.perform(post("/api/content/admin/packages/{id}/versions", packageId)
                         .contentType(MediaType.APPLICATION_JSON).content("{}"))

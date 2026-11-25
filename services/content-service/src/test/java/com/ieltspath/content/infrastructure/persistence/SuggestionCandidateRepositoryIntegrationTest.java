@@ -1,7 +1,10 @@
 package com.ieltspath.content.infrastructure.persistence;
 
+import com.ieltspath.content.application.result.LessonSummaryResult;
 import com.ieltspath.content.application.result.SuggestionCandidatesResult;
 import com.ieltspath.content.domain.vo.PackageType;
+import com.ieltspath.content.domain.vo.Skill;
+import com.ieltspath.content.infrastructure.persistence.adapter.JdbcLearningContentReader;
 import com.ieltspath.content.infrastructure.persistence.adapter.JdbcSuggestionCandidateRepository;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterEach;
@@ -173,6 +176,61 @@ class SuggestionCandidateRepositoryIntegrationTest {
                 .extracting(SuggestionCandidatesResult.PackageCandidate::packageId).containsExactly(lowSet.id());
     }
 
+    /** The course and skill position of a lesson candidate match what the learner's lesson summary reports. */
+    @Test
+    void lessonCandidatesCarryTheirCourseAndTheSummarySkillPosition() {
+        UUID lowTopic = jdbc.queryForObject("SELECT topic_id FROM lessons WHERE id=?", UUID.class, lowLesson);
+        UUID lowCourse = jdbc.queryForObject("SELECT course_id FROM topics WHERE id=?", UUID.class, lowTopic);
+        UUID highTopic = jdbc.queryForObject("SELECT topic_id FROM lessons WHERE id=?", UUID.class, highLesson);
+        UUID highCourse = jdbc.queryForObject("SELECT course_id FROM topics WHERE id=?", UUID.class, highTopic);
+        UUID secondLowLesson = lessonAt(lowTopic, lowKp, 2);
+
+        var lessons = repository.lessons(List.of(lowKp, highKp), new BigDecimal("7.0"));
+        var first = candidate(lessons, lowLesson);
+        var second = candidate(lessons, secondLowLesson);
+        var high = candidate(lessons, highLesson);
+
+        assertThat(first.courseId()).isEqualTo(lowCourse);
+        assertThat(second.courseId()).isEqualTo(lowCourse);
+        assertThat(high.courseId()).isEqualTo(highCourse);
+        assertThat(second.skillPosition()).isEqualTo(first.skillPosition() + 1);
+
+        var summaries = new JdbcLearningContentReader(new NamedParameterJdbcTemplate(dataSource))
+                .publishedLessons(lowTopic);
+        assertThat(summaries).filteredOn(item -> item.lessonId().equals(lowLesson))
+                .extracting(LessonSummaryResult::skillPosition).containsExactly(first.skillPosition());
+    }
+
+    /**
+     * The gate skills come from the lesson's blocks, not from its points: a text block teaching a LISTENING point makes the
+     * lesson LISTENING for the reader, even though its lesson-level point is READING. The candidate must say the same.
+     */
+    @Test
+    void lessonSkillsFollowTheBlocksTheReaderGatesOn() {
+        UUID listeningPoint = knowledgePoint(jdbc.queryForObject("SELECT topic_id FROM lessons WHERE id=?", UUID.class,
+                lowLesson));
+        jdbc.update("UPDATE knowledge_points SET skill='LISTENING' WHERE id=?", listeningPoint);
+        UUID block = UUID.randomUUID();
+        jdbc.update("INSERT INTO lesson_blocks(id,lesson_id,sort_order,block_type,text_content) "
+                + "VALUES (?,?,1,'TEXT','Listening theory')", block, lowLesson);
+        jdbc.update("INSERT INTO lesson_block_knowledge_points(block_id,knowledge_point_id) VALUES (?,?)",
+                block, listeningPoint);
+
+        var candidate = candidate(repository.lessons(List.of(lowKp), new BigDecimal("7.0")), lowLesson);
+
+        assertThat(candidate.skill()).isEqualTo(Skill.READING);
+        assertThat(candidate.skills()).containsExactly(Skill.LISTENING);
+        var topic = jdbc.queryForObject("SELECT topic_id FROM lessons WHERE id=?", UUID.class, lowLesson);
+        var summary = new JdbcLearningContentReader(new NamedParameterJdbcTemplate(dataSource)).publishedLessons(topic)
+                .stream().filter(item -> item.lessonId().equals(lowLesson)).findFirst().orElseThrow();
+        assertThat(candidate.skills()).isEqualTo(summary.skills());
+    }
+
+    private static SuggestionCandidatesResult.LessonCandidate candidate(
+            List<SuggestionCandidatesResult.LessonCandidate> lessons, UUID lessonId) {
+        return lessons.stream().filter(item -> item.lessonId().equals(lessonId)).findFirst().orElseThrow();
+    }
+
     private SuggestionCandidatesResult candidates(BigDecimal maxBand) {
         List<UUID> ids = List.of(lowKp, highKp);
         return new SuggestionCandidatesResult(repository.packages(ids, maxBand), repository.lessons(ids, maxBand));
@@ -194,10 +252,13 @@ class SuggestionCandidateRepositoryIntegrationTest {
     }
 
     private UUID lesson(UUID topic, UUID knowledgePoint) {
+        return lessonAt(topic, knowledgePoint, 1);
+    }
+
+    private UUID lessonAt(UUID topic, UUID knowledgePoint, int sortOrder) {
         UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO lessons(id,topic_id,code,title,sort_order,status) "
-                        + "VALUES (?,?,?,? ,1,'PUBLISHED')",
-                id, topic, "SUGG_LESSON_" + id, "Suggestion lesson");
+        jdbc.update("INSERT INTO lessons(id,topic_id,code,title,sort_order,status) VALUES (?,?,?,?,?,'PUBLISHED')",
+                id, topic, "SUGG_LESSON_" + id, "Suggestion lesson", sortOrder);
         jdbc.update("INSERT INTO lesson_knowledge_points(lesson_id,knowledge_point_id) VALUES (?,?)",
                 id, knowledgePoint);
         return id;
@@ -217,8 +278,8 @@ class SuggestionCandidateRepositoryIntegrationTest {
         jdbc.update("UPDATE content_packages SET current_published_version_id=? WHERE id=?", versionId, packageId);
         jdbc.update("INSERT INTO content_sections(id,package_version_id,title,skill,sort_order) "
                         + "VALUES (?,?,'Section','READING',1)", sectionId, versionId);
-        jdbc.update("INSERT INTO questions(id,question_type,skill,status) "
-                        + "VALUES (?,'MULTIPLE_CHOICE','READING','PUBLISHED')", questionId);
+        jdbc.update("INSERT INTO questions(id,code,question_type,skill,status) "
+                        + "VALUES (?,'Q-' || replace(?::text,'-',''),'MULTIPLE_CHOICE','READING','PUBLISHED')", questionId, questionId);
         jdbc.update("INSERT INTO question_versions(id,question_id,version_number,stem,status) "
                         + "VALUES (?,?,1,'Question','PUBLISHED')", questionVersionId, questionId);
         jdbc.update("INSERT INTO section_questions(section_id,question_version_id,sort_order) VALUES (?,?,1)",

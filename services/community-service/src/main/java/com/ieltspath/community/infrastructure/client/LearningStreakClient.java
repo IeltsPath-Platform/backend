@@ -63,9 +63,9 @@ public class LearningStreakClient implements StreakLookup {
                     response.streaks().forEach(item -> result.put(item.userId(), item.currentDays()));
                 }
             } catch (DownstreamUnavailableException exception) {
-                throw new CommunityUnavailableException("Streaks are temporarily unavailable");
+                throw new CommunityUnavailableException("Chuỗi ngày học tạm thời không tải được. Vui lòng thử lại sau.");
             } catch (RestClientException exception) {
-                throw new CommunityUnavailableException("Streaks are temporarily unavailable");
+                throw new CommunityUnavailableException("Chuỗi ngày học tạm thời không tải được. Vui lòng thử lại sau.");
             }
         }
         return result;

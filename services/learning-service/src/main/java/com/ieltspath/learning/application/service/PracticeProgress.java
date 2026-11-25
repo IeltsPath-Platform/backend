@@ -64,8 +64,13 @@ public class PracticeProgress {
 
     /** The caller holds the learner lock. Only write paths invoke this method. */
     public void refreshPassForLesson(UUID userId, UUID lessonId) {
-        boolean completed = lessons.find(userId, lessonId).map(LessonAccess::completed).orElse(false);
         var sets = content.lessonPracticeSets(lessonId);
+        refreshPassForLesson(userId, lessonId, sets == null ? List.of() : sets);
+    }
+
+    /** The caller supplies the lesson practice catalog loaded before taking the learner lock. */
+    public void refreshPassForLesson(UUID userId, UUID lessonId, List<LessonPracticeSet> sets) {
+        boolean completed = lessons.find(userId, lessonId).map(LessonAccess::completed).orElse(false);
         Clearance state = forLesson(userId, lessonId, completed, sets == null ? List.of() : sets);
         persistPassed(userId, Map.of(lessonId, state));
     }
@@ -95,7 +100,8 @@ public class PracticeProgress {
         Map<UUID, List<PracticeClearance.ReviewFact>> reviewFacts = new HashMap<>();
         for (PracticeReviewState review : allReviews) {
             reviewFacts.computeIfAbsent(review.lessonId(), ignored -> new ArrayList<>())
-                    .add(new PracticeClearance.ReviewFact(review.status(), review.skill(), review.blocking()));
+                    .add(new PracticeClearance.ReviewFact(review.status(), review.skill(), review.blocking(),
+                            review.unblocked()));
         }
         Map<UUID, Clearance> result = new HashMap<>();
         for (var entry : sets.entrySet()) {

@@ -32,7 +32,7 @@ class SchedulePackagePublicationUseCaseTest {
         UUID versionId = UUID.randomUUID();
         assertThatThrownBy(() -> useCase.execute(packageId, versionId, Instant.now().minusSeconds(1)))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("publishAt must be in the future");
+                .hasMessage("Thời điểm xuất bản phải ở trong tương lai");
         verify(packages, never()).findById(packageId);
     }
 

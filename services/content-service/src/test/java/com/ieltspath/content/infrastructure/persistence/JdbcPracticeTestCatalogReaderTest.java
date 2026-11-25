@@ -186,8 +186,8 @@ class JdbcPracticeTestCatalogReaderTest {
     private void addQuestion(UUID sectionId, int order, String questionType) {
         UUID questionId = UUID.randomUUID();
         UUID questionVersionId = UUID.randomUUID();
-        sql.update("INSERT INTO questions(id, question_type, skill, purpose, status) VALUES (?, ?, 'READING', 'EXAM', 'PUBLISHED')",
-                questionId, questionType);
+        sql.update("INSERT INTO questions(id, code, question_type, skill, purpose, status) VALUES (?, 'Q-' || replace(?::text,'-',''), ?, 'READING', 'EXAM', 'PUBLISHED')",
+                questionId, questionId, questionType);
         sql.update("INSERT INTO question_versions(id, question_id, version_number, stem, answer_spec, status) " +
                         "VALUES (?, ?, 1, 'Question', '{}'::jsonb, 'PUBLISHED')", questionVersionId, questionId);
         sql.update("INSERT INTO section_questions(section_id, question_version_id, sort_order) VALUES (?, ?, ?)",

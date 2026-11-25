@@ -65,12 +65,14 @@ class InternalSuggestionControllerTest {
         UUID versionId = UUID.randomUUID();
         UUID lessonId = UUID.randomUUID();
         UUID topicId = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
         BigDecimal maxBand = new BigDecimal("5.5");
         when(candidates.execute(List.of(kp), maxBand)).thenReturn(new SuggestionCandidatesResult(
                 List.of(new SuggestionCandidatesResult.PackageCandidate(packageId, versionId,
                         PackageType.PRACTICE_TEST, "Practice test", List.of(kp), maxBand, Skill.READING)),
                 List.of(new SuggestionCandidatesResult.LessonCandidate(lessonId, topicId,
-                        "Reading lesson", List.of(kp), maxBand, Skill.READING, 2))));
+                        "Reading lesson", List.of(kp), maxBand, Skill.READING, 2, courseId, 3,
+                        List.of(Skill.READING, Skill.LISTENING)))));
 
         mockMvc.perform(post("/internal/learning-content/suggestions/candidates")
                         .contentType(MediaType.APPLICATION_JSON).content(body(kp, "5.5")))
@@ -84,7 +86,11 @@ class InternalSuggestionControllerTest {
                 .andExpect(jsonPath("$.lessons[0].lessonId").value(lessonId.toString()))
                 .andExpect(jsonPath("$.lessons[0].topicId").value(topicId.toString()))
                 .andExpect(jsonPath("$.lessons[0].knowledgePointIds[0]").value(kp.toString()))
-                .andExpect(jsonPath("$.lessons[0].sortOrder").value(2));
+                .andExpect(jsonPath("$.lessons[0].sortOrder").value(2))
+                .andExpect(jsonPath("$.lessons[0].courseId").value(courseId.toString()))
+                .andExpect(jsonPath("$.lessons[0].skillPosition").value(3))
+                .andExpect(jsonPath("$.lessons[0].skills[0]").value("READING"))
+                .andExpect(jsonPath("$.lessons[0].skills[1]").value("LISTENING"));
         verify(candidates).execute(List.of(kp), maxBand);
     }
 

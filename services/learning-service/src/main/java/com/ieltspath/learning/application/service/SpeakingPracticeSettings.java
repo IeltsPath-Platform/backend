@@ -29,6 +29,7 @@ public record SpeakingPracticeSettings(
         @DefaultValue("90") @Min(1) int retentionDays,
         @DefaultValue("Asia/Ho_Chi_Minh") @NotBlank String timezone,
         @DefaultValue("5") @Min(1) int dailyGradingLimit,
+        @DefaultValue("10") @Min(1) int premiumDailyGradingLimit,
         /** A row being analysed or graded that has not changed for this long is taken over by another worker. */
         @DefaultValue("120") @Min(30) int staleAfterSeconds,
         /** A grading that failed for a reason that may pass waits this long before it is tried again. */
@@ -50,5 +51,17 @@ public record SpeakingPracticeSettings(
         /** Interim: the highest band when the answers do not address the questions. */
         @DefaultValue("4.0") @Min(0) @Max(9) double offTopicBandCap,
         /** Interim: the highest band when the answers are not in English. */
-        @DefaultValue("3.0") @Min(0) @Max(9) double notEnglishBandCap) {
+        @DefaultValue("3.0") @Min(0) @Max(9) double notEnglishBandCap,
+        /**
+         * How many submissions this instance grades at once. In practice the Azure cap ({@code maxConcurrent} of the speech
+         * settings) and the model's rate limit bound it, so raise them together, not this alone.
+         */
+        @DefaultValue("2") @Min(1) @Max(32) int gradingWorkers,
+        /**
+         * How many recordings of one submission are analysed at once. Keep it near the Azure cap: the cap applies across all
+         * submissions, and an analysis that waits longer than the speech timeout for a free place ends as SPEECH_BUSY.
+         */
+        @DefaultValue("2") @Min(1) @Max(16) int analysisParallelism,
+        /** A completed submission wakes a worker at once; with false only the periodic poll finds it (tests drive the job by hand). */
+        @DefaultValue("true") boolean wakeOnSubmit) {
 }

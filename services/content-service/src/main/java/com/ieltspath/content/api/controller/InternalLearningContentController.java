@@ -1,5 +1,7 @@
 package com.ieltspath.content.api.controller;
 
+import com.ieltspath.content.api.dto.internal.PlacementPackageResponse;
+import com.ieltspath.content.domain.vo.PlacementPool;
 import com.ieltspath.content.api.dto.internal.LessonContentResponse;
 import com.ieltspath.content.api.dto.internal.KnowledgePointPrerequisitesRequest;
 import com.ieltspath.content.api.dto.internal.PracticeSetSkillFilter;
@@ -79,9 +81,21 @@ public class InternalLearningContentController {
         return getActiveKnowledgePrerequisites.execute(request.ids());
     }
 
+    /**
+     * Published placement exams. Without {@code pool} only the full-length pool ({@code BAND_5_9}) is returned: a
+     * Learning instance that still takes the first exam of the list (the single exam it was written for) must never be
+     * handed a shortened exam during a release or a rollback. {@code pool=ALL} returns every pool, each with its pool;
+     * any other value must be a pool name.
+     */
     @GetMapping("/placement-packages")
-    public List<TopicTestPackageResponse> placementPackages() {
-        return getPlacementTestPackages.execute().stream().map(TopicTestPackageResponse::from).toList();
+    public List<PlacementPackageResponse> placementPackages(@RequestParam(value = "pool", required = false) String pool) {
+        return getPlacementTestPackages.execute(poolFilter(pool)).stream().map(PlacementPackageResponse::from).toList();
+    }
+
+    /** An unknown pool name throws {@link IllegalArgumentException}, which the exception handler maps to 400. */
+    private static PlacementPool poolFilter(String value) {
+        if (value == null || value.isBlank()) return PlacementPool.BAND_5_9;
+        return "ALL".equals(value) ? null : PlacementPool.valueOf(value);
     }
 
     /**
@@ -97,12 +111,18 @@ public class InternalLearningContentController {
         return errorTypes.stream().map(ActiveErrorTypeResponse::from).toList();
     }
 
+    /**
+     * {@code modelDefinition} is null when the code has none; an empty {@code writingTasks} means both Writing tasks.
+     * {@code modelSelectable} is false for a code a grader must not offer the model (it describes the whole essay).
+     */
     public record ActiveErrorTypeResponse(String code, String name, String category, int severity, String fixHint,
-                                          UUID knowledgePointId, List<String> skills, boolean fallback) {
+                                          UUID knowledgePointId, List<String> skills, boolean fallback,
+                                          String modelDefinition, List<String> writingTasks, boolean modelSelectable) {
         static ActiveErrorTypeResponse from(com.ieltspath.content.domain.aggregate.ErrorType errorType) {
             return new ActiveErrorTypeResponse(errorType.getCode(), errorType.getName(),
                     errorType.getCategory().name(), errorType.getSeverity(), errorType.getFixHint(),
-                    errorType.getKnowledgePointId(), errorType.getSkills(), errorType.isFallback());
+                    errorType.getKnowledgePointId(), errorType.getSkills(), errorType.isFallback(),
+                    errorType.getModelDefinition(), errorType.getWritingTasks(), errorType.isModelSelectable());
         }
     }
 

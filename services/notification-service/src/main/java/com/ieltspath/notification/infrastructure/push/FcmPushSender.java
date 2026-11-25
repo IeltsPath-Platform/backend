@@ -50,9 +50,10 @@ public final class FcmPushSender implements PushSender, AutoCloseable {
         long ttlMillis = Math.max(0, Duration.between(Instant.now(), expires).toMillis());
         if (ttlMillis == 0) throw new PushSendException(PushSendException.Category.PERMANENT, "EXPIRED");
         Map<String, String> data = payload(snapshot.notification());
+        PushCopy copy = PushCopy.forEventType(snapshot.notification().eventType());
         Message message = Message.builder().setToken(snapshot.token()).putAllData(data)
                 .setNotification(com.google.firebase.messaging.Notification.builder()
-                        .setTitle("IELTSPath notification").setBody(bodyFor(snapshot.notification().eventType())).build())
+                        .setTitle(copy.title()).setBody(copy.body()).build())
                 .setAndroidConfig(AndroidConfig.builder().setTtl(ttlMillis)
                         .setNotification(AndroidNotification.builder().setChannelId(channelId).build()).build())
                 .build();
@@ -122,12 +123,6 @@ public final class FcmPushSender implements PushSender, AutoCloseable {
 
     private long clampRetryAfter(long seconds) {
         return Math.max(0, Math.min(MAX_RETRY_AFTER_SECONDS, seconds));
-    }
-
-    private String bodyFor(String eventType) {
-        if (eventType.contains("grading")) return "Your IELTS grading update is ready.";
-        if (eventType.contains("subscription")) return "Your IELTSPath subscription has been updated.";
-        return "There is new activity in your IELTSPath account.";
     }
 
     @Override

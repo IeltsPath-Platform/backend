@@ -85,7 +85,8 @@ class JdbcWritingTaskReaderTest {
         UUID version = sql.queryForObject("SELECT current_published_version_id FROM content_packages WHERE code = ?", UUID.class, "PT-WRITING-01");
         UUID section = sql.queryForObject("SELECT id FROM content_sections WHERE package_version_id = ? AND part_no = 1", UUID.class, version);
         var response = new GetWritingTaskUseCase(reader,
-                new MediaReferencePolicy("https://media.example.test/ieltspath")).execute(version, section);
+                new MediaReferencePolicy("https://media.example.test/ieltspath"), () -> false)
+                .execute(version, section, false);
         assertThat(response.images()).singleElement().satisfies(image ->
                 assertThat(image.url()).isEqualTo("https://media.example.test/ieltspath/writing/charts/2e000000-0000-4000-8000-010000003001.webp"));
         assertThat(task.guide()).contains("## 1. Giải thích đề");

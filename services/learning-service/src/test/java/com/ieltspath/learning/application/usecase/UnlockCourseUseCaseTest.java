@@ -130,6 +130,87 @@ class UnlockCourseUseCaseTest {
         verify(unlocks, never()).activate(any(), any());
     }
 
+    @Test
+    void aMissingIdempotencyKeyIsRefusedBeforeLocking() {
+        assertThatThrownBy(() -> useCase.execute(user, courseId, "READING", null))
+                .isInstanceOf(LearningRequestException.class)
+                .satisfies(error -> {
+                    assertThat(((LearningRequestException) error).getStatus()).isEqualTo(400);
+                    assertThat(((LearningRequestException) error).getCode()).isEqualTo("IDEMPOTENCY_KEY_REQUIRED");
+                });
+        verifyNoInteractions(lock, refresh, unlocks, writer, reconciler);
+    }
+
+    @Test
+    void aRequestIdUsedForAnotherCourseIsAConflict() {
+        var earlier = new LearnerCourseUnlock(UUID.randomUUID(), user, UUID.randomUUID(), LearningSkill.READING,
+                125, requestId, LearnerCourseUnlock.Status.ACTIVE, ledgerId);
+        when(unlocks.findByRequestId(requestId)).thenReturn(Optional.of(earlier));
+
+        assertThatThrownBy(() -> useCase.execute(user, courseId, "READING", requestId))
+                .isInstanceOf(LearningRequestException.class)
+                .satisfies(error -> {
+                    assertThat(((LearningRequestException) error).getStatus()).isEqualTo(409);
+                    assertThat(((LearningRequestException) error).getCode()).isEqualTo("IDEMPOTENCY_KEY_REUSED");
+                });
+        verifyNoInteractions(writer, refresh);
+        verify(reconciler, never()).debit(any());
+    }
+
+    @Test
+    void anUnlockTheLearnerAlreadyOwnsIsAConflict() {
+        when(unlocks.findByRequestId(requestId)).thenReturn(Optional.empty(), Optional.empty());
+        when(refresh.execute(user)).thenReturn(List.of(topic()));
+        when(unlocks.findActive(user, courseId)).thenReturn(List.of(new LearnerCourseUnlock(UUID.randomUUID(), user,
+                courseId, LearningSkill.READING, 125, UUID.randomUUID(), LearnerCourseUnlock.Status.ACTIVE, ledgerId)));
+
+        assertThatThrownBy(() -> useCase.execute(user, courseId, "READING", requestId))
+                .isInstanceOf(LearningRequestException.class)
+                .satisfies(error -> {
+                    assertThat(((LearningRequestException) error).getStatus()).isEqualTo(409);
+                    assertThat(((LearningRequestException) error).getCode()).isEqualTo("ALREADY_UNLOCKED");
+                });
+        verifyNoInteractions(writer);
+        verify(reconciler, never()).debit(any());
+    }
+
+    @Test
+    void aCourseOutsideTheLearnersListIsNotFound() {
+        when(unlocks.findByRequestId(requestId)).thenReturn(Optional.empty(), Optional.empty());
+        when(refresh.execute(user)).thenReturn(List.of(topic()));
+
+        assertThatThrownBy(() -> useCase.execute(user, UUID.randomUUID(), "READING", requestId))
+                .isInstanceOf(LearningRequestException.class)
+                .satisfies(error -> {
+                    assertThat(((LearningRequestException) error).getStatus()).isEqualTo(404);
+                    assertThat(((LearningRequestException) error).getCode()).isEqualTo("COURSE_NOT_FOUND");
+                });
+        verifyNoInteractions(writer);
+    }
+
+    @Test
+    void aComboThatCostsNothingAfterDeductionsIsActivatedWithoutAskingAccess() {
+        var pending = new LearnerCourseUnlock(UUID.randomUUID(), user, courseId, null, 0, requestId,
+                LearnerCourseUnlock.Status.PENDING, null);
+        var active = new LearnerCourseUnlock(pending.id(), user, courseId, null, 0, requestId,
+                LearnerCourseUnlock.Status.ACTIVE, null);
+        when(unlocks.findByRequestId(requestId)).thenReturn(Optional.empty(), Optional.empty(), Optional.of(active));
+        when(refresh.execute(user)).thenReturn(List.of(topic()));
+        when(unlocks.findActive(user, courseId)).thenReturn(List.of(
+                new LearnerCourseUnlock(UUID.randomUUID(), user, courseId, LearningSkill.READING, 125,
+                        UUID.randomUUID(), LearnerCourseUnlock.Status.ACTIVE, UUID.randomUUID()),
+                new LearnerCourseUnlock(UUID.randomUUID(), user, courseId, LearningSkill.LISTENING, 300,
+                        UUID.randomUUID(), LearnerCourseUnlock.Status.ACTIVE, UUID.randomUUID())));
+        when(writer.createPending(user, courseId, null, 0, requestId)).thenReturn(pending);
+
+        var result = useCase.execute(user, courseId, "COMBO", requestId);
+
+        assertThat(result.pointCost()).isZero();
+        assertThat(result.status()).isEqualTo("ACTIVE");
+        verify(unlocks).activate(requestId, null);
+        verify(reconciler, never()).debit(any());
+    }
+
     private TopicResult topic() {
         var course = new TopicResult.Course(courseId, "IELTS_6_0", "IELTS 6.0", new BigDecimal("6.0"), null,
                 null, Map.of(LearningSkill.READING, 125), 400,

@@ -60,6 +60,7 @@ public class SubmitPracticeEssayUseCase {
 
     public WritingSubmissionResult execute(UUID userId, UUID attemptId, UUID questionVersionId, UUID requestId,
                                            String essayText) {
+        boolean premium = flow.premiumLearner();
         int words = flow.validate(essayText);
 
         Optional<WritingSubmission> existing = essays.findByRequestId(requestId);
@@ -80,11 +81,11 @@ public class SubmitPracticeEssayUseCase {
                 .filter(ItemGrading::isEssay).findFirst()
                 .orElseThrow(() -> new LearningRequestException(409, "NOT_ESSAY_ITEM",
                         "This question is not an essay of the practice set"));
-        flow.requireBalance();
+        flow.requireBalance(premium);
 
         WritingSubmission grading = transaction.execute(status -> startGrading(userId, attemptId, item, requestId,
-                essayText, words));
-        flow.grade(grading);
+                essayText, words, premium));
+        flow.grade(grading, premium);
         return charge(grading);
     }
 
@@ -104,7 +105,7 @@ public class SubmitPracticeEssayUseCase {
     }
 
     private WritingSubmission startGrading(UUID userId, UUID attemptId, Item item, UUID requestId, String essayText,
-                                           int words) {
+                                           int words, boolean premium) {
         lock.lock(userId);
         PracticeAttempt attempt = owned(userId, attemptId);
         if (attempt.origin() == com.ieltspath.learning.domain.vo.PracticeOrigin.FREE) {
@@ -133,7 +134,7 @@ public class SubmitPracticeEssayUseCase {
         if (existing.isEmpty()) {
             WritingSubmission submission = WritingSubmission.startPractice(UUID.randomUUID(), userId,
                     attempt.lessonId(), attemptId, requestId, essayText, words, EssayPrompts.of(item),
-                    flow.pointCost(), now);
+                    flow.pointCost(premium), now);
             essays.save(submission);
             return submission;
         }

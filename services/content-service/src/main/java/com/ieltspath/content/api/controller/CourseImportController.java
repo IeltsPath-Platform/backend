@@ -62,7 +62,7 @@ public class CourseImportController {
     }
 
     /** The size is checked before the bytes are read into the request's memory. */
-    private static byte[] bytes(MultipartFile file) {
+    static byte[] bytes(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new ImportFileRejectedException(ImportFileRejectedException.NOT_XLSX);
         }

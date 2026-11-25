@@ -26,15 +26,15 @@ public class SearchPracticeSetsUseCase {
 
     public List<PracticeSetResult> execute(SearchPracticeSetsCommand command) {
         if (command.knowledgePointId() == null) {
-            throw new IllegalArgumentException("knowledgePointId is required");
+            throw new IllegalArgumentException("Cần chọn điểm kiến thức");
         }
         int minQuestions = command.minQuestions() == null ? DEFAULT_MIN_QUESTIONS : command.minQuestions();
         int limit = command.limit() == null ? DEFAULT_LIMIT : command.limit();
         if (minQuestions < 1) {
-            throw new IllegalArgumentException("minQuestions must be at least 1");
+            throw new IllegalArgumentException("Số câu tối thiểu phải từ 1");
         }
         if (limit < 1 || limit > MAX_LIMIT) {
-            throw new IllegalArgumentException("limit must be between 1 and " + MAX_LIMIT);
+            throw new IllegalArgumentException("Số lượng phải từ 1 đến " + MAX_LIMIT);
         }
         List<UUID> exclude = command.excludePackageIds() == null ? List.of() : command.excludePackageIds();
         return reader.searchPracticeSets(command.knowledgePointId(), exclude, minQuestions, limit,

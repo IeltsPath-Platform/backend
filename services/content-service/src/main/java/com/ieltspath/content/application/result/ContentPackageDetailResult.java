@@ -1,5 +1,6 @@
 package com.ieltspath.content.application.result;
 
+import com.ieltspath.content.domain.vo.PlacementPool;
 import com.ieltspath.content.domain.vo.PackageType;
 import com.ieltspath.content.domain.vo.PublicationStatus;
 
@@ -22,8 +23,18 @@ public record ContentPackageDetailResult(
         Instant createdAt,
         Instant updatedAt,
         List<ContentSectionResult> sections,
-        String sourceCode
+        String sourceCode,
+        PlacementPool placementPool
 ) {
+    public ContentPackageDetailResult(UUID id, String code, String title, PackageType packageType,
+                                      String requiredFeatureKey, PublicationStatus status,
+                                      UUID currentPublishedVersionId, int versionNumber, String rulesJson,
+                                      Instant publishedAt, UUID publishedBy, Instant createdAt, Instant updatedAt,
+                                      List<ContentSectionResult> sections, String sourceCode) {
+        this(id, code, title, packageType, requiredFeatureKey, status, currentPublishedVersionId, versionNumber,
+                rulesJson, publishedAt, publishedBy, createdAt, updatedAt, sections, sourceCode, null);
+    }
+
     public ContentPackageDetailResult(UUID id, String code, String title, PackageType packageType,
                                      String requiredFeatureKey, PublicationStatus status,
                                      UUID currentPublishedVersionId, int versionNumber, String rulesJson,

@@ -10,11 +10,13 @@ import com.ieltspath.learning.domain.service.PrerequisiteDiagnosis.ProbeFact;
 import com.ieltspath.learning.domain.service.ReviewRule.ReviewCandidate;
 import com.ieltspath.learning.domain.vo.DiagnosticProbe;
 import com.ieltspath.learning.domain.vo.DiagnosticSession;
+import com.ieltspath.learning.domain.vo.DiagnosticSession.ConclusionKind;
 import com.ieltspath.learning.domain.vo.LearningSkill;
 import com.ieltspath.learning.domain.vo.PendingReview;
 import com.ieltspath.learning.domain.vo.ReviewStatus;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -33,120 +35,127 @@ public class DiagnosticFlow {
     static final String DIAGNOSTIC_TRIGGER = "DIAGNOSTIC";
     static final int MIN_PROBE_QUESTIONS = 3;
 
-    private final LearningContentClient content;
     private final DiagnosticRepository diagnostics;
     private final ReviewItemRepository reviews;
     private final PracticeAttemptRepository attempts;
     private final CompletedLessonLocator lessonLocator;
-    private final KnowledgePointDirectory directory;
     private final PrerequisiteDiagnosis rule = new PrerequisiteDiagnosis();
 
-    public DiagnosticFlow(LearningContentClient content, DiagnosticRepository diagnostics,
-                          ReviewItemRepository reviews, PracticeAttemptRepository attempts,
-                          CompletedLessonLocator lessonLocator, KnowledgePointDirectory directory) {
-        this.content = content;
+    public DiagnosticFlow(DiagnosticRepository diagnostics, ReviewItemRepository reviews,
+                          PracticeAttemptRepository attempts, CompletedLessonLocator lessonLocator) {
         this.diagnostics = diagnostics;
         this.reviews = reviews;
         this.attempts = attempts;
         this.lessonLocator = lessonLocator;
-        this.directory = directory;
     }
 
-    /** The review failed its second set. */
-    public Optional<DiagnosticSession> startAfterSecondFailure(ReviewItem review) {
-        return start(review);
+    public record Prepared(Map<UUID, List<UUID>> prerequisites,
+                           Map<UUID, List<LearningContentClient.PracticeSet>> candidates,
+                           Map<UUID, KnowledgePointDirectory.Entry> directory) {
+        public Prepared {
+            prerequisites = prerequisites == null ? Map.of() : Map.copyOf(prerequisites);
+            candidates = candidates == null ? Map.of() : Map.copyOf(candidates);
+            directory = directory == null ? Map.of() : Map.copyOf(directory);
+        }
     }
 
-    /**
-     * The review has no unseen set left, so the content team is told, and a diagnosis may follow. Call before the review
-     * is skipped.
-     */
-    public Optional<DiagnosticSession> startWhenOutOfSets(ReviewItem review) {
+    /** The review failed repeatedly. Content data must be prepared before the learner lock is acquired. */
+    public Optional<DiagnosticSession> startAfterSecondFailure(ReviewItem review, Prepared prepared) {
+        return start(review, prepared);
+    }
+
+    /** The review has no unseen set left, so the content team is told, and a diagnosis may follow. */
+    public Optional<DiagnosticSession> startWhenOutOfSets(ReviewItem review, Prepared prepared) {
         if (!review.blocking()) return Optional.empty();
         diagnostics.recordContentGap(review.knowledgePointId());
-        return start(review);
+        return start(review, prepared);
     }
 
-    private Optional<DiagnosticSession> start(ReviewItem review) {
+    private Optional<DiagnosticSession> start(ReviewItem review, Prepared prepared) {
         // A review that came from a diagnosis is not diagnosed again, which keeps the walk back finite.
         if (!review.blocking() || DIAGNOSTIC_TRIGGER.equals(review.triggerKind())) return Optional.empty();
         if (diagnostics.findByRootReview(review.id()).isPresent()) return Optional.empty();
         UUID root = review.knowledgePointId();
-        List<UUID> first = rule.nextProbes(0, prerequisitesOf(root), Set.of(root), 0);
-        if (first.isEmpty()) return Optional.empty();
+        List<UUID> first = rule.nextProbes(0, prepared.prerequisites().getOrDefault(root, List.of()), Set.of(root), 0);
 
+        Instant now = Instant.now();
         DiagnosticSession session = new DiagnosticSession(UUID.randomUUID(), review.userId(), review.id(), root,
-                DiagnosticSession.Status.PROBING, List.of(), null, null);
+                first.isEmpty() ? DiagnosticSession.Status.CONCLUDED : DiagnosticSession.Status.PROBING,
+                List.of(), first.isEmpty() ? ConclusionKind.NO_PREREQUISITES : null, now,
+                first.isEmpty() ? now : null);
         diagnostics.insertSession(session);
-        addProbes(session, root, 1, first);
-        advance(session);
+        if (!first.isEmpty()) {
+            addProbes(session, root, 1, first, prepared);
+            advance(session, prepared.directory());
+        }
         return diagnostics.findSession(review.userId(), session.id());
     }
 
     /** A probe was answered: probe the prerequisites of a failed one, then conclude when none is left open. */
-    public void afterAnswer(DiagnosticSession session, DiagnosticProbe answered, boolean passed) {
+    public void afterAnswer(DiagnosticSession session, DiagnosticProbe answered, boolean passed, Prepared prepared) {
         if (!passed) {
             List<DiagnosticProbe> probes = diagnostics.findProbes(session.id());
             Set<UUID> known = new HashSet<>(probes.stream().map(DiagnosticProbe::knowledgePointId).toList());
             known.add(session.rootKnowledgePointId());
-            List<UUID> next = rule.nextProbes(answered.depth(), prerequisitesOf(answered.knowledgePointId()), known,
+            List<UUID> next = rule.nextProbes(answered.depth(),
+                    prepared.prerequisites().getOrDefault(answered.knowledgePointId(), List.of()), known,
                     probes.size());
-            addProbes(session, answered.knowledgePointId(), answered.depth() + 1, next);
+            addProbes(session, answered.knowledgePointId(), answered.depth() + 1, next, prepared);
         }
-        advance(session);
+        advance(session, prepared.directory());
     }
 
     /** An open probe whose set was seen elsewhere gets another set, or none, and the session moves on. */
-    public void replaceStaleSet(DiagnosticSession session, DiagnosticProbe probe) {
-        Optional<LearningContentClient.PracticeSet> next = unseenSet(session.userId(), probe.knowledgePointId(),
-                new HashSet<>());
+    public void replaceStaleSet(DiagnosticSession session, DiagnosticProbe probe,
+                                Optional<LearningContentClient.PracticeSet> next,
+                                Map<UUID, KnowledgePointDirectory.Entry> described) {
+        if (next.isEmpty()) diagnostics.recordContentGap(probe.knowledgePointId());
         diagnostics.replaceProbeSet(probe.id(), next.map(LearningContentClient.PracticeSet::packageId).orElse(null),
                 next.map(LearningContentClient.PracticeSet::packageVersionId).orElse(null));
-        advance(session);
+        advance(session, described);
     }
 
-    private void addProbes(DiagnosticSession session, UUID parent, int depth, List<UUID> knowledgePointIds) {
+    /** Skips unanswered probes after the learner has completed at least one probe. */
+    public void skip(DiagnosticSession session, Map<UUID, KnowledgePointDirectory.Entry> described) {
+        diagnostics.skipOpenProbes(session.id());
+        conclude(session, diagnostics.findProbes(session.id()), described);
+    }
+
+    private void addProbes(DiagnosticSession session, UUID parent, int depth, List<UUID> knowledgePointIds,
+                           Prepared prepared) {
         Set<UUID> taken = new HashSet<>();
+        Set<UUID> unavailable = new HashSet<>(attempts.revealedPackageIds(session.userId()));
+        unavailable.addAll(reviews.assignedPackageIds(session.userId()));
         for (UUID kp : knowledgePointIds) {
-            Optional<LearningContentClient.PracticeSet> set = unseenSet(session.userId(), kp, taken);
+            Optional<LearningContentClient.PracticeSet> set = prepared.candidates().getOrDefault(kp, List.of()).stream()
+                    .filter(candidate -> !taken.contains(candidate.packageId()))
+                    .filter(candidate -> !unavailable.contains(candidate.packageId()))
+                    .findFirst();
             set.ifPresent(found -> taken.add(found.packageId()));
+            if (set.isEmpty()) diagnostics.recordContentGap(kp);
             diagnostics.insertProbe(DiagnosticProbe.open(session.id(), kp, parent, depth,
                     set.map(LearningContentClient.PracticeSet::packageId).orElse(null),
                     set.map(LearningContentClient.PracticeSet::packageVersionId).orElse(null)));
         }
     }
 
-    /** A set of at least {@value #MIN_PROBE_QUESTIONS} questions whose answers the learner has not seen. */
-    private Optional<LearningContentClient.PracticeSet> unseenSet(UUID userId, UUID kp, Set<UUID> alsoTaken) {
-        Set<UUID> excluded = new HashSet<>(attempts.revealedPackageIds(userId));
-        excluded.addAll(reviews.assignedPackageIds(userId));
-        excluded.addAll(alsoTaken);
-        return content.searchPracticeSets(kp, new ArrayList<>(excluded), MIN_PROBE_QUESTIONS, 1).stream().findFirst();
-    }
-
-    private List<UUID> prerequisitesOf(UUID kp) {
-        Map<UUID, List<UUID>> prerequisites = content.prerequisites(List.of(kp));
-        List<UUID> found = prerequisites == null ? null : prerequisites.get(kp);
-        return found == null ? List.of() : found;
-    }
-
-    private void advance(DiagnosticSession session) {
+    private void advance(DiagnosticSession session, Map<UUID, KnowledgePointDirectory.Entry> described) {
         List<DiagnosticProbe> probes = diagnostics.findProbes(session.id());
         if (probes.stream().anyMatch(probe -> probe.status() == DiagnosticProbe.Status.OPEN)) return;
-        conclude(session, probes);
+        conclude(session, probes, described);
     }
 
-    private void conclude(DiagnosticSession session, List<DiagnosticProbe> probes) {
+    private void conclude(DiagnosticSession session, List<DiagnosticProbe> probes,
+                          Map<UUID, KnowledgePointDirectory.Entry> described) {
         List<ProbeFact> facts = probes.stream().map(probe -> new ProbeFact(probe.knowledgePointId(),
                 probe.parentKnowledgePointId(), probe.depth(),
                 probe.status() == DiagnosticProbe.Status.ANSWERED ? probe.passed() : null)).toList();
         PrerequisiteDiagnosis.Conclusion conclusion = rule.conclude(session.rootKnowledgePointId(), facts);
-        diagnostics.conclude(session.id(), conclusion.knowledgePointIds());
-        if (conclusion.rootIsGap()) return;
+        diagnostics.conclude(session.id(), conclusion.knowledgePointIds(), conclusion.kind());
+        if (conclusion.kind() != ConclusionKind.GAPS_FOUND) return;
 
         UUID userId = session.userId();
         ReviewItem rootReview = reviews.findOwned(userId, session.rootReviewId()).orElseThrow();
-        Map<UUID, KnowledgePointDirectory.Entry> described = directory.describe();
         List<ReviewCandidate> candidates = conclusion.knowledgePointIds().stream()
                 .map(kp -> new ReviewCandidate(kp, lessonLocator.teaching(userId, kp).orElse(rootReview.lessonId()),
                         skill(described.get(kp)))).toList();

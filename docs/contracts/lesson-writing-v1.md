@@ -52,7 +52,7 @@ third W1 Task 1 table prompt and its fifth chart reference. Image upload is perf
 ## `POST /lessons/{lessonId}/essays/{blockId}/submissions`
 
 Request: `{"requestId":"<UUID>","essayText":"..."}`. The essay is graded **within the request** using one LLM request
-for both criterion bands and sub-point judgments. Its default timeout is 20 s; service and payment work add latency.
+for both criterion bands and the judgments of the question's knowledge points. Its default timeout is 20 s; service and payment work add latency.
 
 Order: validate input → look up `requestId` → load the lesson from Content → check the point balance → gate check and
 record `GRADING` → daily grading limit → LLM grading → debit points → record `GRADED` and mastery evidence.
@@ -97,17 +97,31 @@ Response 200:
   `PROMPT_VERSION_UNAVAILABLE`) gives its daily grading unit back. `INVALID_GRADE` keeps the unit, because a malformed
   output may be caused by the essay itself.
 - `bandLimits` (optional, present only when a cap lowered a band): `[{reason, criterion, cap, message}]`, the same shape
-  as Speaking's `bandLimits` plus `criterion` (TA or TR). `reason` is `TOO_SHORT`, `OFF_TOPIC`, `T1_NO_OVERVIEW`,
-  `PARTIAL_ANSWER` or `NO_POSITION`. A criterion lowered by a cap carries `limited: true`. Caps are off until
+  as Speaking's `bandLimits` plus `criterion` (TA, TR, CC, GRA or LR). `reason` is `TOO_SHORT`, `OFF_TOPIC`, `T1_NO_OVERVIEW`,
+  `PARTIAL_ANSWER`, `NO_POSITION`, `DENSE_GRAMMAR`, `DENSE_IMPEDING_GRAMMAR`, `DENSE_VOCABULARY`, `DENSE_COHERENCE`, `WRONG_DATA` or
+  `WRONG_DATA_OVERVIEW`. A criterion lowered by a cap carries `limited: true`. Caps are off until
   `learning.writing.band-caps-enabled` is true and the thresholds are set; while off, responses carry neither field.
   The length rule needs only the essay. `T1_NO_OVERVIEW` fires when the second prompt template reports
   `hasOverview = false`; `PARTIAL_ANSWER` and `NO_POSITION` fire from the Task 2 checks below. `OFF_TOPIC` has no check
-  behind it yet and never fires.
+  behind it yet and never fires. The six density reasons are counted from the corrections of the grade, not by the model:
+  `DENSE_GRAMMAR` and `DENSE_VOCABULARY` cap GRA and LR when the share of sentences with a grammar or a vocabulary error
+  reaches `learning.writing.density.grammar-share` or `vocabulary-share`; `DENSE_COHERENCE` caps CC when the share of
+  sentences with a coherence error (category `COHERENCE`: a wrong linking word, an unclear reference) reaches
+  `coherence-share`; `DENSE_IMPEDING_GRAMMAR` caps GRA when the share of sentences with a grammar error that the
+  model flagged `impedesMeaning: true` (the reader has to guess the meaning) reaches `impeding-grammar-share`; for
+  Task 1, `WRONG_DATA` caps TA when the
+  share of chart statements judged wrong reaches `wrong-data-share`, and `WRONG_DATA_OVERVIEW` caps it lower when the
+  overview is also wrong. A correction that is only a suggestion is not counted. Each cap is set by a
+  `learning.writing.density.*-band-cap` key and a blank cap switches its rule off. The shared configuration leaves
+  `DENSE_GRAMMAR` off: grammar errors in most sentences also appear in band 5 essays whose meaning stays clear.
 - `dataChecks` (Task 1, only for a grade made with the second prompt template; absent otherwise):
   `{wrong: [{excerpt, expected}], correctCount, hasOverview?, overviewAccurate?, hasPersonalOpinion?}`. `wrong` lists the
   sentences of the essay that contradict the chart; `expected` is a short Vietnamese statement of what the chart shows.
   Sentences judged right come back only as `correctCount`. A flag the model did not give is omitted. The chart facts
-  themselves are never returned. A wrong figure also appears in `corrections` with the code `T1_DATA_MISREPORTED`.
+  themselves are never returned. A wrong figure also appears in `corrections` with the code `T1_DATA_MISREPORTED`. When the model gave no such entry, Learning adds one
+whose `suggestion` is the sentence itself and whose `reason` is the `expected` statement. A `suggestion` that contains Vietnamese is emptied
+(the correction keeps its excerpt and reason), so no Vietnamese text reaches a corrected essay. A `suggestion` is at most 600
+characters and a criterion `comment` at most 300, both cut at a sentence end when one is near the limit.
 - `taskChecks` (Task 2, same condition): `{questionParts: [{part, addressed, excerpt?}], position?: {required, stated,
   excerpt?, consistent?, conflictExcerpt?}, outline: [{role, mainIdea, developed, excerpt?}], partialAnswer, noPosition,
   inconsistentPosition, noConclusion}`. `addressed` is `FULL`, `PARTIAL` or `NONE`; `role` is `INTRODUCTION`, `BODY` or
@@ -146,28 +160,42 @@ Response 200:
 grading, outside the submission transaction, and stored in the grade JSON; reads never recalculate it. Older grades
 without this field return `[]`. Null fields inside a point are omitted.
 
-Each criterion also includes `knowledgePointJudgments`, an ordered array that is `[]` for grades without stored judgments.
-Each judgment has `knowledgePointId`, `code`, `name`, and `judgment` (`PASS`, `FAIL` or `NOT_ASSESSED`); `excerpt` and `reason` are omitted
-when no evidence is available. When the rubric lists sub-points, Learning appends `essay-kp-judgment-v2` instructions to
-the unchanged band template `v1`; one response supplies `criteria`, `corrections`, `summary`, `focus` and `judgments`.
-Rubrics without sub-points do not require `judgments`. `promptVersion` is
+Each criterion also includes `knowledgePointJudgments`, an ordered array that is `[]` for grades without stored judgments
+and always `[]` for a grade made with `kpj3`; only grades made with `kpj2` (judged on the sub-points of a criterion) carry
+entries there. The judgments of a `kpj3` grade belong to no criterion and are returned in the top-level array
+`taskKnowledgePointJudgments` (added 2026-11-13), omitted when empty. **Frontend must read this field to show them.**
+Each judgment, in either place, has `knowledgePointId`, `code`, `name`, and `judgment` (`PASS`, `FAIL` or `NOT_ASSESSED`);
+`excerpt` and `reason` are omitted when no evidence is available.
+
+The judgments block of the prompt contains exactly the knowledge points attached to the question
+(`question_knowledge_points`), at most 4, in the question's order and without repeats; a point the Content catalog does
+not know is left out. A question without knowledge points has no `judgments` block, no `judgmentVersion` and an empty
+`taskKnowledgePointJudgments`. Learning appends `essay-kp-judgment-v3` to the band template of any version; one response
+supplies `criteria`, `judgments` (right after `criteria`), `corrections`, `summary` and `focus`. A failed judgment adds a
+`studyPoints` entry of kind `KNOWLEDGE_POINT` without `criterionCode` and `band`, after the criterion entries and before the
+model's `focus` entries; its `practiceKnowledgePointId` is the point itself when it has a practice set, otherwise absent.
+This applies to course essays, Practice essays and free writing alike. `promptVersion` is
 `<rubricCode>@<rubricVersion>+tplv1` for band activation, or `+tplv2` when an administrator has activated a run made with the
-second template (`docs/contracts/essay-prompt-template-v2.txt`); with nothing activated, `v1` is used and an unknown template
-version is `PROMPT_VERSION_UNAVAILABLE`. Template `v2` additionally returns, and the grade JSON stores (not yet exposed by the API),
+second template (`docs/contracts/essay-prompt-template-v2.txt`), or `+tplv3` for the third (`docs/contracts/essay-prompt-template-v3.txt`,
+which asks for `taskChecks` first and for the sentence rules of the corrections); with nothing activated, `v1` is used and an unknown template
+version is `PROMPT_VERSION_UNAVAILABLE`. The default template is set by `learning.writing.default-template` and has been `v3` since 2026-11-14 (`v2` from 2026-11-12), chosen by the product owner without an examiner gold set. Template `v2` additionally returns, and the grade JSON stores (not yet exposed by the API),
 per correction a `reason` (at most 300 characters, optional) and `certainty` (`ERROR` or `SUGGESTION`; missing or unknown reads as
 `ERROR`; a `SUGGESTION` never creates a knowledge-point `FAIL` and is not counted in the essay event's `error_code`), per criterion
 `evidence` (exact quotations, at most 3; a quotation not in the essay is dropped and the band is kept) and `descriptor`, at most 3
 `priorities` and one `errorExamples` entry per error code in `corrections`. Missing optional parts never make the grade `INVALID_GRADE`.
-Band activation is unchanged; internal grade JSON stores `judgmentVersion=kpj2` whenever the rubric has
-sub-points (the prompt was extended), even if the response has no judgments array, otherwise null. This version is not
+Band activation is unchanged; internal grade JSON stores `judgmentVersion=kpj3` whenever the prompt carried the judgments
+block (even if the response has no judgments array), otherwise null; grades stored as `kpj2` keep that value. This version is not
 exposed by the API. `EssayKnowledgeJudge` validates the received data without LLM or clock
-dependencies; the grader supplies a lazy Content catalog, loaded at most once when needed for practice targets.
+dependencies; the grader supplies a lazy Content catalog, loaded at most once per grading and only when the question has
+knowledge points.
 The essay template's single source is `docs/contracts/essay-prompt-template-v*.txt`; Maven copies it to the root
 classpath of Learning and Assessment. Each grader owns the `<rubricCode>@<rubricVersion>+tpl<templateVersion>`
 identifier; the shared LLM transport does not construct or interpret it.
 Missing or malformed judgments preserve a valid band and leave the affected model
-judgments `NOT_ASSESSED`; validated corrections whose active error type maps to a knowledge point can still produce
-`FAIL`. Corrections and judgments come from the same model response and are checked against application rules.
+judgments `NOT_ASSESSED`; validated corrections whose active error type maps to a knowledge point of the question can still
+produce `FAIL`. For course essays and Practice essays a question point judged `PASS` is recorded as correct and one judged
+`FAIL` as wrong; a point not judged (`NOT_ASSESSED`, or not put to the model) takes the pass or fail of the whole essay, and a
+criterion point of the same id still follows its band. Free writing records no mastery evidence. Corrections and judgments come from the same model response and are checked against application rules.
 
 There is no second request to repair JSON and no automatic HTTP retry for provider 429/503. Invalid JSON or invalid
 criterion bands fail with stored `INVALID_GRADE` (public `GRADING_UNAVAILABLE`), without charging points. A provider
@@ -178,10 +206,11 @@ failure or timeout fails the grading without charging points. The single request
 | --- | --- |
 | `CRITERION` | `criterionCode`, `band` and `knowledgePointId` are required. Only criteria with `band < passBand` and a mapped KP qualify; no criterion points when `passBand` is null. `code`, `name`, `title` and `reason` are optional snapshots of Content's KP details; `title` is its name, and `reason` prefers `canDo` over `description` (maximum 300 characters). If Content is unavailable, grading still succeeds without those details. |
 | `AI` | `kind`, `title` and optional `reason` describe a model `focus` entry. At most four entries, split at the first colon, with title limited to 80 and reason to 300 characters; blank or non-text entries are discarded. |
-| `KNOWLEDGE_POINT` | A sub knowledge point judged `FAIL`. Carries the parent `criterionCode` and `band`, the sub-point fields, exact validated `excerpt` and `reason`; `practiceKnowledgePointId` is the sub-point ID when it has a practice set, otherwise the parent criterion point ID when available. |
+| `KNOWLEDGE_POINT` | A knowledge point judged `FAIL`. For a `kpj3` grade it is a point of the question: no `criterionCode` and no `band`, the point's fields, exact validated `excerpt` and `reason`; `practiceKnowledgePointId` is the point's own ID when it has a practice set, otherwise absent. A grade stored as `kpj2` carries the parent `criterionCode` and `band` of a failed sub-point, and its `practiceKnowledgePointId` falls back to the parent criterion point. |
 
-Study points keep criterion points in their existing band/rubric order, followed immediately by failed sub-points for that
-criterion; failed sub-points without a criterion study point follow in rubric order, then AI points in model order.
+Study points keep criterion points in their existing band/rubric order, then the failed question points in the
+question's order, then AI points in model order. (A `kpj2` grade keeps its older order: failed sub-points directly after the
+criterion point they belong to.)
 The same response applies to lesson, course Practice, free-writing and revision submissions. Mentor review and
 Assessment result shapes are unchanged. The learner can use a criterion point's KP ID with the existing
 [free-practice API](free-practice-v1.md); its reserve and exhaustion rules still apply.
@@ -213,31 +242,50 @@ results replace this essay's AI criterion evidence, and its marked errors count 
 - 3 points per successful grading (Access Service, `POST /internal/access/points/debit`, idempotency key
   `lesson-writing:{userId}:{requestId}`). Points are charged only after the LLM grade succeeds; there is no refund.
 - At most one `GRADING` submission per learner and block.
-- Daily limit: at most 10 gradings per learner per day (`Asia/Ho_Chi_Minh`), counted when the LLM is called. Exceeding
+- Daily limit: at most 20 gradings per learner per day by default (`Asia/Ho_Chi_Minh`), counted when the LLM is called. Exceeding
   it → 429 `DAILY_LIMIT_REACHED`, no LLM call, no charge.
+- Premium grading: an active Premium learner is graded at `pointCost: 0` without a balance check or points debit.
+  Writing, Practice and free-writing submissions use `learning.writing.premium-daily-grading-limit` (default 20);
+  other learners use `learning.writing.daily-grading-limit` (default 20 in Config Server). A failed Premium lookup
+  falls back to the normal paid path and limit.
 - Mastery evidence (`source = lesson_writing`) is recorded on every graded submission until the block is first passed,
-  and never after. It has one row per knowledge point of the question with `correct = passed`, and one row per rubric
-  criterion whose knowledge point is mapped, with `correct = criterion band >= passBand`. A sub-point judgment of
-  `PASS` or `FAIL` adds evidence regardless of the essay pass band; `NOT_ASSESSED` adds none. Criterion band evidence
-  takes priority when the same KP is mapped twice, and sub-point evidence overrides the question's pass result when IDs
-  overlap. Criterion knowledge points appear only in `studyPoints[]`; `criteria[]` exposes sub-point IDs only inside
-  `knowledgePointJudgments[]`. The question's event carries the most frequent correction `errorCode`.
+  and never after. It has one row per knowledge point of the question, and one row per rubric criterion whose knowledge
+  point is mapped, with `correct = criterion band >= passBand`. A question point judged `PASS` is `correct = true` and one
+  judged `FAIL` is `correct = false`, whatever the essay's pass band; a point judged `NOT_ASSESSED`, or not put to the model
+  (left out of the prompt, or beyond the first four), takes `correct = passed`. Criterion band evidence takes priority when
+  the same KP is mapped twice, and a question point's judgment overrides the essay's pass result. Criterion knowledge points
+  appear only in `studyPoints[]`; a question point's judgment appears in `taskKnowledgePointJudgments[]`. A grade stored as
+  `kpj2` is read with the older rule: sub-point judgments decide their own points. The question's event carries the most
+  frequent correction `errorCode`; the knowledge point of a correction's error code adds no evidence.
 
 ## Optional criterion reviews
 
 When a lesson essay records evidence, or a lesson Practice package is submitted with `countedAsEvidence = true`,
 failed rubric criterion KPs may receive optional reviews in the same transaction as their evidence. A criterion fails
-only when its band is strictly below the prompt's pass band (5.5 against 5.5 passes). Judged sub knowledge points do
-not create these reviews. Existing evidence, including sub-point judgments, is unchanged.
+only when its band is strictly below the prompt's pass band (5.5 against 5.5 passes). Judged question knowledge points do
+not create these reviews. Existing evidence, including `kpj2` sub-point judgments, is unchanged.
+
+The criterion decides whether there is a review; the errors of the essay decide what it practises. For each weak
+criterion the review practises the knowledge point of the error code met most often among that criterion's errors:
+corrections that are not `SUGGESTION` and whose code belongs to the criterion (`VOCABULARY` for LR, `GRAMMAR` for GRA,
+`COHERENCE` for CC, `TASK` for TA and TR; the word-level codes `WORD_FORM`, `NOUN_PLURAL` and `WRITING_SPELLING` count for
+LR). Codes are ranked by how often they occur, then by the higher `severity`, then by code. The first knowledge point in
+that order that has no `PENDING` review and still has an eligible unrevealed set is practised; when none has, the review
+practises the criterion's own point (`DEMO_WRITING_CRITERION_*`) on the same terms. A knowledge point is the one of an
+error code only when the correction carries a `practiceKnowledgePointId`, which the grade keeps only for a point with a
+practice set. This applies to AI grading of lesson and course Practice essays; Mentor results, Speaking and free writing
+are unchanged. Mastery is unchanged: the criterion's band is still evidence for its own point.
 
 The service selects the lowest criterion bands first, breaking ties by KP code, and creates at most
 `learning.writing.criterion-review-limit` reviews per submission (default `2`, pending user/mentor confirmation).
-A KP with any existing `PENDING` review is skipped. Content must have an eligible unrevealed set with at least three
+A criterion whose own point, or a review made for it, is `PENDING` is skipped, so a criterion has one waiting review. Content must have an eligible unrevealed set with at least three
 questions; packages already revealed in Practice/review or assigned in any review are excluded. Availability is
-checked once for all candidate KPs. This uses the published `PS-WCR-*` criterion practice sets.
+checked once for all candidate KPs. A criterion with no error point to practise uses the published `PS-WCR-*` criterion practice sets.
 
 Each new review stores the essay's lesson ID, `skill = WRITING`, `blocking = false`, and
-`trigger_kind = WRITING_CRITERION`. These reviews never block lessons, Practice or topic tests and do not change
+`trigger_kind = WRITING_CRITERION`. Its `knowledge_point_id` is the point it practises; `criterion_knowledge_point_id`
+keeps the criterion's own point so that an examiner's result finds the review: a criterion graded below the pass band
+makes its waiting review blocking, one graded at or above it closes the review. These reviews never block lessons, Practice or topic tests and do not change
 Practice clearance. They are accessible through `GET /reviews`, `GET /review-basket` (in `weak` when absent from
 `required`, `consolidate` and `due`), and the existing review start/submission routes. A successful review set writes `review_set` evidence and updates mastery.
 Replaying an existing submission or resubmitting a revealed Practice package creates no additional reviews.
@@ -264,3 +312,7 @@ Body `{detail, code}`, as in `lesson-learning-v1`.
 | 429 | `DAILY_LIMIT_REACHED` | Daily grading limit reached |
 | 503 | `GRADING_UNAVAILABLE` | LLM not configured, failed, timed out or returned an invalid result; no charge |
 | 503 | `PAYMENT_UNAVAILABLE` | Access Service failed or rejected the token during debit; status `PAYMENT_PENDING`, resend the same `requestId` |
+
+## Free Writing practice tests
+
+Submitting a free Writing essay for a tagged practice test requires an active Premium subscription before quota, balance, grading, lock or transaction work. A missing subscription returns HTTP 403 PREMIUM_REQUIRED; an unavailable entitlement lookup returns HTTP 503 ENTITLEMENT_UNAVAILABLE. Both responses contain details.code and a Vietnamese user message. A stored request replay does not perform another entitlement check.

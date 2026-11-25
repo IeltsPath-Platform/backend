@@ -36,12 +36,16 @@ class PlacementTestSeedTest {
         reader = new JdbcLearningContentReader(jdbc);
     }
 
+    private static com.ieltspath.content.application.result.PlacementPackageResult originalExam() {
+        return reader.placementTestPackages(null).stream().filter(pkg -> pkg.code().equals("PLACEMENT-4SKILLS"))
+                .findFirst().orElseThrow();
+    }
+
     @Test
-    void onePublishedPlacementPackageCoversAllFourSkills() {
-        var packages = reader.placementTestPackages();
-        assertThat(packages).singleElement().satisfies(pkg -> assertThat(pkg.code()).isEqualTo("PLACEMENT-4SKILLS"));
-        var payload = reader.publishedPackageVersion(packages.getFirst().packageVersionId()).orElseThrow();
+    void theOriginalPlacementPackageCoversAllFourSkills() {
+        var payload = reader.publishedPackageVersion(originalExam().packageVersionId()).orElseThrow();
         assertThat(payload.packageType()).isEqualTo(PackageType.PLACEMENT_TEST);
+        assertThat(payload.placementPool()).isEqualTo(com.ieltspath.content.domain.vo.PlacementPool.BAND_5_9);
         Set<Skill> skills = payload.sections().stream().map(section -> section.skill()).collect(Collectors.toSet());
         assertThat(skills).containsExactlyInAnyOrder(Skill.LISTENING, Skill.READING, Skill.WRITING, Skill.SPEAKING);
         // Same parts and order as the real test.
@@ -58,8 +62,7 @@ class PlacementTestSeedTest {
 
     @Test
     void listeningAndReadingHaveFortyQuestionsEachWithOneAudioOrPassagePerPart() {
-        var payload = reader.publishedPackageVersion(reader.placementTestPackages().getFirst().packageVersionId())
-                .orElseThrow();
+        var payload = reader.publishedPackageVersion(originalExam().packageVersionId()).orElseThrow();
         Map<Skill, Integer> questions = payload.sections().stream().collect(Collectors.groupingBy(
                 section -> section.skill(), Collectors.summingInt(section -> section.items().size())));
         assertThat(questions).containsEntry(Skill.LISTENING, 40).containsEntry(Skill.READING, 40)
@@ -72,16 +75,18 @@ class PlacementTestSeedTest {
 
     @Test
     void placementQuestionsHaveTheirOwnPurposeAndNoOtherOwner() {
-        var version = reader.placementTestPackages().getFirst().packageVersionId();
+        var version = originalExam().packageVersionId();
         assertThat(reader.questionsWithWrongPurpose(version, QuestionPurpose.PLACEMENT)).isEmpty();
         assertThat(reader.questionsUsedElsewhere(version)).isEmpty();
+        // 101 questions of the original exam, plus 4 x 43 (shortened exams) and 90 (full-length exam) of the pool exams.
         assertThat(jdbc.queryForObject("SELECT count(*) FROM questions WHERE purpose = 'PLACEMENT'", Map.of(), Integer.class))
-                .isEqualTo(101);
+                .isEqualTo(101 + 4 * 43 + 90);
     }
 
     @Test
     void courseTestsAndMockTestsAreNotListedAsPlacementPackages() {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM content_packages WHERE package_type = 'PLACEMENT_TEST'",
-                Map.of(), Integer.class)).isEqualTo(1);
+                Map.of(), Integer.class)).isEqualTo(6);
+        assertThat(reader.placementTestPackages(null)).hasSize(6);
     }
 }
