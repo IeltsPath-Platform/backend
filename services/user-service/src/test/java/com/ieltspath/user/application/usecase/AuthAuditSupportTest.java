@@ -1,11 +1,13 @@
 package com.ieltspath.user.application.usecase;
 
 import com.ieltspath.user.application.command.LoginContext;
+import com.ieltspath.commonobservability.CorrelationIdFilter;
 import com.ieltspath.user.application.port.AuthAuditRecorder;
 import com.ieltspath.user.application.port.AuthAuditContextProvider;
 import com.ieltspath.user.domain.aggregate.AuthAuditEvent;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.slf4j.MDC;
 
 import java.util.Map;
 import java.util.UUID;
@@ -37,5 +39,20 @@ class AuthAuditSupportTest {
     void auditStorageFailureDoesNotFailTheAccountAction() {
         doThrow(new IllegalStateException("database unavailable")).when(recorder).record(any());
         support.record("PASSWORD_CHANGED", UUID.randomUUID(), null, Map.of());
+    }
+
+    @Test
+    void recordsAuditEventsWithCorrelationIdsWithinTheDatabaseLimit() {
+        String correlationId = "a".repeat(100);
+        MDC.put(CorrelationIdFilter.MDC_KEY, correlationId);
+        try {
+            support.record("SESSION_REVOKED", UUID.randomUUID(), LoginContext.UNKNOWN, Map.of());
+        } finally {
+            MDC.remove(CorrelationIdFilter.MDC_KEY);
+        }
+
+        ArgumentCaptor<AuthAuditEvent> event = ArgumentCaptor.forClass(AuthAuditEvent.class);
+        verify(recorder).record(event.capture());
+        assertThat(event.getValue().correlationId()).hasSize(64).isEqualTo("a".repeat(64));
     }
 }

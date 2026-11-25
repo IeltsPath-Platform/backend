@@ -10,6 +10,9 @@ public record AuthAuditEvent(UUID id, UUID userId, String eventType, String ipAd
         if (eventType == null || eventType.isBlank() || eventType.length() > 40) {
             throw new IllegalArgumentException("Loại sự kiện bảo mật không hợp lệ");
         }
+        correlationId = correlationId == null || correlationId.length() <= 64
+                ? correlationId
+                : correlationId.substring(0, 64);
         detail = detail == null ? Map.of() : Map.copyOf(detail);
     }
 }
