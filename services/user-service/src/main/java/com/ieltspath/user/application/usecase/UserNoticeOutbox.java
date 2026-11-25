@@ -10,8 +10,8 @@ import org.springframework.stereotype.Component;
 import java.util.UUID;
 
 /**
- * Writes an account notice (password changed, Google linked) to the outbox. Call it inside the transaction that makes
- * the change, so a rolled-back change sends nothing.
+ * Writes an account notice (password changed, Google linked, or Google unlinked) to the outbox. Call it inside the
+ * transaction that makes the change, so a rolled-back change sends nothing.
  */
 @Component
 @RequiredArgsConstructor

@@ -2,6 +2,6 @@ package com.ieltspath.user.application.exception;
 
 public class GoogleAccountConflictException extends RuntimeException {
     public GoogleAccountConflictException() {
-        super("A different Google account is already linked");
+        super("Tài khoản Google này đã được liên kết với một tài khoản khác.");
     }
 }

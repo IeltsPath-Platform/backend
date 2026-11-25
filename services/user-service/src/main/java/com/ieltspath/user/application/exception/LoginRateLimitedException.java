@@ -6,7 +6,7 @@ public class LoginRateLimitedException extends RuntimeException {
     private final Duration retryAfter;
 
     public LoginRateLimitedException(Duration retryAfter) {
-        super("Too many login attempts. Try again later.");
+        super("Bạn đã thử đăng nhập sai quá nhiều lần. Vui lòng thử lại sau.");
         this.retryAfter = retryAfter == null || retryAfter.isNegative() || retryAfter.isZero()
                 ? Duration.ofSeconds(1) : retryAfter;
     }

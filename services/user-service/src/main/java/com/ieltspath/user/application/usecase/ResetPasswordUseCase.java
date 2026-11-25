@@ -10,6 +10,7 @@ import com.ieltspath.user.domain.exception.UserNotFoundException;
 import com.ieltspath.user.domain.repository.AccountActionTokenRepository;
 import com.ieltspath.user.domain.repository.UserRepository;
 import com.ieltspath.user.application.port.UserLock;
+import com.ieltspath.user.application.port.AccessTokenRevocationStore;
 import com.ieltspath.user.domain.repository.RefreshTokenRepository;
 import com.ieltspath.user.domain.vo.ActionTokenPurpose;
 import com.ieltspath.user.domain.vo.UserStatus;
@@ -21,6 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
+import com.ieltspath.user.application.port.AuthMetrics;
 
 @Slf4j
 @Service
@@ -33,6 +36,16 @@ public class ResetPasswordUseCase {
     private final UserLock userLock;
     private final RefreshTokenRepository refreshTokenRepository;
     private final UserNoticeOutbox notices;
+    private final AccessTokenRevocationStore accessTokens;
+    private final PasswordPolicyService passwordPolicy;
+    private AuthAuditSupport authAudit;
+    private AuthMetrics authMetrics;
+
+    @Autowired
+    void setAuthAudit(AuthAuditSupport authAudit) { this.authAudit = authAudit; }
+
+    @Autowired
+    void setAuthMetrics(AuthMetrics authMetrics) { this.authMetrics = authMetrics; }
 
     @Transactional
     public void execute(ResetPasswordCommand command) {
@@ -59,6 +72,8 @@ public class ResetPasswordUseCase {
         if (user.getStatus() != UserStatus.ACTIVE) {
             throw new InvalidActionTokenException("Không thể đặt lại mật khẩu cho tài khoản không hoạt động");
         }
+        passwordPolicy.check(command.newPassword(), user.getEmail().value(), user.getFullName(),
+                user.getPhoneNumber() == null ? null : user.getPhoneNumber().value());
         if (!accountActionTokenRepository.consumePasswordResetToken(tokenHash, java.time.LocalDateTime.now(java.time.ZoneOffset.UTC))) {
             throw new InvalidActionTokenException("Mã token đã hết hạn hoặc đã được sử dụng");
         }
@@ -73,12 +88,15 @@ public class ResetPasswordUseCase {
         }
         user.changePassword(passwordEncoder.encode(command.newPassword()));
         userRepository.save(user);
-        refreshTokenRepository.revokeAllActiveForUser(user.getId(), java.time.LocalDateTime.now());
+        refreshTokenRepository.revokeAllActiveForUser(user.getId(), java.time.LocalDateTime.now(), "PASSWORD_RESET");
+        accessTokens.revokeUser(user.getId(), java.time.Instant.now());
 
         UUID eventId = UUID.randomUUID();
         notices.enqueue(eventId, user.getId(), PasswordChangedV1.EVENT_TYPE, new PasswordChangedV1(eventId,
                 PasswordChangedV1.EVENT_TYPE, Instant.now(), user.getId(), user.getEmail().value(), user.getFullName()));
+        if (authAudit != null) authAudit.record("PASSWORD_RESET", user.getId(), null, java.util.Map.of());
+        if (authMetrics != null) authMetrics.record("auth.password", "event", "reset");
+        if (authMetrics != null) authMetrics.record("auth.session.revoked", "reason", "PASSWORD_RESET");
         log.info("Đặt lại mật khẩu thành công cho userId={}", user.getId());
     }
 }
-

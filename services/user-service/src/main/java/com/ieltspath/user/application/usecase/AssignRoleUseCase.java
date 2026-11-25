@@ -12,6 +12,10 @@ import com.ieltspath.user.domain.service.RoleAssignmentPolicy;
 import com.ieltspath.user.domain.vo.RoleName;
 import com.ieltspath.user.domain.vo.UserStatus;
 import com.ieltspath.user.application.port.UserLock;
+import com.ieltspath.user.application.port.AccessTokenRevocationStore;
+import java.time.Instant;
+import com.ieltspath.user.domain.repository.RefreshTokenRepository;
+import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Autowired;
+import com.ieltspath.user.application.port.AuthMetrics;
 
 @Service
 @RequiredArgsConstructor
@@ -26,6 +32,16 @@ public class AssignRoleUseCase {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final UserLock userLock;
+    private final RefreshTokenRepository refreshTokens;
+    private final AccessTokenRevocationStore accessTokens;
+    private AuthAuditSupport authAudit;
+    private AuthMetrics authMetrics;
+
+    @Autowired
+    void setAuthAudit(AuthAuditSupport authAudit) { this.authAudit = authAudit; }
+
+    @Autowired
+    void setAuthMetrics(AuthMetrics authMetrics) { this.authMetrics = authMetrics; }
 
     @Transactional
     public User execute(AssignRoleCommand command) {
@@ -57,6 +73,12 @@ public class AssignRoleUseCase {
             throw new RoleNotFoundException("Một hoặc nhiều vai trò không tồn tại");
         }
         user.assignRoles(roles);
-        return userRepository.save(user);
+        User saved = userRepository.save(user);
+        refreshTokens.revokeAllActiveForUser(user.getId(), LocalDateTime.now(), "ADMIN");
+        accessTokens.revokeUser(user.getId(), Instant.now());
+        if (authAudit != null) authAudit.record("ROLE_CHANGED", user.getId(), null,
+                java.util.Map.of("reason", "ADMIN"));
+        if (authMetrics != null) authMetrics.record("auth.session.revoked", "reason", "ADMIN");
+        return saved;
     }
 }

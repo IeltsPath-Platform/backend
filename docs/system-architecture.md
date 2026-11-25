@@ -353,7 +353,7 @@ cùng course mở theo trạng thái suy ra khi đọc. Course test không chặ
 
 ## Scheduler và nhiều instance
 
-Backend hiện có 29 phương thức `@Scheduled` trong 28 file. Cơ chế chống xử lý trùng theo mã đang chạy:
+Backend hiện có 30 phương thức `@Scheduled` trong 29 file. Cơ chế chống xử lý trùng theo mã đang chạy:
 
 | Service | Job / lịch | Cơ chế cạnh tranh | HTTP/LLM khi giữ khóa hoặc transaction |
 |---|---|---|---|
@@ -386,6 +386,8 @@ Backend hiện có 29 phương thức `@Scheduled` trong 28 file. Cơ chế ch�
 | learning | `MasteryDecayJob` | Session advisory lock; các batch ghi theo transaction riêng | Không |
 | learning | `WorkItemSyncJob` | Đọc nguồn và lấy metadata Content trước; transaction ngắn lấy advisory lock rồi ghi snapshot; unique key loại mục trùng | Content HTTP ngoài transaction/khóa |
 | user | `LoginHistoryPurgeScheduler` | Xóa theo cutoff thời gian; chạy lặp an toàn | Không |
+| user | `AuthAuditPurgeScheduler` | Xóa từng lô bằng `FOR UPDATE SKIP LOCKED`; giữ dữ liệu 365 ngày theo mặc định | Không |
+| user | `RefreshTokenCleanupJob` | Xóa tối đa 1000 token hết hạn hoặc đã thu hồi quá 30 ngày bằng `FOR UPDATE SKIP LOCKED`; nhiều instance không giữ cùng hàng | Không |
 
 Game không cần thêm claim riêng: hàng trận được khóa trước khi cập nhật và trạng thái được kiểm lại. Relay dùng row claim để instance khác có thể xử lý các hàng còn lại. Việc đọc nguồn của `WorkItemSyncJob` có thể chạy đồng thời; phần ghi được tuần tự hóa và repository bỏ qua work item đã tồn tại.
 
@@ -510,3 +512,12 @@ hoạt động upload.
 ### Mobile vocabulary study ownership
 
 Library owns curated vocabulary units, immutable revisions, attempt snapshots, unit progress, and the independent `vocabulary_study_*` XP/streak/hearts ledgers. Completion and real flashcard reviews maintain this vocabulary streak; only first unit completion can award vocabulary XP. Learning web state is neither imported nor called. The shared Access wallet charges heart/freeze purchases through a durable PENDING intent, an HTTP debit outside transactions/locks, and an idempotent effect transaction. Access plan reads also occur outside transactions and are cached per profile for ten minutes; failures retain the stored heart capacity. Public unit GET paths require explicit allowlists at both Gateway and Library.
+# Thu hồi access token
+
+Gateway xác thực external JWT, sau đó kiểm tra các khóa `auth:revoked:*` trong Redis trước khi chuyển tiếp request; cùng
+lớp kiểm tra áp dụng cho WebSocket notifications. User-service chỉ ghi dấu thu hồi sau commit. Mặc định Redis lỗi được
+xử lý fail-open và ghi metric; cờ `gateway.auth.revocation.fail-closed` cho phép trả 503 khi cần.
+
+Sensitive account changes can require a one-time reauthentication grant stored by SHA-256 hash in Redis and bound to
+the active user session. User-service publishes Google unlink notices through the user outbox; Notification owns the
+mail queue, retries, and dead-letter queue.

@@ -5,8 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.ieltspath.user.domain.exception.InvalidUserStatusException;
 import com.ieltspath.user.application.command.ChangeUserStatusCommand;
 import com.ieltspath.user.application.port.UserLock;
+import com.ieltspath.user.application.port.AccessTokenRevocationStore;
 import com.ieltspath.user.domain.aggregate.User;
 import com.ieltspath.user.domain.repository.UserRepository;
+import com.ieltspath.user.domain.repository.RefreshTokenRepository;
 import com.ieltspath.user.domain.vo.Email;
 import com.ieltspath.user.domain.vo.UserStatus;
 import org.junit.jupiter.api.Test;
@@ -17,9 +19,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -28,6 +33,10 @@ class ChangeUserStatusUseCaseTest {
     private UserRepository userRepository;
     @Mock
     private UserLock userLock;
+    @Mock
+    private RefreshTokenRepository refreshTokens;
+    @Mock
+    private AccessTokenRevocationStore accessTokens;
     @InjectMocks
     private ChangeUserStatusUseCase useCase;
 
@@ -47,6 +56,7 @@ class ChangeUserStatusUseCaseTest {
         User updated = useCase.execute(new ChangeUserStatusCommand(userId, UserStatus.LOCKED, UUID.randomUUID()));
 
         assertThat(updated.getStatus()).isEqualTo(UserStatus.LOCKED);
+        verify(refreshTokens).revokeAllActiveForUser(eq(userId), any(LocalDateTime.class), eq("ADMIN"));
     }
 
     @Test

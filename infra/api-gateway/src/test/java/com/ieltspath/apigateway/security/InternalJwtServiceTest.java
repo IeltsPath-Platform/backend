@@ -66,6 +66,21 @@ class InternalJwtServiceTest {
         assertThat(rawClaims).containsOnlyKeys("iss", "sub", "exp", "roles");
     }
 
+    @Test
+    void copiesTheSessionClaimIntoTheInternalToken() {
+        InternalJwtService service = new InternalJwtService(jwtEncoder(INTERNAL_SECRET), authProperties(List.of("/api/users")));
+        String sessionId = UUID.randomUUID().toString();
+        Jwt externalToken = Jwt.withTokenValue("external").header("alg", "HS256")
+                .issuer("urn:code-base:auth").expiresAt(Instant.now().plusSeconds(300))
+                .subject(UUID.randomUUID().toString()).claim("roles", List.of("CUSTOMER"))
+                .claim("sid", sessionId).build();
+
+        Jwt internal = NimbusJwtDecoder.withSecretKey(secretKey(INTERNAL_SECRET))
+                .macAlgorithm(MacAlgorithm.HS256).build().decode(service.createToken(externalToken));
+
+        assertThat(internal.getClaimAsString("sid")).isEqualTo(sessionId);
+    }
+
     private AuthProperties authProperties(List<String> internalJwtPaths) {
         return new AuthProperties(
                 "urn:code-base:auth",

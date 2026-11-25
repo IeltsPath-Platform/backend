@@ -12,10 +12,12 @@ import com.ieltspath.user.domain.exception.OAuthIdentityNotFoundException;
 import com.ieltspath.user.domain.exception.PhoneAlreadyExistsException;
 import com.ieltspath.user.domain.exception.RoleNotFoundException;
 import com.ieltspath.user.domain.exception.ResourceNotFoundException;
+import com.ieltspath.user.domain.exception.SessionNotFoundException;
 import com.ieltspath.user.domain.exception.UserNotFoundException;
 import com.ieltspath.user.domain.exception.UserManagementRuleViolationException;
 import com.ieltspath.user.domain.exception.PasswordChangeException;
 import com.ieltspath.user.domain.exception.PasswordNotConfiguredException;
+import com.ieltspath.user.domain.exception.WeakPasswordException;
 import com.ieltspath.user.application.exception.AvatarUploadRateLimitException;
 import com.ieltspath.user.application.exception.LoginLimiterUnavailableException;
 import com.ieltspath.user.application.exception.LoginRateLimitedException;
@@ -23,6 +25,11 @@ import com.ieltspath.user.application.exception.GoogleAccountConflictException;
 import com.ieltspath.user.application.exception.GoogleEmailNotSupportedException;
 import com.ieltspath.user.application.exception.GoogleSignInNotAllowedException;
 import com.ieltspath.user.application.exception.GoogleSignInUnavailableException;
+import com.ieltspath.user.application.exception.GoogleIdTokenInvalidException;
+import com.ieltspath.user.application.exception.ReauthAccountMismatchException;
+import com.ieltspath.user.application.exception.ReauthRequiredException;
+import com.ieltspath.user.application.exception.PasswordAlreadySetException;
+import com.ieltspath.user.application.exception.ReauthUnavailableException;
 import com.ieltspath.commonstorage.UploadRejectedException;
 import com.ieltspath.commonstorage.StorageException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -62,6 +69,12 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.NOT_FOUND, exception.getMessage(), request, null);
     }
 
+    @ExceptionHandler(SessionNotFoundException.class)
+    ResponseEntity<ErrorResponse> handleSessionNotFound(SessionNotFoundException exception, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(errorBody(HttpStatus.NOT_FOUND, exception.getMessage(), request, null, "SESSION_NOT_FOUND"));
+    }
+
     @ExceptionHandler({EmailAlreadyExistsException.class, PhoneAlreadyExistsException.class,
             ConflictException.class, PasswordNotConfiguredException.class})
     ResponseEntity<ErrorResponse> handleConflict(RuntimeException exception, HttpServletRequest request) {
@@ -72,6 +85,13 @@ public class GlobalExceptionHandler {
     ResponseEntity<ErrorResponse> handlePasswordChange(PasswordChangeException exception, HttpServletRequest request) {
         HttpStatus status = exception.isRateLimited() ? HttpStatus.TOO_MANY_REQUESTS : HttpStatus.BAD_REQUEST;
         return error(status, exception.getMessage(), request, Map.of("code", exception.getCode()));
+    }
+
+    @ExceptionHandler(WeakPasswordException.class)
+    ResponseEntity<ErrorResponse> handleWeakPassword(WeakPasswordException exception, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(errorBody(HttpStatus.BAD_REQUEST, exception.getMessage(), request,
+                        Map.of("reasons", String.join(",", exception.reasons())), "WEAK_PASSWORD"));
     }
 
     @ExceptionHandler(UploadRejectedException.class)
@@ -118,6 +138,39 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AuthenticationFailedException.class)
     ResponseEntity<ErrorResponse> handleAuthenticationFailed(AuthenticationFailedException exception, HttpServletRequest request) {
         return error(HttpStatus.UNAUTHORIZED, exception.getMessage(), request, null);
+    }
+
+    @ExceptionHandler(GoogleIdTokenInvalidException.class)
+    ResponseEntity<ErrorResponse> handleInvalidGoogleToken(GoogleIdTokenInvalidException exception, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(errorBody(HttpStatus.UNAUTHORIZED, exception.getMessage(), request, null, "GOOGLE_ID_TOKEN_INVALID"));
+    }
+
+    @ExceptionHandler(ReauthRequiredException.class)
+    ResponseEntity<ErrorResponse> handleReauthRequired(ReauthRequiredException exception, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(errorBody(HttpStatus.FORBIDDEN, exception.getMessage(), request, null, "REAUTH_REQUIRED"));
+    }
+
+    @ExceptionHandler(ReauthAccountMismatchException.class)
+    ResponseEntity<ErrorResponse> handleReauthAccountMismatch(ReauthAccountMismatchException exception,
+                                                               HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(errorBody(HttpStatus.FORBIDDEN, exception.getMessage(), request, null, "REAUTH_ACCOUNT_MISMATCH"));
+    }
+
+    @ExceptionHandler(PasswordAlreadySetException.class)
+    ResponseEntity<ErrorResponse> handlePasswordAlreadySet(PasswordAlreadySetException exception,
+                                                            HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(errorBody(HttpStatus.CONFLICT, exception.getMessage(), request, null, "PASSWORD_ALREADY_SET"));
+    }
+
+    @ExceptionHandler(ReauthUnavailableException.class)
+    ResponseEntity<ErrorResponse> handleReauthUnavailable(ReauthUnavailableException exception,
+                                                            HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(errorBody(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage(), request, null, "REAUTH_UNAVAILABLE"));
     }
 
     @ExceptionHandler({GoogleSignInNotAllowedException.class, GoogleEmailNotSupportedException.class})
@@ -171,7 +224,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(AccessDeniedException.class)
     ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException exception, HttpServletRequest request) {
-        return error(HttpStatus.FORBIDDEN, "Forbidden", request, null);
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(errorBody(HttpStatus.FORBIDDEN, "Bạn không có quyền thực hiện thao tác này.", request,
+                        null, "FORBIDDEN"));
     }
 
     @ExceptionHandler({

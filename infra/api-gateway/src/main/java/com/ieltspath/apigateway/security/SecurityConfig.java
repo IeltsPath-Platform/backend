@@ -49,7 +49,7 @@ import java.util.List;
 import java.util.Set;
 
 @Configuration
-@EnableConfigurationProperties({PublicEndpointProperties.class, AuthProperties.class})
+@EnableConfigurationProperties({PublicEndpointProperties.class, AuthProperties.class, RevocationProperties.class})
 public class SecurityConfig {
 
     private static final List<HttpMethod> CORS_METHODS = List.of(
@@ -242,6 +242,7 @@ public class SecurityConfig {
                 status.getReasonPhrase(),
                 message,
                 exchange.getRequest().getPath().value(),
+                null,
                 null
         );
 

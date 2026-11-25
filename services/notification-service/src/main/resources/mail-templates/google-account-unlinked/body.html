@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="vi">
+<head><meta charset="UTF-8"><title>Liên kết Google đã bị gỡ</title></head>
+<body>
+<th:block th:replace="~{_layout :: header}"></th:block>
+<p>Xin chào <span th:text="${displayName}">bạn</span>,</p>
+<p>Liên kết Google với tài khoản IELTSPath của bạn vừa được gỡ. Bạn sẽ không thể đăng nhập bằng Google cho đến khi liên kết lại.</p>
+<p>Nếu đây không phải bạn thực hiện, hãy đổi mật khẩu và liên hệ đội ngũ hỗ trợ ngay.</p>
+<th:block th:replace="~{_layout :: footer}"></th:block>
+</body>
+</html>

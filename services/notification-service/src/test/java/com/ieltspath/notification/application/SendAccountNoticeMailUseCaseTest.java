@@ -1,6 +1,7 @@
 package com.ieltspath.notification.application;
 
 import com.ieltspath.events.user.GoogleAccountLinkedV1;
+import com.ieltspath.events.user.GoogleAccountUnlinkedV1;
 import com.ieltspath.events.user.PasswordResetGoogleOnlyV1;
 import com.ieltspath.events.user.PasswordChangedV1;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,6 +37,7 @@ class SendAccountNoticeMailUseCaseTest {
         useCase = new SendAccountNoticeMailUseCase(renderer, sender, deliveries);
         ReflectionTestUtils.setField(useCase, "passwordChangedEnabled", true);
         ReflectionTestUtils.setField(useCase, "googleAccountLinkedEnabled", true);
+        ReflectionTestUtils.setField(useCase, "googleAccountUnlinkedEnabled", true);
         ReflectionTestUtils.setField(useCase, "passwordResetGoogleOnlyEnabled", true);
     }
 
@@ -71,6 +73,19 @@ class SendAccountNoticeMailUseCaseTest {
 
         when(deliveries.exists(eventId, "google-account-linked")).thenReturn(true);
         useCase.googleAccountLinked(googleLinked(eventId));
+        verify(sender, org.mockito.Mockito.times(1)).send(any(), any());
+    }
+
+    @Test
+    void googleAccountUnlinkedSendsOnceAndSkipsDuplicate() {
+        UUID eventId = UUID.randomUUID();
+        when(deliveries.exists(eventId, "google-account-unlinked")).thenReturn(false);
+        useCase.googleAccountUnlinked(googleUnlinked(eventId));
+        verify(renderer).render(eq(MailTemplate.GOOGLE_ACCOUNT_UNLINKED), anyMap());
+        verify(sender).send("learner@example.test", RENDERED);
+
+        when(deliveries.exists(eventId, "google-account-unlinked")).thenReturn(true);
+        useCase.googleAccountUnlinked(googleUnlinked(eventId));
         verify(sender, org.mockito.Mockito.times(1)).send(any(), any());
     }
 
@@ -157,6 +172,11 @@ class SendAccountNoticeMailUseCaseTest {
 
     private GoogleAccountLinkedV1 googleLinked(UUID eventId) {
         return new GoogleAccountLinkedV1(eventId, GoogleAccountLinkedV1.EVENT_TYPE, Instant.now(), UUID.randomUUID(),
+                "learner@example.test", "An");
+    }
+
+    private GoogleAccountUnlinkedV1 googleUnlinked(UUID eventId) {
+        return new GoogleAccountUnlinkedV1(eventId, GoogleAccountUnlinkedV1.EVENT_TYPE, Instant.now(), UUID.randomUUID(),
                 "learner@example.test", "An");
     }
 }

@@ -12,6 +12,7 @@ import com.ieltspath.user.api.dto.request.VerifyEmailRequest;
 import com.ieltspath.user.api.dto.response.AuthTokenResponse;
 import com.ieltspath.user.api.dto.response.CurrentUserResponse;
 import com.ieltspath.user.api.dto.response.MessageResponse;
+import com.ieltspath.user.api.dto.response.GoogleNonceResponse;
 import com.ieltspath.user.application.command.ForgotPasswordCommand;
 import com.ieltspath.user.application.command.ResetPasswordCommand;
 import com.ieltspath.user.application.command.LoginContext;
@@ -24,6 +25,8 @@ import com.ieltspath.user.application.usecase.AuditedLoginUseCase;
 import com.ieltspath.user.application.usecase.LogoutUseCase;
 import com.ieltspath.user.application.usecase.RefreshTokenUseCase;
 import com.ieltspath.user.application.usecase.EmailVerificationUseCase;
+import com.ieltspath.user.application.port.GoogleNonceStore;
+import com.ieltspath.user.application.exception.GoogleSignInUnavailableException;
 import com.ieltspath.user.application.usecase.ResetPasswordUseCase;
 import com.ieltspath.user.api.cookie.AuthCookieService;
 import com.ieltspath.user.api.request.LoginContextResolver;
@@ -38,6 +41,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ResponseEntity;
 
 import java.util.List;
 
@@ -55,6 +60,17 @@ public class AuthController {
     private final GetUserByIdUseCase getUserByIdUseCase;
     private final CurrentUserProvider currentUserProvider;
     private final AuthCookieService authCookieService;
+    private final GoogleNonceStore googleNonceStore;
+
+    @PostMapping("/google/nonce")
+    public ResponseEntity<GoogleNonceResponse> googleNonce() {
+        try {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(new GoogleNonceResponse(googleNonceStore.issue(), 300));
+        } catch (RuntimeException unavailable) {
+            throw new GoogleSignInUnavailableException(unavailable);
+        }
+    }
 
     @PostMapping("/forgot-password")
     public MessageResponse forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
@@ -116,12 +132,13 @@ public class AuthController {
     public AuthTokenResponse refresh(
             @CookieValue(name = "${app.auth.cookie.refresh-token-name:refresh_token}", required = false) String cookieRefreshToken,
             @RequestBody(required = false) RefreshRequest request,
+            HttpServletRequest httpRequest,
             HttpServletResponse response
     ) {
         String token = (cookieRefreshToken != null && !cookieRefreshToken.isBlank())
                 ? cookieRefreshToken
                 : (request == null ? null : request.refreshToken());
-        AuthTokenResult tokens = refreshTokenUseCase.execute(token);
+        AuthTokenResult tokens = refreshTokenUseCase.execute(token, LoginContextResolver.from(httpRequest));
         authCookieService.addAuthCookies(
                 response,
                 tokens.accessToken(),

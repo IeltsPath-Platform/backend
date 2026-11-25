@@ -3,11 +3,13 @@ package com.ieltspath.apigateway;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.env.YamlPropertySourceLoader;
 import org.springframework.core.env.PropertySource;
+import org.springframework.core.env.EnumerablePropertySource;
 import org.springframework.core.io.FileSystemResource;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Arrays;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -34,7 +36,8 @@ class LearningRouteConfigTest {
         PropertySource<?> yaml = gatewayYaml();
         int learningIndex = -1;
         boolean hasJwtPrefix = false;
-        for (int index = 0; index < 30; index++) {
+        for (int index = 0; index < indexedPropertyCount(yaml,
+                "spring.cloud.gateway.server.webflux.routes"); index++) {
             String route = "spring.cloud.gateway.server.webflux.routes[" + index + "]";
             Object id = yaml.getProperty(route + ".id");
             if ("learning-service".equals(id)) learningIndex = index;
@@ -54,7 +57,8 @@ class LearningRouteConfigTest {
         String routes = "spring.cloud.gateway.server.webflux.routes[";
         boolean learningRoute = false;
         boolean assessmentRoute = false;
-        for (int index = 0; index < 30; index++) {
+        for (int index = 0; index < indexedPropertyCount(yaml,
+                "spring.cloud.gateway.server.webflux.routes"); index++) {
             Object id = yaml.getProperty(routes + index + "].id");
             Object predicate = yaml.getProperty(routes + index + "].predicates[0]");
             if ("learning-service".equals(id)
@@ -66,7 +70,7 @@ class LearningRouteConfigTest {
         assertTrue(assessmentRoute, "All new assessment endpoints must match the assessment service route");
 
         List<String> internalJwtPaths = new java.util.ArrayList<>();
-        for (int index = 0; index < 30; index++) {
+        for (int index = 0; index < indexedPropertyCount(yaml, "app.auth.internal-jwt-paths"); index++) {
             Object path = yaml.getProperty("app.auth.internal-jwt-paths[" + index + "]");
             if (path instanceof String value) internalJwtPaths.add(value);
         }
@@ -78,6 +82,27 @@ class LearningRouteConfigTest {
 
     private static boolean hasProtectedPrefix(String path, List<String> prefixes) {
         return prefixes.stream().anyMatch(prefix -> path.equals(prefix) || path.startsWith(prefix + "/"));
+    }
+
+    private static int indexedPropertyCount(PropertySource<?> source, String prefix) {
+        if (!(source instanceof EnumerablePropertySource<?> enumerable)) {
+            throw new AssertionError("Gateway YAML source must expose its property names");
+        }
+        String indexedPrefix = prefix + "[";
+        return Arrays.stream(enumerable.getPropertyNames())
+                .filter(name -> name.startsWith(indexedPrefix))
+                .mapToInt(name -> {
+                    int start = indexedPrefix.length();
+                    int end = name.indexOf(']', start);
+                    if (end < 0) return -1;
+                    try {
+                        return Integer.parseInt(name.substring(start, end));
+                    } catch (NumberFormatException ignored) {
+                        return -1;
+                    }
+                })
+                .max()
+                .orElse(-1) + 1;
     }
 
     private static PropertySource<?> gatewayYaml() throws Exception {

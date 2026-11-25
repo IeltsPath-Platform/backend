@@ -8,8 +8,8 @@ class PasswordPolicyTest {
 
     @Test
     void countsCharactersForTheMinimum() {
-        assertThat(PasswordPolicy.isWithinLimits("a".repeat(5))).isFalse();
-        assertThat(PasswordPolicy.isWithinLimits("a".repeat(6))).isTrue();
+        assertThat(PasswordPolicy.isWithinLimits("a".repeat(7))).isFalse();
+        assertThat(PasswordPolicy.isWithinLimits("a".repeat(8))).isTrue();
     }
 
     @Test

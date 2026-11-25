@@ -10,7 +10,9 @@ public record AuthTokenProperties(
         @NotBlank String externalJwtIssuer,
         @NotBlank String externalJwtSecret,
         long accessTokenMaxAgeSeconds,
-        long refreshTokenMaxAgeSeconds
+        long refreshTokenMaxAgeSeconds,
+        long refreshReuseGraceSeconds,
+        long sessionMaxAgeSeconds
 ) {
     public AuthTokenProperties {
         requireConfigured(externalJwtIssuer, "app.auth.external-jwt-issuer");
@@ -20,6 +22,12 @@ public record AuthTokenProperties(
         }
         if (refreshTokenMaxAgeSeconds <= 0) {
             refreshTokenMaxAgeSeconds = 604800;
+        }
+        if (refreshReuseGraceSeconds <= 0) {
+            refreshReuseGraceSeconds = 10;
+        }
+        if (sessionMaxAgeSeconds < 0) {
+            sessionMaxAgeSeconds = 0;
         }
     }
 

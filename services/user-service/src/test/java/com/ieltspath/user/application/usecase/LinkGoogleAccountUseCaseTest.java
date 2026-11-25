@@ -7,6 +7,7 @@ import com.ieltspath.user.application.exception.GoogleAccountNotActiveException;
 import com.ieltspath.user.application.exception.GoogleEmailNotSupportedException;
 import com.ieltspath.user.application.exception.GoogleSignInNotAllowedException;
 import com.ieltspath.user.application.port.UserLock;
+import com.ieltspath.user.application.port.AccessTokenRevocationStore;
 import com.ieltspath.user.application.result.AuthTokenResult;
 import com.ieltspath.user.application.result.GoogleIdentity;
 import com.ieltspath.user.domain.aggregate.OAuthIdentity;
@@ -35,6 +36,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.lenient;
@@ -50,6 +52,7 @@ class LinkGoogleAccountUseCaseTest {
     @Mock UserLock userLock;
     @Mock AuthTokenIssuer tokenIssuer;
     @Mock UserNoticeOutbox notices;
+    @Mock AccessTokenRevocationStore accessTokens;
 
     private LinkGoogleAccountUseCase useCase;
     private final UUID userId = UUID.randomUUID();
@@ -58,7 +61,7 @@ class LinkGoogleAccountUseCaseTest {
 
     @BeforeEach
     void setUp() {
-        useCase = new LinkGoogleAccountUseCase(users, identities, roles, refreshTokens, userLock, tokenIssuer, notices);
+        useCase = new LinkGoogleAccountUseCase(users, identities, roles, refreshTokens, userLock, tokenIssuer, notices, accessTokens);
         lenient().when(users.findById(userId)).thenReturn(Optional.of(customerWithPassword));
         lenient().when(tokenIssuer.issue(any(User.class))).thenReturn(tokens);
         lenient().when(identities.save(any(OAuthIdentity.class))).thenAnswer(call -> call.getArgument(0));
@@ -78,7 +81,7 @@ class LinkGoogleAccountUseCaseTest {
         assertThat(customerWithPassword.getPasswordHash()).isEqualTo("hash");
         verify(userLock).lock(userId);
         verify(users, never()).clearPasswordHash(userId);
-        verify(refreshTokens, never()).revokeAllActiveForUser(eq(userId), any());
+        verify(refreshTokens, never()).revokeAllActiveForUser(eq(userId), any(), anyString());
         verify(notices).enqueue(any(), eq(userId), eq(GoogleAccountLinkedV1.EVENT_TYPE), any());
         verify(notices, never()).enqueue(any(), eq(userId), eq(UserEmailVerificationStateV1.EVENT_TYPE), any());
         ArgumentCaptor<OAuthIdentity> identity = ArgumentCaptor.forClass(OAuthIdentity.class);
@@ -103,7 +106,7 @@ class LinkGoogleAccountUseCaseTest {
         assertThat(unverified.isEmailVerified()).isTrue();
         assertThat(unverified.getPasswordHash()).isNull();
         verify(users).clearPasswordHash(userId);
-        verify(refreshTokens).revokeAllActiveForUser(eq(userId), any());
+        verify(refreshTokens).revokeAllActiveForUser(eq(userId), any(), eq("GOOGLE_LINK"));
         verify(users).save(unverified);
         verify(notices).enqueue(any(), eq(userId), eq(UserEmailVerificationStateV1.EVENT_TYPE), any());
         verify(notices).enqueue(any(), eq(userId), eq(GoogleAccountLinkedV1.EVENT_TYPE), any());
@@ -124,7 +127,7 @@ class LinkGoogleAccountUseCaseTest {
         verify(users).save(created.capture());
         assertThat(created.getValue().getPasswordHash()).isNull();
         assertThat(created.getValue().getRoles()).extracting(Role::getName).containsExactly(RoleName.CUSTOMER);
-        verify(refreshTokens, never()).revokeAllActiveForUser(eq(userId), any());
+        verify(refreshTokens, never()).revokeAllActiveForUser(eq(userId), any(), anyString());
         verify(notices).enqueue(any(), eq(userId), eq(UserEmailVerificationStateV1.EVENT_TYPE), any());
         verify(notices, never()).enqueue(any(), any(), eq(GoogleAccountLinkedV1.EVENT_TYPE), any());
     }
@@ -135,6 +138,22 @@ class LinkGoogleAccountUseCaseTest {
                 "sub", "person@hotmail.com", "Person", null)))
                 .isInstanceOf(GoogleEmailNotSupportedException.class);
         verify(users, never()).findByEmail(any());
+    }
+
+    @Test
+    void acceptsAnAlreadyLinkedSubjectWhenItsCurrentEmailDomainIsUnsupported() {
+        OAuthIdentity linked = OAuthIdentity.builder().userId(userId).provider(OAuthProvider.GOOGLE)
+                .providerSubject("google-sub").build();
+        when(identities.findByProviderAndProviderSubject(OAuthProvider.GOOGLE, "google-sub"))
+                .thenReturn(Optional.of(linked));
+        when(identities.findByUserIdAndProvider(userId, OAuthProvider.GOOGLE)).thenReturn(Optional.of(linked));
+
+        var result = useCase.execute(new GoogleIdentity("google-sub", "person@unsupported.example", "Person", null));
+
+        assertThat(result.userId()).isEqualTo(userId);
+        assertThat(customerWithPassword.getEmail().value()).isEqualTo("learner@gmail.com");
+        verify(users, never()).findByEmail(any());
+        verify(users, never()).save(any());
     }
 
     @Test

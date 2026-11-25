@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class AuthRequestValidationTest {
 
-    private static final String PASSWORD_MESSAGE = "Mật khẩu phải có từ 6 đến 72 byte (chữ có dấu tính nhiều byte hơn)";
+    private static final String PASSWORD_MESSAGE = "Mật khẩu phải có từ 8 đến 72 ký tự (chữ có dấu tính nhiều byte hơn)";
     private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 
     @Test
@@ -36,7 +36,8 @@ class AuthRequestValidationTest {
         assertThat(messages(validator.validate(register("a".repeat(73), "Learner", null)))).containsExactly(PASSWORD_MESSAGE);
         assertThat(validator.validate(register("ậ".repeat(24), "Learner", null))).isEmpty();
         assertThat(messages(validator.validate(register("ậ".repeat(25), "Learner", null)))).containsExactly(PASSWORD_MESSAGE);
-        assertThat(messages(validator.validate(register("a".repeat(5), "Learner", null)))).containsExactly(PASSWORD_MESSAGE);
+        assertThat(messages(validator.validate(register("a".repeat(7), "Learner", null)))).containsExactly(PASSWORD_MESSAGE);
+        assertThat(validator.validate(register("a".repeat(8), "Learner", null))).isEmpty();
     }
 
     @Test

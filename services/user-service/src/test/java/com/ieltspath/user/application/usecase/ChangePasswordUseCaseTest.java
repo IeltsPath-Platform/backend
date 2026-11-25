@@ -2,6 +2,7 @@ package com.ieltspath.user.application.usecase;
 
 import com.ieltspath.user.application.command.ChangePasswordCommand;
 import com.ieltspath.user.application.port.UserLock;
+import com.ieltspath.user.application.port.AccessTokenRevocationStore;
 import com.ieltspath.user.domain.aggregate.PasswordChangeAttempts;
 import com.ieltspath.user.domain.aggregate.User;
 import com.ieltspath.user.domain.exception.PasswordChangeException;
@@ -41,6 +42,7 @@ class ChangePasswordUseCaseTest {
     @Mock PasswordEncoder encoder;
     @Mock UserLock userLock;
     @Mock UserNoticeOutbox notices;
+    @Mock AccessTokenRevocationStore accessTokens;
 
     private final Map<UUID, PasswordChangeAttempts> stored = new HashMap<>();
     private ChangePasswordUseCase useCase;
@@ -51,7 +53,8 @@ class ChangePasswordUseCaseTest {
             @Override public Optional<PasswordChangeAttempts> findByUserId(UUID userId) { return Optional.ofNullable(stored.get(userId)); }
             @Override public void save(PasswordChangeAttempts attempts) { stored.put(attempts.getUserId(), attempts); }
             @Override public void deleteByUserId(UUID userId) { stored.remove(userId); }
-        }, notices);
+        }, notices, new PasswordPolicyService(password -> false,
+                new com.ieltspath.user.config.AuthPasswordProperties(8, 12)), accessTokens);
     }
 
     private User userWithHash(UUID id) {
@@ -71,7 +74,8 @@ class ChangePasswordUseCaseTest {
         useCase.execute(new ChangePasswordCommand(id, "old-password", "next-password"));
 
         assertEquals("new-hash", user.getPasswordHash());
-        verify(tokens).revokeAllActiveForUser(eq(id), any());
+        verify(tokens).revokeAllActiveForUser(eq(id), any(), eq("PASSWORD_CHANGE"));
+        verify(accessTokens).revokeUser(eq(id), any());
         assertTrue(stored.isEmpty());
     }
 
@@ -149,7 +153,7 @@ class ChangePasswordUseCaseTest {
         UUID id = UUID.randomUUID();
         var error = assertThrows(IllegalArgumentException.class,
                 () -> useCase.execute(new ChangePasswordCommand(id, "old-password", "ậ".repeat(25))));
-        assertEquals("Mật khẩu phải có từ 6 đến 72 byte (chữ có dấu tính nhiều byte hơn)", error.getMessage());
+        assertEquals("Mật khẩu phải có từ 8 đến 72 ký tự (chữ có dấu tính nhiều byte hơn)", error.getMessage());
         verifyNoInteractions(userLock, users, tokens, encoder);
         assertTrue(stored.isEmpty());
     }

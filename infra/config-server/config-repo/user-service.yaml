@@ -43,14 +43,26 @@ app:
     avatar:
       bucket: ${USER_AVATAR_BUCKET:avatars}
   auth:
+    password:
+      min-length: ${APP_AUTH_PASSWORD_MIN_LENGTH:8}
+      bcrypt-cost: ${APP_AUTH_PASSWORD_BCRYPT_COST:12}
     google:
       client-ids: ${GOOGLE_CLIENT_IDS:}
+      max-token-age-seconds: ${APP_AUTH_GOOGLE_MAX_TOKEN_AGE_SECONDS:300}
+      require-nonce: ${APP_AUTH_GOOGLE_REQUIRE_NONCE:false}
+    reauth-required-for-unlink: ${APP_AUTH_REAUTH_REQUIRED_FOR_UNLINK:false}
     external-jwt-issuer: ${EXTERNAL_JWT_ISSUER:urn:code-base:auth}
     external-jwt-secret: ${EXTERNAL_JWT_SECRET}
     internal-jwt-issuer: ${INTERNAL_JWT_ISSUER:urn:code-base:api-gateway}
     internal-jwt-secret: ${GATEWAY_INTERNAL_JWT_SECRET}
     access-token-max-age-seconds: ${ACCESS_TOKEN_MAX_AGE_SECONDS:3600}
     refresh-token-max-age-seconds: ${REFRESH_TOKEN_MAX_AGE_SECONDS:604800}
+    refresh-reuse-grace-seconds: ${APP_AUTH_REFRESH_REUSE_GRACE_SECONDS:10}
+    session-max-age-seconds: ${APP_AUTH_SESSION_MAX_AGE_SECONDS:0}
+    audit:
+      retention-days: ${APP_AUTH_AUDIT_RETENTION_DAYS:365}
+      batch-size: ${APP_AUTH_AUDIT_BATCH_SIZE:500}
+      purge-cron: ${APP_AUTH_AUDIT_PURGE_CRON:0 40 3 * * *}
     cookie:
       enabled: ${APP_AUTH_COOKIE_ENABLED:true}
       access-token-name: ${APP_AUTH_COOKIE_ACCESS_TOKEN_NAME:access_token}
@@ -60,6 +72,7 @@ app:
       same-site: ${APP_AUTH_COOKIE_SAME_SITE:LAX}
       secure: ${APP_AUTH_COOKIE_SECURE:false}
       http-only: ${APP_AUTH_COOKIE_HTTP_ONLY:true}
+      enforce-secure: ${APP_AUTH_COOKIE_ENFORCE_SECURE:false}
   security:
     public-endpoints:
       - method: POST
@@ -72,6 +85,7 @@ app:
           - /auth/verify-email
           - /auth/resend-verification
           - /auth/google
+          - /auth/google/nonce
           - /api/users/register
       - method: GET
         patterns:

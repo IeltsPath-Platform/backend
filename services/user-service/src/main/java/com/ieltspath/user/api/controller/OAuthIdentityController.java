@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestHeader;
 
 import java.util.List;
 import java.util.UUID;
@@ -34,9 +35,11 @@ public class OAuthIdentityController {
     }
 
     @DeleteMapping("/me/oauth/{provider}")
-    public MessageResponse unlinkMyOAuthIdentity(@PathVariable("provider") String provider) {
+    public MessageResponse unlinkMyOAuthIdentity(@PathVariable("provider") String provider,
+            @RequestHeader(name = "X-Reauth-Token", required = false) String reauthToken) {
         UUID userId = currentUserProvider.requireUserId();
-        unlinkOAuthIdentityUseCase.execute(userId, provider);
+        unlinkOAuthIdentityUseCase.execute(userId, provider, reauthToken,
+                currentUserProvider.currentSessionId().orElse(null));
         return new MessageResponse("Hủy liên kết tài khoản OAuth thành công");
     }
 

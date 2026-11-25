@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Base64;
+import java.util.UUID;
+import com.ieltspath.user.application.command.LoginContext;
 
 @Service
 @RequiredArgsConstructor
@@ -24,19 +26,40 @@ public class AuthTokenIssuer {
     private final SecureRandom secureRandom = new SecureRandom();
 
     public AuthTokenResult issue(User user) {
-        String accessToken = jwtTokenService.createAccessToken(user);
+        UUID familyId = UUID.randomUUID();
+        LocalDateTime startedAt = LocalDateTime.now();
+        return issue(user, familyId, startedAt, LoginContext.UNKNOWN);
+    }
+
+    public AuthTokenResult issue(User user, UUID familyId, LocalDateTime sessionStartedAt, LoginContext context) {
+        String accessToken = jwtTokenService.createAccessToken(user, familyId);
         String refreshToken = newRefreshToken();
-        refreshTokenRepository.save(RefreshToken.builder()
+        RefreshToken stored = refreshTokenRepository.save(RefreshToken.builder()
                 .userId(user.getId())
                 .tokenHash(tokenHashService.hash(refreshToken))
                 .expiresAt(LocalDateTime.now().plusSeconds(properties.refreshTokenMaxAgeSeconds()))
+                .familyId(familyId)
+                .sessionStartedAt(sessionStartedAt)
+                .lastUsedAt(LocalDateTime.now())
+                .ipAddress(context.ipAddress())
+                .userAgent(context.userAgent())
                 .build());
         return new AuthTokenResult(
                 accessToken,
                 refreshToken,
                 properties.accessTokenMaxAgeSeconds(),
-                properties.refreshTokenMaxAgeSeconds()
+                properties.refreshTokenMaxAgeSeconds(),
+                stored.getId()
         );
+    }
+
+    public long reuseGraceSeconds() {
+        return properties.refreshReuseGraceSeconds();
+    }
+
+    public boolean sessionExpired(LocalDateTime startedAt, LocalDateTime now) {
+        long maximum = properties.sessionMaxAgeSeconds();
+        return maximum > 0 && startedAt != null && startedAt.plusSeconds(maximum).isBefore(now);
     }
 
     private String newRefreshToken() {

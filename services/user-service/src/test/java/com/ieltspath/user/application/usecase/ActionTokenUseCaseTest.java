@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.user.application.command.ForgotPasswordCommand;
 import com.ieltspath.user.application.command.ResetPasswordCommand;
 import com.ieltspath.user.application.port.UserLock;
+import com.ieltspath.user.application.port.AccessTokenRevocationStore;
 import com.ieltspath.events.user.PasswordResetGoogleOnlyV1;
 import com.ieltspath.user.domain.aggregate.AccountActionToken;
 import com.ieltspath.user.domain.aggregate.OAuthIdentity;
@@ -33,6 +34,7 @@ import java.util.TimeZone;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -52,6 +54,7 @@ class ActionTokenUseCaseTest {
     @Mock private RefreshTokenRepository refreshTokenRepository;
     @Mock private UserNoticeOutbox notices;
     @Mock private OAuthIdentityRepository oauthIdentityRepository;
+    @Mock private AccessTokenRevocationStore accessTokens;
 
     private ForgotPasswordUseCase forgotPasswordUseCase;
     private ResetPasswordUseCase resetPasswordUseCase;
@@ -64,7 +67,8 @@ class ActionTokenUseCaseTest {
                 outboxEventRepository, tokenHashService, userLock, new ObjectMapper().findAndRegisterModules(),
                 oauthIdentityRepository, notices);
         resetPasswordUseCase = new ResetPasswordUseCase(userRepository, accountActionTokenRepository, tokenHashService,
-                passwordEncoder, userLock, refreshTokenRepository, notices);
+                passwordEncoder, userLock, refreshTokenRepository, notices, accessTokens,
+                new PasswordPolicyService(password -> false, new com.ieltspath.user.config.AuthPasswordProperties(8, 12)));
         getActionTokensByUserIdUseCase = new GetActionTokensByUserIdUseCase(accountActionTokenRepository);
         revokeUserActionTokensUseCase = new RevokeUserActionTokensUseCase(accountActionTokenRepository);
     }
@@ -137,6 +141,26 @@ class ActionTokenUseCaseTest {
     }
 
     @Test
+    void anAccountThatSetsAPasswordAgainCanUseThePasswordResetFlow() {
+        UUID userId = UUID.randomUUID();
+        User restored = User.builder().id(userId).email(new Email("restored@gmail.com")).passwordHash("old")
+                .status(UserStatus.ACTIVE).build();
+        restored.clearPassword();
+        restored.changePassword("new-hash");
+        when(userRepository.findByEmail("restored@gmail.com")).thenReturn(Optional.of(restored));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(restored));
+        when(accountActionTokenRepository.findLatestCreatedAt(userId, ActionTokenPurpose.PASSWORD_RESET)).thenReturn(Optional.empty());
+        when(tokenHashService.hash(any(String.class))).thenReturn("hashed-token");
+
+        forgotPasswordUseCase.execute(new ForgotPasswordCommand("restored@gmail.com"));
+
+        assertFalse(restored.hasNeverHadPassword());
+        verify(accountActionTokenRepository).save(any());
+        verify(outboxEventRepository).save(any());
+        verify(notices, never()).enqueue(any(), any(), any(), any());
+    }
+
+    @Test
     void anAccountWithAPasswordAndGoogleLinkedStillGetsAResetLink() {
         UUID userId = UUID.randomUUID();
         User both = User.builder().id(userId).email(new Email("b@gmail.com")).passwordHash("hash")
@@ -193,7 +217,7 @@ class ActionTokenUseCaseTest {
         verify(accountActionTokenRepository).consumePasswordResetToken(eq("token-hash"), any(LocalDateTime.class));
         verify(userRepository).save(user);
         verify(userLock).lock(userId);
-        verify(refreshTokenRepository).revokeAllActiveForUser(eq(userId), any(LocalDateTime.class));
+        verify(refreshTokenRepository).revokeAllActiveForUser(eq(userId), any(LocalDateTime.class), eq("PASSWORD_RESET"));
     }
 
     @Test

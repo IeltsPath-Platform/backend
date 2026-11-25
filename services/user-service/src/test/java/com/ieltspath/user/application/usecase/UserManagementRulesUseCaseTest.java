@@ -8,7 +8,9 @@ import com.ieltspath.user.domain.aggregate.User;
 import com.ieltspath.user.domain.exception.UserManagementRuleViolationException;
 import com.ieltspath.user.domain.repository.RoleRepository;
 import com.ieltspath.user.application.port.UserLock;
+import com.ieltspath.user.application.port.AccessTokenRevocationStore;
 import com.ieltspath.user.domain.repository.UserRepository;
+import com.ieltspath.user.domain.repository.RefreshTokenRepository;
 import com.ieltspath.user.domain.vo.Email;
 import com.ieltspath.user.domain.vo.RoleName;
 import com.ieltspath.user.domain.vo.UserStatus;
@@ -23,9 +25,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -36,6 +40,8 @@ class UserManagementRulesUseCaseTest {
     @Mock RoleRepository roles;
     @Mock PasswordEncoder passwordEncoder;
     @Mock UserLock userLock;
+    @Mock AccessTokenRevocationStore accessTokens;
+    @Mock RefreshTokenRepository refreshTokens;
 
     private AssignRoleUseCase assignRole;
     private ChangeUserStatusUseCase changeStatus;
@@ -44,10 +50,11 @@ class UserManagementRulesUseCaseTest {
 
     @BeforeEach
     void setUp() {
-        assignRole = new AssignRoleUseCase(users, roles, userLock);
-        changeStatus = new ChangeUserStatusUseCase(users, userLock);
-        deleteUser = new DeleteUserUseCase(users, userLock);
-        createUser = new CreateUserUseCase(users, roles, passwordEncoder);
+        assignRole = new AssignRoleUseCase(users, roles, userLock, refreshTokens, accessTokens);
+        changeStatus = new ChangeUserStatusUseCase(users, userLock, refreshTokens, accessTokens);
+        deleteUser = new DeleteUserUseCase(users, userLock, refreshTokens, accessTokens);
+        createUser = new CreateUserUseCase(users, roles, passwordEncoder, new PasswordPolicyService(password -> false,
+                new com.ieltspath.user.config.AuthPasswordProperties(8, 12)));
     }
 
     @Test
@@ -146,6 +153,19 @@ class UserManagementRulesUseCaseTest {
         assertRule("LAST_ADMIN", () -> deleteUser.execute(adminId, UUID.randomUUID()));
 
         verify(users, never()).save(any());
+    }
+
+    @Test
+    void revokesActiveSessionsWhenDeletingAUser() {
+        UUID userId = UUID.randomUUID();
+        User user = user(userId, UserStatus.ACTIVE, Set.of(RoleName.CUSTOMER));
+        when(users.lockActiveAdminUserIds()).thenReturn(List.of());
+        when(users.findById(userId)).thenReturn(Optional.of(user));
+        when(users.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        deleteUser.execute(userId, UUID.randomUUID());
+
+        verify(refreshTokens).revokeAllActiveForUser(eq(userId), any(LocalDateTime.class), eq("ADMIN"));
     }
 
     private User user(UUID id, UserStatus status, Set<RoleName> roleNames) {

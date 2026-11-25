@@ -96,7 +96,7 @@ class OAuthIdentitySecurityTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Hủy liên kết tài khoản OAuth thành công"));
 
-        verify(unlinkOAuthIdentityUseCase).execute(userId, "GOOGLE");
+        verify(unlinkOAuthIdentityUseCase).execute(userId, "GOOGLE", null, null);
     }
 
     private String signedToken(String secret, UUID subject, String issuer, List<String> roles) {

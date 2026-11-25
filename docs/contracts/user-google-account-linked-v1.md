@@ -1,6 +1,6 @@
 # `user.google-account-linked.v1`
 
-User Service publishes this security notice on `user.events` when linking Google clears an existing password. Notification sends it to the account email; the event is not emitted for a link that does not clear a password.
+User Service publishes this security notice on `user.events` when a Google identity is newly linked to an existing account, whether or not the existing password is cleared. Notification sends it to the account email. The event is not emitted when a new account is created through Google sign-in.
 
 | Field | Type | Meaning |
 |---|---|---|

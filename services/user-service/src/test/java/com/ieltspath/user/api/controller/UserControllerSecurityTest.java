@@ -4,6 +4,8 @@ import com.ieltspath.commonsecurity.config.CommonSecurityAutoConfiguration;
 import com.ieltspath.user.application.command.UpdateUserCommand;
 import com.ieltspath.user.application.usecase.GetMyProfileUseCase;
 import com.ieltspath.user.application.usecase.RegisterUseCase;
+import com.ieltspath.user.application.command.RegisterCommand;
+import com.ieltspath.user.domain.exception.WeakPasswordException;
 import com.ieltspath.user.application.usecase.UpdateUserUseCase;
 import com.ieltspath.user.domain.aggregate.User;
 import com.ieltspath.user.domain.vo.Email;
@@ -39,6 +41,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -190,7 +193,20 @@ class UserControllerSecurityTest {
                 .content(body))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.details.password")
-                        .value("Mật khẩu phải có từ 6 đến 72 byte (chữ có dấu tính nhiều byte hơn)"));
+                        .value("Mật khẩu phải có từ 8 đến 72 ký tự (chữ có dấu tính nhiều byte hơn)"));
+    }
+
+    @Test
+    void registerRejectsACommonPasswordWithTheStableErrorCode() throws Exception {
+        doThrow(new WeakPasswordException(List.of("TOO_COMMON")))
+                .when(registerUseCase).execute(any(RegisterCommand.class));
+        mockMvc.perform(post("/api/users/register")
+                        .contentType("application/json")
+                        .content("{\"email\":\"common-password@example.com\",\"password\":\"password\",\"fullName\":\"Learner\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Mật khẩu chưa đủ mạnh."))
+                .andExpect(jsonPath("$.code").value("WEAK_PASSWORD"))
+                .andExpect(jsonPath("$.details.reasons").value("TOO_COMMON"));
     }
 
     @Test

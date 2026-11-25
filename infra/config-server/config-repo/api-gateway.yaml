@@ -77,7 +77,16 @@ spring:
             - id: user-auth-limited
               uri: lb://USER-SERVICE
               predicates:
-                - Path=/auth/login,/auth/refresh,/auth/forgot-password,/auth/reset-password,/auth/google,/auth/verify-email,/auth/resend-verification,/api/users/register
+                - Path=/auth/login,/auth/refresh,/auth/forgot-password,/auth/reset-password,/auth/google,/auth/google/nonce,/auth/verify-email,/auth/resend-verification,/api/users/register
+              filters:
+                - name: ClientRateLimit
+                  args:
+                    tier: auth
+
+            - id: user-reauth-limited
+              uri: lb://USER-SERVICE
+              predicates:
+                - Path=/api/users/me/reauth
               filters:
                 - name: ClientRateLimit
                   args:
@@ -374,6 +383,9 @@ app:
     frontend-origin: ${FRONTEND_ORIGIN:http://localhost:5173}
 
 gateway:
+  auth:
+    revocation:
+      fail-closed: ${GATEWAY_AUTH_REVOCATION_FAIL_CLOSED:false}
   rate-limit:
     trusted-proxies: []
     tiers:
@@ -389,6 +401,7 @@ gateway:
       - /auth/forgot-password
       - /auth/reset-password
       - /auth/google
+      - /auth/google/nonce
       - /auth/verify-email
       - /auth/resend-verification
       - /api/users/register

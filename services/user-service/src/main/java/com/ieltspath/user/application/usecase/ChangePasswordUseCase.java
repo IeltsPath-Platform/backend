@@ -3,6 +3,7 @@ package com.ieltspath.user.application.usecase;
 import com.ieltspath.events.user.PasswordChangedV1;
 import com.ieltspath.user.application.command.ChangePasswordCommand;
 import com.ieltspath.user.application.port.UserLock;
+import com.ieltspath.user.application.port.AccessTokenRevocationStore;
 import com.ieltspath.user.domain.aggregate.PasswordChangeAttempts;
 import com.ieltspath.user.domain.aggregate.User;
 import com.ieltspath.user.domain.exception.EmailNotVerifiedException;
@@ -12,7 +13,6 @@ import com.ieltspath.user.domain.exception.UserNotFoundException;
 import com.ieltspath.user.domain.repository.PasswordChangeAttemptRepository;
 import com.ieltspath.user.domain.repository.RefreshTokenRepository;
 import com.ieltspath.user.domain.repository.UserRepository;
-import com.ieltspath.user.domain.vo.PasswordPolicy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -21,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
+import com.ieltspath.user.application.port.AuthMetrics;
 
 @Service
 @RequiredArgsConstructor
@@ -31,6 +33,16 @@ public class ChangePasswordUseCase {
     private final UserLock userLock;
     private final PasswordChangeAttemptRepository attemptsRepository;
     private final UserNoticeOutbox notices;
+    private final PasswordPolicyService passwordPolicy;
+    private final AccessTokenRevocationStore accessTokens;
+    private AuthAuditSupport authAudit;
+    private AuthMetrics authMetrics;
+
+    @Autowired
+    void setAuthAudit(AuthAuditSupport authAudit) { this.authAudit = authAudit; }
+
+    @Autowired
+    void setAuthMetrics(AuthMetrics authMetrics) { this.authMetrics = authMetrics; }
 
     /**
      * A wrong password ends in an exception, and the failure it just counted must still be saved, so that exception
@@ -38,8 +50,8 @@ public class ChangePasswordUseCase {
      */
     @Transactional(noRollbackFor = PasswordChangeException.class)
     public void execute(ChangePasswordCommand command) {
-        if (!PasswordPolicy.isWithinLimits(command.newPassword())) {
-            throw new IllegalArgumentException(PasswordPolicy.MESSAGE);
+        if (com.ieltspath.user.domain.vo.PasswordPolicy.exceedsMaxBytes(command.newPassword())) {
+            throw new IllegalArgumentException(com.ieltspath.user.domain.vo.PasswordPolicy.MESSAGE);
         }
         UUID userId = command.userId();
         userLock.lock(userId);
@@ -53,6 +65,8 @@ public class ChangePasswordUseCase {
         User user = users.findById(userId).orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng"));
         if (!user.isEmailVerified()) throw new EmailNotVerifiedException();
         if (user.getPasswordHash() == null || user.getPasswordHash().isBlank()) throw new PasswordNotConfiguredException();
+        passwordPolicy.check(command.newPassword(), user.getEmail().value(), user.getFullName(),
+                user.getPhoneNumber() == null ? null : user.getPhoneNumber().value());
         if (!encoder.matches(command.currentPassword(), user.getPasswordHash())) {
             attempts.recordFailure(now);
             attemptsRepository.save(attempts);
@@ -63,10 +77,14 @@ public class ChangePasswordUseCase {
         }
         user.changePassword(encoder.encode(command.newPassword()));
         users.save(user);
-        refreshTokens.revokeAllActiveForUser(userId, LocalDateTime.now());
+        refreshTokens.revokeAllActiveForUser(userId, LocalDateTime.now(), "PASSWORD_CHANGE");
+        accessTokens.revokeUser(userId, Instant.now());
         attemptsRepository.deleteByUserId(userId);
         UUID eventId = UUID.randomUUID();
         notices.enqueue(eventId, userId, PasswordChangedV1.EVENT_TYPE, new PasswordChangedV1(eventId,
                 PasswordChangedV1.EVENT_TYPE, Instant.now(), userId, user.getEmail().value(), user.getFullName()));
+        if (authAudit != null) authAudit.record("PASSWORD_CHANGED", userId, null, java.util.Map.of());
+        if (authMetrics != null) authMetrics.record("auth.password", "event", "change");
+        if (authMetrics != null) authMetrics.record("auth.session.revoked", "reason", "PASSWORD_CHANGE");
     }
 }

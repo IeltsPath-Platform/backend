@@ -18,6 +18,9 @@ public final class InternalJwtClaims {
     /** Ten claim chuan: expiration time cua token. */
     public static final String EXPIRATION = "exp";
 
+    /** Session family identifier copied from the external access token. */
+    public static final String SESSION_ID = "sid";
+
     private InternalJwtClaims() {
     }
 }

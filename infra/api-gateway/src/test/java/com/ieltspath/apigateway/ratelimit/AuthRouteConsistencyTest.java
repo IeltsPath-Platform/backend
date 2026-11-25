@@ -22,6 +22,7 @@ class AuthRouteConsistencyTest {
             "/auth/forgot-password",
             "/auth/reset-password",
             "/auth/google",
+            "/auth/google/nonce",
             "/auth/verify-email",
             "/auth/resend-verification",
             "/api/users/register");
@@ -57,6 +58,16 @@ class AuthRouteConsistencyTest {
         Set<String> actual = routePaths(authRoute);
 
         assertThat(actual).containsAll(expected);
+    }
+
+    @Test
+    void authenticatedReauthEndpointUsesTheAuthRateLimitTier() throws IOException {
+        Map<String, Object> config = loadConfig();
+        List<Map<String, Object>> routes = nested(config, "spring", "cloud", "gateway", "server", "webflux", "routes");
+        Map<String, Object> route = routes.stream().filter(item -> "user-reauth-limited".equals(item.get("id")))
+                .findFirst().orElseThrow();
+        assertThat(routePaths(route)).containsExactly("/api/users/me/reauth");
+        assertThat(route.toString()).contains("tier=auth");
     }
 
     @Test

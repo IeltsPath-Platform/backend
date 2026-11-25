@@ -30,6 +30,10 @@ public class InternalJwtService {
                 .expiresAt(Instant.now().plusSeconds(authProperties.internalTokenMaxAgeSeconds()))
                 .subject(externalToken.getSubject())
                 .claim(InternalJwtClaims.ROLES, roles(externalToken))
+                .claims(values -> {
+                    String sessionId = externalToken.getClaimAsString(InternalJwtClaims.SESSION_ID);
+                    if (sessionId != null && !sessionId.isBlank()) values.put(InternalJwtClaims.SESSION_ID, sessionId);
+                })
                 .claims(values -> values.remove("iat"))
                 .build();
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();

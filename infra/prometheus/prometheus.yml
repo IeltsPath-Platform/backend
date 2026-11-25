@@ -3,6 +3,8 @@
 # The gateway is not scraped: its /actuator endpoints are public on its port, and metrics stay internal.
 global:
   scrape_interval: 15s
+rule_files:
+  - /etc/prometheus/rules/auth.yml
 scrape_configs:
   - job_name: user-service
     metrics_path: /actuator/prometheus

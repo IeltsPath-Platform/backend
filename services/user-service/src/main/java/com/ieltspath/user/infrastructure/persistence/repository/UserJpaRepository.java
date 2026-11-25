@@ -61,6 +61,11 @@ public interface UserJpaRepository extends JpaRepository<UserJpaEntity, UUID> {
             + "where user.id = :userId")
     int clearPasswordHash(@Param("userId") UUID userId);
 
+    @Modifying
+    @Query("update UserJpaEntity user set user.passwordHash = :newHash where user.id = :userId and user.passwordHash = :oldHash")
+    int updatePasswordHashIfUnchanged(@Param("userId") UUID userId, @Param("oldHash") String oldHash,
+                                      @Param("newHash") String newHash);
+
     @Query(value = """
             SELECT u.id
             FROM users u

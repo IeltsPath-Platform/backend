@@ -52,6 +52,11 @@ public class UserRepositoryAdapter implements UserRepository {
     }
 
     @Override
+    public int updatePasswordHashIfUnchanged(UUID userId, String oldHash, String newHash) {
+        return userJpaRepository.updatePasswordHashIfUnchanged(userId, oldHash, newHash);
+    }
+
+    @Override
     public Optional<User> findById(UUID id) {
         return userJpaRepository.findWithRolesById(id).map(userMapper::toDomain);
     }

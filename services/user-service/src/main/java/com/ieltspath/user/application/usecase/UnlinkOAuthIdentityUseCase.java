@@ -7,30 +7,47 @@ import com.ieltspath.user.domain.exception.UserNotFoundException;
 import com.ieltspath.user.domain.repository.OAuthIdentityRepository;
 import com.ieltspath.user.domain.repository.UserRepository;
 import com.ieltspath.user.domain.vo.OAuthProvider;
+import com.ieltspath.events.user.GoogleAccountUnlinkedV1;
+import com.ieltspath.user.application.exception.ReauthRequiredException;
+import com.ieltspath.user.application.port.ReauthTokenStore;
+import org.springframework.beans.factory.annotation.Value;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
+import java.time.Instant;
+import org.springframework.beans.factory.annotation.Autowired;
 
 @Service
 @RequiredArgsConstructor
 public class UnlinkOAuthIdentityUseCase {
     private final OAuthIdentityRepository oauthIdentityRepository;
     private final UserRepository userRepository;
+    private final ReauthTokenStore reauthTokens;
+    private final UserNoticeOutbox notices;
+    @Value("${app.auth.reauth-required-for-unlink:false}") private boolean reauthRequired;
+    private AuthAuditSupport authAudit;
+
+    @Autowired
+    void setAuthAudit(AuthAuditSupport authAudit) { this.authAudit = authAudit; }
+
+    public void execute(UUID userId, String providerStr) { execute(userId, providerStr, null, null); }
 
     @Transactional
-    public void execute(UUID userId, String providerStr) {
+    public void execute(UUID userId, String providerStr, String reauthToken, UUID sessionId) {
         if (providerStr == null || providerStr.isBlank()) {
             throw new IllegalArgumentException("Nhà cung cấp OAuth không được để trống");
         }
+
+        if (reauthRequired) requireReauth(userId, reauthToken, sessionId);
 
         OAuthProvider provider;
         try {
             provider = OAuthProvider.valueOf(providerStr.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Nhà cung cấp OAuth không hợp lệ: " + providerStr);
+            throw new IllegalArgumentException("Nhà cung cấp OAuth không hợp lệ");
         }
 
         oauthIdentityRepository.findByUserIdAndProvider(userId, provider)
@@ -48,6 +65,27 @@ public class UnlinkOAuthIdentityUseCase {
         }
 
         oauthIdentityRepository.deleteByUserIdAndProvider(userId, provider);
+        if (provider == OAuthProvider.GOOGLE) {
+            UUID eventId = UUID.randomUUID();
+            notices.enqueue(eventId, userId, GoogleAccountUnlinkedV1.EVENT_TYPE, new GoogleAccountUnlinkedV1(
+                    eventId, GoogleAccountUnlinkedV1.EVENT_TYPE, Instant.now(), userId,
+                    user.getEmail().value(), user.getFullName()));
+            if (authAudit != null) authAudit.record("GOOGLE_UNLINKED", userId, null, java.util.Map.of("provider", "GOOGLE"));
+        }
+    }
+
+    private void requireReauth(UUID userId, String token, UUID sessionId) {
+        if (sessionId == null || token == null || token.isBlank()) throw new ReauthRequiredException();
+        try {
+            var grant = reauthTokens.consume(token).orElse(null);
+            if (grant == null || !grant.userId().equals(userId) || !grant.sessionId().equals(sessionId)) {
+                throw new ReauthRequiredException();
+            }
+        } catch (ReauthRequiredException rejected) {
+            throw rejected;
+        } catch (RuntimeException unavailable) {
+            throw new ReauthRequiredException();
+        }
     }
 }
 

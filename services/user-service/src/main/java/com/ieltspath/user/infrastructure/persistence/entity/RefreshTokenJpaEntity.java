@@ -42,6 +42,27 @@ public class RefreshTokenJpaEntity {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "family_id", nullable = false)
+    private UUID familyId;
+
+    @Column(name = "session_started_at", nullable = false)
+    private LocalDateTime sessionStartedAt;
+
+    @Column(name = "revoked_reason", length = 20)
+    private String revokedReason;
+
+    @Column(name = "replaced_by_id")
+    private UUID replacedById;
+
+    @Column(name = "last_used_at")
+    private LocalDateTime lastUsedAt;
+
+    @Column(name = "ip_address", length = 45)
+    private String ipAddress;
+
+    @Column(name = "user_agent", length = 255)
+    private String userAgent;
+
     @PrePersist
     void prePersist() {
         if (id == null) {
@@ -49,6 +70,12 @@ public class RefreshTokenJpaEntity {
         }
         if (createdAt == null) {
             createdAt = LocalDateTime.now();
+        }
+        if (familyId == null) {
+            familyId = UUID.randomUUID();
+        }
+        if (sessionStartedAt == null) {
+            sessionStartedAt = createdAt;
         }
     }
 }

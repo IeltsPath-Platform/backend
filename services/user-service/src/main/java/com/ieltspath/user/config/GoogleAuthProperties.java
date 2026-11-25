@@ -12,4 +12,6 @@ import java.util.List;
 @ConfigurationProperties(prefix = "app.auth.google")
 public class GoogleAuthProperties {
     private List<String> clientIds = new ArrayList<>();
+    private long maxTokenAgeSeconds = 300;
+    private boolean requireNonce;
 }
