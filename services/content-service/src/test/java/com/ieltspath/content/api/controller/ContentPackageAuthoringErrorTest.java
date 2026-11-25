@@ -42,6 +42,10 @@ class ContentPackageAuthoringErrorTest {
     private final CodeSettingsUseCases codeSettings = mock(CodeSettingsUseCases.class);
 
     private final ListAuthorPackagesUseCase listPackages = mock(ListAuthorPackagesUseCase.class);
+    private final com.ieltspath.content.application.usecase.UpdatePackageInfoUseCase updatePackageInfo =
+            mock(com.ieltspath.content.application.usecase.UpdatePackageInfoUseCase.class);
+    private final com.ieltspath.content.application.usecase.ChangePackageVisibilityUseCase packageVisibility =
+            mock(com.ieltspath.content.application.usecase.ChangePackageVisibilityUseCase.class);
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -50,7 +54,7 @@ class ContentPackageAuthoringErrorTest {
                         mock(GetAuthorPackageUseCase.class), createDraft, mock(CreateContentSectionUseCase.class),
                         updateSection, mock(DeleteContentSectionUseCase.class), reorderSections,
                         mock(AddSectionQuestionUseCase.class), mock(RemoveAndReorderSectionQuestionsUseCase.class),
-                        listPackages, codeSettings))
+                        listPackages, codeSettings, updatePackageInfo, packageVisibility))
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
     }
 
@@ -60,7 +64,7 @@ class ContentPackageAuthoringErrorTest {
                 "POOL", "Placement", com.ieltspath.content.domain.vo.PackageType.PLACEMENT_TEST, null,
                 com.ieltspath.content.domain.vo.PublicationStatus.DRAFT, null, null, null, null, null,
                 java.time.Instant.now(), java.time.Instant.now(), null, false,
-                com.ieltspath.content.domain.vo.PlacementPool.BAND_3_5);
+                com.ieltspath.content.domain.vo.PlacementPool.BAND_3_5, "READING", java.util.List.of(1), 1, 10);
         when(listPackages.execute(any())).thenReturn(java.util.List.of(summary));
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/content/admin/packages"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$[0].placementPool").value("BAND_3_5"));
@@ -144,6 +148,38 @@ class ContentPackageAuthoringErrorTest {
                         .content("{\"code\":\"X\",\"title\":\"T\",\"packageType\":\"COURSE_TEST\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.details.code").value("INVALID_PACKAGE_COURSE"));
+    }
+
+    @Test
+    void lockedPlacementPoolReturnsConflictWithItsCode() throws Exception {
+        when(updatePackageInfo.execute(any()))
+                .thenThrow(new com.ieltspath.content.domain.exception.PlacementPoolLockedException());
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .patch("/api/content/admin/packages/{id}", UUID.randomUUID())
+                        .contentType("application/json").content("{\"placementPool\":\"BAND_0_3\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.details.code").value("PLACEMENT_POOL_LOCKED"));
+    }
+
+    @Test
+    void lastPublishedPlacementTestCannotBeArchived() throws Exception {
+        when(packageVisibility.archive(any()))
+                .thenThrow(new com.ieltspath.content.domain.exception.PlacementPoolLastPublishedException());
+
+        mockMvc.perform(post("/api/content/admin/packages/{id}/archive", UUID.randomUUID()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.details.code").value("PLACEMENT_POOL_LAST_PUBLISHED"));
+    }
+
+    @Test
+    void otherTypesCannotBeArchived() throws Exception {
+        when(packageVisibility.archive(any()))
+                .thenThrow(new com.ieltspath.content.domain.exception.PackageArchiveNotSupportedException());
+
+        mockMvc.perform(post("/api/content/admin/packages/{id}/archive", UUID.randomUUID()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.details.code").value("PACKAGE_ARCHIVE_NOT_SUPPORTED"));
     }
 
     @Test

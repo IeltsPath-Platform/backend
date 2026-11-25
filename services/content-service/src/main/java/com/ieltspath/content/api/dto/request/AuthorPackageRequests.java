@@ -36,6 +36,14 @@ public final class AuthorPackageRequests {
         }
     }
 
+    /** A null field is left unchanged; a blank {@code sourceCode} takes a practice test out of the library. */
+    public record UpdatePackageInfo(
+            @Size(max = 255) String title,
+            AccessLevel accessLevel,
+            @Size(max = 40) String sourceCode,
+            PlacementPool placementPool) {
+    }
+
     /** {@code rulesJson} defaults to {@code "{}"} when omitted; a non-JSON value is refused by the use case. */
     public record CreateDraftVersion(@Size(max = 20000) String rulesJson) {
     }

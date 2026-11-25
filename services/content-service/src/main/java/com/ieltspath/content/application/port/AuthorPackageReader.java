@@ -13,9 +13,15 @@ import java.util.UUID;
 public interface AuthorPackageReader {
 
     /** Any filter may be null; {@code q} matches the code or the title, ignoring case. */
-    record Filter(PackageType type, PublicationStatus status, UUID lessonId, UUID topicId, UUID courseId, String q, PlacementPool placementPool) {
+    record Filter(PackageType type, PublicationStatus status, UUID lessonId, UUID topicId, UUID courseId, String q,
+                  PlacementPool placementPool, Boolean premium, String skill) {
+        public Filter(PackageType type, PublicationStatus status, UUID lessonId, UUID topicId, UUID courseId, String q,
+                      PlacementPool placementPool) {
+            this(type, status, lessonId, topicId, courseId, q, placementPool, null, null);
+        }
+
         public Filter(PackageType type, PublicationStatus status, UUID lessonId, UUID topicId, UUID courseId, String q) {
-            this(type, status, lessonId, topicId, courseId, q, null);
+            this(type, status, lessonId, topicId, courseId, q, null, null, null);
         }
     }
 

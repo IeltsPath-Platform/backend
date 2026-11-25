@@ -219,7 +219,7 @@ is required. An enabled locked setting rejects a manually supplied code that dif
 - `PLACEMENT_TEST`: `placementPool` is required and must be `BAND_0_3`, `BAND_3_5` or `BAND_5_9`.
   Any other package type requires a null/omitted pool. Missing, unknown or inapplicable pools return `400`.
   The same validation applies to the legacy `POST /api/content/packages`. Create, list and detail responses
-  carry `placementPool`; the stored pool cannot be changed. A mistake requires creating a new package.
+  carry `placementPool`; the pool changes only before the first publication (section 8).
 - Publishing a placement package without a pool returns `400` with `details.code = PLACEMENT_POOL_REQUIRED`.
   This also applies to scheduled publishing and validation before scheduling.
 - A duplicate `code` returns `400` like the original route.
@@ -228,6 +228,56 @@ is required. An enabled locked setting rejects a manually supplied code that dif
   version. Publishing keeps its existing rules.
 
 The original `POST /api/content/packages` still refuses `TOPIC_TEST` and `COURSE_TEST`.
+
+## 8. Change a package's information
+
+`PATCH /api/content/admin/packages/{packageId}` (`CONTENT_AUTHOR`). Every field is optional and a missing field is left
+as it is:
+
+```json
+{ "title": "Reading Practice Test 6", "accessLevel": "PREMIUM", "sourceCode": "IELTS_SPACE_PRO", "placementPool": "BAND_3_5" }
+```
+
+Returns `200` with the detail shape of section 1. The code and the package type never change.
+
+- `title`: up to 255 characters, not blank.
+- `accessLevel` `FREE` or `PREMIUM`: takes effect for learners at once (the learner library and the Premium checks read it).
+- `sourceCode`: only for `PRACTICE_TEST`, a supported test source. A blank value clears it, which takes the test out of
+  the learner library (it becomes an internal checkpoint). Another type answers `400`.
+- `placementPool`: only for `PLACEMENT_TEST`. It can change only while the package has never been published (status
+  `DRAFT` and no published or archived version); otherwise `409` with `details.code = PLACEMENT_POOL_LOCKED`
+  ("Đề đã xuất bản nên không đổi được kho band. Gỡ đề này và tạo đề mới cho kho khác."). Another type answers `400`.
+- An unknown package answers `404`.
+
+## 9. Hide and restore a test
+
+`POST /api/content/admin/packages/{packageId}/archive` and `POST /api/content/admin/packages/{packageId}/restore`
+(`CONTENT_AUTHOR`) return `200` with the detail shape of section 1. Only `PRACTICE_TEST` and `PLACEMENT_TEST` can be
+hidden; any other type answers `409` with `details.code = PACKAGE_ARCHIVE_NOT_SUPPORTED`.
+
+- Archive sets the status to `ARCHIVED`. Learners no longer see the test: the library and the placement selection read
+  `PUBLISHED` packages only. Attempts already started keep their snapshot and can still be finished.
+- The last published placement test of a band pool cannot be archived: `409` with
+  `details.code = PLACEMENT_POOL_LAST_PUBLISHED` ("Kho đề này chỉ còn một đề đã xuất bản. Thêm đề khác trước khi gỡ đề
+  này."). An unpublished placement test can always be archived.
+- Restore puts the package back to `PUBLISHED` when it has a published version, otherwise to `DRAFT`.
+- Archive and restore are idempotent: repeating one returns the package as it is.
+
+## 10. The author list
+
+`GET /api/content/admin/packages` accepts `type`, `status`, `lessonId`, `topicId`, `courseId`, `q`, `placementPool` and,
+for the practice library and placement screens, `accessLevel` (`FREE` or `PREMIUM`) and `skill` (`READING`, `LISTENING`,
+`WRITING`, `SPEAKING`). The list is bounded (500 rows, most recently updated first). Each row also carries, for the
+version a learner would see (the published one, otherwise the latest):
+
+| Field | Meaning |
+| --- | --- |
+| `skill` | The one skill of its sections; null when they mix skills or there are none. |
+| `partNos` | The distinct, sorted `partNo` of its sections. |
+| `sectionCount`, `questionCount` | Number of sections and of section questions. |
+
+Attempt counts and the average band of a test are read from Assessment
+(`GET /api/assessments/admin/package-stats`, see the Assessment contract), not from this route.
 
 Backlog: unreferenced upload cleanup, section-question-group editing, bulk import, package
 deletion and cloning old versions. None is implemented by this contract.
