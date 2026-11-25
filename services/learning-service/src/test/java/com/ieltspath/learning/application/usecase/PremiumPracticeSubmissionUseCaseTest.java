@@ -56,6 +56,39 @@ class PremiumPracticeSubmissionUseCaseTest {
     }
 
     @Test
+    void examinerWritingSubmissionRejectsTaggedPromptBeforeStoringEssay() {
+        var prompts = mock(FreeWritingPrompts.class);
+        var flow = mock(EssaySubmissionFlow.class);
+        var essays = mock(WritingSubmissionRepository.class);
+        var lock = mock(LearnerLock.class);
+        var transactionManager = mock(PlatformTransactionManager.class);
+        var view = mock(WritingSubmissionViewAssembler.class);
+        var reviews = mock(HumanReviewUseCase.class);
+        UUID userId = UUID.randomUUID();
+        UUID requestId = UUID.randomUUID();
+        UUID packageVersionId = UUID.randomUUID();
+        UUID questionId = UUID.randomUUID();
+        UUID examinerId = UUID.randomUUID();
+        Item prompt = new Item(questionId, 1, "Write an essay", List.of(), Map.of("type", "ESSAY"), null, null,
+                BigDecimal.ONE, List.of());
+        when(flow.validate("An essay with words")).thenReturn(4);
+        when(essays.findByRequestId(requestId)).thenReturn(Optional.empty());
+        when(essays.findLatestSentToExaminer(userId, questionId)).thenReturn(Optional.empty());
+        when(prompts.resolve(packageVersionId, questionId))
+                .thenReturn(new FreeWritingPrompts.ResolvedPrompt(prompt, "PREMIUM_CONTENT"));
+        when(flow.premiumStatus()).thenReturn(false);
+
+        var useCase = new SubmitFreeWritingToExaminerUseCase(prompts, lock, essays, flow, reviews, view,
+                transactionManager);
+        LearningRequestException exception = assertThrows(LearningRequestException.class,
+                () -> useCase.execute(userId, packageVersionId, questionId, requestId,
+                        "An essay with words", examinerId));
+
+        assertEquals("PREMIUM_REQUIRED", exception.getCode());
+        verifyNoInteractions(lock, transactionManager, reviews, view);
+    }
+
+    @Test
     void freeSpeakingSubmissionRejectsTaggedTestBeforeOpeningSubmission() {
         var submissions = mock(SpeakingSubmissionRepository.class);
         var questions = mock(SpeakingTestQuestions.class);
