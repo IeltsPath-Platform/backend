@@ -77,8 +77,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(WeakPasswordException.class)
     ResponseEntity<ErrorResponse> handleWeakPassword(WeakPasswordException exception, HttpServletRequest request) {
-        return error(HttpStatus.BAD_REQUEST, exception.getMessage(), request,
-                Map.of("code", "WEAK_PASSWORD", "reasons", String.join(",", exception.reasons())));
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(errorBody(HttpStatus.BAD_REQUEST, exception.getMessage(), request,
+                        Map.of("reasons", String.join(",", exception.reasons())), "WEAK_PASSWORD"));
     }
 
     @ExceptionHandler(UploadRejectedException.class)

@@ -93,8 +93,9 @@ class GlobalExceptionHandlerTest {
         var response = handler.handleWeakPassword(new WeakPasswordException(java.util.List.of("TOO_COMMON", "TOO_SIMPLE")), request);
         assertThat(response.getStatusCode().value()).isEqualTo(400);
         assertThat(response.getBody().message()).isEqualTo("Mật khẩu chưa đủ mạnh.");
-        assertThat(response.getBody().details()).containsEntry("code", "WEAK_PASSWORD")
-                .containsEntry("reasons", "TOO_COMMON,TOO_SIMPLE");
+        assertThat(response.getBody().code()).isEqualTo("WEAK_PASSWORD");
+        assertThat(response.getBody().details()).containsEntry("reasons", "TOO_COMMON,TOO_SIMPLE")
+                .doesNotContainKey("code");
     }
 
     @Test
