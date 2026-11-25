@@ -9,6 +9,7 @@ import com.ieltspath.user.domain.exception.UserManagementRuleViolationException;
 import com.ieltspath.user.domain.repository.RoleRepository;
 import com.ieltspath.user.application.port.UserLock;
 import com.ieltspath.user.domain.repository.UserRepository;
+import com.ieltspath.user.domain.repository.RefreshTokenRepository;
 import com.ieltspath.user.domain.vo.Email;
 import com.ieltspath.user.domain.vo.RoleName;
 import com.ieltspath.user.domain.vo.UserStatus;
@@ -36,6 +37,7 @@ class UserManagementRulesUseCaseTest {
     @Mock RoleRepository roles;
     @Mock PasswordEncoder passwordEncoder;
     @Mock UserLock userLock;
+    @Mock RefreshTokenRepository refreshTokens;
 
     private AssignRoleUseCase assignRole;
     private ChangeUserStatusUseCase changeStatus;
@@ -44,9 +46,9 @@ class UserManagementRulesUseCaseTest {
 
     @BeforeEach
     void setUp() {
-        assignRole = new AssignRoleUseCase(users, roles, userLock);
-        changeStatus = new ChangeUserStatusUseCase(users, userLock);
-        deleteUser = new DeleteUserUseCase(users, userLock);
+        assignRole = new AssignRoleUseCase(users, roles, userLock, refreshTokens);
+        changeStatus = new ChangeUserStatusUseCase(users, userLock, refreshTokens);
+        deleteUser = new DeleteUserUseCase(users, userLock, refreshTokens);
         createUser = new CreateUserUseCase(users, roles, passwordEncoder, new PasswordPolicyService(password -> false,
                 new com.ieltspath.user.config.AuthPasswordProperties(8, 12)));
     }

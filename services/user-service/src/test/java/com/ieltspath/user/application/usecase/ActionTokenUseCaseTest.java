@@ -194,7 +194,7 @@ class ActionTokenUseCaseTest {
         verify(accountActionTokenRepository).consumePasswordResetToken(eq("token-hash"), any(LocalDateTime.class));
         verify(userRepository).save(user);
         verify(userLock).lock(userId);
-        verify(refreshTokenRepository).revokeAllActiveForUser(eq(userId), any(LocalDateTime.class));
+        verify(refreshTokenRepository).revokeAllActiveForUser(eq(userId), any(LocalDateTime.class), eq("PASSWORD_RESET"));
     }
 
     @Test

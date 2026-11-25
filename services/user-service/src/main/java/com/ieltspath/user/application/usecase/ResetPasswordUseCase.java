@@ -76,7 +76,7 @@ public class ResetPasswordUseCase {
         }
         user.changePassword(passwordEncoder.encode(command.newPassword()));
         userRepository.save(user);
-        refreshTokenRepository.revokeAllActiveForUser(user.getId(), java.time.LocalDateTime.now());
+        refreshTokenRepository.revokeAllActiveForUser(user.getId(), java.time.LocalDateTime.now(), "PASSWORD_RESET");
 
         UUID eventId = UUID.randomUUID();
         notices.enqueue(eventId, user.getId(), PasswordChangedV1.EVENT_TYPE, new PasswordChangedV1(eventId,

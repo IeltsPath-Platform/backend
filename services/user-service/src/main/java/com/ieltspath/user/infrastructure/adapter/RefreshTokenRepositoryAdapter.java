@@ -9,6 +9,9 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.List;
+import java.util.UUID;
+import org.springframework.data.domain.PageRequest;
 
 @Repository
 @RequiredArgsConstructor
@@ -26,16 +29,60 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
     }
 
     @Override
-    public Optional<RefreshToken> consumeActiveToken(String tokenHash, LocalDateTime consumedAt) {
-        return refreshTokenJpaRepository.findByTokenHash(tokenHash)
-                .map(this::toDomain)
-                .filter(token -> token.isUsable(consumedAt))
-                .filter(token -> refreshTokenJpaRepository.revokeActiveToken(tokenHash, consumedAt) == 1);
+    public Optional<java.util.UUID> findUserIdByTokenHash(String tokenHash) {
+        return refreshTokenJpaRepository.findUserIdByTokenHash(tokenHash);
     }
 
     @Override
-    public int revokeAllActiveForUser(java.util.UUID userId, LocalDateTime revokedAt) {
-        return refreshTokenJpaRepository.revokeAllActiveForUser(userId, revokedAt);
+    public Optional<RefreshToken> findByTokenHashForUpdate(String tokenHash) {
+        return refreshTokenJpaRepository.findByTokenHashForUpdate(tokenHash).map(this::toDomain);
+    }
+
+    @Override
+    public Optional<RefreshToken> consumeActiveToken(String tokenHash, LocalDateTime consumedAt, String reason,
+                                                      UUID replacedById, LocalDateTime lastUsedAt,
+                                                      String ipAddress, String userAgent) {
+        return refreshTokenJpaRepository.findByTokenHash(tokenHash)
+                .map(this::toDomain)
+                .filter(token -> token.isUsable(consumedAt))
+                .filter(token -> refreshTokenJpaRepository.revokeActiveToken(tokenHash, consumedAt, reason,
+                        replacedById, lastUsedAt, ipAddress, userAgent) == 1);
+    }
+
+    @Override
+    public int revokeAllActiveForUser(UUID userId, LocalDateTime revokedAt, String reason) {
+        return refreshTokenJpaRepository.revokeAllActiveForUser(userId, revokedAt, reason);
+    }
+
+    @Override
+    public int revokeFamily(UUID familyId, LocalDateTime revokedAt, String reason) {
+        return refreshTokenJpaRepository.revokeFamily(familyId, revokedAt, reason);
+    }
+
+    @Override
+    public List<RefreshToken> findActiveSessions(UUID userId, LocalDateTime now, int limit) {
+        return refreshTokenJpaRepository.findActiveSessions(userId, now, PageRequest.of(0, limit))
+                .stream().map(this::toDomain).toList();
+    }
+
+    @Override
+    public int revokeSession(UUID userId, UUID familyId, LocalDateTime revokedAt, String reason) {
+        return refreshTokenJpaRepository.revokeSession(userId, familyId, revokedAt, reason);
+    }
+
+    @Override
+    public int revokeAllActiveExceptSession(UUID userId, UUID currentFamilyId, LocalDateTime revokedAt, String reason) {
+        return refreshTokenJpaRepository.revokeAllActiveExceptSession(userId, currentFamilyId, revokedAt, reason);
+    }
+
+    @Override
+    public int deleteExpiredOrOldRevoked(LocalDateTime now, LocalDateTime revokedBefore, int limit) {
+        return refreshTokenJpaRepository.deleteExpiredOrOldRevoked(now, revokedBefore, limit);
+    }
+
+    @Override
+    public int updateReplacement(String tokenHash, UUID replacedById) {
+        return refreshTokenJpaRepository.updateReplacement(tokenHash, replacedById);
     }
 
     private RefreshToken toDomain(RefreshTokenJpaEntity entity) {
@@ -46,6 +93,13 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
                 .expiresAt(entity.getExpiresAt())
                 .revokedAt(entity.getRevokedAt())
                 .createdAt(entity.getCreatedAt())
+                .familyId(entity.getFamilyId())
+                .sessionStartedAt(entity.getSessionStartedAt())
+                .revokedReason(entity.getRevokedReason())
+                .replacedById(entity.getReplacedById())
+                .lastUsedAt(entity.getLastUsedAt())
+                .ipAddress(entity.getIpAddress())
+                .userAgent(entity.getUserAgent())
                 .build();
     }
 
@@ -57,6 +111,13 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
                 .expiresAt(refreshToken.getExpiresAt())
                 .revokedAt(refreshToken.getRevokedAt())
                 .createdAt(refreshToken.getCreatedAt())
+                .familyId(refreshToken.getFamilyId())
+                .sessionStartedAt(refreshToken.getSessionStartedAt())
+                .revokedReason(refreshToken.getRevokedReason())
+                .replacedById(refreshToken.getReplacedById())
+                .lastUsedAt(refreshToken.getLastUsedAt())
+                .ipAddress(refreshToken.getIpAddress())
+                .userAgent(refreshToken.getUserAgent())
                 .build();
     }
 }

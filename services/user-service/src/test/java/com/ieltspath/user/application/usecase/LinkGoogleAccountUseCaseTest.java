@@ -78,7 +78,7 @@ class LinkGoogleAccountUseCaseTest {
         assertThat(customerWithPassword.getPasswordHash()).isEqualTo("hash");
         verify(userLock).lock(userId);
         verify(users, never()).clearPasswordHash(userId);
-        verify(refreshTokens, never()).revokeAllActiveForUser(eq(userId), any());
+        verify(refreshTokens, never()).revokeAllActiveForUser(eq(userId), any(), anyString());
         verify(notices).enqueue(any(), eq(userId), eq(GoogleAccountLinkedV1.EVENT_TYPE), any());
         verify(notices, never()).enqueue(any(), eq(userId), eq(UserEmailVerificationStateV1.EVENT_TYPE), any());
         ArgumentCaptor<OAuthIdentity> identity = ArgumentCaptor.forClass(OAuthIdentity.class);
@@ -103,7 +103,7 @@ class LinkGoogleAccountUseCaseTest {
         assertThat(unverified.isEmailVerified()).isTrue();
         assertThat(unverified.getPasswordHash()).isNull();
         verify(users).clearPasswordHash(userId);
-        verify(refreshTokens).revokeAllActiveForUser(eq(userId), any());
+        verify(refreshTokens).revokeAllActiveForUser(eq(userId), any(), eq("GOOGLE_LINK"));
         verify(users).save(unverified);
         verify(notices).enqueue(any(), eq(userId), eq(UserEmailVerificationStateV1.EVENT_TYPE), any());
         verify(notices).enqueue(any(), eq(userId), eq(GoogleAccountLinkedV1.EVENT_TYPE), any());
@@ -124,7 +124,7 @@ class LinkGoogleAccountUseCaseTest {
         verify(users).save(created.capture());
         assertThat(created.getValue().getPasswordHash()).isNull();
         assertThat(created.getValue().getRoles()).extracting(Role::getName).containsExactly(RoleName.CUSTOMER);
-        verify(refreshTokens, never()).revokeAllActiveForUser(eq(userId), any());
+        verify(refreshTokens, never()).revokeAllActiveForUser(eq(userId), any(), anyString());
         verify(notices).enqueue(any(), eq(userId), eq(UserEmailVerificationStateV1.EVENT_TYPE), any());
         verify(notices, never()).enqueue(any(), any(), eq(GoogleAccountLinkedV1.EVENT_TYPE), any());
     }

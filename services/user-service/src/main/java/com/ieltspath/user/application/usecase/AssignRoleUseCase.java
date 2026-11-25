@@ -12,6 +12,8 @@ import com.ieltspath.user.domain.service.RoleAssignmentPolicy;
 import com.ieltspath.user.domain.vo.RoleName;
 import com.ieltspath.user.domain.vo.UserStatus;
 import com.ieltspath.user.application.port.UserLock;
+import com.ieltspath.user.domain.repository.RefreshTokenRepository;
+import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +28,7 @@ public class AssignRoleUseCase {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final UserLock userLock;
+    private final RefreshTokenRepository refreshTokens;
 
     @Transactional
     public User execute(AssignRoleCommand command) {
@@ -57,6 +60,8 @@ public class AssignRoleUseCase {
             throw new RoleNotFoundException("Một hoặc nhiều vai trò không tồn tại");
         }
         user.assignRoles(roles);
-        return userRepository.save(user);
+        User saved = userRepository.save(user);
+        refreshTokens.revokeAllActiveForUser(user.getId(), LocalDateTime.now(), "ADMIN");
+        return saved;
     }
 }

@@ -1,12 +1,13 @@
 package com.ieltspath.user.application.usecase;
 
+import com.ieltspath.user.application.command.LoginContext;
 import com.ieltspath.user.application.result.AuthTokenResult;
+import com.ieltspath.user.application.port.UserLock;
 import com.ieltspath.user.domain.aggregate.RefreshToken;
 import com.ieltspath.user.domain.aggregate.User;
 import com.ieltspath.user.domain.exception.AuthenticationFailedException;
 import com.ieltspath.user.domain.repository.RefreshTokenRepository;
 import com.ieltspath.user.domain.repository.UserRepository;
-import com.ieltspath.user.application.port.UserLock;
 import com.ieltspath.user.domain.vo.Email;
 import com.ieltspath.user.domain.vo.UserStatus;
 import org.junit.jupiter.api.Test;
@@ -20,171 +21,130 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.never;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class RefreshTokenUseCaseTest {
-    @Mock
-    private RefreshTokenRepository refreshTokenRepository;
-    @Mock
-    private UserRepository userRepository;
-    @Mock
-    private TokenHashService tokenHashService;
-    @Mock
-    private AuthTokenIssuer authTokenIssuer;
-    @Mock
-    private UserLock userLock;
+    @Mock RefreshTokenRepository tokens;
+    @Mock UserRepository users;
+    @Mock TokenHashService hashes;
+    @Mock AuthTokenIssuer issuer;
+    @Mock UserLock userLock;
 
     @Test
-    void rotatesUsableRefreshToken() {
-        RefreshTokenUseCase useCase = new RefreshTokenUseCase(
-                refreshTokenRepository,
-                userRepository,
-                tokenHashService,
-                authTokenIssuer,
-                userLock
-        );
+    void rotatesWithinTheSameSessionAndRecordsRequestContext() {
         UUID userId = UUID.randomUUID();
-        RefreshToken storedToken = RefreshToken.builder()
-                .id(UUID.randomUUID())
-                .userId(userId)
-                .tokenHash("hashed-token")
-                .expiresAt(LocalDateTime.now().plusHours(1))
-                .build();
+        UUID familyId = UUID.randomUUID();
+        UUID replacementId = UUID.randomUUID();
+        LocalDateTime started = LocalDateTime.now().minusHours(1);
+        RefreshToken token = token(userId, familyId, started, null, null);
         User user = activeUser(userId);
-        AuthTokenResult replacementTokens = new AuthTokenResult("access-2", "refresh-2", 3600, 604800);
-        when(tokenHashService.hash("refresh-1")).thenReturn("hashed-token");
-        when(refreshTokenRepository.findByTokenHash("hashed-token")).thenReturn(Optional.of(storedToken));
-        when(refreshTokenRepository.consumeActiveToken(eq("hashed-token"), any(LocalDateTime.class))).thenReturn(Optional.of(storedToken));
-        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(authTokenIssuer.issue(user)).thenReturn(replacementTokens);
+        LoginContext context = new LoginContext("203.0.113.45", "Browser");
+        AuthTokenResult result = new AuthTokenResult("access", "next-refresh", 3600, 604800, replacementId);
+        when(hashes.hash("raw")).thenReturn("hash");
+        when(tokens.findUserIdByTokenHash("hash")).thenReturn(Optional.of(token.getUserId()));
+        when(tokens.findByTokenHashForUpdate("hash")).thenReturn(Optional.of(token));
+        when(tokens.consumeActiveToken(eq("hash"), any(), eq("ROTATED"), isNull(), any(),
+                eq("203.0.113.45"), eq("Browser"))).thenReturn(Optional.of(token));
+        when(users.findById(userId)).thenReturn(Optional.of(user));
+        when(issuer.issue(user, familyId, started, context)).thenReturn(result);
 
-        AuthTokenResult result = useCase.execute("refresh-1");
+        AuthTokenResult actual = useCase().execute("raw", context);
 
-        assertThat(result).isEqualTo(replacementTokens);
-        verify(refreshTokenRepository, never()).save(storedToken);
-        verify(authTokenIssuer).issue(user);
+        assertThat(actual).isEqualTo(result);
+        verify(tokens).updateReplacement("hash", replacementId);
     }
 
     @Test
-    void rejectsRevokedRefreshToken() {
-        RefreshTokenUseCase useCase = new RefreshTokenUseCase(
-                refreshTokenRepository,
-                userRepository,
-                tokenHashService,
-                authTokenIssuer,
-                userLock
-        );
-        RefreshToken storedToken = RefreshToken.builder()
-                .id(UUID.randomUUID())
-                .userId(UUID.randomUUID())
-                .tokenHash("hashed-token")
-                .expiresAt(LocalDateTime.now().plusHours(1))
-                .revokedAt(LocalDateTime.now().minusMinutes(1))
-                .build();
-        when(tokenHashService.hash("refresh-1")).thenReturn("hashed-token");
-        when(refreshTokenRepository.findByTokenHash("hashed-token")).thenReturn(Optional.of(storedToken));
-        when(refreshTokenRepository.consumeActiveToken(eq("hashed-token"), any(LocalDateTime.class))).thenReturn(Optional.empty());
+    void reuseAfterGraceRevokesTheWholeSessionFamily() {
+        UUID familyId = UUID.randomUUID();
+        RefreshToken token = token(UUID.randomUUID(), familyId, LocalDateTime.now().minusHours(1),
+                LocalDateTime.now().minusSeconds(20), "ROTATED");
+        when(hashes.hash("raw")).thenReturn("hash");
+        when(tokens.findUserIdByTokenHash("hash")).thenReturn(Optional.of(token.getUserId()));
+        when(tokens.findByTokenHashForUpdate("hash")).thenReturn(Optional.of(token));
+        when(issuer.reuseGraceSeconds()).thenReturn(10L);
 
-        assertThatThrownBy(() -> useCase.execute("refresh-1"))
+        assertThatThrownBy(() -> useCase().execute("raw", LoginContext.UNKNOWN))
                 .isInstanceOf(AuthenticationFailedException.class)
                 .hasMessage("Refresh token không hợp lệ");
-        verify(refreshTokenRepository, never()).save(storedToken);
-        verifyNoInteractions(userRepository, authTokenIssuer);
+        verify(tokens).revokeFamily(eq(familyId), any(), eq("REUSE_DETECTED"));
+        verifyNoInteractions(users);
     }
 
     @Test
-    void rejectsRefreshTokenForInactiveUser() {
-        RefreshTokenUseCase useCase = new RefreshTokenUseCase(
-                refreshTokenRepository,
-                userRepository,
-                tokenHashService,
-                authTokenIssuer,
-                userLock
-        );
+    void reuseWithinGraceDoesNotRevokeTheFamily() {
+        RefreshToken token = token(UUID.randomUUID(), UUID.randomUUID(), LocalDateTime.now().minusHours(1),
+                LocalDateTime.now().minusSeconds(2), "ROTATED");
+        when(hashes.hash("raw")).thenReturn("hash");
+        when(tokens.findUserIdByTokenHash("hash")).thenReturn(Optional.of(token.getUserId()));
+        when(tokens.findByTokenHashForUpdate("hash")).thenReturn(Optional.of(token));
+        when(issuer.reuseGraceSeconds()).thenReturn(10L);
+
+        assertThatThrownBy(() -> useCase().execute("raw", LoginContext.UNKNOWN))
+                .isInstanceOf(AuthenticationFailedException.class);
+        verify(tokens, never()).revokeFamily(any(), any(), anyString());
+    }
+
+    @Test
+    void logoutRevokedTokenDoesNotTriggerReuseRevocation() {
+        RefreshToken token = token(UUID.randomUUID(), UUID.randomUUID(), LocalDateTime.now().minusHours(1),
+                LocalDateTime.now().minusMinutes(1), "LOGOUT");
+        when(hashes.hash("raw")).thenReturn("hash");
+        when(tokens.findUserIdByTokenHash("hash")).thenReturn(Optional.of(token.getUserId()));
+        when(tokens.findByTokenHashForUpdate("hash")).thenReturn(Optional.of(token));
+
+        assertThatThrownBy(() -> useCase().execute("raw", LoginContext.UNKNOWN))
+                .isInstanceOf(AuthenticationFailedException.class);
+        verify(tokens, never()).revokeFamily(any(), any(), anyString());
+    }
+
+    @Test
+    void absoluteSessionExpiryRevokesFamily() {
+        UUID familyId = UUID.randomUUID();
+        RefreshToken token = token(UUID.randomUUID(), familyId, LocalDateTime.now().minusDays(31), null, null);
+        when(hashes.hash("raw")).thenReturn("hash");
+        when(tokens.findUserIdByTokenHash("hash")).thenReturn(Optional.of(token.getUserId()));
+        when(tokens.findByTokenHashForUpdate("hash")).thenReturn(Optional.of(token));
+        when(issuer.sessionExpired(eq(token.getSessionStartedAt()), any())).thenReturn(true);
+
+        assertThatThrownBy(() -> useCase().execute("raw", LoginContext.UNKNOWN))
+                .isInstanceOf(AuthenticationFailedException.class);
+        verify(tokens).revokeFamily(eq(familyId), any(), eq("SESSION_REVOKED"));
+    }
+
+    @Test
+    void inactiveUserCannotRefresh() {
         UUID userId = UUID.randomUUID();
-        RefreshToken storedToken = RefreshToken.builder()
-                .id(UUID.randomUUID())
-                .userId(userId)
-                .tokenHash("hashed-token")
-                .expiresAt(LocalDateTime.now().plusHours(1))
-                .build();
-        User user = User.builder()
-                .id(userId)
-                .email(new Email("john@example.com"))
-                .fullName("John Doe")
-                .status(UserStatus.INACTIVE)
-                .build();
-        when(tokenHashService.hash("refresh-1")).thenReturn("hashed-token");
-        when(refreshTokenRepository.findByTokenHash("hashed-token")).thenReturn(Optional.of(storedToken));
-        when(refreshTokenRepository.consumeActiveToken(eq("hashed-token"), any(LocalDateTime.class))).thenReturn(Optional.of(storedToken));
-        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        RefreshToken token = token(userId, UUID.randomUUID(), LocalDateTime.now().minusHours(1), null, null);
+        User user = User.builder().id(userId).email(new Email("inactive@example.com"))
+                .fullName("Inactive User").status(UserStatus.INACTIVE).build();
+        when(hashes.hash("raw")).thenReturn("hash");
+        when(tokens.findUserIdByTokenHash("hash")).thenReturn(Optional.of(token.getUserId()));
+        when(tokens.findByTokenHashForUpdate("hash")).thenReturn(Optional.of(token));
+        when(tokens.consumeActiveToken(eq("hash"), any(), eq("ROTATED"), isNull(), any(), isNull(), isNull()))
+                .thenReturn(Optional.of(token));
+        when(users.findById(userId)).thenReturn(Optional.of(user));
 
-        assertThatThrownBy(() -> useCase.execute("refresh-1"))
-                .isInstanceOf(AuthenticationFailedException.class)
-                .hasMessage("Refresh token không hợp lệ");
-        verify(refreshTokenRepository, never()).save(storedToken);
-        verifyNoInteractions(authTokenIssuer);
-    }
-
-    private User activeUser(UUID userId) {
-        return User.builder()
-                .id(userId)
-                .email(new Email("john@example.com"))
-                .fullName("John Doe")
-                .status(UserStatus.ACTIVE)
-                .build();
+        assertThatThrownBy(() -> useCase().execute("raw", LoginContext.UNKNOWN))
+                .isInstanceOf(AuthenticationFailedException.class);
+        verify(issuer, never()).issue(any(User.class), any(UUID.class), any(LocalDateTime.class), any(LoginContext.class));
     }
 
     private RefreshTokenUseCase useCase() {
-        return new RefreshTokenUseCase(refreshTokenRepository, userRepository, tokenHashService, authTokenIssuer, userLock);
+        return new RefreshTokenUseCase(tokens, users, hashes, issuer, userLock);
     }
 
-    private RefreshToken tokenExpiringAt(LocalDateTime expiresAt) {
-        return RefreshToken.builder()
-                .id(UUID.randomUUID())
-                .userId(UUID.randomUUID())
-                .tokenHash("hashed-token")
-                .expiresAt(expiresAt)
-                .build();
+    private RefreshToken token(UUID userId, UUID familyId, LocalDateTime started,
+                               LocalDateTime revokedAt, String reason) {
+        return RefreshToken.builder().id(UUID.randomUUID()).userId(userId).familyId(familyId)
+                .sessionStartedAt(started).tokenHash("hash").expiresAt(LocalDateTime.now().plusDays(5))
+                .revokedAt(revokedAt).revokedReason(reason).build();
     }
 
-    @Test
-    void rejectsATokenThatAlreadyGotItsNewPair() {
-        RefreshToken storedToken = tokenExpiringAt(LocalDateTime.now().plusHours(1));
-        when(tokenHashService.hash("refresh-1")).thenReturn("hashed-token");
-        when(refreshTokenRepository.findByTokenHash("hashed-token")).thenReturn(Optional.of(storedToken));
-        when(refreshTokenRepository.consumeActiveToken(eq("hashed-token"), any(LocalDateTime.class)))
-                .thenReturn(Optional.of(storedToken))
-                .thenReturn(Optional.empty());
-        when(userRepository.findById(storedToken.getUserId())).thenReturn(Optional.of(activeUser(storedToken.getUserId())));
-        when(authTokenIssuer.issue(any(User.class))).thenReturn(new AuthTokenResult("access-2", "refresh-2", 3600, 604800));
-        RefreshTokenUseCase useCase = useCase();
-
-        useCase.execute("refresh-1");
-
-        assertThatThrownBy(() -> useCase.execute("refresh-1"))
-                .isInstanceOf(AuthenticationFailedException.class)
-                .hasMessage("Refresh token không hợp lệ");
-        verify(authTokenIssuer, org.mockito.Mockito.times(1)).issue(any(User.class));
-    }
-
-    @Test
-    void rejectsAnExpiredTokenEvenIfTheRepositoryStillHandsItBack() {
-        RefreshToken storedToken = tokenExpiringAt(LocalDateTime.now().minusSeconds(1));
-        when(tokenHashService.hash("refresh-1")).thenReturn("hashed-token");
-        when(refreshTokenRepository.findByTokenHash("hashed-token")).thenReturn(Optional.of(storedToken));
-        when(refreshTokenRepository.consumeActiveToken(eq("hashed-token"), any(LocalDateTime.class)))
-                .thenReturn(Optional.of(storedToken));
-
-        assertThatThrownBy(() -> useCase().execute("refresh-1"))
-                .isInstanceOf(AuthenticationFailedException.class)
-                .hasMessage("Refresh token không hợp lệ");
-        verifyNoInteractions(userRepository, authTokenIssuer);
+    private User activeUser(UUID id) {
+        return User.builder().id(id).email(new Email("active@example.com")).fullName("Active User")
+                .status(UserStatus.ACTIVE).build();
     }
 }

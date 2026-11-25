@@ -116,12 +116,13 @@ public class AuthController {
     public AuthTokenResponse refresh(
             @CookieValue(name = "${app.auth.cookie.refresh-token-name:refresh_token}", required = false) String cookieRefreshToken,
             @RequestBody(required = false) RefreshRequest request,
+            HttpServletRequest httpRequest,
             HttpServletResponse response
     ) {
         String token = (cookieRefreshToken != null && !cookieRefreshToken.isBlank())
                 ? cookieRefreshToken
                 : (request == null ? null : request.refreshToken());
-        AuthTokenResult tokens = refreshTokenUseCase.execute(token);
+        AuthTokenResult tokens = refreshTokenUseCase.execute(token, LoginContextResolver.from(httpRequest));
         authCookieService.addAuthCookies(
                 response,
                 tokens.accessToken(),

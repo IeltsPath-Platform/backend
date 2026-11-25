@@ -72,7 +72,7 @@ class ChangePasswordUseCaseTest {
         useCase.execute(new ChangePasswordCommand(id, "old-password", "next-password"));
 
         assertEquals("new-hash", user.getPasswordHash());
-        verify(tokens).revokeAllActiveForUser(eq(id), any());
+        verify(tokens).revokeAllActiveForUser(eq(id), any(), eq("PASSWORD_CHANGE"));
         assertTrue(stored.isEmpty());
     }
 

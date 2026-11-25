@@ -20,7 +20,7 @@ public class LogoutUseCase {
         }
         refreshTokenRepository.findByTokenHash(tokenHashService.hash(refreshToken))
                 .ifPresent(storedToken -> {
-                    storedToken.revoke(LocalDateTime.now());
+                    storedToken.revoke(LocalDateTime.now(), "LOGOUT");
                     refreshTokenRepository.save(storedToken);
                 });
     }

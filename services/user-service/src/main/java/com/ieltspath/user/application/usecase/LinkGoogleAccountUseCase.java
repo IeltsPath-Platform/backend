@@ -93,7 +93,7 @@ public class LinkGoogleAccountUseCase {
         if (unverifiedBefore && user.getPasswordHash() != null && !user.getPasswordHash().isBlank()) {
             userRepository.clearPasswordHash(user.getId());
             user.clearPassword();
-            refreshTokenRepository.revokeAllActiveForUser(user.getId(), now);
+            refreshTokenRepository.revokeAllActiveForUser(user.getId(), now, "GOOGLE_LINK");
         }
         if (unverifiedBefore) {
             user.markEmailVerified(now);

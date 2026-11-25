@@ -65,7 +65,7 @@ public class ChangePasswordUseCase {
         }
         user.changePassword(encoder.encode(command.newPassword()));
         users.save(user);
-        refreshTokens.revokeAllActiveForUser(userId, LocalDateTime.now());
+        refreshTokens.revokeAllActiveForUser(userId, LocalDateTime.now(), "PASSWORD_CHANGE");
         attemptsRepository.deleteByUserId(userId);
         UUID eventId = UUID.randomUUID();
         notices.enqueue(eventId, userId, PasswordChangedV1.EVENT_TYPE, new PasswordChangedV1(eventId,

@@ -12,7 +12,9 @@ class AuthTokenPropertiesTest {
                 "urn:code-base:auth",
                 "",
                 3600,
-                604800))
+                604800,
+                10,
+                0))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("app.auth.external-jwt-secret must be configured");
     }

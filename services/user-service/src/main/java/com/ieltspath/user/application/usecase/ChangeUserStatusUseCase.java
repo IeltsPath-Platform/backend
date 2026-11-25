@@ -12,12 +12,15 @@ import com.ieltspath.user.application.port.UserLock;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.ieltspath.user.domain.repository.RefreshTokenRepository;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
 public class ChangeUserStatusUseCase {
     private final UserRepository userRepository;
     private final UserLock userLock;
+    private final RefreshTokenRepository refreshTokens;
 
     @Transactional
     public User execute(ChangeUserStatusCommand command) {
@@ -41,6 +44,10 @@ public class ChangeUserStatusUseCase {
             throw new UserManagementRuleViolationException("LAST_ADMIN", "The last active administrator cannot be deactivated");
         }
         user.changeStatus(command.status());
-        return userRepository.save(user);
+        User saved = userRepository.save(user);
+        if (command.status() != UserStatus.ACTIVE) {
+            refreshTokens.revokeAllActiveForUser(user.getId(), LocalDateTime.now(), "ADMIN");
+        }
+        return saved;
     }
 }

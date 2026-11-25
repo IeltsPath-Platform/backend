@@ -100,6 +100,21 @@ class GoogleSignInConcurrencyIT {
                         .expiresAt(LocalDateTime.now().plusDays(7)).build());
                 return new AuthTokenResult("access-" + UUID.randomUUID(), refreshToken, 3600, 604800);
             });
+            when(issuer.reuseGraceSeconds()).thenReturn(10L);
+            when(issuer.sessionExpired(any(), any())).thenReturn(false);
+            when(issuer.issue(any(User.class), any(UUID.class), any(LocalDateTime.class), any(LoginContext.class)))
+                    .thenAnswer(call -> {
+                        User user = call.getArgument(0);
+                        UUID familyId = call.getArgument(1);
+                        LocalDateTime startedAt = call.getArgument(2);
+                        String refreshToken = "rotated-" + UUID.randomUUID();
+                        RefreshToken saved = refreshTokens.save(RefreshToken.builder().userId(user.getId())
+                                .familyId(familyId).sessionStartedAt(startedAt)
+                                .tokenHash(tokenHashService.hash(refreshToken))
+                                .expiresAt(LocalDateTime.now().plusDays(7)).build());
+                        return new AuthTokenResult("access-" + UUID.randomUUID(), refreshToken, 3600, 604800,
+                                saved.getId());
+                    });
             return issuer;
         }
     }
@@ -184,6 +199,45 @@ class GoogleSignInConcurrencyIT {
             assertThat(jdbc.queryForObject("SELECT revoked_at IS NULL FROM refresh_tokens WHERE token_hash = ?",
                     Boolean.class, tokenHashService.hash(oldRawToken))).isFalse();
             assertThat(jdbc.queryForObject("SELECT password_hash FROM users WHERE id = ?", String.class, userId)).isNull();
+        }
+    }
+
+    @Test
+    void concurrentRefreshRequestsUsingTheSameTokenHaveOnlyOneSuccess() throws Exception {
+        Set<Role> customerRole = new HashSet<>(roles.findByNames(Set.of(RoleName.CUSTOMER.name())));
+        User user = users.save(User.builder().email(new Email("refresh-race@example.com"))
+                .passwordHash("existing-hash").fullName("Refresh Race").status(UserStatus.ACTIVE)
+                .roles(customerRole).build());
+        String raw = "one-time-refresh-token";
+        RefreshToken original = refreshTokens.save(RefreshToken.builder().userId(user.getId())
+                .tokenHash(tokenHashService.hash(raw)).expiresAt(LocalDateTime.now().plusDays(7)).build());
+
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            CountDownLatch ready = new CountDownLatch(2);
+            CountDownLatch start = new CountDownLatch(1);
+            var first = pool.submit(() -> runConcurrent(ready, start,
+                    () -> refreshTokenUseCase.execute(raw, LoginContext.UNKNOWN)));
+            var second = pool.submit(() -> runConcurrent(ready, start,
+                    () -> refreshTokenUseCase.execute(raw, LoginContext.UNKNOWN)));
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            int successes = 0;
+            int rejected = 0;
+            for (var future : java.util.List.of(first, second)) {
+                try {
+                    future.get(30, TimeUnit.SECONDS);
+                    successes++;
+                } catch (java.util.concurrent.ExecutionException failure) {
+                    assertThat(failure.getCause()).isInstanceOf(AuthenticationFailedException.class);
+                    rejected++;
+                }
+            }
+            assertThat(successes).isEqualTo(1);
+            assertThat(rejected).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM refresh_tokens WHERE family_id = ? AND revoked_at IS NULL",
+                    Integer.class, original.getFamilyId())).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT replaced_by_id IS NOT NULL FROM refresh_tokens WHERE id = ?",
+                    Boolean.class, original.getId())).isTrue();
         }
     }
 
