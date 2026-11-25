@@ -6,6 +6,9 @@ import com.ieltspath.content.domain.repository.LessonAuthoringRepository;
 import com.ieltspath.content.domain.vo.PublicationStatus;
 import com.ieltspath.content.domain.vo.QuestionPurpose;
 import com.ieltspath.content.domain.vo.Skill;
+import com.ieltspath.content.application.usecase.ListQuestionsUseCase;
+import com.ieltspath.content.application.usecase.ListQuestionsWithIncludesUseCase;
+import com.ieltspath.content.application.result.QuestionResult;
 import com.ieltspath.content.infrastructure.persistence.mapper.QuestionPersistenceMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -90,6 +93,21 @@ class QuestionRepositoryAdapterPageTest {
         jdbc.update("INSERT INTO content_sections(id,package_version_id,title,sort_order) VALUES(?,?,?,0)",
                 sectionId, packageVersionId, "Section");
         return sectionId;
+    }
+
+    private UUID knowledgePoint(String code) {
+        UUID topicId = UUID.randomUUID();
+        UUID pointId = UUID.randomUUID();
+        jdbc.update("INSERT INTO topics(id,code,name) VALUES(?,?,?)", topicId, "T-" + code, code);
+        jdbc.update("INSERT INTO knowledge_points(id,topic_id,code,name,kind,status,skill,learning_type,cefr_level) "
+                        + "VALUES(?,?,?,?,'STRATEGY','ACTIVE','READING','CONCEPT','C2')",
+                pointId, topicId, "KP-" + code, code);
+        return pointId;
+    }
+
+    private void addQuestionPoint(UUID versionId, UUID pointId) {
+        jdbc.update("INSERT INTO question_knowledge_points(question_version_id,knowledge_point_id) VALUES(?,?)",
+                versionId, pointId);
     }
 
     private long count(String where) {
@@ -210,6 +228,48 @@ class QuestionRepositoryAdapterPageTest {
         assertThat(lessonAuthoring.questionVersionsOwnedElsewhere(currentBlock,
                 List.of(currentVersion, otherVersion, sectionVersion, freeVersion)))
                 .containsExactlyInAnyOrder(otherVersion, sectionVersion);
+    }
+
+    @Test
+    void combinesOwnershipIncludesFreeOnlyExceptedBlockAndKnowledgePointFiltersBeforePaging() {
+        Instant at = Instant.parse("2105-01-01T00:00:00Z");
+        UUID point = knowledgePoint("MATCH");
+        UUID otherPoint = knowledgePoint("OTHER");
+        UUID currentBlock = lessonBlock("COMBINED_CURRENT");
+        UUID otherBlock = lessonBlock("COMBINED_OTHER");
+        UUID currentVersion = publishedVersion(question("READING", "LEARNING", "PUBLISHED", at), "Current");
+        UUID firstFreeVersion = publishedVersion(question("READING", "LEARNING", "PUBLISHED", at.plusSeconds(1)), "First free");
+        UUID secondFreeVersion = publishedVersion(question("READING", "LEARNING", "PUBLISHED", at.plusSeconds(2)), "Second free");
+        UUID otherOwnerVersion = publishedVersion(question("READING", "LEARNING", "PUBLISHED", at.plusSeconds(3)), "Other owner");
+        UUID otherPointVersion = publishedVersion(question("READING", "LEARNING", "PUBLISHED", at.plusSeconds(4)), "Other point");
+        publishedVersion(question("READING", "LEARNING", "PUBLISHED", at.plusSeconds(5)), "Untagged");
+        jdbc.update("INSERT INTO lesson_block_questions(block_id,question_version_id,sort_order) VALUES(?,?,0)", currentBlock, currentVersion);
+        jdbc.update("INSERT INTO lesson_block_questions(block_id,question_version_id,sort_order) VALUES(?,?,0)", otherBlock, otherOwnerVersion);
+        addQuestionPoint(currentVersion, point);
+        addQuestionPoint(firstFreeVersion, point);
+        addQuestionPoint(secondFreeVersion, point);
+        addQuestionPoint(otherOwnerVersion, point);
+        addQuestionPoint(otherPointVersion, otherPoint);
+
+        var useCase = new ListQuestionsWithIncludesUseCase(new ListQuestionsUseCase(questions), questions, lessonAuthoring);
+        var firstPage = useCase.execute(Skill.READING, QuestionPurpose.LEARNING, PublicationStatus.PUBLISHED,
+                null, 0, 1, java.util.Set.of("ownership", "preview"), true, currentBlock, List.of(point));
+        var secondPage = useCase.execute(Skill.READING, QuestionPurpose.LEARNING, PublicationStatus.PUBLISHED,
+                null, 1, 1, java.util.Set.of("ownership", "preview"), true, currentBlock, List.of(point));
+
+        assertThat(firstPage.totalElements()).isEqualTo(3);
+        assertThat(secondPage.totalElements()).isEqualTo(3);
+        assertThat(firstPage.totalPages()).isEqualTo(3);
+        assertThat(List.of(firstPage, secondPage).stream().flatMap(page -> page.items().stream())
+                .map(QuestionResult::currentPublishedVersionId))
+                .containsExactly(secondFreeVersion, firstFreeVersion).doesNotHaveDuplicates();
+        assertThat(firstPage.items().getFirst().ownedElsewhere()).isFalse();
+        assertThat(firstPage.items().getFirst().knowledgePoints()).isNotEmpty();
+        assertThat(questions.findFreePageByKnowledgePoints(Skill.READING, QuestionPurpose.LEARNING,
+                PublicationStatus.PUBLISHED, null, currentBlock, List.of(point), 2, 1).items())
+                .extracting(Question::getCurrentPublishedVersionId).containsExactly(currentVersion);
+        assertThat(questions.findFreePageByKnowledgePoints(Skill.READING, QuestionPurpose.LEARNING,
+                PublicationStatus.PUBLISHED, null, currentBlock, List.of(point), 3, 1).items()).isEmpty();
     }
 
     private static List<UUID> ids(QuestionRepository.Page page) {

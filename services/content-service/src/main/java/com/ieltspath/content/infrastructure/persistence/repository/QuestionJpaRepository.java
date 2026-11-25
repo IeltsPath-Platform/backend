@@ -9,6 +9,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
@@ -29,6 +31,13 @@ public interface QuestionJpaRepository extends JpaRepository<QuestionJpaEntity, 
 
     @EntityGraph(attributePaths = {"versions"})
     List<QuestionJpaEntity> findAllByIdIn(List<UUID> ids);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {"versions"})
+    @Query("select distinct q from QuestionJpaEntity q where q.id in "
+            + "(select owner.id from QuestionJpaEntity owner join owner.versions version where version.id in :versionIds) "
+            + "order by q.id")
+    List<QuestionJpaEntity> findAllByVersionIdsForUpdate(@Param("versionIds") List<UUID> versionIds);
 
     @Query(value = "SELECT q FROM QuestionJpaEntity q WHERE (:skill IS NULL OR q.skill = :skill)"
             + " AND (:purpose IS NULL OR q.purpose = :purpose) AND (:status IS NULL OR q.status = :status)"

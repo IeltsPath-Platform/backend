@@ -53,16 +53,17 @@ class QuestionDraftAuthorizationTest {
     @WithMockUser(roles = {"CUSTOMER", "EXAMINER", "ADMIN"})
     void onlyAContentAuthorMayUseQuestionDrafts() throws Exception {
         UUID id = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
         String base = "/api/content/admin/ai-drafts";
 
         mockMvc.perform(post(base + "/questions").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"knowledgePointId\":\"" + id + "\",\"questionType\":\"MULTIPLE_CHOICE\",\"count\":3,"
                         + "\"difficulty\":\"MEDIUM\"}")).andExpect(status().isForbidden());
-        mockMvc.perform(patch(base + "/{id}/items/{index}", id, 0).contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(patch(base + "/{id}/items/{itemId}?revision=0", id, itemId).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"stem\":\"x\"}")).andExpect(status().isForbidden());
-        mockMvc.perform(delete(base + "/{id}/items/{index}", id, 0)).andExpect(status().isForbidden());
+        mockMvc.perform(delete(base + "/{id}/items/{itemId}?revision=0", id, itemId)).andExpect(status().isForbidden());
         mockMvc.perform(post(base + "/{id}/approve", id).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"itemIndexes\":[0]}")).andExpect(status().isForbidden());
+                .content("{\"itemIds\":[\"" + itemId + "\"],\"revision\":0}")).andExpect(status().isForbidden());
 
         verifyNoInteractions(request, approve, edit);
     }

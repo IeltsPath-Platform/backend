@@ -35,6 +35,15 @@ public class JdbcAiUsageQuota implements AiUsageQuota {
     }
 
     @Override
+    public int used(UUID userId, LocalDate day, AiUsageKind kind) {
+        Integer count = jdbc.queryForObject("""
+                SELECT COALESCE((SELECT count FROM ai_usage_daily
+                    WHERE user_id = :userId AND usage_date = :day AND kind = :kind), 0)
+                """, params(userId, day, kind), Integer.class);
+        return count == null ? 0 : count;
+    }
+
+    @Override
     public void refund(UUID userId, LocalDate day, AiUsageKind kind) {
         jdbc.update("""
                 UPDATE ai_usage_daily SET count = count - 1

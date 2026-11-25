@@ -35,10 +35,18 @@ public class ListQuestionsWithIncludesUseCase {
 
     public ListQuestionsUseCase.Page execute(Skill skill, QuestionPurpose purpose, PublicationStatus status,
                                              String code, int page, int size, Set<String> includes,
-                                             boolean onlyFree, UUID exceptBlockId) {
-        ListQuestionsUseCase.Page result = onlyFree
-                ? listQuestions.executeOnlyFree(skill, purpose, status, code, exceptBlockId, page, size)
-                : listQuestions.execute(skill, purpose, status, code, page, size);
+                                             boolean onlyFree, UUID exceptBlockId, List<UUID> knowledgePointIds) {
+        boolean filterByPoints = knowledgePointIds != null && !knowledgePointIds.isEmpty();
+        ListQuestionsUseCase.Page result;
+        if (onlyFree && filterByPoints) {
+            result = listQuestions.executeOnlyFree(skill, purpose, status, code, exceptBlockId, knowledgePointIds, page, size);
+        } else if (onlyFree) {
+            result = listQuestions.executeOnlyFree(skill, purpose, status, code, exceptBlockId, page, size);
+        } else if (filterByPoints) {
+            result = listQuestions.execute(skill, purpose, status, code, knowledgePointIds, page, size);
+        } else {
+            result = listQuestions.execute(skill, purpose, status, code, page, size);
+        }
         if (includes.isEmpty() || result.items().isEmpty()) return result;
 
         List<UUID> versionIds = result.items().stream().map(QuestionResult::currentPublishedVersionId)

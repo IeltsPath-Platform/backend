@@ -66,6 +66,8 @@ Block request fields are selected by `blockType`:
 
 `ASSET` uses `assetId`; `VOCABULARY` uses `vocabularySenseIds`; `EXERCISE` uses `questionVersionIds`. Only `TEXT`
 accepts `knowledgePointIds`. A block must supply the field matching its type and no incompatible type-specific fields.
+Updating an exercise block may also include `expectedQuestionVersionIds`; if it differs from the saved list, the API
+returns `409 BLOCK_CHANGED` without saving.
 Invalid client block data returns `422` with `details.code = LESSON_BLOCK_INVALID`.
 
 `TEXT`, `ASSET`, and `VOCABULARY` blocks may be edited or removed in any lesson state. For an `EXERCISE` block,
@@ -85,6 +87,10 @@ question version must be `PUBLISHED` with `purpose = LEARNING` and not owned by 
 block KP must be active, and each vocabulary sense must exist in Library. Invalid lessons return `422` with
 `details.code = LESSON_NOT_PUBLISHABLE` and an `issues` array of safe reason codes. An unavailable Library Service
 returns `503`.
+
+`POST /api/content/admin/lessons/{lessonId}/questions/publish-drafts` publishes every valid DRAFT question version in
+the lesson's exercise blocks atomically and returns `{ "publishedCount": N }`. If any question cannot be published,
+none are published.
 
 `POST /api/content/admin/lessons/{lessonId}/archive` archives the lesson and returns its updated detail. Learning
 then omits the lesson from learner-facing reads.

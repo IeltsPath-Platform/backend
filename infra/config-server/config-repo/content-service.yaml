@@ -38,9 +38,20 @@ content:
   ai:
     batch-size: 2
     stale-after: PT10M
+    max-attempts: 3
     daily-limit: 20
     max-items-per-request: 20
     quota-zone: Asia/Ho_Chi_Minh
+    section-questions:
+      min-source-words: 80
+      max-source-chars: 20000
+      max-count: 10
+      duplicate-threshold: 0.8
+      same-answer-threshold: 0.5
+      max-answer-words: 4
+      max-copied-words: 12
+      max-stem-chars: 400
+      ready-ttl: P14D
 
 app:
   storage:

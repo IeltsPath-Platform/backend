@@ -3,6 +3,7 @@ package com.ieltspath.content.infrastructure.config;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import com.ieltspath.content.application.result.SectionQuestionRules;
 
 import java.time.Clock;
 import java.time.ZoneId;
@@ -18,5 +19,14 @@ public class AiDraftConfiguration {
     @Bean
     Clock aiClock(ContentAiProperties properties) {
         return Clock.system(ZoneId.of(properties.getAi().getQuotaZone()));
+    }
+
+    @Bean
+    SectionQuestionRules sectionQuestionRules(ContentAiProperties properties) {
+        var configured = properties.getAi().getSectionQuestions();
+        return new SectionQuestionRules(configured.getMinSourceWords(), configured.getMaxSourceChars(),
+                configured.getMaxCount(), configured.getDuplicateThreshold(), configured.getSameAnswerThreshold(),
+                configured.getMaxAnswerWords(), configured.getMaxCopiedWords(), configured.getMaxStemChars(),
+                properties.getAi().getDailyLimit());
     }
 }

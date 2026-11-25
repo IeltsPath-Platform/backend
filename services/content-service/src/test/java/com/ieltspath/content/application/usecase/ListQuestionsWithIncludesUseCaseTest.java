@@ -47,7 +47,7 @@ class ListQuestionsWithIncludesUseCaseTest {
 
         var page = new ListQuestionsWithIncludesUseCase(listQuestions, questions, lessonAuthoring)
                 .execute(Skill.READING, QuestionPurpose.LEARNING, PublicationStatus.PUBLISHED,
-                        "Q-1", 0, 25, Set.of("ownership", "preview"), false, exceptBlock);
+                        "Q-1", 0, 25, Set.of("ownership", "preview"), false, exceptBlock, null);
 
         QuestionResult result = page.items().getFirst();
         assertThat(result.ownedElsewhere()).isTrue();
@@ -67,7 +67,7 @@ class ListQuestionsWithIncludesUseCaseTest {
                 .thenReturn(new ListQuestionsUseCase.Page(1, 0, 25, List.of(question)));
 
         var page = new ListQuestionsWithIncludesUseCase(listQuestions, questions, lessonAuthoring)
-                .execute(null, null, null, null, 0, 25, Set.of(), false, null);
+                .execute(null, null, null, null, 0, 25, Set.of(), false, null, null);
 
         assertThat(page.items().getFirst()).isSameAs(question);
     }

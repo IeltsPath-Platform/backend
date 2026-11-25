@@ -4,6 +4,7 @@ import com.ieltspath.content.domain.aggregate.AiDraft;
 import com.ieltspath.content.domain.repository.AiDraftRepository;
 import com.ieltspath.content.domain.vo.DraftKind;
 import com.ieltspath.content.domain.vo.DraftStatus;
+import com.ieltspath.content.domain.vo.AiDraftClaim;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -74,6 +75,36 @@ public class JdbcAiDraftRepository implements AiDraftRepository {
     }
 
     @Override
+    public Optional<AiDraft> findOpenSectionDraft(UUID authorId, UUID sectionId) {
+        return jdbc.query("SELECT " + COLUMNS + " FROM ai_drafts " + """
+                WHERE requested_by = :authorId AND kind = 'SECTION_QUESTIONS'
+                  AND request ->> 'sectionId' = :sectionId
+                  AND status IN ('QUEUED', 'GENERATING', 'READY')
+                ORDER BY created_at DESC LIMIT 1
+                """, new MapSqlParameterSource().addValue("authorId", authorId)
+                .addValue("sectionId", sectionId.toString()), JdbcAiDraftRepository::map).stream().findFirst();
+    }
+
+    @Override
+    public Optional<AiDraft> findOpenLessonQuestionDraft(UUID authorId, UUID lessonId) {
+        return jdbc.query("SELECT " + COLUMNS + " FROM ai_drafts " + """
+                WHERE requested_by = :authorId AND kind = 'QUESTIONS'
+                  AND request ->> 'lessonId' = :lessonId
+                  AND status IN ('QUEUED', 'GENERATING', 'READY')
+                ORDER BY created_at DESC, id LIMIT 1
+                """, new MapSqlParameterSource().addValue("authorId", authorId)
+                .addValue("lessonId", lessonId.toString()), JdbcAiDraftRepository::map).stream().findFirst();
+    }
+
+    @Override
+    @Transactional
+    public Optional<AiDraft> findByIdForUpdate(UUID id) {
+        return jdbc.query("SELECT " + COLUMNS + " FROM ai_drafts WHERE id = :id FOR UPDATE",
+                        new MapSqlParameterSource("id", id), JdbcAiDraftRepository::map)
+                .stream().findFirst();
+    }
+
+    @Override
     public int deleteIfStatusIn(UUID id, Collection<DraftStatus> statuses) {
         if (statuses.isEmpty()) {
             return 0;
@@ -85,19 +116,24 @@ public class JdbcAiDraftRepository implements AiDraftRepository {
 
     @Override
     public List<AiDraft> findByRequester(UUID requestedBy, DraftKind kind, DraftStatus status, int page, int size) {
-        return jdbc.query("""
-                SELECT %s FROM ai_drafts
-                WHERE requested_by = :requestedBy
-                  AND (CAST(:kind AS VARCHAR) IS NULL OR kind = CAST(:kind AS VARCHAR))
-                  AND (CAST(:status AS VARCHAR) IS NULL OR status = CAST(:status AS VARCHAR))
-                ORDER BY created_at DESC, id
-                LIMIT :size OFFSET :offset
-                """.formatted(COLUMNS), new MapSqlParameterSource()
-                .addValue("requestedBy", requestedBy)
-                .addValue("kind", kind == null ? null : kind.name())
-                .addValue("status", status == null ? null : status.name())
-                .addValue("size", size)
-                .addValue("offset", page * size), JdbcAiDraftRepository::map);
+        return findByRequester(requestedBy, kind == null ? List.of() : List.of(kind), status, page, size);
+    }
+
+    @Override
+    public List<AiDraft> findByRequester(UUID requestedBy, List<DraftKind> kinds, DraftStatus status, int page, int size) {
+        StringBuilder sql = new StringBuilder("SELECT %s FROM ai_drafts WHERE requested_by = :requestedBy".formatted(COLUMNS));
+        MapSqlParameterSource parameters = new MapSqlParameterSource().addValue("requestedBy", requestedBy);
+        if (kinds != null && !kinds.isEmpty()) {
+            sql.append(" AND kind IN (:kinds)");
+            parameters.addValue("kinds", kinds.stream().map(DraftKind::name).toList());
+        }
+        if (status != null) {
+            sql.append(" AND status = :status");
+            parameters.addValue("status", status.name());
+        }
+        sql.append(" ORDER BY created_at DESC, id LIMIT :size OFFSET :offset");
+        parameters.addValue("size", size).addValue("offset", page * size);
+        return jdbc.query(sql.toString(), parameters, JdbcAiDraftRepository::map);
     }
 
     /**
@@ -106,8 +142,8 @@ public class JdbcAiDraftRepository implements AiDraftRepository {
      */
     @Override
     @Transactional
-    public List<UUID> claimQueued(int limit) {
-        return jdbc.queryForList("""
+    public List<AiDraftClaim> claimQueued(int limit) {
+        return jdbc.query("""
                 WITH picked AS (
                     SELECT id FROM ai_drafts
                     WHERE status = 'QUEUED'
@@ -116,20 +152,74 @@ public class JdbcAiDraftRepository implements AiDraftRepository {
                     FOR UPDATE SKIP LOCKED
                 )
                 UPDATE ai_drafts d
-                SET status = 'GENERATING', started_at = CURRENT_TIMESTAMP
+                SET status = 'GENERATING', started_at = CURRENT_TIMESTAMP,
+                    claim_token = gen_random_uuid(), attempt_count = d.attempt_count + 1
                 FROM picked
                 WHERE d.id = picked.id
-                RETURNING d.id
-                """, new MapSqlParameterSource("limit", limit), UUID.class);
+                RETURNING d.id, d.claim_token
+                """, new MapSqlParameterSource("limit", limit),
+                (rs, row) -> new AiDraftClaim(rs.getObject("id", UUID.class), rs.getObject("claim_token", UUID.class)));
     }
 
     @Override
     @Transactional
-    public int requeueStaleGenerating(Instant startedBefore) {
+    public int completeIfClaimed(UUID id, UUID claimToken, String result, String model, String promptVersion,
+                                 Instant now) {
         return jdbc.update("""
-                UPDATE ai_drafts SET status = 'QUEUED', started_at = NULL
-                WHERE status = 'GENERATING' AND started_at < :before
-                """, new MapSqlParameterSource("before", timestamp(startedBefore)));
+                UPDATE ai_drafts
+                SET status = 'READY', result = CAST(:result AS JSONB), model = :model,
+                    prompt_version = :promptVersion, finished_at = :now, error_code = NULL, claim_token = NULL
+                WHERE id = :id AND status = 'GENERATING' AND claim_token = :claimToken
+                """, new MapSqlParameterSource("id", id).addValue("claimToken", claimToken)
+                .addValue("result", result).addValue("model", model).addValue("promptVersion", promptVersion)
+                .addValue("now", timestamp(now)));
+    }
+
+    @Override
+    @Transactional
+    public int failIfClaimed(UUID id, UUID claimToken, String code, Instant now) {
+        return jdbc.update("""
+                UPDATE ai_drafts
+                SET status = 'FAILED', error_code = :code, finished_at = :now, claim_token = NULL
+                WHERE id = :id AND status = 'GENERATING' AND claim_token = :claimToken
+                """, new MapSqlParameterSource("id", id).addValue("claimToken", claimToken)
+                .addValue("code", code).addValue("now", timestamp(now)));
+    }
+
+    @Override
+    @Transactional
+    public List<AiDraft> requeueStaleGenerating(Instant startedBefore, int maxAttempts, Instant now) {
+        return jdbc.query("""
+                WITH stale AS (
+                    SELECT id FROM ai_drafts
+                    WHERE status = 'GENERATING' AND started_at < :before
+                    ORDER BY started_at, id
+                    FOR UPDATE SKIP LOCKED
+                ), updated AS (
+                    UPDATE ai_drafts d
+                    SET status = CASE WHEN d.attempt_count >= :maxAttempts THEN 'FAILED' ELSE 'QUEUED' END,
+                        error_code = CASE WHEN d.attempt_count >= :maxAttempts THEN 'INTERNAL' ELSE d.error_code END,
+                        finished_at = CASE WHEN d.attempt_count >= :maxAttempts THEN :now ELSE d.finished_at END,
+                        started_at = NULL, claim_token = NULL
+                    FROM stale
+                    WHERE d.id = stale.id
+                    RETURNING d.id, d.kind, d.status, d.requested_by, d.request::text AS request,
+                              d.result::text AS result, d.error_code, d.model, d.prompt_version, d.created_at,
+                              d.started_at, d.finished_at, d.reviewed_by, d.reviewed_at, d.review_note
+                )
+                SELECT * FROM updated WHERE status = 'FAILED'
+                """, new MapSqlParameterSource("before", timestamp(startedBefore))
+                .addValue("maxAttempts", maxAttempts).addValue("now", timestamp(now)),
+                JdbcAiDraftRepository::map);
+    }
+
+    @Override
+    public int expireReadySectionDrafts(Instant finishedBefore) {
+        return jdbc.update("""
+                UPDATE ai_drafts SET status = 'EXPIRED'
+                WHERE status = 'READY' AND finished_at < :finishedBefore
+                  AND (kind = 'SECTION_QUESTIONS' OR (kind = 'QUESTIONS' AND jsonb_exists(request, 'lessonId')))
+                """, new MapSqlParameterSource("finishedBefore", timestamp(finishedBefore)));
     }
 
     private static AiDraft map(ResultSet rs, int row) throws SQLException {

@@ -59,10 +59,45 @@ public class QuestionRepositoryAdapter implements QuestionRepository {
     }
 
     @Override
+    public List<Question> findByVersionIdsForUpdate(List<UUID> versionIds) {
+        if (versionIds.isEmpty()) return List.of();
+        return questionJpaRepository.findAllByVersionIdsForUpdate(versionIds).stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
     public Page findPage(Skill skill, QuestionPurpose purpose, PublicationStatus status, String code, int page, int size) {
         var result = questionJpaRepository.findPage(skill, purpose, status, code == null ? "" : code,
                 PageRequest.of(page, size));
         return new Page(result.getTotalElements(), result.getContent().stream().map(mapper::toDomainSummary).toList());
+    }
+
+    @Override
+    public Page findPageByKnowledgePoints(Skill skill, QuestionPurpose purpose, PublicationStatus status, String code,
+                                          List<UUID> knowledgePointIds, int page, int size) {
+        if (knowledgePointIds == null || knowledgePointIds.isEmpty()) return findPage(skill, purpose, status, code, page, size);
+        var params = new org.springframework.jdbc.core.namedparam.MapSqlParameterSource()
+                .addValue("skill", skill == null ? null : skill.name())
+                .addValue("purpose", purpose == null ? null : purpose.name())
+                .addValue("status", status == null ? null : status.name())
+                .addValue("code", code == null ? "" : code)
+                .addValue("ids", knowledgePointIds).addValue("limit", size).addValue("offset", page * size);
+        String where = """
+                WHERE (:skill IS NULL OR q.skill = :skill) AND (:purpose IS NULL OR q.purpose = :purpose)
+                  AND (:status IS NULL OR q.status = :status)
+                  AND (:code = '' OR LOWER(q.code) LIKE LOWER(CONCAT('%', :code, '%')))
+                  AND q.current_published_version_id IS NOT NULL
+                  AND EXISTS (SELECT 1 FROM question_knowledge_points qkp
+                              WHERE qkp.question_version_id = q.current_published_version_id
+                                AND qkp.knowledge_point_id IN (:ids))
+                """;
+        Long total = namedJdbc.queryForObject("SELECT COUNT(*) FROM questions q " + where, params, Long.class);
+        List<UUID> ids = namedJdbc.query("SELECT q.id FROM questions q " + where
+                        + " ORDER BY q.created_at DESC, q.id LIMIT :limit OFFSET :offset", params,
+                (rs, row) -> rs.getObject(1, UUID.class));
+        if (ids.isEmpty()) return new Page(total == null ? 0 : total, List.of());
+        var byId = questionJpaRepository.findAllByIdIn(ids).stream().map(mapper::toDomainSummary)
+                .collect(java.util.stream.Collectors.toMap(Question::getId, q -> q));
+        return new Page(total == null ? 0 : total, ids.stream().map(byId::get).filter(java.util.Objects::nonNull).toList());
     }
 
     @Override
@@ -77,6 +112,43 @@ public class QuestionRepositoryAdapter implements QuestionRepository {
                 : questionJpaRepository.findFreePageExceptBlock(skillValue, purposeValue, statusValue, code == null ? "" : code,
                         exceptBlockId, pageable);
         return new Page(result.getTotalElements(), result.getContent().stream().map(mapper::toDomainSummary).toList());
+    }
+
+    @Override
+    public Page findFreePageByKnowledgePoints(Skill skill, QuestionPurpose purpose, PublicationStatus status, String code,
+                                             UUID exceptBlockId, List<UUID> knowledgePointIds, int page, int size) {
+        if (knowledgePointIds == null || knowledgePointIds.isEmpty())
+            return findFreePage(skill, purpose, status, code, exceptBlockId, page, size);
+        var params = new org.springframework.jdbc.core.namedparam.MapSqlParameterSource()
+                .addValue("skill", skill == null ? null : skill.name())
+                .addValue("purpose", purpose == null ? null : purpose.name())
+                .addValue("status", status == null ? null : status.name())
+                .addValue("code", code == null ? "" : code)
+                .addValue("exceptBlockId", exceptBlockId)
+                .addValue("ids", knowledgePointIds).addValue("limit", size).addValue("offset", page * size);
+        String where = """
+                WHERE (:skill IS NULL OR q.skill = :skill) AND (:purpose IS NULL OR q.purpose = :purpose)
+                  AND (:status IS NULL OR q.status = :status)
+                  AND (:code = '' OR LOWER(q.code) LIKE LOWER(CONCAT('%', :code, '%')))
+                  AND q.current_published_version_id IS NOT NULL
+                  AND EXISTS (SELECT 1 FROM question_knowledge_points qkp
+                              WHERE qkp.question_version_id = q.current_published_version_id
+                                AND qkp.knowledge_point_id IN (:ids))
+                  AND NOT EXISTS (SELECT 1 FROM lesson_block_questions lbq
+                                  WHERE lbq.question_version_id = q.current_published_version_id
+                                    AND (:exceptBlockId IS NULL OR lbq.block_id <> :exceptBlockId))
+                  AND NOT EXISTS (SELECT 1 FROM section_questions sq
+                                  WHERE sq.question_version_id = q.current_published_version_id)
+                """;
+        Long total = namedJdbc.queryForObject("SELECT COUNT(*) FROM questions q " + where, params, Long.class);
+        List<UUID> ids = namedJdbc.query("SELECT q.id FROM questions q " + where
+                        + " ORDER BY q.created_at DESC, q.id LIMIT :limit OFFSET :offset", params,
+                (rs, row) -> rs.getObject(1, UUID.class));
+        if (ids.isEmpty()) return new Page(total == null ? 0 : total, List.of());
+        var byId = questionJpaRepository.findAllByIdIn(ids).stream().map(mapper::toDomainSummary)
+                .collect(java.util.stream.Collectors.toMap(Question::getId, q -> q));
+        return new Page(total == null ? 0 : total,
+                ids.stream().map(byId::get).filter(java.util.Objects::nonNull).toList());
     }
 
     @Override

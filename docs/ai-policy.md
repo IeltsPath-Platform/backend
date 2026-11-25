@@ -107,10 +107,12 @@ Chi tiết route: [ai-drafts-v1](contracts/ai-drafts-v1.md), [question-drafts-v1
   nháp course mà mô hình đã sinh trước đây còn trong `ai_drafts`, vẫn đọc, sửa và duyệt như bản soạn tay: duyệt tạo
   course/topic `INACTIVE`, bài `DRAFT`, đề cuối rỗng `DRAFT`.
 - **Mô hình không quyết định giá trị.** `answer_spec` do server dựng, không lấy từ mô hình; mã lỗi gắn phương án sai phải
-  `ACTIVE` và đã `APPROVED` trong danh mục; câu trùng nguyên văn câu đã có của KP bị loại; độ khó là độ khó đã yêu cầu.
+  `ACTIVE` và đã `APPROVED` trong danh mục; câu trùng hoặc gần giống câu đã có của KP bị loại; độ khó luôn do server đặt `MEDIUM`.
 - **Không dữ liệu học viên trong prompt**, không log prompt hay câu trả lời thô; lỗi gọi mô hình thành mã an toàn, hoàn
   hạn mức ngày và bản nháp `FAILED`. Thiếu cấu hình (`CONTENT_LLM_*`) là `NOT_CONFIGURED`, service vẫn chạy.
 - **Hạn mức theo author và ngày** (`ai_usage_daily`): yêu cầu sinh và import Excel đếm riêng.
+- **Sinh câu theo phần Reading/Listening** dùng duy nhất đoạn văn hoặc transcript của phần đó, chụp cùng SHA-256 trong bản nháp; không gửi dữ liệu học viên. Nguồn, hướng dẫn người soạn và câu hỏi hiện có được serialize thành một đối tượng JSON, coi là dữ liệu không đáng tin cậy chứ không phải chỉ dẫn. Câu được kiểm tra cấu trúc, đáp án, nội dung sao chép và trùng lặp rồi chờ người soạn chọn; duyệt mới tạo câu hỏi `DRAFT` và gắn vào phần. Danh sách bản nháp bỏ `source.text`; chỉ chủ bản nháp xem chi tiết.
+- **Sinh câu cho bài học** dùng mô tả KP cùng tối đa 30 stem hiện có của KP để tránh trùng gần giống; không gửi nội dung người học. Câu được duyệt tạo `DRAFT`, gắn vào block bài tập trong transaction khóa bài trước rồi khóa bản nháp. Prompt `QUESTIONS-v3` ghi dữ liệu curriculum là dữ liệu, không phải chỉ dẫn.
 
 | Quy tắc | Điểm thực thi | Test kiểm tra |
 | --- | --- | --- |

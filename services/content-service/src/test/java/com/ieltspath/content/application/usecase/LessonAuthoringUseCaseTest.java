@@ -81,6 +81,15 @@ class LessonAuthoringUseCaseTest {
         verify(repository, never()).save(any(Lesson.class));
     }
 
+    @Test void refusesAStaleExerciseQuestionSnapshotBeforeReplacingTheBlock() {
+        UUID expected = UUID.randomUUID();
+        assertThatThrownBy(() -> useCase.updateBlock(lessonId, blockId, BlockType.EXERCISE, null, null, null,
+                List.of(), List.of(UUID.randomUUID()), List.of(), List.of(expected)))
+                .isInstanceOfSatisfying(com.ieltspath.content.application.exception.SectionDraftException.class,
+                        failure -> assertThat(failure.code()).isEqualTo("BLOCK_CHANGED"));
+        verify(repository, never()).save(any(Lesson.class));
+    }
+
     @Test void doesNotCheckOwnershipForABlockWithoutQuestions() {
         when(repository.lockAndFindById(lessonId)).thenReturn(Optional.of(lesson(LessonStatus.DRAFT)));
 

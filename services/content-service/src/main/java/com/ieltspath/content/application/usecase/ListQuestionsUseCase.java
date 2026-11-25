@@ -26,11 +26,19 @@ public class ListQuestionsUseCase {
 
     /** One page of the catalog, newest first. {@code page} is zero-based. */
     public Page execute(Skill skill, QuestionPurpose purpose, PublicationStatus status, String code, int page, int size) {
+        return execute(skill, purpose, status, code, List.of(), page, size);
+    }
+
+    public Page execute(Skill skill, QuestionPurpose purpose, PublicationStatus status, String code,
+                        List<UUID> knowledgePointIds, int page, int size) {
         if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
             throw new IllegalArgumentException("Trang phải từ 0 trở lên và kích thước trang từ 1 đến " + MAX_PAGE_SIZE);
         }
         String normalizedCode = code == null ? "" : code.trim();
-        QuestionRepository.Page result = questionRepository.findPage(skill, purpose, status, normalizedCode, page, size);
+        if (knowledgePointIds != null && knowledgePointIds.size() > 50) throw new IllegalArgumentException("Có thể lọc tối đa 50 điểm kiến thức.");
+        QuestionRepository.Page result = knowledgePointIds == null || knowledgePointIds.isEmpty()
+                ? questionRepository.findPage(skill, purpose, status, normalizedCode, page, size)
+                : questionRepository.findPageByKnowledgePoints(skill, purpose, status, normalizedCode, knowledgePointIds, page, size);
         return new Page(result.totalElements(), page, size, result.items().stream().map(QuestionResult::of).toList());
     }
 
@@ -47,6 +55,18 @@ public class ListQuestionsUseCase {
         String normalizedCode = code == null ? "" : code.trim();
         QuestionRepository.Page result = questionRepository.findFreePage(skill, purpose, status, normalizedCode,
                 exceptBlockId, page, size);
+        return new Page(result.totalElements(), page, size, result.items().stream().map(QuestionResult::of).toList());
+    }
+
+    public Page executeOnlyFree(Skill skill, QuestionPurpose purpose, PublicationStatus status, String code,
+                                UUID exceptBlockId, List<UUID> knowledgePointIds, int page, int size) {
+        if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
+            throw new IllegalArgumentException("Trang phải từ 0 trở lên và kích thước trang từ 1 đến " + MAX_PAGE_SIZE);
+        }
+        if (knowledgePointIds != null && knowledgePointIds.size() > 50)
+            throw new IllegalArgumentException("Có thể lọc tối đa 50 điểm kiến thức.");
+        QuestionRepository.Page result = questionRepository.findFreePageByKnowledgePoints(skill, purpose, status,
+                code == null ? "" : code.trim(), exceptBlockId, knowledgePointIds, page, size);
         return new Page(result.totalElements(), page, size, result.items().stream().map(QuestionResult::of).toList());
     }
 

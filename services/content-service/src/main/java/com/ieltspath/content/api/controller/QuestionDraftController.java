@@ -19,6 +19,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.UUID;
 
@@ -47,24 +49,31 @@ public class QuestionDraftController {
     @ResponseStatus(HttpStatus.ACCEPTED)
     public AiDraftResponse requestQuestions(@Valid @RequestBody QuestionDraftRequests.Request body) {
         QuestionDraftRequest command = new QuestionDraftRequest(body.knowledgePointId(), body.questionType(),
-                body.count(), body.difficulty(), body.instructions());
+                body.count(), body.difficulty(), body.instructions(), body.lessonId(), body.blockId());
         return AiDraftResponse.from(request.execute(currentUser.requireUserId(), command), json);
     }
 
-    @PatchMapping("/{id}/items/{index}")
-    public AiDraftResponse editItem(@PathVariable("id") UUID id, @PathVariable("index") int index,
-                                    @Valid @RequestBody QuestionDraftRequests.ItemPatch body) {
-        return AiDraftResponse.from(edit.edit(currentUser.requireUserId(), id, index, body.toCommand()), json);
+    @GetMapping("/questions/open")
+    public AiDraftResponse openForLesson(@RequestParam("lessonId") UUID lessonId) {
+        return AiDraftResponse.from(request.findOpen(currentUser.requireUserId(), lessonId), json);
     }
 
-    @DeleteMapping("/{id}/items/{index}")
-    public AiDraftResponse removeItem(@PathVariable("id") UUID id, @PathVariable("index") int index) {
-        return AiDraftResponse.from(edit.remove(currentUser.requireUserId(), id, index), json);
+    @PatchMapping("/{id}/items/{itemId}")
+    public AiDraftResponse editItem(@PathVariable("id") UUID id, @PathVariable("itemId") UUID itemId,
+                                    @RequestParam("revision") int revision,
+                                    @Valid @RequestBody QuestionDraftRequests.ItemPatch body) {
+        return AiDraftResponse.from(edit.edit(currentUser.requireUserId(), id, itemId, revision, body.toCommand()), json);
+    }
+
+    @DeleteMapping("/{id}/items/{itemId}")
+    public AiDraftResponse removeItem(@PathVariable("id") UUID id, @PathVariable("itemId") UUID itemId,
+                                      @RequestParam("revision") int revision) {
+        return AiDraftResponse.from(edit.remove(currentUser.requireUserId(), id, itemId, revision), json);
     }
 
     @PostMapping("/{id}/approve")
     public AiDraftResponse approveItems(@PathVariable("id") UUID id,
                                         @Valid @RequestBody QuestionDraftRequests.Approve body) {
-        return AiDraftResponse.from(approve.execute(currentUser.requireUserId(), id, body.itemIndexes()), json);
+        return AiDraftResponse.from(approve.execute(currentUser.requireUserId(), id, body.itemIds(), body.revision(), body.createNewBlock()), json);
     }
 }

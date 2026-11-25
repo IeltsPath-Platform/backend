@@ -52,7 +52,8 @@ public class QuestionController {
             @RequestParam(value = "size", defaultValue = "25") int size,
             @RequestParam(value = "include", required = false) String include,
             @RequestParam(value = "exceptBlockId", required = false) UUID exceptBlockId,
-            @RequestParam(value = "onlyFree", defaultValue = "false") boolean onlyFree
+            @RequestParam(value = "onlyFree", defaultValue = "false") boolean onlyFree,
+            @RequestParam(value = "knowledgePointIds", required = false) List<UUID> knowledgePointIds
     ) {
         if (importRef != null) {
             return QuestionPageResponse.from(listQuestionsUseCase.findByImportRef(importRef));
@@ -60,9 +61,9 @@ public class QuestionController {
         Set<String> includes = parseIncludes(include);
         if (!includes.isEmpty() || onlyFree) {
             return QuestionPageResponse.from(listQuestionsWithIncludesUseCase.execute(
-                    skill, purpose, status, code, page, size, includes, onlyFree, exceptBlockId));
+                    skill, purpose, status, code, page, size, includes, onlyFree, exceptBlockId, knowledgePointIds));
         }
-        return QuestionPageResponse.from(listQuestionsUseCase.execute(skill, purpose, status, code, page, size));
+        return QuestionPageResponse.from(listQuestionsUseCase.execute(skill, purpose, status, code, knowledgePointIds, page, size));
     }
 
     private static Set<String> parseIncludes(String include) {
