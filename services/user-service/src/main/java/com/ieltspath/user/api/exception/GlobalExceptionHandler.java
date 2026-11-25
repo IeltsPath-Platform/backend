@@ -25,6 +25,7 @@ import com.ieltspath.user.application.exception.GoogleAccountConflictException;
 import com.ieltspath.user.application.exception.GoogleEmailNotSupportedException;
 import com.ieltspath.user.application.exception.GoogleSignInNotAllowedException;
 import com.ieltspath.user.application.exception.GoogleSignInUnavailableException;
+import com.ieltspath.user.application.exception.GoogleIdTokenInvalidException;
 import com.ieltspath.commonstorage.UploadRejectedException;
 import com.ieltspath.commonstorage.StorageException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -133,6 +134,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AuthenticationFailedException.class)
     ResponseEntity<ErrorResponse> handleAuthenticationFailed(AuthenticationFailedException exception, HttpServletRequest request) {
         return error(HttpStatus.UNAUTHORIZED, exception.getMessage(), request, null);
+    }
+
+    @ExceptionHandler(GoogleIdTokenInvalidException.class)
+    ResponseEntity<ErrorResponse> handleInvalidGoogleToken(GoogleIdTokenInvalidException exception, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(errorBody(HttpStatus.UNAUTHORIZED, exception.getMessage(), request, null, "GOOGLE_ID_TOKEN_INVALID"));
     }
 
     @ExceptionHandler({GoogleSignInNotAllowedException.class, GoogleEmailNotSupportedException.class})

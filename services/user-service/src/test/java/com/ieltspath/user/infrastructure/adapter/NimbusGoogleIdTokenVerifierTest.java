@@ -35,6 +35,7 @@ class NimbusGoogleIdTokenVerifierTest {
     private RestTemplate restTemplate;
     private MockRestServiceServer server;
     private NimbusGoogleIdTokenVerifier verifier;
+    private GoogleAuthProperties properties;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -42,7 +43,7 @@ class NimbusGoogleIdTokenVerifierTest {
         rotatedKey = new RSAKeyGenerator(2048).keyID("rotated-key").generate();
         restTemplate = new RestTemplate();
         server = MockRestServiceServer.createServer(restTemplate);
-        GoogleAuthProperties properties = new GoogleAuthProperties();
+        properties = new GoogleAuthProperties();
         properties.setClientIds(List.of("web-client-id"));
         verifier = new NimbusGoogleIdTokenVerifier(properties, restTemplate);
     }
@@ -108,6 +109,29 @@ class NimbusGoogleIdTokenVerifierTest {
                 .isInstanceOf(GoogleSignInUnavailableException.class);
     }
 
+    @Test
+    void rejectsOldFutureAndMissingIssueTimesWithTheSameInvalidTokenMessage() throws Exception {
+        expectJwks(signingKey);
+        assertStale(token(signingKey, "https://accounts.google.com", List.of("web-client-id"), null, true,
+                Instant.now().plusSeconds(300), Instant.now().minusSeconds(361)));
+        assertStale(token(signingKey, "https://accounts.google.com", List.of("web-client-id"), null, true,
+                Instant.now().plusSeconds(300), Instant.now().plusSeconds(61)));
+        assertStale(token(signingKey, "https://accounts.google.com", List.of("web-client-id"), null, true,
+                Instant.now().plusSeconds(300), null));
+        server.verify();
+    }
+
+    @Test
+    void acceptsTokensInsideClockToleranceAndCanDisableAgeValidation() throws Exception {
+        expectJwks(signingKey);
+        assertThat(verifier.verify(token(signingKey, "https://accounts.google.com", List.of("web-client-id"), null,
+                true, Instant.now().plusSeconds(300), Instant.now().minusSeconds(359))).subject()).isEqualTo("subject");
+        properties.setMaxTokenAgeSeconds(0);
+        assertThat(verifier.verify(token(signingKey, "https://accounts.google.com", List.of("web-client-id"), null,
+                true, Instant.now().plusSeconds(300), Instant.now().minusSeconds(3600))).subject()).isEqualTo("subject");
+        server.verify();
+    }
+
     private void expectJwks(RSAKey key) {
         server.expect(requestTo(JWKS_URI)).andRespond(withSuccess(new JWKSet(key.toPublicJWK()).toString(),
                 MediaType.APPLICATION_JSON));
@@ -115,16 +139,21 @@ class NimbusGoogleIdTokenVerifierTest {
 
     private String token(RSAKey key, String issuer, List<String> audience, String authorizedParty,
                          boolean emailVerified, Instant expiresAt) throws Exception {
+        return token(key, issuer, audience, authorizedParty, emailVerified, expiresAt, Instant.now().minusSeconds(1));
+    }
+
+    private String token(RSAKey key, String issuer, List<String> audience, String authorizedParty,
+                         boolean emailVerified, Instant expiresAt, Instant issuedAt) throws Exception {
         JWTClaimsSet.Builder claims = new JWTClaimsSet.Builder()
                 .issuer(issuer)
                 .subject("subject")
                 .audience(audience)
-                .issueTime(Date.from(Instant.now().minusSeconds(1)))
                 .expirationTime(Date.from(expiresAt))
                 .claim("email", "person@school.edu")
                 .claim("email_verified", emailVerified)
                 .claim("name", "Person")
                 .claim("hd", "school.edu");
+        if (issuedAt != null) claims.issueTime(Date.from(issuedAt));
         if (authorizedParty != null) claims.claim("azp", authorizedParty);
         SignedJWT jwt = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(key.getKeyID()).build(), claims.build());
         jwt.sign(new RSASSASigner(key));
@@ -133,6 +162,11 @@ class NimbusGoogleIdTokenVerifierTest {
 
     private void assertInvalid(String token) {
         assertThatThrownBy(() -> verifier.verify(token)).isInstanceOf(AuthenticationFailedException.class)
+                .hasMessage("Phiên đăng nhập Google không hợp lệ hoặc đã hết hạn. Vui lòng thử lại.");
+    }
+
+    private void assertStale(String token) {
+        assertThatThrownBy(() -> verifier.verify(token)).isInstanceOf(com.ieltspath.user.application.exception.GoogleStaleIdTokenException.class)
                 .hasMessage("Phiên đăng nhập Google không hợp lệ hoặc đã hết hạn. Vui lòng thử lại.");
     }
 }

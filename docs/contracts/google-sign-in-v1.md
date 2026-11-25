@@ -11,6 +11,19 @@
 `idToken` is required and limited to 4096 characters. The browser and mobile clients send the signed Google ID token;
 the User Service verifies it against Google's JWKS before looking up any account.
 
+Before requesting a Google ID token, clients may call public, rate-limited `POST /auth/google/nonce`:
+
+```json
+{ "nonce": "<43-character base64url value>", "expiresInSeconds": 300 }
+```
+
+The response is `Cache-Control: no-store`. Include the nonce in the Google Identity Services request (`nonce`) or Android
+Credential Manager request (`setNonce`). The resulting signed ID token must carry the same nonce; each value can be used
+once. The server stores only its SHA-256 hash. `APP_AUTH_GOOGLE_REQUIRE_NONCE` defaults to `false` during rollout; when
+enabled, tokens without an issued nonce are rejected. Google ID tokens older than five minutes plus 60 seconds of clock
+tolerance, more than 60 seconds in the future, or missing `iat` are rejected with the same generic 401 message. The age
+check can be disabled with `APP_AUTH_GOOGLE_MAX_TOKEN_AGE_SECONDS=0`.
+
 ## Responses
 
 - `200`: same `AuthTokenResponse` body and auth cookies as `POST /auth/login`.
@@ -24,6 +37,8 @@ the User Service verifies it against Google's JWKS before looking up any account
 - `503 GOOGLE_SIGNIN_UNAVAILABLE`: no `GOOGLE_CLIENT_IDS` are configured or Google's signing keys cannot be fetched.
 
 Google sign-in errors use Vietnamese messages while keeping these status codes and stable `code` values.
+Invalid, expired, stale, or replayed Google ID tokens use HTTP 401, top-level code `GOOGLE_ID_TOKEN_INVALID`, and one
+generic Vietnamese message so clients cannot distinguish the rejection reason.
 
 ## Account matching and sessions
 
@@ -45,7 +60,7 @@ is newly linked to an account that already existed, whether or not its password 
 An access token issued before linking remains valid until it expires (at most one hour). Access tokens are not revoked by
 this flow. Unlinking the only login identity remains prohibited by the existing OAuth unlink rule.
 
-The service checks `iss`, `aud`, optional `azp`, `exp`, the RS256 signature, and `email_verified`. A client ID found in
+The service checks `iss`, `aud`, optional `azp`, `exp`, `iat`, the RS256 signature, and `email_verified`. A client ID found in
 `aud` must be listed in comma-separated `GOOGLE_CLIENT_IDS`. Google Workspace addresses are accepted only when `hd`
 matches their domain.
 

@@ -8,6 +8,7 @@ import com.ieltspath.user.application.exception.GoogleSignInUnavailableException
 import com.ieltspath.user.application.exception.LoginLimiterUnavailableException;
 import com.ieltspath.user.application.exception.LoginRateLimitedException;
 import com.ieltspath.user.application.exception.GoogleAccountNotActiveException;
+import com.ieltspath.user.application.exception.GoogleNonceRejectedException;
 import com.ieltspath.user.domain.exception.WeakPasswordException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
@@ -106,5 +107,16 @@ class GlobalExceptionHandlerTest {
                         com.ieltspath.user.domain.vo.UserStatus.LOCKED), request);
         assertThat(response.getStatusCode().value()).isEqualTo(401);
         assertThat(response.getBody().message()).contains("Tài khoản không còn hoạt động");
+    }
+
+    @Test
+    void invalidGoogleNonceUsesTheGenericVietnamese401AndTopLevelCode() {
+        when(request.getRequestURI()).thenReturn("/auth/google");
+        var response = handler.handleInvalidGoogleToken(new GoogleNonceRejectedException(), request);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(401);
+        assertThat(response.getBody().message()).isEqualTo("Phiên đăng nhập Google không hợp lệ hoặc đã hết hạn. Vui lòng thử lại.");
+        assertThat(response.getBody().code()).isEqualTo("GOOGLE_ID_TOKEN_INVALID");
+        assertThat(response.getBody().details()).isNull();
     }
 }

@@ -2,7 +2,11 @@ package com.ieltspath.user.application.result;
 
 import java.util.Locale;
 
-public record GoogleIdentity(String subject, String email, String name, String hostedDomain) {
+public record GoogleIdentity(String subject, String email, String name, String hostedDomain, String nonce) {
+    public GoogleIdentity(String subject, String email, String name, String hostedDomain) {
+        this(subject, email, name, hostedDomain, null);
+    }
+
     public boolean isEmailAuthoritative() {
         if (email == null) {
             return false;

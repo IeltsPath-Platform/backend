@@ -6,6 +6,8 @@ public interface GoogleSignInMetrics {
     enum Result {
         SUCCESS("success"),
         INVALID_TOKEN("invalid_token"),
+        STALE_TOKEN("stale_token"),
+        REPLAY("replay"),
         EMAIL_NOT_SUPPORTED("email_not_supported"),
         NOT_ALLOWED("not_allowed"),
         CONFLICT("conflict"),

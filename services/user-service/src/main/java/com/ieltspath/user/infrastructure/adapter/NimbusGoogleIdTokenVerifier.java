@@ -4,10 +4,11 @@ import com.ieltspath.commonresilience.CallKind;
 import com.ieltspath.commonresilience.DownstreamUnavailableException;
 import com.ieltspath.commonresilience.ResilientCall;
 import com.ieltspath.user.application.exception.GoogleSignInUnavailableException;
+import com.ieltspath.user.application.exception.GoogleStaleIdTokenException;
+import com.ieltspath.user.application.exception.GoogleIdTokenInvalidException;
 import com.ieltspath.user.application.port.GoogleIdTokenVerifier;
 import com.ieltspath.user.application.result.GoogleIdentity;
 import com.ieltspath.user.config.GoogleAuthProperties;
-import com.ieltspath.user.domain.exception.AuthenticationFailedException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -61,17 +62,30 @@ public class NimbusGoogleIdTokenVerifier implements GoogleIdTokenVerifier {
         }
         try {
             Jwt jwt = resilientCall.call("google", CallKind.READ, () -> decode(idToken));
+            validateTokenAge(jwt);
             String subject = jwt.getSubject();
             String email = jwt.getClaimAsString("email");
             if (subject == null || subject.isBlank() || email == null || email.isBlank()) {
-                throw new AuthenticationFailedException("Phiên đăng nhập Google không hợp lệ hoặc đã hết hạn. Vui lòng thử lại.");
+                throw new GoogleIdTokenInvalidException();
             }
-            return new GoogleIdentity(subject, email, jwt.getClaimAsString("name"), jwt.getClaimAsString("hd"));
+            return new GoogleIdentity(subject, email, jwt.getClaimAsString("name"), jwt.getClaimAsString("hd"),
+                    jwt.getClaimAsString("nonce"));
         } catch (BadJwtException invalidToken) {
-            throw new AuthenticationFailedException("Phiên đăng nhập Google không hợp lệ hoặc đã hết hạn. Vui lòng thử lại.");
+            throw new GoogleIdTokenInvalidException();
         } catch (ResourceAccessException | DownstreamUnavailableException | JwtException unavailable) {
             log.warn("Google ID token verification unavailable errorType={}", unavailable.getClass().getSimpleName());
             throw new GoogleSignInUnavailableException(unavailable);
+        }
+    }
+
+    private void validateTokenAge(Jwt jwt) {
+        long maximumAge = properties.getMaxTokenAgeSeconds();
+        if (maximumAge == 0) return;
+        if (jwt.getIssuedAt() == null) throw new GoogleStaleIdTokenException();
+        java.time.Instant now = java.time.Instant.now();
+        if (jwt.getIssuedAt().isBefore(now.minusSeconds(maximumAge + 60))
+                || jwt.getIssuedAt().isAfter(now.plusSeconds(60))) {
+            throw new GoogleStaleIdTokenException();
         }
     }
 

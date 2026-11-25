@@ -6,8 +6,11 @@ import com.ieltspath.user.application.exception.GoogleAccountNotActiveException;
 import com.ieltspath.user.application.exception.GoogleEmailNotSupportedException;
 import com.ieltspath.user.application.exception.GoogleSignInNotAllowedException;
 import com.ieltspath.user.application.exception.GoogleSignInUnavailableException;
+import com.ieltspath.user.application.exception.GoogleNonceRejectedException;
 import com.ieltspath.user.application.port.GoogleIdTokenVerifier;
 import com.ieltspath.user.application.port.GoogleSignInMetrics;
+import com.ieltspath.user.application.port.GoogleNonceStore;
+import com.ieltspath.user.config.GoogleAuthProperties;
 import com.ieltspath.user.application.result.AuthTokenResult;
 import com.ieltspath.user.application.result.GoogleIdentity;
 import com.ieltspath.user.application.result.GoogleSignInResult;
@@ -37,6 +40,7 @@ class GoogleSignInUseCaseTest {
     @Mock LinkGoogleAccountUseCase linker;
     @Mock LoginHistoryRecorder history;
     @Mock GoogleSignInMetrics metrics;
+    @Mock GoogleNonceStore nonceStore;
 
     private GoogleSignInUseCase useCase;
     private final GoogleIdentity identity = new GoogleIdentity("subject", "person@gmail.com", "Person", null);
@@ -46,7 +50,7 @@ class GoogleSignInUseCaseTest {
 
     @BeforeEach
     void setUp() {
-        useCase = new GoogleSignInUseCase(verifier, linker, history, metrics);
+        useCase = new GoogleSignInUseCase(verifier, linker, history, metrics, nonceStore, new GoogleAuthProperties());
         when(verifier.verify("signed-token")).thenReturn(identity);
     }
 
@@ -80,10 +84,75 @@ class GoogleSignInUseCaseTest {
         assertThatThrownBy(() -> useCase.execute("signed-token", context)).isInstanceOf(AuthenticationFailedException.class);
 
         verify(linker, never()).execute(identity);
+        verifyNoInteractions(nonceStore);
         verify(history, never()).recordSuccess(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
         verify(history, never()).recordFailure(org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
         verify(metrics).record(GoogleSignInMetrics.Result.INVALID_TOKEN);
+    }
+
+    @Test
+    void recordsStaleTokenOutcomeWithoutLookingUpAnAccount() {
+        when(verifier.verify("signed-token")).thenThrow(new com.ieltspath.user.application.exception.GoogleStaleIdTokenException());
+
+        assertThatThrownBy(() -> useCase.execute("signed-token", context))
+                .isInstanceOf(com.ieltspath.user.application.exception.GoogleStaleIdTokenException.class)
+                .hasMessage("Phiên đăng nhập Google không hợp lệ hoặc đã hết hạn. Vui lòng thử lại.");
+
+        verify(metrics).record(GoogleSignInMetrics.Result.STALE_TOKEN);
+        verifyNoInteractions(nonceStore);
+        verify(linker, never()).execute(identity);
+    }
+
+    @Test
+    void consumesAValidGoogleNonceExactlyOnce() {
+        GoogleIdentity withNonce = new GoogleIdentity("subject", "person@gmail.com", "Person", null, "nonce-value");
+        when(verifier.verify("signed-token")).thenReturn(withNonce);
+        when(nonceStore.consume("nonce-value")).thenReturn(true);
+        when(linker.execute(withNonce)).thenReturn(result);
+
+        assertThat(useCase.execute("signed-token", context)).isEqualTo(result);
+
+        verify(nonceStore).consume("nonce-value");
+    }
+
+    @Test
+    void rejectsAnUnknownOrReplayedGoogleNonceWithTheGenericInvalidTokenMessage() {
+        GoogleIdentity withNonce = new GoogleIdentity("subject", "person@gmail.com", "Person", null, "nonce-value");
+        when(verifier.verify("signed-token")).thenReturn(withNonce);
+        when(nonceStore.consume("nonce-value")).thenReturn(false);
+
+        assertThatThrownBy(() -> useCase.execute("signed-token", context))
+                .isInstanceOf(GoogleNonceRejectedException.class)
+                .hasMessage("Phiên đăng nhập Google không hợp lệ hoặc đã hết hạn. Vui lòng thử lại.");
+        verify(metrics).record(GoogleSignInMetrics.Result.REPLAY);
+        verify(linker, never()).execute(withNonce);
+    }
+
+    @Test
+    void requiresANonceOnlyWhenTheConfigurationFlagIsEnabled() {
+        GoogleAuthProperties required = new GoogleAuthProperties();
+        required.setRequireNonce(true);
+        useCase = new GoogleSignInUseCase(verifier, linker, history, metrics, nonceStore, required);
+
+        assertThatThrownBy(() -> useCase.execute("signed-token", context))
+                .isInstanceOf(GoogleNonceRejectedException.class);
+        verify(metrics).record(GoogleSignInMetrics.Result.REPLAY);
+        verify(linker, never()).execute(identity);
+    }
+
+    @Test
+    void nonceStoreFailureIsUnavailableWhenNonceIsRequired() {
+        GoogleAuthProperties required = new GoogleAuthProperties();
+        required.setRequireNonce(true);
+        useCase = new GoogleSignInUseCase(verifier, linker, history, metrics, nonceStore, required);
+        GoogleIdentity withNonce = new GoogleIdentity("subject", "person@gmail.com", "Person", null, "nonce-value");
+        when(verifier.verify("signed-token")).thenReturn(withNonce);
+        when(nonceStore.consume("nonce-value")).thenThrow(new IllegalStateException());
+
+        assertThatThrownBy(() -> useCase.execute("signed-token", context))
+                .isInstanceOf(GoogleSignInUnavailableException.class);
+        verify(metrics).record(GoogleSignInMetrics.Result.UNAVAILABLE);
     }
 
     @Test

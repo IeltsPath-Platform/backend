@@ -4,6 +4,8 @@ import com.ieltspath.user.application.command.LoginContext;
 import com.ieltspath.user.application.exception.GoogleAccountNotActiveException;
 import com.ieltspath.user.application.port.GoogleIdTokenVerifier;
 import com.ieltspath.user.application.port.GoogleSignInMetrics;
+import com.ieltspath.user.application.port.GoogleNonceStore;
+import com.ieltspath.user.config.GoogleAuthProperties;
 import com.ieltspath.user.application.exception.GoogleAccountConflictException;
 import com.ieltspath.user.application.exception.GoogleEmailNotSupportedException;
 import com.ieltspath.user.application.exception.GoogleSignInNotAllowedException;
@@ -25,6 +27,8 @@ public class GoogleSignInUseCase {
     private final LinkGoogleAccountUseCase linkGoogleAccountUseCase;
     private final LoginHistoryRecorder loginHistoryRecorder;
     private final GoogleSignInMetrics metrics;
+    private final GoogleNonceStore nonceStore;
+    private final GoogleAuthProperties googleProperties;
 
     public GoogleSignInResult execute(String idToken, LoginContext context) {
         try {
@@ -40,6 +44,7 @@ public class GoogleSignInUseCase {
 
     private GoogleSignInResult executeAndAudit(String idToken, LoginContext context) {
         var google = verifier.verify(idToken);
+        validateNonce(google.nonce());
         LoginContext auditContext = context == null ? LoginContext.UNKNOWN : context;
         try {
             GoogleSignInResult result;
@@ -67,6 +72,20 @@ public class GoogleSignInUseCase {
         }
     }
 
+    private void validateNonce(String nonce) {
+        if (nonce == null || nonce.isBlank()) {
+            if (googleProperties.isRequireNonce()) throw new com.ieltspath.user.application.exception.GoogleNonceRejectedException();
+            return;
+        }
+        try {
+            if (!nonceStore.consume(nonce)) throw new com.ieltspath.user.application.exception.GoogleNonceRejectedException();
+        } catch (com.ieltspath.user.application.exception.GoogleNonceRejectedException rejected) {
+            throw rejected;
+        } catch (RuntimeException unavailable) {
+            if (googleProperties.isRequireNonce()) throw new GoogleSignInUnavailableException(unavailable);
+        }
+    }
+
     private GoogleSignInMetrics.Result classify(RuntimeException failure) {
         if (failure instanceof GoogleEmailNotSupportedException) return GoogleSignInMetrics.Result.EMAIL_NOT_SUPPORTED;
         if (failure instanceof GoogleSignInNotAllowedException) return GoogleSignInMetrics.Result.NOT_ALLOWED;
@@ -74,6 +93,8 @@ public class GoogleSignInUseCase {
                 || failure instanceof DataIntegrityViolationException) return GoogleSignInMetrics.Result.CONFLICT;
         if (failure instanceof GoogleAccountNotActiveException) return GoogleSignInMetrics.Result.INACTIVE;
         if (failure instanceof GoogleSignInUnavailableException) return GoogleSignInMetrics.Result.UNAVAILABLE;
+        if (failure instanceof com.ieltspath.user.application.exception.GoogleStaleIdTokenException) return GoogleSignInMetrics.Result.STALE_TOKEN;
+        if (failure instanceof com.ieltspath.user.application.exception.GoogleNonceRejectedException) return GoogleSignInMetrics.Result.REPLAY;
         if (failure instanceof AuthenticationFailedException) return GoogleSignInMetrics.Result.INVALID_TOKEN;
         return null;
     }

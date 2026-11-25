@@ -22,6 +22,7 @@ class AuthRouteConsistencyTest {
             "/auth/forgot-password",
             "/auth/reset-password",
             "/auth/google",
+            "/auth/google/nonce",
             "/auth/verify-email",
             "/auth/resend-verification",
             "/api/users/register");
