@@ -40,7 +40,7 @@ import com.ieltspath.content.domain.vo.PracticeTestMilestone;
 import com.ieltspath.content.domain.vo.QuestionOptionPayload;
 import com.ieltspath.content.domain.vo.QuestionPurpose;
 import com.ieltspath.content.domain.vo.Skill;
-import com.ieltspath.content.infrastructure.config.ContentAiProperties;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -87,7 +87,7 @@ public class CourseImportUseCases {
     private final AddSectionQuestionUseCase addSectionQuestion;
     private final PracticeTestMilestoneRepository milestones;
     private final AiUsageQuota quota;
-    private final ContentAiProperties properties;
+    private final int dailyImportLimit;
     private final ObjectMapper json;
     private final Clock clock;
 
@@ -99,7 +99,8 @@ public class CourseImportUseCases {
                                 CreateDraftPackageVersionUseCase createDraftVersion,
                                 CreateContentSectionUseCase createSection, AddSectionQuestionUseCase addSectionQuestion,
                                 PracticeTestMilestoneRepository milestones, AiUsageQuota quota,
-                                ContentAiProperties properties, ObjectMapper json, Clock clock) {
+                                @Value("${content.ai.daily-limit:20}") int dailyImportLimit, ObjectMapper json,
+                                Clock clock) {
         this.reader = reader;
         this.catalog = catalog;
         this.errorTypes = errorTypes;
@@ -114,7 +115,7 @@ public class CourseImportUseCases {
         this.addSectionQuestion = addSectionQuestion;
         this.milestones = milestones;
         this.quota = quota;
-        this.properties = properties;
+        this.dailyImportLimit = dailyImportLimit;
         this.json = json;
         this.clock = clock;
     }
@@ -198,7 +199,7 @@ public class CourseImportUseCases {
         if (!report.valid()) {
             throw new CourseImportInvalidException(report.errors(), report.warnings());
         }
-        if (!quota.tryConsume(author, LocalDate.now(clock), AiUsageKind.IMPORT, properties.getAi().getDailyLimit())) {
+        if (!quota.tryConsume(author, LocalDate.now(clock), AiUsageKind.IMPORT, dailyImportLimit)) {
             throw new ImportQuotaExceededException();
         }
         CourseImportPlan plan = report.plan();
