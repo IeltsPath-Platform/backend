@@ -7,4 +7,11 @@ import java.util.UUID;
 
 public record LessonBlockRequest(@NotNull BlockType blockType, Integer sortOrder, String textContent, UUID assetId,
                                 List<UUID> vocabularySenseIds, List<UUID> questionVersionIds,
-                                List<UUID> knowledgePointIds) {}
+                                List<UUID> knowledgePointIds, List<UUID> expectedQuestionVersionIds) {
+    public LessonBlockRequest(BlockType blockType, Integer sortOrder, String textContent, UUID assetId,
+                              List<UUID> vocabularySenseIds, List<UUID> questionVersionIds,
+                              List<UUID> knowledgePointIds) {
+        this(blockType, sortOrder, textContent, assetId, vocabularySenseIds, questionVersionIds,
+                knowledgePointIds, null);
+    }
+}

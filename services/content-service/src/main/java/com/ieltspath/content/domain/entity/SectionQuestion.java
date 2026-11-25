@@ -8,7 +8,7 @@ import java.util.UUID;
 public class SectionQuestion {
     private final UUID id;
     private final UUID sectionId;
-    private final UUID questionVersionId;
+    private UUID questionVersionId;
     private int sortOrder;
     private BigDecimal maxScore;
     private UUID groupId;
@@ -37,6 +37,11 @@ public class SectionQuestion {
     /** Used by the section when it renumbers after a removal or a reordering. */
     public void changeSortOrder(int sortOrder) {
         this.sortOrder = sortOrder;
+    }
+
+    /** Points the row at another version of the same question; its place, score and group stay. */
+    public void useVersion(UUID newQuestionVersionId) {
+        this.questionVersionId = Objects.requireNonNull(newQuestionVersionId, "questionVersionId must not be null");
     }
 
     public UUID getId() { return id; }

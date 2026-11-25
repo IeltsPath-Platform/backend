@@ -4,15 +4,25 @@ import com.ieltspath.user.domain.aggregate.User;
 import com.ieltspath.user.domain.exception.EmailAlreadyExistsException;
 import com.ieltspath.user.domain.exception.PhoneAlreadyExistsException;
 import com.ieltspath.user.domain.repository.UserRepository;
+import com.ieltspath.user.domain.result.UserPage;
+import com.ieltspath.user.domain.vo.RoleName;
+import com.ieltspath.user.domain.vo.UserStatus;
 import com.ieltspath.user.infrastructure.persistence.mapper.UserMapper;
 import com.ieltspath.user.infrastructure.persistence.repository.UserJpaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Repository
 @RequiredArgsConstructor
@@ -79,6 +89,20 @@ public class UserRepositoryAdapter implements UserRepository {
     @Override
     public List<User> findAll() {
         return userJpaRepository.findAll().stream().map(userMapper::toDomain).toList();
+    }
+
+    @Override
+    public UserPage findPage(RoleName role, UserStatus status, String search, int page, int size) {
+        Page<UUID> ids = userJpaRepository.findPageIds(role == null ? null : role.name(),
+                status == null ? null : status.name(), search == null ? null : search.toLowerCase(Locale.ROOT),
+                PageRequest.of(page, size, Sort.unsorted()));
+        if (ids.isEmpty()) return new UserPage(List.of(), page, size, ids.getTotalElements());
+
+        Map<UUID, User> users = userJpaRepository.findAllWithRolesByIdIn(ids.getContent()).stream()
+                .map(userMapper::toDomain)
+                .collect(Collectors.toMap(User::getId, Function.identity(), (first, ignored) -> first));
+        List<User> ordered = ids.getContent().stream().map(users::get).filter(java.util.Objects::nonNull).toList();
+        return new UserPage(ordered, page, size, ids.getTotalElements());
     }
 
     @Override

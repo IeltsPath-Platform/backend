@@ -41,13 +41,11 @@ public class CreateLessonResourceUseCase {
     }
 
     private static LessonResource newFileResource(CreateLessonResourceCommand command, String fileKey) {
-        if (command.resourceType() != LessonResourceType.DOCUMENT) {
-            throw new IllegalArgumentException("Chỉ tài liệu mới là tệp tải lên được");
-        }
         if (command.url() != null && !command.url().isBlank()) {
             throw new IllegalArgumentException("Tài nguyên cần một đường dẫn hoặc một tệp, không được cả hai");
         }
         ObjectKeys.requireOwnedBy(fileKey, LessonResource.FILE_KEY_PREFIX, command.uploaderId());
-        return LessonResource.createFile(command.lessonId(), command.title(), fileKey, command.sortOrder());
+        return LessonResource.createFile(command.lessonId(), command.resourceType(), command.title(), fileKey,
+                command.sortOrder());
     }
 }

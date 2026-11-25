@@ -12,6 +12,7 @@ import com.ieltspath.user.api.dto.response.MessageResponse;
 import com.ieltspath.user.api.dto.response.OAuthIdentityResponse;
 import com.ieltspath.user.api.dto.response.RoleResponse;
 import com.ieltspath.user.api.dto.response.UserResponse;
+import com.ieltspath.user.api.dto.response.UserPageResponse;
 import com.ieltspath.user.application.command.AssignRoleCommand;
 import com.ieltspath.user.application.command.ChangeUserStatusCommand;
 import com.ieltspath.user.application.command.CreateUserCommand;
@@ -27,6 +28,7 @@ import com.ieltspath.user.application.usecase.DeleteLearnerProfileUseCase;
 import com.ieltspath.user.application.usecase.DeleteUserUseCase;
 import com.ieltspath.user.application.usecase.GetActionTokensByUserIdUseCase;
 import com.ieltspath.user.application.usecase.GetAllUsersUseCase;
+import com.ieltspath.user.application.usecase.GetUsersPageUseCase;
 import com.ieltspath.user.application.usecase.GetLearnerProfileUseCase;
 import com.ieltspath.user.application.usecase.GetOAuthIdentitiesUseCase;
 import com.ieltspath.user.application.usecase.GetUserByIdUseCase;
@@ -46,6 +48,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -62,6 +65,7 @@ import java.util.stream.Collectors;
 public class UserManagementController {
 
     private final GetAllUsersUseCase getAllUsersUseCase;
+    private final GetUsersPageUseCase getUsersPageUseCase;
     private final CurrentUserProvider currentUserProvider;
     private final GetUserByIdUseCase getUserByIdUseCase;
     private final CreateUserUseCase createUserUseCase;
@@ -83,7 +87,18 @@ public class UserManagementController {
 
     // --- User Management ---
     @GetMapping
-    public List<UserResponse> getAllUsers() {
+    public UserPageResponse getUsers(@RequestParam(defaultValue = "0") int page,
+                                     @RequestParam(defaultValue = "25") int size,
+                                     @RequestParam(required = false) String role,
+                                     @RequestParam(required = false) String status,
+                                     @RequestParam(required = false) String search) {
+        var result = getUsersPageUseCase.execute(page, size, role, status, search);
+        return new UserPageResponse(result.content().stream().map(this::toUserResponse).toList(), result.page(),
+                result.size(), result.totalElements(), result.totalPages());
+    }
+
+    @GetMapping("/admin/all")
+    public List<UserResponse> getAllUsersForOverview() {
         return getAllUsersUseCase.execute().stream().map(this::toUserResponse).toList();
     }
 

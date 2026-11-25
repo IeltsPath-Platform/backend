@@ -31,8 +31,8 @@ public class JdbcAuthorPackageReader implements AuthorPackageReader {
     }
 
     @Override
-    public List<AuthorPackageSummary> list(Filter filter) {
-        MapSqlParameterSource params = new MapSqlParameterSource("limit", LIST_LIMIT);
+    public Page list(Filter filter, int page, int size) {
+        MapSqlParameterSource params = new MapSqlParameterSource();
         StringBuilder where = new StringBuilder(" WHERE TRUE");
         if (filter.type() != null) {
             where.append(" AND p.package_type = :type");
@@ -69,7 +69,9 @@ public class JdbcAuthorPackageReader implements AuthorPackageReader {
             where.append(" AND (p.code ILIKE :q ESCAPE '\\' OR p.title ILIKE :q ESCAPE '\\')");
             params.addValue("q", "%" + escapeLike(filter.q().strip()) + "%");
         }
-        return jdbc.query("""
+        Long total = jdbc.queryForObject("SELECT COUNT(*) FROM content_packages p" + where, params, Long.class);
+        params.addValue("limit", size).addValue("offset", (long) page * size);
+        List<AuthorPackageSummary> items = jdbc.query("""
                 SELECT p.id, p.code, p.title, p.package_type, p.required_feature_key, p.status,
                        p.current_published_version_id, p.lesson_id, p.topic_id, p.course_id, p.source_code,
                        p.created_at, p.updated_at, p.placement_pool,
@@ -92,7 +94,7 @@ public class JdbcAuthorPackageReader implements AuthorPackageReader {
                 """ + where + """
 
                 ORDER BY p.updated_at DESC, p.id
-                LIMIT :limit
+                LIMIT :limit OFFSET :offset
                 """, params, (rs, i) -> new AuthorPackageSummary(uuid(rs, "id"), rs.getString("code"),
                 rs.getString("title"), PackageType.valueOf(rs.getString("package_type")),
                 rs.getString("required_feature_key"), PublicationStatus.valueOf(rs.getString("status")),
@@ -102,6 +104,7 @@ public class JdbcAuthorPackageReader implements AuthorPackageReader {
                 rs.getBoolean("has_draft"), rs.getString("placement_pool") == null ? null
                         : PlacementPool.valueOf(rs.getString("placement_pool")),
                 rs.getString("skill"), partNos(rs), rs.getInt("section_count"), rs.getInt("question_count")));
+        return new Page(total == null ? 0 : total, items);
     }
 
     @Override
@@ -135,7 +138,10 @@ public class JdbcAuthorPackageReader implements AuthorPackageReader {
         Map<UUID, AuthorPackageExtras.QuestionInfo> questions = new LinkedHashMap<>();
         jdbc.query("""
                 SELECT sq.id AS section_question_id, q.id AS question_id, left(qv.stem, %d) AS stem,
-                       qv.status, q.purpose
+                       qv.status, q.purpose,
+                       (SELECT max(newer.version_number) FROM question_versions newer
+                        WHERE newer.question_id = qv.question_id AND newer.status = 'PUBLISHED'
+                          AND newer.version_number > qv.version_number) AS newer_version_number
                 FROM section_questions sq
                 JOIN content_sections s ON s.id = sq.section_id
                 JOIN content_package_versions v ON v.id = s.package_version_id
@@ -144,7 +150,8 @@ public class JdbcAuthorPackageReader implements AuthorPackageReader {
                 WHERE v.package_id = :packageId
                 """.formatted(STEM_PREVIEW_LENGTH), byPackage, rs -> {
             questions.put(uuid(rs, "section_question_id"), new AuthorPackageExtras.QuestionInfo(
-                    uuid(rs, "question_id"), rs.getString("stem"), rs.getString("status"), rs.getString("purpose")));
+                    uuid(rs, "question_id"), rs.getString("stem"), rs.getString("status"), rs.getString("purpose"),
+                    (Integer) rs.getObject("newer_version_number")));
         });
         return new AuthorPackageExtras(sections, questions);
     }

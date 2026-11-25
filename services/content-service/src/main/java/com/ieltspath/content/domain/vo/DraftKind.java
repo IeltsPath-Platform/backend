@@ -4,5 +4,6 @@ package com.ieltspath.content.domain.vo;
 public enum DraftKind {
     QUESTIONS,
     COURSE,
-    PRACTICE_SET
+    PRACTICE_SET,
+    SECTION_QUESTIONS
 }

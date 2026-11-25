@@ -59,7 +59,7 @@ class AiDraftRequestAndReviewUseCaseTest {
     @Test
     void anotherAuthorsDraftLooksLikeItDoesNotExist() {
         AiDraft mine = draft(UUID.randomUUID(), DraftStatus.READY);
-        when(drafts.findById(mine.getId())).thenReturn(Optional.of(mine));
+        when(drafts.findByIdForUpdate(mine.getId())).thenReturn(Optional.of(mine));
         UUID stranger = UUID.randomUUID();
 
         assertThrows(AiDraftNotFoundException.class,
@@ -70,7 +70,7 @@ class AiDraftRequestAndReviewUseCaseTest {
     void authorCanRejectOwnReadyDraft() {
         UUID author = UUID.randomUUID();
         AiDraft ready = draft(author, DraftStatus.READY);
-        when(drafts.findById(ready.getId())).thenReturn(Optional.of(ready));
+        when(drafts.findByIdForUpdate(ready.getId())).thenReturn(Optional.of(ready));
         when(drafts.save(any(AiDraft.class))).thenAnswer(call -> call.getArgument(0));
 
         AiDraft rejected = new AiDraftReviewUseCases(drafts, clock).reject(author, ready.getId(), "off topic");
@@ -83,7 +83,7 @@ class AiDraftRequestAndReviewUseCaseTest {
     void queuedDraftCannotBeRejected() {
         UUID author = UUID.randomUUID();
         AiDraft queued = draft(author, DraftStatus.QUEUED);
-        when(drafts.findById(queued.getId())).thenReturn(Optional.of(queued));
+        when(drafts.findByIdForUpdate(queued.getId())).thenReturn(Optional.of(queued));
 
         assertThrows(InvalidContentStateException.class,
                 () -> new AiDraftReviewUseCases(drafts, clock).reject(author, queued.getId(), null));

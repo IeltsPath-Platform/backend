@@ -4,6 +4,8 @@ import com.ieltspath.user.domain.aggregate.User;
 import com.ieltspath.user.domain.vo.Email;
 import com.ieltspath.user.domain.vo.PhoneNumber;
 import com.ieltspath.user.domain.vo.UserStatus;
+import com.ieltspath.user.domain.vo.RoleName;
+import com.ieltspath.user.domain.result.UserPage;
 import com.ieltspath.user.infrastructure.persistence.entity.UserJpaEntity;
 import com.ieltspath.user.infrastructure.persistence.mapper.UserMapper;
 import com.ieltspath.user.infrastructure.persistence.repository.UserJpaRepository;
@@ -16,6 +18,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -86,6 +91,29 @@ class UserRepositoryAdapterTest {
 
         assertThat(results).containsExactly(domain);
         verify(userJpaRepository).findAll();
+    }
+
+    @Test
+    void findPageFetchesRolesForThePageAndPreservesIdOrder() {
+        UUID firstId = UUID.randomUUID();
+        UUID secondId = UUID.randomUUID();
+        UserJpaEntity firstEntity = UserJpaEntity.builder().id(firstId).build();
+        UserJpaEntity secondEntity = UserJpaEntity.builder().id(secondId).build();
+        User first = User.builder().id(firstId).email(new Email("first@example.test")).build();
+        User second = User.builder().id(secondId).email(new Email("second@example.test")).build();
+        when(userJpaRepository.findPageIds("ADMIN", "ACTIVE", "admin", PageRequest.of(0, 2, Sort.unsorted())))
+                .thenReturn(new PageImpl<>(List.of(firstId, secondId), PageRequest.of(0, 2), 3));
+        when(userJpaRepository.findAllWithRolesByIdIn(List.of(firstId, secondId)))
+                .thenReturn(List.of(secondEntity, firstEntity));
+        when(userMapper.toDomain(firstEntity)).thenReturn(first);
+        when(userMapper.toDomain(secondEntity)).thenReturn(second);
+
+        UserPage page = repositoryAdapter.findPage(RoleName.ADMIN, UserStatus.ACTIVE, "Admin", 0, 2);
+
+        assertThat(page.content()).containsExactly(first, second);
+        assertThat(page.totalElements()).isEqualTo(3);
+        assertThat(page.totalPages()).isEqualTo(2);
+        verify(userJpaRepository).findAllWithRolesByIdIn(List.of(firstId, secondId));
     }
 
     @Test

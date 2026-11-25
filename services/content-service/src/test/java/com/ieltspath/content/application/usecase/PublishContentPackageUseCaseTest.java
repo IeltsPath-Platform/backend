@@ -11,12 +11,14 @@ import com.ieltspath.content.domain.exception.InvalidContentStateException;
 import com.ieltspath.content.domain.exception.InvalidPackageLessonException;
 import com.ieltspath.content.domain.exception.QuestionAlreadyUsedException;
 import com.ieltspath.content.domain.exception.QuestionPurposeMismatchException;
+import com.ieltspath.content.domain.exception.QuestionNotPublishedException;
 import com.ieltspath.content.domain.repository.ContentPackageRepository;
 import com.ieltspath.content.domain.vo.PackageType;
 import com.ieltspath.content.domain.vo.QuestionType;
 import com.ieltspath.content.domain.vo.PublicationStatus;
 import com.ieltspath.content.domain.vo.QuestionUsageConflict;
 import com.ieltspath.content.domain.vo.QuestionPurpose;
+import com.ieltspath.content.domain.vo.UnpublishedPackageQuestion;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -134,6 +136,36 @@ class PublishContentPackageUseCaseTest {
         assertThat(contentPackage.getStatus()).isEqualTo(PublicationStatus.DRAFT);
         assertThat(version.getStatus()).isEqualTo(PublicationStatus.DRAFT);
         assertThat(contentPackage.getCurrentPublishedVersionId()).isNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"PRACTICE_SET", "TOPIC_TEST", "COURSE_TEST", "MOCK_TEST", "PLACEMENT_TEST", "PRACTICE_TEST"})
+    void everyPackageTypeRefusesUnpublishedQuestionVersions(String typeName) {
+        PackageType type = PackageType.valueOf(typeName);
+        ContentPackage pkg = switch (type) {
+            case TOPIC_TEST -> ContentPackage.createFinalTest("UNPUBLISHED", "Draft questions", type, null,
+                    UUID.randomUUID(), null);
+            case COURSE_TEST -> ContentPackage.createFinalTest("UNPUBLISHED", "Draft questions", type, null,
+                    null, UUID.randomUUID());
+            default -> ContentPackage.create("UNPUBLISHED", "Draft questions", type, null, null, null,
+                    type == PackageType.PLACEMENT_TEST ? com.ieltspath.content.domain.vo.PlacementPool.BAND_5_9 : null);
+        };
+        ContentPackageVersion draft = ContentPackageVersion.create(pkg.getId(), 1, "{}");
+        pkg.addVersion(draft);
+        UUID questionId = UUID.randomUUID();
+        when(contentPackageRepository.findById(pkg.getId())).thenReturn(Optional.of(pkg));
+        when(lessons.unpublishedQuestions(draft.getId())).thenReturn(List.of(
+                new UnpublishedPackageQuestion(questionId, "Q-DRAFT", "Reading 1", "DRAFT")));
+
+        assertThatThrownBy(() -> publishContentPackageUseCase.execute(
+                new PublishContentPackageCommand(pkg.getId(), draft.getId(), userId)))
+                .isInstanceOf(QuestionNotPublishedException.class)
+                .hasMessage("Đề còn 1 câu hỏi chưa xuất bản. Xuất bản các câu đó trước.");
+        verify(contentPackageRepository, never()).save(any());
+        InOrder checks = inOrder(lessons);
+        checks.verify(lessons).lockQuestionsForPublishing(draft.getId());
+        checks.verify(lessons).unpublishedQuestions(draft.getId());
+        verify(lessons, never()).questionsUsedElsewhere(draft.getId());
     }
 
     @Test

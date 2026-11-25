@@ -131,8 +131,9 @@ public record CourseDraftStructure(CourseInfo course, List<TopicPlan> topics, Fi
     public record OptionPlan(String optionKey, String content) {
     }
 
-    /** A slide or document of a lesson: a title and the link to open. */
-    public record ResourcePlan(com.ieltspath.content.domain.vo.LessonResourceType type, String title, String url) {
+    /** A slide or document of a lesson, as an uploaded file or link where the type allows it. */
+    public record ResourcePlan(com.ieltspath.content.domain.vo.LessonResourceType type, String title, String url,
+                               String fileKey) {
     }
 
     /** {@code type} is {@code TEXT} or {@code EXERCISE}; an exercise lists question references. */

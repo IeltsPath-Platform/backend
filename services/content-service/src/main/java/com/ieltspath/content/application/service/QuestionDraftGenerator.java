@@ -73,11 +73,13 @@ public class QuestionDraftGenerator implements AiDraftGenerator {
 
         List<ErrorType> codes = errorTypes.findApprovedActive();
         Set<String> activeCodes = codes.stream().map(ErrorType::getCode).collect(Collectors.toSet());
-        GenerationReply reply = model.generate(QuestionDraftPromptBuilder.build(point, request, codes));
-        JsonNode candidates = candidates(reply.text());
         // Stems the point already has, and then those kept from this reply, so neither is repeated.
-        Set<String> knownStems = stems.stemsOf(point.getId()).stream().map(QuestionDraftItems::normalize)
+        List<String> existingStems = stems.stemsOf(point.getId());
+        GenerationReply reply = model.generate(QuestionDraftPromptBuilder.build(point, request, codes, existingStems));
+        JsonNode candidates = candidates(reply.text());
+        Set<String> knownStems = existingStems.stream().map(QuestionDraftItems::normalize)
                 .collect(Collectors.toCollection(HashSet::new));
+        List<String> allKnown = new java.util.ArrayList<>(existingStems);
 
         ArrayNode accepted = json.createArrayNode();
         ArrayNode rejected = json.createArrayNode();
@@ -87,11 +89,16 @@ public class QuestionDraftGenerator implements AiDraftGenerator {
             if (accepted.size() >= limit) {
                 break;
             }
-            String reason = QuestionDraftValidator.rejectionReason(candidate, request.questionType(), activeCodes,
+            String stem = candidate.path("stem").asText();
+            boolean nearDuplicate = allKnown.stream().anyMatch(existing -> QuestionSimilarity.jaccard(stem, existing) >= 0.78);
+            String reason = nearDuplicate ? "DUPLICATE_STEM" : QuestionDraftValidator.rejectionReason(candidate, request.questionType(), activeCodes,
                     knownStems);
             if (reason == null) {
-                knownStems.add(QuestionDraftItems.normalize(candidate.path("stem").asText()));
-                accepted.add(QuestionDraftItems.toItem(candidate, request.questionType(), request.difficulty()));
+                knownStems.add(QuestionDraftItems.normalize(stem));
+                allKnown.add(stem);
+                ObjectNode acceptedItem = QuestionDraftItems.toItem(candidate, request.questionType(), request.difficulty());
+                acceptedItem.put("itemId", java.util.UUID.randomUUID().toString());
+                accepted.add(acceptedItem);
             } else {
                 rejected.add(json.createObjectNode().put("index", index).put("reason", reason));
             }
@@ -105,6 +112,7 @@ public class QuestionDraftGenerator implements AiDraftGenerator {
         }
 
         ObjectNode result = json.createObjectNode();
+        result.put("revision", 0);
         result.set("items", accepted);
         result.set("rejected", rejected);
         return new GenerationOutcome(write(result), reply.model(), QuestionDraftPromptBuilder.VERSION);

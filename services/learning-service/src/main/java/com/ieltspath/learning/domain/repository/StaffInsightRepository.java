@@ -64,6 +64,11 @@ public interface StaffInsightRepository {
     /** {@code status} and {@code kind} are optional filters; the oldest items come first. */
     List<WorkItem> workItems(Collection<Queue> queues, WorkStatus status, WorkKind kind);
 
+    long countWorkItems(Collection<Queue> queues, WorkStatus status, WorkKind kind, boolean activeOnly);
+
+    List<WorkItem> workItems(Collection<Queue> queues, WorkStatus status, WorkKind kind, boolean activeOnly,
+                             int offset, int limit);
+
     List<WorkItem> openWorkItemsOf(UUID userId);
 
     List<WorkItem> visibleNotes(UUID userId);

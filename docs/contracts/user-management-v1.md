@@ -7,7 +7,8 @@ the authenticated user identity and are described under Role and account rules.
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/users` | List all users. The response is an unpaginated array; clients may filter it locally. |
+| GET | `/api/users` | List a filtered page of users. |
+| GET | `/api/users/admin/all` | Read the complete user list for the bounded system overview aggregate. |
 | POST | `/api/users` | Create a user with `email`, `password`, `fullName`, optional `phoneNumber`, and optional `roles`. |
 | GET | `/api/users/{id}` | Get a user. |
 | PUT | `/api/users/{id}` | Update `fullName` and optional `phoneNumber`. |
@@ -22,6 +23,13 @@ User responses contain `id`, `email`, `fullName`, `phoneNumber`, `status`, `role
 The create request defaults an omitted or empty role set to `CUSTOMER`.
 
 New passwords for registration, administrator-created users, password changes, and password resets must have at least 8 characters and no more than 72 UTF-8 bytes. Common passwords, passwords matching account details, and simple repeated or sequential strings return HTTP 400 with top-level `code=WEAK_PASSWORD` and comma-separated `details.reasons` (`TOO_SHORT`, `TOO_COMMON`, `CONTAINS_ACCOUNT_INFO`, or `TOO_SIMPLE`). The client message is `Mật khẩu chưa đủ mạnh.`. Existing passwords are not checked at sign-in; old BCrypt hashes are upgraded after a successful sign-in when needed.
+
+### User list pagination
+
+Compared with the previous contract, `GET /api/users` returned an array; it now returns `{ "content": [...], "page": 0, "size": 25, "totalElements": 0, "totalPages": 0 }`.
+`page` is zero-based. `size` defaults to 25 and must be 1–100. Optional `role`, `status`, and `search` filters are applied in the database; `search` matches email or full name without case sensitivity. Results are ordered by creation time and then `id` for a stable page boundary. Invalid page parameters return HTTP 400 with a Vietnamese message.
+
+The system overview uses `GET /api/users/admin/all` to calculate totals across all accounts. This endpoint retains the existing user response fields and is restricted by the same `ADMIN` role.
 
 ## Role and account rules
 

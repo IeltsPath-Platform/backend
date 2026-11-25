@@ -16,6 +16,8 @@ import com.ieltspath.user.application.usecase.DeleteLearnerProfileUseCase;
 import com.ieltspath.user.application.usecase.DeleteUserUseCase;
 import com.ieltspath.user.application.usecase.GetActionTokensByUserIdUseCase;
 import com.ieltspath.user.application.usecase.GetAllUsersUseCase;
+import com.ieltspath.user.application.usecase.GetUsersPageUseCase;
+import com.ieltspath.user.domain.result.UserPage;
 import com.ieltspath.user.application.usecase.GetLearnerProfileUseCase;
 import com.ieltspath.user.application.usecase.GetOAuthIdentitiesUseCase;
 import com.ieltspath.user.application.usecase.GetUserByIdUseCase;
@@ -86,6 +88,9 @@ class UserManagementControllerSecurityTest {
 
     @MockBean
     private GetAllUsersUseCase getAllUsersUseCase;
+
+    @MockBean
+    private GetUsersPageUseCase getUsersPageUseCase;
     @MockBean
     private GetUserByIdUseCase getUserByIdUseCase;
     @MockBean
@@ -155,12 +160,36 @@ class UserManagementControllerSecurityTest {
 
     @Test
     void adminCanListUsers() throws Exception {
-        when(getAllUsersUseCase.execute()).thenReturn(List.of());
+        when(getUsersPageUseCase.execute(0, 25, null, null, null)).thenReturn(new UserPage(List.of(), 0, 25, 0));
         String adminToken = signedToken(INTERNAL_SECRET, UUID.randomUUID(), INTERNAL_ISSUER, List.of("ADMIN"));
 
         mockMvc.perform(get("/api/users")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(25))
+                .andExpect(jsonPath("$.totalElements").value(0))
+                .andExpect(jsonPath("$.totalPages").value(0));
+
+        mockMvc.perform(get("/api/users/admin/all")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void passesUserListFiltersAndPageParametersToTheUseCase() throws Exception {
+        when(getUsersPageUseCase.execute(1, 20, "ADMIN", "LOCKED", "minh"))
+                .thenReturn(new UserPage(List.of(), 1, 20, 0));
+        String adminToken = signedToken(INTERNAL_SECRET, UUID.randomUUID(), INTERNAL_ISSUER, List.of("ADMIN"));
+
+        mockMvc.perform(get("/api/users?page=1&size=20&role=ADMIN&status=LOCKED&search=minh")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.size").value(20));
+
+        verify(getUsersPageUseCase).execute(1, 20, "ADMIN", "LOCKED", "minh");
     }
 
     @Test

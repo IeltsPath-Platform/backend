@@ -56,8 +56,8 @@ class LessonResourceAuthorizationWebMvcTest {
 
     private final UUID lessonId = UUID.randomUUID();
     private final UUID resourceId = UUID.randomUUID();
-    private static final String RESOURCE = "{\"type\":\"SLIDE\",\"title\":\"Slide\",\"url\":\"https://a.com\",\"sortOrder\":0}";
-    private static final String UPDATE = "{\"title\":\"Slide\",\"url\":\"https://a.com\",\"sortOrder\":0}";
+    private static final String RESOURCE = "{\"type\":\"SLIDE\",\"title\":\"Slide\",\"fileKey\":\"lesson-document/00000000-0000-0000-0000-000000000001/00000000-0000-0000-0000-000000000002.pdf\",\"sortOrder\":0}";
+    private static final String UPDATE = "{\"title\":\"Slide\",\"sortOrder\":0}";
 
     @Test
     @WithMockUser(roles = "CUSTOMER")
@@ -83,8 +83,8 @@ class LessonResourceAuthorizationWebMvcTest {
     @Test
     @WithMockUser(roles = "CONTENT_AUTHOR")
     void contentAuthorCanManageLessonResources() throws Exception {
-        var result = LessonResourceResult.from(LessonResource.create(lessonId, LessonResourceType.SLIDE, "Slide",
-                "https://a.com", 0));
+        var result = LessonResourceResult.from(LessonResource.createFile(lessonId, LessonResourceType.SLIDE, "Slide",
+                "lesson-document/" + UUID.randomUUID() + "/" + UUID.randomUUID() + ".pdf", 0));
         when(listResources.execute(lessonId)).thenReturn(new LessonResourcesResult(lessonId, null, List.of(result)));
         when(createResource.execute(any())).thenReturn(result);
         when(updateResource.execute(any())).thenReturn(result);

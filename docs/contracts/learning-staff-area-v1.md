@@ -53,9 +53,11 @@ records the reviewer. `422 INVALID_FLAG_STATUS` for `OPEN`, `404` when unknown.
 
 ## Work queues
 
-`GET /api/learning/admin/work-items?queue=&status=&kind=`: the queues the caller may see, optionally one queue
-(`403 QUEUE_NOT_ALLOWED` for another), one status (`OPEN`, `IN_PROGRESS`, `DONE`) and one kind (a value of the table below,
-otherwise `400`). Listing first adds items for new
+Compared with the previous contract, this endpoint returned an array; it now returns the page object described below.
+
+`GET /api/learning/admin/work-items?queue=&status=&kind=&page=&size=`: the queues the caller may see, optionally one queue
+(`403 QUEUE_NOT_ALLOWED` for another), one status (`OPEN`, `IN_PROGRESS`, `DONE`, or `ACTIVE` for any unfinished item) and one kind (a value of the table below,
+otherwise `400`). `page` is zero-based; `size` defaults to 25 and must be 1–100. The response is `{ "content": [...], "page": 0, "size": 25, "totalElements": 0, "totalPages": 0 }`. Rows and matching totals are filtered in the database and ordered by `created_at`, then `id`. Invalid pagination parameters return HTTP 400 with a Vietnamese message. Listing first adds items for new
 work, and a scheduled round does the same every 3 hours (`learning.work-items.sync-interval`, first run after
 `sync-initial-delay`, off with `sync-enabled=false`); only one service instance runs a round at a time. Each source becomes
 at most one item (`UNIQUE (kind, subject)`) and finished work is never reopened.

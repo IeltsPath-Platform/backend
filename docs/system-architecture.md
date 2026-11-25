@@ -95,7 +95,7 @@ Timer `llm.call.duration` và counter `llm.tokens` mang nhãn `service`, `model`
 
 Các lời gọi HTTP đồng bộ dùng `shared/common-resilience`: retry tối đa một lần sau 200 ms chỉ cho lỗi kết nối/timeout và HTTP 5xx; chỉ `READ` và `IDEMPOTENT_WRITE` được retry. Circuit breaker dùng chung theo dịch vụ đích (content, access, user, assessment, library, learning, llm), mở 30 giây sau ngưỡng lỗi cấu hình; LLM có semaphore tối đa bốn lời gọi đồng thời. Lỗi breaker/bulkhead được client ánh xạ về contract lỗi của service gọi.
 
-Gateway đặt connect timeout 2 giây và response timeout mặc định 15 giây. Route upload và AI của assessment dùng 120 giây; ba endpoint chấm essay của Learning dùng 60 giây và tier rate limit `ai`; route tạo AI draft của Content dùng 210 giây theo timeout LLM mặc định 180 giây cộng dự phòng retry và gateway.
+Gateway đặt connect timeout 2 giây và response timeout mặc định 15 giây. Route upload và AI của assessment dùng 120 giây; ba endpoint chấm essay của Learning dùng 60 giây và tier rate limit `ai`; POST tạo AI draft `PRACTICE_SET` và `SECTION_QUESTIONS` của Content dùng tier `ai` cùng response timeout 210 giây theo timeout LLM mặc định 180 giây. Polling, mở bản nháp và đọc allowance không đi qua tier gọi AI. Content gọi LLM như `WRITE`, không retry.
 
 Assessment, content, game và learning gọi thẳng service đích (không qua Gateway), kèm bearer của request và `X-Correlation-Id`.
 Content dùng timeout kết nối 2 giây, đọc 5 giây khi gọi Library; Library không đáp được thì Content trả 503 mã `VOCABULARY_SERVICE_UNAVAILABLE`. Library không gọi Content. Hai nơi cài snapshot game theo
@@ -377,7 +377,7 @@ Backend hiện có 30 phương thức `@Scheduled` trong 29 file. Cơ chế ch�
 | assessment | `GradingDeadlineScheduler` | Store chọn các job bằng `FOR UPDATE SKIP LOCKED`; ghi thông báo/outbox trong transaction | Không |
 | assessment | `SpeakingRecordingRetentionScheduler` | Xóa theo ngưỡng thời gian; chạy lặp an toàn | Không |
 | content | `ScheduledPublishJob` | Advisory lock tránh hai instance publish cùng đợt | Không |
-| content | `AiDraftScheduler` | Claim bản nháp bằng `FOR UPDATE SKIP LOCKED`, commit claim trước khi gọi generator; lưu kết quả riêng | Generator/LLM ngoài transaction claim |
+| content | `AiDraftScheduler` | Claim từng bản nháp bằng `FOR UPDATE SKIP LOCKED`, tăng `attempt_count` và gán `claim_token`; cập nhật kết quả có điều kiện theo token. Bản treo được đưa lại hàng chờ tối đa ba lần, sau đó thất bại và hoàn lượt trong cùng transaction | Generator/LLM ngoài transaction claim; claim cũ không thể ghi đè lượt mới |
 | learning | `LeagueCloseJob` | Advisory transaction lock quanh cập nhật tuần | Không |
 | learning | `InactivityFlagJob` | Advisory transaction lock quanh tính và ghi cờ | Không |
 | learning | `SnapshotJob` (weekly) | Advisory transaction lock theo kỳ snapshot | Không |

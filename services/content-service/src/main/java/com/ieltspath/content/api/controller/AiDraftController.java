@@ -7,6 +7,8 @@ import com.ieltspath.content.api.dto.response.AiDraftResponse;
 import com.ieltspath.content.application.usecase.AiDraftReviewUseCases;
 import com.ieltspath.content.domain.vo.DraftKind;
 import com.ieltspath.content.domain.vo.DraftStatus;
+import com.ieltspath.content.application.port.AiDraftOriginReader;
+import org.springframework.beans.factory.annotation.Autowired;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,22 +33,32 @@ public class AiDraftController {
     private final AiDraftReviewUseCases drafts;
     private final CurrentUserProvider currentUser;
     private final ObjectMapper json;
+    private final AiDraftOriginReader origins;
 
-    public AiDraftController(AiDraftReviewUseCases drafts, CurrentUserProvider currentUser, ObjectMapper json) {
+    @Autowired
+    public AiDraftController(AiDraftReviewUseCases drafts, CurrentUserProvider currentUser, ObjectMapper json, AiDraftOriginReader origins) {
         this.drafts = drafts;
         this.currentUser = currentUser;
         this.json = json;
+        this.origins = origins;
+    }
+
+    public AiDraftController(AiDraftReviewUseCases drafts, CurrentUserProvider currentUser, ObjectMapper json) {
+        this(drafts, currentUser, json, null);
     }
 
     @GetMapping
-    public List<AiDraftResponse> list(@RequestParam(value = "kind", required = false) DraftKind kind,
+    public List<AiDraftResponse> list(@RequestParam(value = "kind", required = false) List<DraftKind> kinds,
                                       @RequestParam(value = "status", required = false) DraftStatus status,
                                       @RequestParam(value = "page", defaultValue = "0") int page,
                                       @RequestParam(value = "size", defaultValue = "20") int size) {
         int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
         int safePage = Math.max(page, 0);
-        return drafts.list(currentUser.requireUserId(), kind, status, safePage, safeSize).stream()
-                .map(draft -> AiDraftResponse.from(draft, json))
+        List<DraftKind> safeKinds = kinds == null ? List.of() : kinds;
+        List<com.ieltspath.content.domain.aggregate.AiDraft> pageRows = drafts.list(currentUser.requireUserId(), safeKinds, status, safePage, safeSize);
+        var originRows = origins == null ? java.util.Map.<UUID, com.ieltspath.content.application.result.AiDraftOrigin>of() : origins.findOrigins(pageRows);
+        return pageRows.stream()
+                .map(draft -> AiDraftResponse.summary(draft, json, originRows.get(draft.getId())))
                 .toList();
     }
 

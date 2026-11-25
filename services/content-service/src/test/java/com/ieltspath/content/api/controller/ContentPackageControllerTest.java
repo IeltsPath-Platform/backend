@@ -4,8 +4,10 @@ import org.mockito.ArgumentCaptor;
 import com.ieltspath.content.domain.exception.InvalidPackageLessonException;
 import com.ieltspath.content.domain.exception.QuestionAlreadyUsedException;
 import com.ieltspath.content.domain.exception.QuestionPurposeMismatchException;
+import com.ieltspath.content.domain.exception.QuestionNotPublishedException;
 import com.ieltspath.content.domain.vo.QuestionUsageConflict;
 import com.ieltspath.content.domain.vo.QuestionPurpose;
+import com.ieltspath.content.domain.vo.UnpublishedPackageQuestion;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -196,6 +198,23 @@ class ContentPackageControllerTest {
         mockMvc.perform(post(path).contentType(MediaType.APPLICATION_JSON).content(request))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.details.code").value("QUESTION_PURPOSE_MISMATCH"));
+    }
+
+    @Test
+    void publishingAnUnpublishedQuestionReturnsVietnameseMessageAndQuestionDetails() throws Exception {
+        UUID questionId = UUID.randomUUID();
+        when(publishContentPackageUseCase.execute(any())).thenThrow(new QuestionNotPublishedException(List.of(
+                new UnpublishedPackageQuestion(questionId, "Q-DRAFT", "Reading 1", "DRAFT"))));
+
+        mockMvc.perform(post("/api/content/packages/" + UUID.randomUUID() + "/publish")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"versionId\":\"" + UUID.randomUUID() + "\"}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value("Đề còn 1 câu hỏi chưa xuất bản. Xuất bản các câu đó trước."))
+                .andExpect(jsonPath("$.details.code").value("QUESTION_NOT_PUBLISHED"))
+                .andExpect(jsonPath("$.details.questions[0].id").value(questionId.toString()))
+                .andExpect(jsonPath("$.details.questions[0].code").value("Q-DRAFT"))
+                .andExpect(jsonPath("$.details.questions[0].section").value("Reading 1"));
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.ieltspath.learning.api.controller;
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.learning.application.result.StaffInsightResults;
 import com.ieltspath.learning.application.result.WorkItemView;
+import com.ieltspath.learning.application.result.WorkItemPage;
 import com.ieltspath.learning.domain.vo.StaffRecords.WorkKind;
 import com.ieltspath.learning.application.usecase.StaffInsightUseCase;
 import com.ieltspath.learning.application.usecase.StaffWorkUseCase;
@@ -52,12 +53,34 @@ public class StaffAdminController {
 
     @GetMapping("/admin/work-items")
     @PreAuthorize("hasAnyRole('EXAMINER', 'CONTENT_AUTHOR')")
-    public List<WorkItemResponse> workItems(@RequestParam(name = "queue", required = false) Queue queue,
-                                            @RequestParam(name = "status", required = false) WorkStatus status,
-                                            @RequestParam(name = "kind", required = false) WorkKind kind,
-                                            Authentication authentication) {
-        return work.listWithSubjects(queues(authentication), queue, status, kind).stream()
-                .map(WorkItemResponse::from).toList();
+    public WorkItemPageResponse workItems(@RequestParam(name = "queue", required = false) Queue queue,
+                                          @RequestParam(name = "status", required = false) String status,
+                                          @RequestParam(name = "kind", required = false) String kind,
+                                          @RequestParam(name = "page", defaultValue = "0") int page,
+                                          @RequestParam(name = "size", defaultValue = "25") int size,
+                                          Authentication authentication) {
+        WorkStatus parsedStatus = parseStatus(status);
+        WorkKind parsedKind = parseKind(kind);
+        WorkItemPage result = work.listPageWithSubjects(queues(authentication), queue, parsedStatus,
+                parsedKind, "ACTIVE".equals(status), page, size);
+        return new WorkItemPageResponse(result.content().stream().map(WorkItemResponse::from).toList(),
+                result.page(), result.size(), result.totalElements(), result.totalPages());
+    }
+
+    private static WorkStatus parseStatus(String status) {
+        if (status == null || status.isBlank() || "ACTIVE".equals(status)) return null;
+        try { return WorkStatus.valueOf(status); }
+        catch (IllegalArgumentException exception) {
+            throw new com.ieltspath.learning.application.exception.LearningRequestException(400, "INVALID_STATUS", "Trạng thái công việc không hợp lệ.");
+        }
+    }
+
+    private static WorkKind parseKind(String kind) {
+        if (kind == null || kind.isBlank()) return null;
+        try { return WorkKind.valueOf(kind); }
+        catch (IllegalArgumentException exception) {
+            throw new com.ieltspath.learning.application.exception.LearningRequestException(400, "INVALID_KIND", "Loại công việc không hợp lệ.");
+        }
     }
 
     @PatchMapping("/admin/work-items/{id}")
@@ -121,6 +144,9 @@ public class StaffAdminController {
                     item.note(), item.noteVisibleToLearner(), item.createdAt(), item.updatedAt(), view.subject());
         }
     }
+
+    public record WorkItemPageResponse(List<WorkItemResponse> content, int page, int size,
+                                      long totalElements, int totalPages) {}
 
     public record UpdateWorkItemRequest(WorkStatus status, String action, String result, String note,
                                         Boolean noteVisibleToLearner) {}

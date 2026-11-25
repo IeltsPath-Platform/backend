@@ -35,11 +35,13 @@ public class LessonAuthoringAdminController {
     @PostMapping("/lessons/{lessonId}/blocks") @ResponseStatus(HttpStatus.CREATED)
     public LessonAuthoringResult addBlock(@PathVariable("lessonId") UUID id,@Valid @RequestBody LessonBlockRequest r){return authoring.addBlock(id,r.blockType(),r.sortOrder(),r.textContent(),r.assetId(),r.vocabularySenseIds(),r.questionVersionIds(),r.knowledgePointIds());}
     @PutMapping("/lessons/{lessonId}/blocks/{blockId}")
-    public LessonAuthoringResult updateBlock(@PathVariable("lessonId") UUID lessonId,@PathVariable("blockId") UUID blockId,@Valid @RequestBody LessonBlockRequest request){return authoring.updateBlock(lessonId,blockId,request.blockType(),request.sortOrder(),request.textContent(),request.assetId(),request.vocabularySenseIds(),request.questionVersionIds(),request.knowledgePointIds());}
+    public LessonAuthoringResult updateBlock(@PathVariable("lessonId") UUID lessonId,@PathVariable("blockId") UUID blockId,@Valid @RequestBody LessonBlockRequest request){return authoring.updateBlock(lessonId,blockId,request.blockType(),request.sortOrder(),request.textContent(),request.assetId(),request.vocabularySenseIds(),request.questionVersionIds(),request.knowledgePointIds(),request.expectedQuestionVersionIds());}
     @DeleteMapping("/lessons/{lessonId}/blocks/{blockId}") @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteBlock(@PathVariable("lessonId") UUID id,@PathVariable("blockId") UUID bid){authoring.deleteBlock(id,bid);}
     @PutMapping("/lessons/{lessonId}/blocks/order") @ResponseStatus(HttpStatus.NO_CONTENT)
     public void reorderBlocks(@PathVariable("lessonId") UUID id,@Valid @RequestBody UpdateBlockOrderRequest r){authoring.reorderBlocks(id,r.blockIds());}
     @PostMapping("/lessons/{lessonId}/publish") public LessonAuthoringResult publish(@PathVariable("lessonId") UUID id){return authoring.publish(id);}
+    @PostMapping("/lessons/{lessonId}/questions/publish-drafts") public Result publishDraftQuestions(@PathVariable("lessonId") UUID id){return new Result(authoring.publishDraftQuestions(id));}
     @PostMapping("/lessons/{lessonId}/archive") public LessonAuthoringResult archive(@PathVariable("lessonId") UUID id){return authoring.archive(id);}
+    public record Result(int publishedCount) {}
 }

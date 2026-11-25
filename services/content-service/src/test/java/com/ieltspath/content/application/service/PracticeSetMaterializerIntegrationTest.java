@@ -58,6 +58,9 @@ class PracticeSetMaterializerIntegrationTest {
     static class Beans {
         @Bean MediaReferencePolicy mediaReferencePolicy() { return new MediaReferencePolicy("https://media.example.test/ieltspath"); }
         @Bean com.fasterxml.jackson.databind.ObjectMapper objectMapper() { return new com.fasterxml.jackson.databind.ObjectMapper(); }
+        @Bean com.ieltspath.content.application.port.QuestionImageWriter questionImageWriter() {
+            return org.mockito.Mockito.mock(com.ieltspath.content.application.port.QuestionImageWriter.class);
+        }
     }
 
     @Container

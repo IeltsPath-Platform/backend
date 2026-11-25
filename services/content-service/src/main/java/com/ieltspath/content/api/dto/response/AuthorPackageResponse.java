@@ -111,7 +111,8 @@ public record AuthorPackageResponse(
     }
 
     public record Question(UUID id, UUID questionVersionId, UUID questionId, int sortOrder,
-                           java.math.BigDecimal maxScore, String stem, String status, String purpose) {
+                           java.math.BigDecimal maxScore, String stem, String status, String purpose,
+                           Integer newerVersionNumber) {
         public static Question from(AuthorSectionQuestionResult result) {
             return from(result, AuthorPackageExtras.EMPTY);
         }
@@ -120,7 +121,8 @@ public record AuthorPackageResponse(
             AuthorPackageExtras.QuestionInfo info = extras.question(result.id());
             return new Question(result.id(), result.questionVersionId(), info == null ? null : info.questionId(),
                     result.sortOrder(), result.maxScore(), info == null ? null : info.stem(),
-                    info == null ? null : info.status(), info == null ? null : info.purpose());
+                    info == null ? null : info.status(), info == null ? null : info.purpose(),
+                    info == null ? null : info.newerVersionNumber());
         }
     }
 }

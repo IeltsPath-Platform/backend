@@ -116,6 +116,15 @@ public class CourseMaterializer {
     @Transactional
     public Created create(CourseDraftStructure plan, Map<String, UUID> questionVersionsByRef,
                           Map<String, UUID> senseByLemma, Map<UUID, SenseText> senseTexts) {
+        return create(plan, questionVersionsByRef, senseByLemma, senseTexts, null);
+    }
+
+    /**
+     * @param uploaderId the author who uploaded any files referenced by the plan; null for link-only imports
+     */
+    @Transactional
+    public Created create(CourseDraftStructure plan, Map<String, UUID> questionVersionsByRef,
+                          Map<String, UUID> senseByLemma, Map<UUID, SenseText> senseTexts, UUID uploaderId) {
         BigDecimal band = plan.course().bandLevel();
         CourseResult course = codeSettings.createCourse(new CreateCourseCommand(plan.course().code(),
                 plan.course().name(), band));
@@ -134,7 +143,8 @@ public class CourseMaterializer {
                     ContentStatus.INACTIVE, topicBand, topicPlan.skill(), course.id()));
             topicIds.add(topic.id());
             topicsByCode.put(topicPlan.code(), topic.id());
-            addLessons(topicPlan, topic.id(), questionVersionsByRef, senseByLemma, senseTexts, lessonIds, lessonsByCode);
+            addLessons(topicPlan, topic.id(), questionVersionsByRef, senseByLemma, senseTexts, uploaderId, lessonIds,
+                    lessonsByCode);
             if (topicPlan.topicTest() != null) {
                 finalTests.add(createFinalTest(PackageType.TOPIC_TEST, topicPlan.topicTest(), topic.id(), null));
             }
@@ -154,8 +164,8 @@ public class CourseMaterializer {
     }
 
     private void addLessons(TopicPlan topic, UUID topicId, Map<String, UUID> questionVersionsByRef,
-                            Map<String, UUID> senseByLemma, Map<UUID, SenseText> senseTexts, List<UUID> lessonIds,
-                            Map<String, UUID> lessonsByCode) {
+                            Map<String, UUID> senseByLemma, Map<UUID, SenseText> senseTexts, UUID uploaderId,
+                            List<UUID> lessonIds, Map<String, UUID> lessonsByCode) {
         int position = 1;
         for (LessonPlan lessonPlan : topic.lessons()) {
             LessonAuthoringResult lesson = codeSettings.createLesson(topicId, lessonPlan.code(), lessonPlan.title(),
@@ -170,7 +180,7 @@ public class CourseMaterializer {
                 addBlock(lesson.id(), block, questionVersionsByRef);
             }
             addVocabulary(lesson.id(), lessonPlan, senseByLemma);
-            addResources(lesson.id(), lessonPlan);
+            addResources(lesson.id(), lessonPlan, uploaderId);
             int ordinal = 1;
             for (PracticeSetPlan newSet : lessonPlan.newPracticeSets()) {
                 practiceSets.create(lesson.id(), lessonPlan.code(), ordinal++, newSet);
@@ -211,12 +221,19 @@ public class CourseMaterializer {
     }
 
     /** Slides and documents are numbered per type, in the order the author listed them. */
-    private void addResources(UUID lessonId, LessonPlan lessonPlan) {
+    private void addResources(UUID lessonId, LessonPlan lessonPlan, UUID uploaderId) {
         Map<LessonResourceType, Integer> next = new java.util.EnumMap<>(LessonResourceType.class);
         for (ResourcePlan resource : lessonPlan.resources()) {
             int order = next.merge(resource.type(), 1, Integer::sum) - 1;
-            lessonResources.execute(new CreateLessonResourceCommand(lessonId, resource.type(), resource.title().trim(),
-                    resource.url().trim(), order));
+            if (resource.fileKey() != null && !resource.fileKey().isBlank() && uploaderId == null) {
+                throw new IllegalArgumentException("Không xác định được tác giả đã tải tệp lên");
+            }
+            CreateLessonResourceCommand command = resource.fileKey() == null || resource.fileKey().isBlank()
+                    ? new CreateLessonResourceCommand(lessonId, resource.type(), resource.title().trim(),
+                            resource.url().trim(), order)
+                    : new CreateLessonResourceCommand(lessonId, resource.type(), resource.title().trim(), null,
+                            resource.fileKey().trim(), uploaderId, order);
+            lessonResources.execute(command);
         }
     }
 

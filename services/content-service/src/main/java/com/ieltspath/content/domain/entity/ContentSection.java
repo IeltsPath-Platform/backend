@@ -85,7 +85,11 @@ public class ContentSection {
         this.updatedAt = Instant.now();
     }
 
+    /** A Writing task is one prompt, so a Writing section never holds more than one question. */
     public void addQuestion(SectionQuestion sectionQuestion) {
+        if (skill == Skill.WRITING && !questions.isEmpty()) {
+            throw new IllegalArgumentException("Mỗi phần Writing chỉ có một câu hỏi. Gỡ câu hiện tại trước khi thêm câu khác.");
+        }
         this.questions.add(Objects.requireNonNull(sectionQuestion, "sectionQuestion must not be null"));
         this.updatedAt = Instant.now();
     }
@@ -102,9 +106,16 @@ public class ContentSection {
                 .orElseThrow(() -> new SectionQuestionNotFoundException(sectionQuestionId));
     }
 
-    /** Removes a question and renumbers the rest 1..n, keeping their relative order. */
+    /**
+     * Removes a question and renumbers the rest 1..n, keeping their relative order. The only question of a Writing
+     * section stays: the author edits that prompt rather than swapping it.
+     */
     public void removeQuestion(UUID sectionQuestionId) {
-        questions.remove(requireQuestion(sectionQuestionId));
+        SectionQuestion target = requireQuestion(sectionQuestionId);
+        if (skill == Skill.WRITING && questions.size() == 1) {
+            throw new IllegalArgumentException("Phần Writing phải giữ câu hỏi duy nhất của nó. Hãy sửa câu hỏi thay vì gỡ.");
+        }
+        questions.remove(target);
         renumberQuestions(questions);
         this.updatedAt = Instant.now();
     }

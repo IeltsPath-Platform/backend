@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.ieltspath.content.application.exception.VocabularyRejectedException;
+import com.ieltspath.content.application.port.LessonDocumentFiles;
 import com.ieltspath.content.application.port.VocabularySenseLookup;
 import com.ieltspath.content.application.port.VocabularySenseLookup.SenseText;
 import com.ieltspath.content.application.port.VocabularySenseWriter;
@@ -66,6 +67,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.when;
 
 /**
  * Approving a course draft on the real schema: what is created, in what state, and that a failure halfway leaves
@@ -73,7 +75,8 @@ import static org.mockito.Mockito.doThrow;
  */
 @DataJpaTest(properties = {"spring.cloud.config.enabled=false", "spring.jpa.hibernate.ddl-auto=none"})
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({ApproveCourseDraftUseCase.class, CourseDraftUseCases.class, CourseMaterializer.class, CourseDraftCodec.class,
+@Import({ApproveCourseDraftUseCase.class, CommitCourseDraftApprovalUseCase.class, CourseDraftUseCases.class,
+        CourseMaterializer.class, CourseDraftCodec.class,
         CourseDraftAnalysisService.class, JdbcCourseCatalogReader.class, JdbcUnlinkedPracticeSetReader.class, CreateCourseUseCase.class,
         UpdateCourseUseCase.class, CourseRepositoryAdapter.class, CoursePersistenceMapperImpl.class,
         CreateTopicUseCase.class, UpdateTopicUseCase.class, TopicRepositoryAdapter.class,
@@ -82,6 +85,9 @@ import static org.mockito.Mockito.doThrow;
         CreateContentPackageUseCase.class, CreateDraftPackageVersionUseCase.class, JdbcLearningContentReader.class,
         JdbcPracticeTestMilestoneRepository.class, JdbcAiDraftRepository.class,
         CreateLessonResourceUseCase.class, LessonResourceRepositoryAdapter.class, LessonResourcePersistenceMapperImpl.class,
+        com.ieltspath.content.infrastructure.persistence.adapter.QuestionRepositoryAdapter.class,
+        com.ieltspath.content.infrastructure.persistence.mapper.QuestionPersistenceMapper.class,
+        PublishQuestionVersionUseCase.class,
         ApproveCourseDraftIntegrationTest.Beans.class})
 @Testcontainers(disabledWithoutDocker = true)
 class ApproveCourseDraftIntegrationTest {
@@ -89,8 +95,7 @@ class ApproveCourseDraftIntegrationTest {
     @TestConfiguration
     static class Beans {
         @Bean ObjectMapper objectMapper() { return new ObjectMapper(); }
-        /** These tests only create link resources, so the document storage is never reached. */
-        @Bean com.ieltspath.content.application.port.LessonDocumentFiles documentFiles() {
+        @Bean LessonDocumentFiles documentFiles() {
             return org.mockito.Mockito.mock(com.ieltspath.content.application.port.LessonDocumentFiles.class);
         }
         @Bean Clock clock() { return Clock.systemUTC(); }
@@ -145,6 +150,7 @@ class ApproveCourseDraftIntegrationTest {
     @Autowired AiDraftRepository draftStore;
     @Autowired FakeLibrary library;
     @Autowired JdbcLearningContentReader reader;
+    @Autowired LessonDocumentFiles documentFiles;
     @Autowired CodeSettingsUseCases codeSettings;
     @Autowired CreateCourseUseCase createCourse;
     @Autowired CreateTopicUseCase createTopic;
@@ -163,6 +169,7 @@ class ApproveCourseDraftIntegrationTest {
 
     @BeforeEach
     void fixtures() {
+        when(documentFiles.exists(any())).thenReturn(true);
         org.mockito.Mockito.reset(codeSettings);
         org.mockito.Mockito.when(codeSettings.createCourse(any()))
                 .thenAnswer(call -> createCourse.execute(call.getArgument(0)));
@@ -233,6 +240,9 @@ class ApproveCourseDraftIntegrationTest {
         assertThat(jdbc.queryForList("SELECT resource_type || ':' || sort_order || ':' || title FROM lesson_resources WHERE lesson_id=? "
                 + "ORDER BY resource_type DESC, sort_order", String.class, first))
                 .containsExactly("SLIDE:0:Deck", "DOCUMENT:0:Sheet B", "DOCUMENT:1:Sheet A");
+        assertThat(jdbc.queryForObject("SELECT file_key FROM lesson_resources WHERE lesson_id=? AND resource_type='SLIDE'",
+                String.class, first)).isEqualTo("lesson-document/" + author
+                + "/00000000-0000-0000-0000-000000000001.pdf");
         assertThat(jdbc.queryForList("SELECT knowledge_point_id FROM lesson_knowledge_points WHERE lesson_id=?",
                 UUID.class, first)).contains(kpFoundation);
         assertThat(jdbc.queryForList("SELECT block_type FROM lesson_blocks WHERE lesson_id=? ORDER BY sort_order",
@@ -498,7 +508,7 @@ class ApproveCourseDraftIntegrationTest {
                    "lessons":[
                      {"code":"%1$s_L1","title":"Basics","summary":"s","knowledgePointIds":["%3$s"],
                       "summaryMarkdown":"- one\\n- two","estimatedMinutes":20,
-                      "resources":[{"type":"SLIDE","title":"Deck","url":"https://slides.example/deck"},
+                      "resources":[{"type":"SLIDE","title":"Deck","fileKey":"lesson-document/%8$s/00000000-0000-0000-0000-000000000001.pdf"},
                                    {"type":"DOCUMENT","title":"Sheet B","url":"https://docs.example/b"},
                                    {"type":"DOCUMENT","title":"Sheet A","url":"https://docs.example/a"}],
                       "blocks":[{"type":"TEXT","text":"Intro","knowledgePointIds":["%3$s"]},
@@ -510,7 +520,7 @@ class ApproveCourseDraftIntegrationTest {
                    "lessons":[],"topicTest":{"code":"%1$s_T2_TEST","title":"Topic test 2"}}],
                  "courseTest":{"code":"%1$s_COURSE_TEST","title":"Course test"},
                  "practiceTestMilestones":[{"packageId":"%7$s","afterTopicSequence":1}]}
-                """.formatted(tag, sortOrder(1), kpFoundation, kpAdvanced, practiceSet, sortOrder(2), practiceTest);
+                """.formatted(tag, sortOrder(1), kpFoundation, kpAdvanced, practiceSet, sortOrder(2), practiceTest, author);
     }
 
     private ObjectNode word(String lemma) {

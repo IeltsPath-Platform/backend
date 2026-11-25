@@ -41,6 +41,11 @@ All routes require `CONTENT_AUTHOR`. An author sees and changes only their own d
   `questionRefs`. A reference is a question version id, or the `importRef` of a question (its latest version is used).
 - `topicTest` and `courseTest` name the final tests that approval creates empty. Topics are ordered by `sortOrder`, and
   lessons by their position in the list. The course reads in that order.
+- A lesson resource is `{ "type", "title", "url" }` for a link or `{ "type", "title", "fileKey" }` for an uploaded file.
+  Slides require `fileKey` under `lesson-document/<author UUID>/` and cannot use `url`; documents may use either form.
+  Upload files through `POST /api/content/admin/media/document` (20 MB maximum). Approval checks that the file belongs to
+  the author and exists in storage. Existing draft slide links are invalid and must be replaced with uploaded PDFs before
+  approval.
 - A lesson's vocabulary has two lists, both optional (a draft saved without them reads as empty). `vocabularySenseIds`
   are senses the library already has, picked by the author. `newVocabulary` are words proposed for the lesson, each
   `{ "lemma", "ipa", "partOfSpeech", "englishDefinition", "vietnameseMeaning", "exampleSentence" }`, written by the author; `partOfSpeech` is

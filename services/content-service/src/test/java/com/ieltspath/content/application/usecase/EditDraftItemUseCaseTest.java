@@ -2,6 +2,8 @@ package com.ieltspath.content.application.usecase;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.ieltspath.content.application.command.QuestionDraftItemPatch;
 import com.ieltspath.content.application.command.QuestionDraftRequest;
 import com.ieltspath.content.application.port.QuestionStemReader;
@@ -58,11 +60,27 @@ class EditDraftItemUseCaseTest {
     }
 
     private AiDraft draft(QuestionType type, DraftStatus status, String result) throws Exception {
+        return draft(type, status, result, true);
+    }
+
+    private AiDraft legacyDraft(QuestionType type, DraftStatus status, String result) throws Exception {
+        return draft(type, status, result, false);
+    }
+
+    private AiDraft draft(QuestionType type, DraftStatus status, String result, boolean metadata) throws Exception {
         String request = json.writeValueAsString(new QuestionDraftRequest(kpId, type, 3, QuestionDifficulty.MEDIUM,
                 null));
-        AiDraft draft = new AiDraft(UUID.randomUUID(), DraftKind.QUESTIONS, status, author, request, result, null, "m",
+        String storedResult = result;
+        if (metadata) {
+            ObjectNode root = (ObjectNode) json.readTree(result);
+            root.put("revision", 0);
+            ArrayNode items = (ArrayNode) root.path("items");
+            for (int index = 0; index < items.size(); index++) ((ObjectNode) items.get(index)).put("itemId", UUID.randomUUID().toString());
+            storedResult = json.writeValueAsString(root);
+        }
+        AiDraft draft = new AiDraft(UUID.randomUUID(), DraftKind.QUESTIONS, status, author, request, storedResult, null, "m",
                 "QUESTIONS-v1", Instant.now(), Instant.now(), Instant.now(), null, null, null);
-        when(drafts.findById(draft.getId())).thenReturn(Optional.of(draft));
+        when(drafts.findByIdForUpdate(draft.getId())).thenReturn(Optional.of(draft));
         return draft;
     }
 
@@ -179,6 +197,21 @@ class EditDraftItemUseCaseTest {
     }
 
     @Test
+    void anOlderQuestionDraftGetsStableItemIdsWhenItIsEdited() throws Exception {
+        AiDraft draft = legacyDraft(QuestionType.MULTIPLE_CHOICE, DraftStatus.READY, CHOICE_ITEMS);
+        UUID stableItemId = UUID.nameUUIDFromBytes((draft.getId() + ":0").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
+        useCase().edit(author, draft.getId(), stableItemId, 0,
+                new QuestionDraftItemPatch("First, edited", null, null, null, null, null));
+
+        assertEquals(stableItemId.toString(), resultOf(draft).path("items").get(0).path("itemId").asText());
+        assertEquals(1, resultOf(draft).path("revision").asInt());
+        var stale = assertThrows(com.ieltspath.content.application.exception.SectionDraftException.class,
+                () -> useCase().remove(author, draft.getId(), stableItemId, 0));
+        assertEquals(org.springframework.http.HttpStatus.CONFLICT, stale.status());
+    }
+
+    @Test
     void onlyAReadyDraftOfItsOwnerCanBeChanged() throws Exception {
         AiDraft approved = draft(QuestionType.MULTIPLE_CHOICE, DraftStatus.APPROVED, CHOICE_ITEMS);
         AiDraft ready = draft(QuestionType.MULTIPLE_CHOICE, DraftStatus.READY, CHOICE_ITEMS);
@@ -194,7 +227,7 @@ class EditDraftItemUseCaseTest {
     @Test
     void aCourseDraftIsNotAQuestionDraft() throws Exception {
         AiDraft course = AiDraft.manual(DraftKind.COURSE, author, "{\"items\":[]}", Instant.now());
-        when(drafts.findById(course.getId())).thenReturn(Optional.of(course));
+        when(drafts.findByIdForUpdate(course.getId())).thenReturn(Optional.of(course));
 
         assertThrows(InvalidContentStateException.class, () -> useCase().remove(author, course.getId(), 0));
     }

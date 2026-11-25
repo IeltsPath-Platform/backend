@@ -45,6 +45,9 @@ class QuestionControllerTest {
     private ListQuestionsUseCase listQuestionsUseCase;
 
     @Mock
+    private ListQuestionsWithIncludesUseCase listQuestionsWithIncludesUseCase;
+
+    @Mock
     private GetQuestionDetailUseCase getQuestionDetailUseCase;
 
     @Mock
@@ -81,7 +84,7 @@ class QuestionControllerTest {
                 PublicationStatus.PUBLISHED, UUID.randomUUID(), Instant.now(), Instant.now()
         );
 
-        when(listQuestionsUseCase.execute(Skill.READING, null, null, null, 0, 25))
+        when(listQuestionsUseCase.execute(Skill.READING, null, null, null, null, 0, 25))
                 .thenReturn(new ListQuestionsUseCase.Page(1, 0, 25, List.of(qResult)));
 
         mockMvc.perform(get("/api/content/questions?skill=READING"))
@@ -91,13 +94,15 @@ class QuestionControllerTest {
                 .andExpect(jsonPath("$.page").value(0))
                 .andExpect(jsonPath("$.size").value(25))
                 .andExpect(jsonPath("$.totalElements").value(1))
-                .andExpect(jsonPath("$.totalPages").value(1));
+                .andExpect(jsonPath("$.totalPages").value(1))
+                .andExpect(jsonPath("$.content[0].ownedElsewhere").doesNotExist())
+                .andExpect(jsonPath("$.content[0].stemExcerpt").doesNotExist());
     }
 
     @Test
     @DisplayName("GET /api/content/admin/questions passes status, page and size to the use case")
     void shouldPassStatusAndPaging() throws Exception {
-        when(listQuestionsUseCase.execute(null, QuestionPurpose.LEARNING, PublicationStatus.PUBLISHED, null, 2, 10))
+        when(listQuestionsUseCase.execute(null, QuestionPurpose.LEARNING, PublicationStatus.PUBLISHED, null, null, 2, 10))
                 .thenReturn(new ListQuestionsUseCase.Page(23, 2, 10, List.of()));
 
         mockMvc.perform(get("/api/content/admin/questions?purpose=LEARNING&status=PUBLISHED&page=2&size=10"))
@@ -110,13 +115,58 @@ class QuestionControllerTest {
 
     @Test
     void codeQueryIsPassedToQuestionCatalogSearch() throws Exception {
-        when(listQuestionsUseCase.execute(null, null, null, "Q-000042", 0, 25))
+        when(listQuestionsUseCase.execute(null, null, null, "Q-000042", null, 0, 25))
                 .thenReturn(new ListQuestionsUseCase.Page(0, 0, 25, List.of()));
 
         mockMvc.perform(get("/api/content/admin/questions?code=Q-000042"))
                 .andExpect(status().isOk());
 
-        verify(listQuestionsUseCase).execute(null, null, null, "Q-000042", 0, 25);
+        verify(listQuestionsUseCase).execute(null, null, null, "Q-000042", null, 0, 25);
+    }
+
+    @Test
+    void unknownIncludeReturnsVietnameseBadRequest() throws Exception {
+        mockMvc.perform(get("/api/content/admin/questions?include=ownership,unknown"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Chỉ hỗ trợ bổ sung trạng thái sử dụng hoặc bản xem trước câu hỏi."));
+    }
+
+    @Test
+    void includesQuestionOwnershipAndPreviewWhenRequested() throws Exception {
+        UUID id = UUID.randomUUID();
+        QuestionResult result = new QuestionResult(id, QuestionType.MULTIPLE_CHOICE, Skill.READING, null,
+                PublicationStatus.PUBLISHED, UUID.randomUUID(), Instant.now(), Instant.now(),
+                QuestionPurpose.LEARNING, null, "Q-000042").enriched(true, "Đoạn đầu…",
+                List.of(new com.ieltspath.content.application.result.QuestionPreviewKnowledgePointResult("R1", "Đọc hiểu")), 5);
+        when(listQuestionsWithIncludesUseCase.execute(Skill.READING, QuestionPurpose.LEARNING,
+                PublicationStatus.PUBLISHED, null, 0, 25, java.util.Set.of("ownership", "preview"), false, null, null))
+                .thenReturn(new ListQuestionsUseCase.Page(1, 0, 25, List.of(result)));
+
+        mockMvc.perform(get("/api/content/admin/questions?skill=READING&purpose=LEARNING&status=PUBLISHED&include=ownership,preview"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].ownedElsewhere").value(true))
+                .andExpect(jsonPath("$.content[0].stemExcerpt").value("Đoạn đầu…"))
+                .andExpect(jsonPath("$.content[0].knowledgePoints[0].code").value("R1"))
+                .andExpect(jsonPath("$.content[0].knowledgePoints[0].name").value("Đọc hiểu"))
+                .andExpect(jsonPath("$.content[0].knowledgePointTotal").value(5));
+    }
+
+    @Test
+    void combinesOwnershipFreeAndKnowledgePointFilters() throws Exception {
+        UUID pointId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        when(listQuestionsWithIncludesUseCase.execute(Skill.READING, QuestionPurpose.LEARNING,
+                PublicationStatus.PUBLISHED, null, 0, 25, java.util.Set.of("ownership", "preview"), true,
+                blockId, List.of(pointId))).thenReturn(new ListQuestionsUseCase.Page(0, 0, 25, List.of()));
+
+        mockMvc.perform(get("/api/content/admin/questions?skill=READING&purpose=LEARNING&status=PUBLISHED"
+                        + "&include=ownership,preview&onlyFree=true&exceptBlockId=" + blockId + "&knowledgePointIds=" + pointId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(0));
+
+        verify(listQuestionsWithIncludesUseCase).execute(Skill.READING, QuestionPurpose.LEARNING,
+                PublicationStatus.PUBLISHED, null, 0, 25, java.util.Set.of("ownership", "preview"), true,
+                blockId, List.of(pointId));
     }
 
     @Test
@@ -136,8 +186,26 @@ class QuestionControllerTest {
     }
 
     @Test
+    @DisplayName("a recording of the version comes with its transcript, link and length")
+    void shouldReturnTheRecordingOfAVersion() throws Exception {
+        UUID version = UUID.randomUUID();
+        UUID asset = UUID.randomUUID();
+        when(getQuestionPassagesUseCase.execute(version)).thenReturn(List.of(new com.ieltspath.content.application.port.QuestionPassageReader.Passage(
+                asset, com.ieltspath.content.domain.vo.AssetType.AUDIO, "Transcript",
+                com.ieltspath.content.application.port.QuestionPassageReader.Source.SECTION, "Listening section", "clip.mp3",
+                com.ieltspath.content.domain.vo.AccessTier.PUBLIC, 95, "https://media.example/clip.mp3")));
+
+        mockMvc.perform(get("/api/content/admin/questions/versions/" + version + "/passages"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].type").value("AUDIO"))
+                .andExpect(jsonPath("$[0].text").value("Transcript"))
+                .andExpect(jsonPath("$[0].mediaUrl").value("https://media.example/clip.mp3"))
+                .andExpect(jsonPath("$[0].durationSeconds").value(95));
+    }
+
+    @Test
     void invalidPagingReturns400() throws Exception {
-        when(listQuestionsUseCase.execute(null, null, null, null, 0, 1000)).thenThrow(new IllegalArgumentException("size"));
+        when(listQuestionsUseCase.execute(null, null, null, null, null, 0, 1000)).thenThrow(new IllegalArgumentException("size"));
 
         mockMvc.perform(get("/api/content/admin/questions?size=1000")).andExpect(status().isBadRequest());
     }
@@ -252,7 +320,7 @@ class QuestionControllerTest {
         QuestionResult exam = new QuestionResult(questionId, QuestionType.MULTIPLE_CHOICE, Skill.READING, null,
                 PublicationStatus.DRAFT, null, Instant.now(), Instant.now(), QuestionPurpose.EXAM);
         when(createQuestionUseCase.execute(any())).thenReturn(exam);
-        when(listQuestionsUseCase.execute(Skill.READING, QuestionPurpose.EXAM, null, null, 0, 25))
+        when(listQuestionsUseCase.execute(Skill.READING, QuestionPurpose.EXAM, null, null, null, 0, 25))
                 .thenReturn(new ListQuestionsUseCase.Page(1, 0, 25, List.of(exam)));
 
         mockMvc.perform(post("/api/content/questions").contentType(MediaType.APPLICATION_JSON)
