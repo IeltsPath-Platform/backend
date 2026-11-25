@@ -205,7 +205,7 @@ class UserControllerSecurityTest {
                         .content("{\"email\":\"common-password@example.com\",\"password\":\"password\",\"fullName\":\"Learner\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Mật khẩu chưa đủ mạnh."))
-                .andExpect(jsonPath("$.details.code").value("WEAK_PASSWORD"))
+                .andExpect(jsonPath("$.code").value("WEAK_PASSWORD"))
                 .andExpect(jsonPath("$.details.reasons").value("TOO_COMMON"));
     }
 

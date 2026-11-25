@@ -136,7 +136,7 @@ class ActionTokenSecurityTest {
                         .content("{\"token\":\"valid-token\",\"newPassword\":\"password\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Mật khẩu chưa đủ mạnh."))
-                .andExpect(jsonPath("$.details.code").value("WEAK_PASSWORD"))
+                .andExpect(jsonPath("$.code").value("WEAK_PASSWORD"))
                 .andExpect(jsonPath("$.details.reasons").value("TOO_COMMON"));
     }
 
