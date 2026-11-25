@@ -312,3 +312,7 @@ Body `{detail, code}`, as in `lesson-learning-v1`.
 | 429 | `DAILY_LIMIT_REACHED` | Daily grading limit reached |
 | 503 | `GRADING_UNAVAILABLE` | LLM not configured, failed, timed out or returned an invalid result; no charge |
 | 503 | `PAYMENT_UNAVAILABLE` | Access Service failed or rejected the token during debit; status `PAYMENT_PENDING`, resend the same `requestId` |
+
+## Free Writing practice tests
+
+Submitting a free Writing essay for a tagged practice test requires an active Premium subscription before quota, balance, grading, lock or transaction work. A missing subscription returns HTTP 403 PREMIUM_REQUIRED; an unavailable entitlement lookup returns HTTP 503 ENTITLEMENT_UNAVAILABLE. Both responses contain details.code and a Vietnamese user message. A stored request replay does not perform another entitlement check.

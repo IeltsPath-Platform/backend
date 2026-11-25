@@ -5,6 +5,8 @@ import com.ieltspath.commonstorage.StorageException;
 import com.ieltspath.commonstorage.UploadRejectedException;
 import com.ieltspath.content.domain.exception.*;
 import com.ieltspath.content.application.exception.VocabularyServiceUnavailableException;
+import com.ieltspath.content.application.exception.EntitlementUnavailableException;
+import com.ieltspath.content.application.exception.PremiumRequiredException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +30,19 @@ import java.util.Map;
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @ExceptionHandler(PremiumRequiredException.class)
+    public ResponseEntity<ErrorResponse> premiumRequired(PremiumRequiredException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.FORBIDDEN, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "PREMIUM_REQUIRED"));
+    }
+
+    @ExceptionHandler(EntitlementUnavailableException.class)
+    public ResponseEntity<ErrorResponse> entitlementUnavailable(EntitlementUnavailableException ex,
+                                                                  HttpServletRequest request) {
+        return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "ENTITLEMENT_UNAVAILABLE"));
+    }
 
     @ExceptionHandler({
             TopicNotFoundException.class,

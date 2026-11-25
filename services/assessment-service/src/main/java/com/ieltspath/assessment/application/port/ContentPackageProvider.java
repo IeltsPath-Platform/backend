@@ -19,12 +19,16 @@ public interface ContentPackageProvider {
     Optional<PackageVersion> findPackageVersion(UUID packageVersionId);
 
     record PackageVersion(UUID packageVersionId, UUID packageId, String packageType, List<Section> sections,
-                          PlacementPool placementPool) {
+                          PlacementPool placementPool, String requiredFeatureKey) {
+        public PackageVersion(UUID packageVersionId, UUID packageId, String packageType, List<Section> sections,
+                              PlacementPool placementPool) {
+            this(packageVersionId, packageId, packageType, sections, placementPool, null);
+        }
         public PackageVersion(UUID packageVersionId, UUID packageId, String packageType, List<Section> sections) {
-            this(packageVersionId, packageId, packageType, sections, null);
+            this(packageVersionId, packageId, packageType, sections, null, null);
         }
         public PackageVersion(UUID packageVersionId, String packageType, List<Section> sections) {
-            this(packageVersionId, null, packageType, sections, null);
+            this(packageVersionId, null, packageType, sections, null, null);
         }
     }
 

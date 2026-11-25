@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.assessment.application.command.StartAssessmentAttemptCommand;
 import com.ieltspath.assessment.application.exception.ContentUnavailableException;
 import com.ieltspath.assessment.application.port.ContentPackageProvider;
+import com.ieltspath.assessment.application.port.LearnerEntitlement;
+import com.ieltspath.assessment.application.exception.PremiumRequiredException;
 import com.ieltspath.assessment.application.port.ContentPackageProvider.Item;
 import com.ieltspath.assessment.application.port.ContentPackageProvider.KnowledgePointWeight;
 import com.ieltspath.assessment.application.port.ContentPackageProvider.Option;
@@ -38,6 +40,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class StartAssessmentAttemptUseCaseTest {
     @Mock ContentPackageProvider content;
+    @Mock LearnerEntitlement entitlement;
     @Mock AssessmentAttemptRepository attempts;
     @Mock AttemptSectionRepository sections;
     @Mock AttemptItemRepository items;
@@ -108,6 +111,23 @@ class StartAssessmentAttemptUseCaseTest {
         verify(attempts).save(attempt.capture());
         assertEquals(AttemptType.OFFICIAL_PRACTICE, attempt.getValue().getAttemptType());
         assertNull(attempt.getValue().getPlacementPool());
+    }
+
+    @Test
+    void taggedListeningPracticeCannotStartForALearnerWithoutPremium() {
+        UUID listeningPracticeVersionId = UUID.fromString("2d000000-0000-4000-8000-060000001005");
+        UUID listeningPracticePackageId = UUID.fromString("2d000000-0000-4000-8000-050000001005");
+        PackageVersion base = version("PRACTICE_TEST", null);
+        when(content.findPackageVersion(listeningPracticeVersionId)).thenReturn(Optional.of(new PackageVersion(
+                listeningPracticeVersionId, listeningPracticePackageId, base.packageType(), base.sections(),
+                base.placementPool(), "PREMIUM_CONTENT")));
+        when(entitlement.premium()).thenReturn(false);
+
+        assertThrows(PremiumRequiredException.class,
+                () -> useCase().execute(command(listeningPracticeVersionId)));
+        verify(entitlement).premium();
+        verify(content).findPackageVersion(listeningPracticeVersionId);
+        verifyNoInteractions(attempts, sections, items, knowledgeSnapshot);
     }
 
     @Test
@@ -208,7 +228,11 @@ class StartAssessmentAttemptUseCaseTest {
     }
 
     private StartAssessmentAttemptCommand command() {
-        return new StartAssessmentAttemptCommand(userId, versionId, AttemptMode.STANDARD, AttemptChannel.WEB);
+        return command(versionId);
+    }
+
+    private StartAssessmentAttemptCommand command(UUID packageVersionId) {
+        return new StartAssessmentAttemptCommand(userId, packageVersionId, AttemptMode.STANDARD, AttemptChannel.WEB);
     }
 
     private PackageVersion version(String type, String passage) {
@@ -228,6 +252,6 @@ class StartAssessmentAttemptUseCaseTest {
     private StartAssessmentAttemptUseCase useCase() {
         return new StartAssessmentAttemptUseCase(content,
                 new AttemptCreator(attempts, sections, items, knowledgeSnapshot, json,
-                        org.mockito.Mockito.mock(org.springframework.jdbc.core.JdbcTemplate.class), 3));
+                        org.mockito.Mockito.mock(org.springframework.jdbc.core.JdbcTemplate.class), 3), entitlement);
     }
 }

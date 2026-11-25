@@ -1,6 +1,7 @@
 package com.ieltspath.learning.application.usecase;
 
 import com.ieltspath.learning.application.port.LearnerLock;
+import com.ieltspath.learning.application.exception.AccessUnavailableException;
 import com.ieltspath.learning.application.port.LearningContentClient.Item;
 import com.ieltspath.learning.application.result.WritingSubmissionResult;
 import com.ieltspath.learning.application.service.EssayPrompts;
@@ -48,7 +49,6 @@ public class SubmitFreeWritingUseCase {
 
     public WritingSubmissionResult execute(UUID userId, UUID packageVersionId, UUID questionVersionId, UUID requestId,
                                            String essayText) {
-        boolean premium = flow.premiumLearner();
         int words = flow.validate(essayText);
 
         Optional<WritingSubmission> existing = essays.findByRequestId(requestId);
@@ -61,15 +61,39 @@ public class SubmitFreeWritingUseCase {
             if (submission.status() == WritingSubmissionStatus.GRADED) return view.assemble(submission);
             if (submission.status() == WritingSubmissionStatus.PAYMENT_PENDING) return charge(submission);
         }
+        FreeWritingPrompts.ResolvedPrompt prompt = prompts.resolve(packageVersionId, questionVersionId);
+        boolean premium = premiumFor(prompt.requiredFeatureKey());
         flow.requireGraderAvailable();
 
-        Item item = prompts.find(packageVersionId, questionVersionId);
+        Item item = prompt.item();
         flow.requireBalance(premium);
 
         WritingSubmission grading = transaction.execute(status -> startGrading(userId, item, requestId, essayText,
                 words, premium));
         flow.grade(grading, premium);
         return charge(grading);
+    }
+
+    private boolean premiumFor(String requiredFeatureKey) {
+        if (requiredFeatureKey == null) return flow.premiumLearner();
+        final boolean premium;
+        try {
+            premium = flow.premiumStatus();
+        } catch (AccessUnavailableException exception) {
+            throw entitlementUnavailable();
+        }
+        if (!premium) throw premiumRequired();
+        return true;
+    }
+
+    private static com.ieltspath.learning.application.exception.LearningRequestException premiumRequired() {
+        return new com.ieltspath.learning.application.exception.LearningRequestException(403, "PREMIUM_REQUIRED",
+                "Đề này dành cho tài khoản Premium. Nâng cấp để luyện đề này.");
+    }
+
+    private static com.ieltspath.learning.application.exception.LearningRequestException entitlementUnavailable() {
+        return new com.ieltspath.learning.application.exception.LearningRequestException(503,
+                "ENTITLEMENT_UNAVAILABLE", "Chưa kiểm tra được gói Premium. Vui lòng thử lại sau.");
     }
 
     private WritingSubmissionResult charge(WritingSubmission submission) {

@@ -159,3 +159,7 @@ make an optional `ERROR_PATTERN` review of the error's parent point, by the rule
 heart, and is not part of the clearance of the lesson's Practice beyond the set's own score: the multiple-choice sets of the
 lesson remain a way to clear it. A practice outside the course (the catalogue's tests) has no lesson or attempt and never
 writes evidence or reviews.
+
+## Free Speaking practice tests
+
+Creating a Speaking submission for a tagged free practice test requires an active Premium subscription before a submission or upload is opened. A missing subscription returns HTTP 403 PREMIUM_REQUIRED; an unavailable entitlement lookup returns HTTP 503 ENTITLEMENT_UNAVAILABLE. Both responses contain details.code and a Vietnamese user message. Existing submission uploads, grading and settlement do not repeat the check.

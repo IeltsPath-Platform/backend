@@ -78,3 +78,4 @@ management:
       probes:
         enabled: true
 
+ACCESS_SERVICE_URL: ${ACCESS_SERVICE_URL:http://localhost:8084}

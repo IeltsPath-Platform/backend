@@ -76,10 +76,14 @@ public class EssaySubmissionFlow {
 
     public boolean premiumLearner() {
         try {
-            return points.premium();
+            return premiumStatus();
         } catch (AccessUnavailableException exception) {
             return false;
         }
+    }
+
+    public boolean premiumStatus() {
+        return points.premium();
     }
 
     public void requireBalance(boolean premium) {

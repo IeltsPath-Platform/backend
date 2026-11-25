@@ -4,11 +4,15 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.content.application.port.WritingTaskReader;
+import com.ieltspath.content.application.port.LearnerEntitlement;
+import com.ieltspath.content.application.exception.PremiumRequiredException;
 import com.ieltspath.content.domain.exception.PackageVersionNotFoundException;
 import com.ieltspath.content.domain.vo.AssetType;
 import com.ieltspath.content.domain.vo.MediaReferencePolicy;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 import java.util.List;
 import java.util.UUID;
@@ -20,16 +24,27 @@ public class GetWritingTaskUseCase {
 
     private final WritingTaskReader reader;
     private final MediaReferencePolicy mediaPolicy;
+    private final LearnerEntitlement entitlement;
 
-    public GetWritingTaskUseCase(WritingTaskReader reader, MediaReferencePolicy mediaPolicy) {
+    @Autowired
+    public GetWritingTaskUseCase(WritingTaskReader reader, MediaReferencePolicy mediaPolicy,
+                                 LearnerEntitlement entitlement) {
         this.reader = reader;
         this.mediaPolicy = mediaPolicy;
+        this.entitlement = entitlement;
     }
 
-    @Transactional(readOnly = true)
-    public Result execute(UUID packageVersionId, UUID sectionId) {
+    public GetWritingTaskUseCase(WritingTaskReader reader, MediaReferencePolicy mediaPolicy) {
+        this(reader, mediaPolicy, () -> false);
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public Result execute(UUID packageVersionId, UUID sectionId, boolean learner) {
         WritingTaskReader.WritingTask task = reader.find(packageVersionId, sectionId)
                 .orElseThrow(() -> new PackageVersionNotFoundException(packageVersionId));
+        if (learner && task.requiredFeatureKey() != null && !entitlement.premium()) {
+            throw new PremiumRequiredException();
+        }
         List<Image> images = task.images().stream()
                 .map(image -> new Image(mediaPolicy.resolve(AssetType.IMAGE, image.mediaReference()), image.altText()))
                 .toList();

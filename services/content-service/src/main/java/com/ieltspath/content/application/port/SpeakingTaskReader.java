@@ -9,7 +9,14 @@ public interface SpeakingTaskReader {
     Optional<SpeakingTask> find(UUID packageVersionId, UUID sectionId);
 
     record SpeakingTask(UUID packageId, UUID packageVersionId, UUID sectionId, String packageTitle, String title,
-                        Integer partNo, Integer timeLimitSeconds, String instructions, List<Question> questions) {}
+                        Integer partNo, Integer timeLimitSeconds, String instructions, List<Question> questions,
+                        String requiredFeatureKey) {
+        public SpeakingTask(UUID packageId, UUID packageVersionId, UUID sectionId, String packageTitle, String title,
+                            Integer partNo, Integer timeLimitSeconds, String instructions, List<Question> questions) {
+            this(packageId, packageVersionId, sectionId, packageTitle, title, partNo, timeLimitSeconds, instructions,
+                    questions, null);
+        }
+    }
 
     /** {@code durationSeconds} is how long the learner may speak on the question; null when the question has none. */
     record Question(UUID questionVersionId, int sortOrder, String stem, Integer durationSeconds) {}

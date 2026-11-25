@@ -75,7 +75,8 @@ public class ContentPackageClient implements ContentPackageProvider {
             catch (IllegalArgumentException ignored) { throw invalid(); }
         }
         return new PackageVersion(response.packageVersionId(), response.packageId(), response.packageType(),
-                response.sections().stream().map(ContentPackageClient::toSection).toList(), pool);
+                response.sections().stream().map(ContentPackageClient::toSection).toList(), pool,
+                response.requiredFeatureKey());
     }
 
     private static Section toSection(SectionResponse section) {
@@ -123,8 +124,9 @@ public class ContentPackageClient implements ContentPackageProvider {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    private record VersionResponse(UUID packageVersionId, UUID packageId, String packageType, List<SectionResponse> sections,
-                                   String placementPool) {}
+    private record VersionResponse(UUID packageVersionId, UUID packageId, String packageType,
+                                   List<SectionResponse> sections, String placementPool,
+                                   String requiredFeatureKey) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record SectionResponse(UUID sectionId, String title, String skill, String instructions, int sortOrder,
