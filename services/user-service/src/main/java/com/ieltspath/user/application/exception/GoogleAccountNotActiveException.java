@@ -10,7 +10,7 @@ public class GoogleAccountNotActiveException extends AuthenticationFailedExcepti
     private final UserStatus status;
 
     public GoogleAccountNotActiveException(UUID userId, UserStatus status) {
-        super("Google sign-in is not available for this account");
+        super("Tài khoản không còn hoạt động nên không thể đăng nhập bằng Google.");
         this.userId = userId;
         this.status = status;
     }

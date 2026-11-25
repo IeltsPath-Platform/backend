@@ -1,7 +1,7 @@
----
+﻿---
 phase: 4
 title: "Chính sách mật khẩu (A4) và băm mật khẩu (A5)"
-status: pending
+status: done
 priority: P1
 dependencies: []
 ---
@@ -26,7 +26,7 @@ chặn, không kiểm trùng email/tên.
   `vietnam123`, `anhyeuem`, `emyeuanh`, `20042004`...), tên sản phẩm (`ielts`, `ielts123`, `ielts2026`...). Mỗi dòng một mục,
   chữ thường, không dòng trống; dòng bắt đầu bằng `#` là chú thích. Nạp một lần vào `Set` lúc khởi động, so khớp không phân
   biệt hoa thường. Thêm mục mới = thêm dòng vào tệp. Không thêm dependency mới.
-- Lỗi trả `400`, `details.code=WEAK_PASSWORD`, `details.reasons` ∈ `TOO_SHORT, TOO_COMMON, CONTAINS_ACCOUNT_INFO,
+- Lỗi trả `400`, `code=WEAK_PASSWORD`, `details.reasons` ∈ `TOO_SHORT, TOO_COMMON, CONTAINS_ACCOUNT_INFO,
   TOO_SIMPLE`. Thông báo tiếng Việt, không nhắc lại mật khẩu (xem bảng trong `plan.md`).
 - Chỉ áp cho mật khẩu **mới** (đăng ký, đổi, đặt lại, phase 7 đặt lần đầu). Người dùng cũ không bị buộc đổi; không
   kiểm khi đăng nhập.
@@ -59,7 +59,7 @@ Argon2id cần thư viện mới (Bouncy Castle) nên **không** chọn trong pl
   encoder hiện tại và cập nhật **có điều kiện** `UPDATE users SET password_hash = :new WHERE id = :id AND password_hash =
   :old` (không ghi đè nếu mật khẩu vừa bị đổi song song). Thêm `UserRepository.updatePasswordHashIfUnchanged`.
 - Hash cũ cost 10 vẫn xác thực được; mỗi người dùng được nâng cấp ở lần đăng nhập kế tiếp, không chạy hàng loạt.
-- Dummy hash của phase 1 tự theo cost mới vì dùng cùng encoder.
+- Hash giả của kiểm tra thời gian đăng nhập dùng cost hiện tại cùng cost 10 để cân bằng các tài khoản cũ chưa nâng cấp.
 - Counter `auth.password.rehash`. Codex thêm mục "Chi phí BCrypt" vào `docs/deployment.md` (cách đo, ngưỡng, biến
   `APP_AUTH_PASSWORD_BCRYPT_COST`). **Chủ dự án** đo trên máy đích (không phải Codex): chọn 12 nếu một lần băm dưới khoảng
   350 ms, hạ 11 nếu VPS yếu (chỉ đổi biến môi trường).
@@ -67,8 +67,9 @@ Argon2id cần thư viện mới (Bouncy Castle) nên **không** chọn trong pl
 **Files:** `config/AuthTokenConfig.java`, `application/usecase/LoginUseCase.java`, `domain/repository/UserRepository.java`,
 `infrastructure/adapter/UserRepositoryAdapter` và JPA repository tương ứng, `config-repo/user-service.yaml`.
 
-**Tests:** `LoginUseCaseTest` (hash cost 10 → được băm lại cost 12 và đăng nhập lại vẫn đúng; hash cost 12 không băm lại;
-sai mật khẩu không băm lại); Testcontainers: hai request đăng nhập đồng thời không ghi đè một lần đổi mật khẩu xen giữa.
+**Tests:** `LoginUseCaseTest` (hash cost 10 được nâng lên cost cấu hình; hash ở cost hiện tại không băm lại; sai mật khẩu
+không băm lại); kiểm thử BCrypt thật xác minh tài khoản hash cost 10 đăng nhập được sau khi nâng và đăng nhập lại được;
+Testcontainers: cập nhật có điều kiện không ghi đè một lần đổi mật khẩu xen giữa.
 
 ## Success Criteria
 - [ ] Đăng ký/đổi/đặt lại với `12345678`, `password`, email của chính mình bị từ chối `WEAK_PASSWORD`; mật khẩu 12 ký tự

@@ -1,7 +1,7 @@
----
+﻿---
 phase: 1
 title: "Nền tảng: A6, G2, G4, G8, dịch thông báo lỗi"
-status: pending
+status: done
 priority: P1
 dependencies: []
 ---
@@ -18,7 +18,7 @@ sau. Các bước "đo tay" thuộc chủ dự án, không phải Codex (xem `pl
 `GoogleSignInUnavailableException`, `LoginLimiterUnavailableException`, `LoginRateLimitedException`, và chuỗi
 "Google ID token is invalid" trong `NimbusGoogleIdTokenVerifier`.
 
-**Việc:** dịch tại nguồn sang tiếng Việt có dấu, giữ nguyên HTTP status và `details.code` đang dùng; đọc `GlobalExceptionHandler`
+**Việc:** dịch tại nguồn sang tiếng Việt có dấu, giữ nguyên HTTP status và `code` đang dùng; đọc `GlobalExceptionHandler`
 và `VietnameseErrorMessages` (đã có trên `main`) để chọn câu và không trùng lặp với lưới dịch. Câu gợi ý (chỉnh cho khớp
 ngữ cảnh khi viết):
 - Xung đột tài khoản Google: "Tài khoản Google này đã được liên kết với một tài khoản khác."
@@ -31,7 +31,7 @@ ngữ cảnh khi viết):
 - Bộ giới hạn đăng nhập không dùng được: "Hệ thống tạm thời không thể xử lý đăng nhập. Vui lòng thử lại sau."
 
 **Test:** mỗi exception có một test (`@WebMvcTest` hoặc test handler) chứng minh response chứa chuỗi tiếng Việt và đúng
-`details.code`; cập nhật test/contract đang assert chuỗi tiếng Anh. Không đổi hành vi nào khác.
+`code`; cập nhật test/contract đang assert chuỗi tiếng Anh. Không đổi hành vi nào khác.
 
 **Success:** không còn exception nào trong danh sách trả chuỗi tiếng Anh; test xanh.
 
@@ -40,17 +40,19 @@ ngữ cảnh khi viết):
 **Vấn đề:** `LoginUseCase.execute` chỉ gọi `passwordEncoder.matches` khi user tồn tại, ACTIVE và có `passwordHash`. Email
 không tồn tại, tài khoản bị khóa hay tài khoản chỉ có Google trả lời nhanh hơn rõ rệt so với tài khoản có mật khẩu.
 
-**Thiết kế:** mọi nhánh thất bại đều chạy đúng một lần `matches` với một hash giả cùng cost.
-- Trong `LoginUseCase` thêm trường `dummyHash`, tạo một lần khi khởi động bằng `passwordEncoder.encode(<chuỗi ngẫu nhiên>)`
-  (cùng encoder nên cùng cost; sau phase 4 tự theo cost mới).
-- Nhánh email sai, `status != ACTIVE`, `passwordHash == null`: gọi `passwordEncoder.matches(password, dummyHash)` rồi mới ném
-  `AuthenticationFailedException("Email hoặc mật khẩu không đúng")`. Thông báo giữ nguyên.
+**Thiết kế:** mọi nhánh thất bại đều làm lượng công việc BCrypt tương đương cho hash cost 10 cũ và cost hiện tại.
+- Trong `LoginUseCase` tạo hash giả ngẫu nhiên một lần khi khởi động bằng encoder cost hiện tại và encoder legacy cost 10.
+- Email sai, `status != ACTIVE`, `passwordHash == null`: so khớp với cả hai hash giả rồi mới ném
+  `AuthenticationFailedException("Email hoặc mật khẩu không đúng")`.
+- Mật khẩu sai trên tài khoản có hash: so khớp hash đã lưu và một hash giả bù theo cost; hash dưới cost hiện tại được bù
+  bằng hash giả cost hiện tại, hash ở cost hiện tại được bù bằng hash giả cost 10. Việc này giữ lượng công việc tương đương
+  giữa tài khoản cũ cost 10 và tài khoản mới cost hiện tại, trong khi vẫn cho phép nâng hash cũ khi đăng nhập thành công.
 - Không dùng `Thread.sleep`.
 
 **File:** `services/user-service/.../application/usecase/LoginUseCase.java`; test `LoginUseCaseTest`.
 
-**Test (Codex):** Mockito `verify(passwordEncoder).matches(...)` ở bốn nhánh (email không tồn tại, không ACTIVE, hash null,
-mật khẩu sai).
+**Test (Codex):** Mockito xác minh các nhánh email không tồn tại, không ACTIVE, hash null và mật khẩu sai đều chạy so khớp
+BCrypt với hash giả phù hợp.
 
 **Đo tay (chủ dự án, không phải Codex):** 50 lần đăng nhập cho mỗi loại trên stack local, hai nhóm lệch nhau dưới 20% trung vị.
 
@@ -100,7 +102,7 @@ hành vi an toàn hơn cho chủ tài khoản nên **sửa tài liệu theo code
 **Test:** `GoogleSignInUseCaseTest` kiểm counter đúng tag cho từng nhánh; test cấu hình đo gauge 0/1.
 
 ## Success Criteria
-- [ ] Bốn nhánh thất bại của `LoginUseCase` đều gọi `matches` (test Mockito xanh).
+- [ ] Bốn nhánh thất bại của `LoginUseCase` đều chạy công việc BCrypt bù cho sai khác cost giữa hash cũ và hiện tại.
 - [ ] Bật `enforce-secure` với `secure=false` làm service không khởi động; hai tổ hợp còn lại chạy bình thường.
 - [ ] Hai contract Google khớp với code, có test chứng minh.
 - [ ] Counter `auth.google.signin` tăng đúng tag cho từng nhánh (test đơn vị).

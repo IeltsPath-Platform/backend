@@ -12,7 +12,8 @@ public record AuthCookieProperties(
         String domain,
         String sameSite,
         boolean secure,
-        boolean httpOnly
+        boolean httpOnly,
+        boolean enforceSecure
 ) {
     public AuthCookieProperties {
         if (accessTokenName == null || accessTokenName.isBlank()) {
@@ -36,7 +37,7 @@ public record AuthCookieProperties(
     }
 
     public static AuthCookieProperties defaults() {
-        return new AuthCookieProperties(true, "access_token", "/", "refresh_token", "/auth", null, "Lax", false, true);
+        return new AuthCookieProperties(true, "access_token", "/", "refresh_token", "/auth", null, "Lax", false, true, false);
     }
 }
 

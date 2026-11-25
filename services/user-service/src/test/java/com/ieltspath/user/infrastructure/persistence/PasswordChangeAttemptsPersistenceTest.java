@@ -3,6 +3,7 @@ package com.ieltspath.user.infrastructure.persistence;
 import com.ieltspath.user.application.command.ChangePasswordCommand;
 import com.ieltspath.user.application.port.UserLock;
 import com.ieltspath.user.application.usecase.ChangePasswordUseCase;
+import com.ieltspath.user.application.usecase.PasswordPolicyService;
 import com.ieltspath.user.application.usecase.UserNoticeOutbox;
 import com.ieltspath.user.domain.aggregate.User;
 import com.ieltspath.user.domain.exception.PasswordChangeException;
@@ -80,6 +81,9 @@ class PasswordChangeAttemptsPersistenceTest {
         }
         @Bean RefreshTokenRepository refreshTokens() { return mock(RefreshTokenRepository.class); }
         @Bean PasswordEncoder passwordEncoder() { return ENCODER; }
+        @Bean PasswordPolicyService passwordPolicyService() {
+            return new PasswordPolicyService(password -> false, new com.ieltspath.user.config.AuthPasswordProperties(8, 12));
+        }
     }
 
     @Autowired ChangePasswordUseCase useCase;
@@ -119,7 +123,8 @@ class PasswordChangeAttemptsPersistenceTest {
         // Another instance has no memory of its own: only the database can tell it the user is locked.
         ChangePasswordUseCase otherInstance = new ChangePasswordUseCase(
                 mock(UserRepository.class), mock(RefreshTokenRepository.class), ENCODER,
-                mock(UserLock.class), new PasswordChangeAttemptRepositoryAdapter(jdbc), mock(UserNoticeOutbox.class));
+                mock(UserLock.class), new PasswordChangeAttemptRepositoryAdapter(jdbc), mock(UserNoticeOutbox.class),
+                new PasswordPolicyService(password -> false, new com.ieltspath.user.config.AuthPasswordProperties(8, 12)));
         var limited = assertThrows(PasswordChangeException.class,
                 () -> otherInstance.execute(new ChangePasswordCommand(USER_ID, "right-password", "next-password")));
 

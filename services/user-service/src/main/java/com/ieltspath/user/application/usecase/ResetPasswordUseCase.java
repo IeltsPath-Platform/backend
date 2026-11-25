@@ -33,6 +33,7 @@ public class ResetPasswordUseCase {
     private final UserLock userLock;
     private final RefreshTokenRepository refreshTokenRepository;
     private final UserNoticeOutbox notices;
+    private final PasswordPolicyService passwordPolicy;
 
     @Transactional
     public void execute(ResetPasswordCommand command) {
@@ -59,6 +60,8 @@ public class ResetPasswordUseCase {
         if (user.getStatus() != UserStatus.ACTIVE) {
             throw new InvalidActionTokenException("Không thể đặt lại mật khẩu cho tài khoản không hoạt động");
         }
+        passwordPolicy.check(command.newPassword(), user.getEmail().value(), user.getFullName(),
+                user.getPhoneNumber() == null ? null : user.getPhoneNumber().value());
         if (!accountActionTokenRepository.consumePasswordResetToken(tokenHash, java.time.LocalDateTime.now(java.time.ZoneOffset.UTC))) {
             throw new InvalidActionTokenException("Mã token đã hết hạn hoặc đã được sử dụng");
         }

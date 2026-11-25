@@ -15,7 +15,7 @@ the User Service verifies it against Google's JWKS before looking up any account
 
 - `200`: same `AuthTokenResponse` body and auth cookies as `POST /auth/login`.
 - `400`: missing, blank, or oversized `idToken`.
-- `401`: invalid/expired token, unverified Google email, or account that is not `ACTIVE`.
+- `401`: invalid/expired token or account that is not `ACTIVE` (messages are localized in Vietnamese).
 - `403 GOOGLE_SIGNIN_NOT_ALLOWED`: account has any role other than `CUSTOMER`.
 - `403 GOOGLE_EMAIL_NOT_SUPPORTED`: address is not `@gmail.com`, `@googlemail.com`, or a Workspace address whose `hd`
   claim matches the email domain.
@@ -23,9 +23,13 @@ the User Service verifies it against Google's JWKS before looking up any account
 - `429`: Gateway `auth` tier limit exceeded.
 - `503 GOOGLE_SIGNIN_UNAVAILABLE`: no `GOOGLE_CLIENT_IDS` are configured or Google's signing keys cannot be fetched.
 
+Google sign-in errors use Vietnamese messages while keeping these status codes and stable `code` values.
+
 ## Account matching and sessions
 
 The service looks up `(GOOGLE, sub)` first, then the verified email, and creates a `CUSTOMER` account if neither exists.
+An already-linked `sub` may sign in without checking the current email domain, and the stored email is not updated from the token.
+For a new `sub`, email authority is required before creating an account or linking by email.
 Google has already confirmed the email (`email_verified`), so linking to an existing account that was not yet verified marks
 it verified and publishes `user.email-verification-state.v1` with `verified=true`; a newly created Google account publishes
 the same state.
@@ -36,7 +40,7 @@ sign-in then fails until the user sets a new password through the reset email fl
 reset flow stays open for it; an account created by Google has no password and gets a "use Google" mail instead, see
 [password-reset-google-only-v1](password-reset-google-only-v1.md)). A **verified** account keeps its
 password and can sign in with either method. A `user.google-account-linked.v1` event is published whenever a Google identity
-is newly linked to an account that already existed.
+is newly linked to an account that already existed, whether or not its password is cleared.
 
 An access token issued before linking remains valid until it expires (at most one hour). Access tokens are not revoked by
 this flow. Unlinking the only login identity remains prohibited by the existing OAuth unlink rule.

@@ -64,11 +64,11 @@ public class NimbusGoogleIdTokenVerifier implements GoogleIdTokenVerifier {
             String subject = jwt.getSubject();
             String email = jwt.getClaimAsString("email");
             if (subject == null || subject.isBlank() || email == null || email.isBlank()) {
-                throw new AuthenticationFailedException("Google ID token is invalid");
+                throw new AuthenticationFailedException("Phiên đăng nhập Google không hợp lệ hoặc đã hết hạn. Vui lòng thử lại.");
             }
             return new GoogleIdentity(subject, email, jwt.getClaimAsString("name"), jwt.getClaimAsString("hd"));
         } catch (BadJwtException invalidToken) {
-            throw new AuthenticationFailedException("Google ID token is invalid");
+            throw new AuthenticationFailedException("Phiên đăng nhập Google không hợp lệ hoặc đã hết hạn. Vui lòng thử lại.");
         } catch (ResourceAccessException | DownstreamUnavailableException | JwtException unavailable) {
             log.warn("Google ID token verification unavailable errorType={}", unavailable.getClass().getSimpleName());
             throw new GoogleSignInUnavailableException(unavailable);

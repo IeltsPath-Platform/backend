@@ -47,10 +47,6 @@ public class LinkGoogleAccountUseCase {
 
     @Transactional
     public GoogleSignInResult execute(GoogleIdentity google) {
-        if (!google.isEmailAuthoritative()) {
-            throw new GoogleEmailNotSupportedException();
-        }
-        String email = new Email(google.email()).value();
         userLock.lockCreationKey("google-subject:" + google.subject());
         OAuthIdentity identity = oauthIdentityRepository
                 .findByProviderAndProviderSubject(OAuthProvider.GOOGLE, google.subject())
@@ -58,6 +54,7 @@ public class LinkGoogleAccountUseCase {
         User user;
         boolean createdNow = false;
         boolean unverifiedBefore = false;
+        String email = null;
         if (identity != null) {
             user = lockAndReload(identity.getUserId());
             identity = oauthIdentityRepository.findByUserIdAndProvider(user.getId(), OAuthProvider.GOOGLE)
@@ -66,6 +63,10 @@ public class LinkGoogleAccountUseCase {
                 throw new GoogleAccountConflictException();
             }
         } else {
+            if (!google.isEmailAuthoritative()) {
+                throw new GoogleEmailNotSupportedException();
+            }
+            email = new Email(google.email()).value();
             userLock.lockCreationKey("email:" + email);
             user = userRepository.findByEmail(email).orElse(null);
             if (user == null) {

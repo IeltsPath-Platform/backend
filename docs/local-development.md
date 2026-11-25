@@ -59,6 +59,8 @@ này chỉ đổi lịch sử Flyway, không chạy SQL còn thiếu.
 
 ## 4. Chạy luồng chính local (học bài → đề cuối → Learning Service)
 
+Google sign-in dùng OAuth client ID lấy từ Google Cloud Console; đặt danh sách client ID phân cách bằng dấu phẩy trong `GOOGLE_CLIENT_IDS` để bật.
+
 Luồng: học viên gọi `GET /api/learning/topics` → học từng bài, nộp khối bài tập (`/api/learning/lessons/**`) → bài ôn khi
 KP yếu (`/api/learning/reviews/**`) → nhận mã đề (`POST /api/learning/topics/{id}/test-assignments`) → làm đề ở
 `/api/assessments/**` → outbox → RabbitMQ → consumer của Learning Service ghi bằng chứng và mở topic kế. Mọi service

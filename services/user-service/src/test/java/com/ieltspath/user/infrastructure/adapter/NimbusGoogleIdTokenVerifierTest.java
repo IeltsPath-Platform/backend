@@ -132,6 +132,7 @@ class NimbusGoogleIdTokenVerifierTest {
     }
 
     private void assertInvalid(String token) {
-        assertThatThrownBy(() -> verifier.verify(token)).isInstanceOf(AuthenticationFailedException.class);
+        assertThatThrownBy(() -> verifier.verify(token)).isInstanceOf(AuthenticationFailedException.class)
+                .hasMessage("Phiên đăng nhập Google không hợp lệ hoặc đã hết hạn. Vui lòng thử lại.");
     }
 }

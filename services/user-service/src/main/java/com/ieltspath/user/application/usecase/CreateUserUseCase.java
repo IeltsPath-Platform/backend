@@ -11,7 +11,6 @@ import com.ieltspath.user.domain.repository.UserRepository;
 import com.ieltspath.user.domain.service.RoleAssignmentPolicy;
 import com.ieltspath.user.domain.vo.Email;
 import com.ieltspath.user.domain.vo.FullName;
-import com.ieltspath.user.domain.vo.PasswordPolicy;
 import com.ieltspath.user.domain.vo.PhoneNumber;
 import com.ieltspath.user.domain.vo.RoleName;
 import com.ieltspath.user.domain.vo.UserStatus;
@@ -32,6 +31,7 @@ public class CreateUserUseCase {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final PasswordPolicyService passwordPolicy;
 
     @Transactional
     public User execute(CreateUserCommand command) {
@@ -46,7 +46,7 @@ public class CreateUserUseCase {
         }
         User user = User.builder()
                 .email(email)
-                .passwordHash(passwordEncoder.encode(requirePassword(command.password())))
+                .passwordHash(passwordEncoder.encode(requirePassword(command.password(), email.value(), command.fullName(), phoneNumber.value())))
                 .fullName(new FullName(command.fullName()).value())
                 .phoneNumber(phoneNumber)
                 .status(UserStatus.ACTIVE)
@@ -69,13 +69,11 @@ public class CreateUserUseCase {
         return roles;
     }
 
-    private String requirePassword(String password) {
+    private String requirePassword(String password, String email, String fullName, String phone) {
         if (password == null || password.isBlank()) {
             throw new IllegalArgumentException("Mật khẩu không được để trống");
         }
-        if (!PasswordPolicy.isWithinLimits(password)) {
-            throw new IllegalArgumentException(PasswordPolicy.MESSAGE);
-        }
+        passwordPolicy.check(password, email, fullName, phone);
         return password;
     }
 }

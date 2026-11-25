@@ -64,7 +64,8 @@ class ActionTokenUseCaseTest {
                 outboxEventRepository, tokenHashService, userLock, new ObjectMapper().findAndRegisterModules(),
                 oauthIdentityRepository, notices);
         resetPasswordUseCase = new ResetPasswordUseCase(userRepository, accountActionTokenRepository, tokenHashService,
-                passwordEncoder, userLock, refreshTokenRepository, notices);
+                passwordEncoder, userLock, refreshTokenRepository, notices,
+                new PasswordPolicyService(password -> false, new com.ieltspath.user.config.AuthPasswordProperties(8, 12)));
         getActionTokensByUserIdUseCase = new GetActionTokensByUserIdUseCase(accountActionTokenRepository);
         revokeUserActionTokensUseCase = new RevokeUserActionTokensUseCase(accountActionTokenRepository);
     }

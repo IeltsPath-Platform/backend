@@ -12,7 +12,6 @@ import com.ieltspath.user.domain.exception.UserNotFoundException;
 import com.ieltspath.user.domain.repository.PasswordChangeAttemptRepository;
 import com.ieltspath.user.domain.repository.RefreshTokenRepository;
 import com.ieltspath.user.domain.repository.UserRepository;
-import com.ieltspath.user.domain.vo.PasswordPolicy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -31,6 +30,7 @@ public class ChangePasswordUseCase {
     private final UserLock userLock;
     private final PasswordChangeAttemptRepository attemptsRepository;
     private final UserNoticeOutbox notices;
+    private final PasswordPolicyService passwordPolicy;
 
     /**
      * A wrong password ends in an exception, and the failure it just counted must still be saved, so that exception
@@ -38,8 +38,8 @@ public class ChangePasswordUseCase {
      */
     @Transactional(noRollbackFor = PasswordChangeException.class)
     public void execute(ChangePasswordCommand command) {
-        if (!PasswordPolicy.isWithinLimits(command.newPassword())) {
-            throw new IllegalArgumentException(PasswordPolicy.MESSAGE);
+        if (com.ieltspath.user.domain.vo.PasswordPolicy.exceedsMaxBytes(command.newPassword())) {
+            throw new IllegalArgumentException(com.ieltspath.user.domain.vo.PasswordPolicy.MESSAGE);
         }
         UUID userId = command.userId();
         userLock.lock(userId);
@@ -53,6 +53,8 @@ public class ChangePasswordUseCase {
         User user = users.findById(userId).orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng"));
         if (!user.isEmailVerified()) throw new EmailNotVerifiedException();
         if (user.getPasswordHash() == null || user.getPasswordHash().isBlank()) throw new PasswordNotConfiguredException();
+        passwordPolicy.check(command.newPassword(), user.getEmail().value(), user.getFullName(),
+                user.getPhoneNumber() == null ? null : user.getPhoneNumber().value());
         if (!encoder.matches(command.currentPassword(), user.getPasswordHash())) {
             attempts.recordFailure(now);
             attemptsRepository.save(attempts);

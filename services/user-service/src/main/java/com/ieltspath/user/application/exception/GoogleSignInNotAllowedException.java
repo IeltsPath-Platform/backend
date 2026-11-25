@@ -2,6 +2,6 @@ package com.ieltspath.user.application.exception;
 
 public class GoogleSignInNotAllowedException extends RuntimeException {
     public GoogleSignInNotAllowedException() {
-        super("Google sign-in is not allowed for this account");
+        super("Loại tài khoản này không được đăng nhập bằng Google.");
     }
 }

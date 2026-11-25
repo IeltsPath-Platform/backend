@@ -1,7 +1,7 @@
 ---
 phase: 6
 title: "Đủ điều kiện đăng nhập Google theo sub (G6)"
-status: pending
+status: done
 priority: P2
 dependencies: []
 ---

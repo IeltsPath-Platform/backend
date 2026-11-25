@@ -15,6 +15,7 @@ import com.ieltspath.user.application.usecase.LogoutUseCase;
 import com.ieltspath.user.application.usecase.RefreshTokenUseCase;
 import com.ieltspath.user.application.usecase.EmailVerificationUseCase;
 import com.ieltspath.user.application.usecase.ResetPasswordUseCase;
+import com.ieltspath.user.domain.exception.WeakPasswordException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
@@ -29,6 +30,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import java.util.UUID;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -122,6 +124,20 @@ class ActionTokenSecurityTest {
                 .andExpect(jsonPath("$.message").value("Đặt lại mật khẩu thành công"));
 
         verify(resetPasswordUseCase).execute(any(ResetPasswordCommand.class));
+    }
+
+    @Test
+    void weakPasswordOnResetReturnsTheStableErrorCodeAndReasons() throws Exception {
+        doThrow(new WeakPasswordException(java.util.List.of("TOO_COMMON")))
+                .when(resetPasswordUseCase).execute(any(ResetPasswordCommand.class));
+
+        mockMvc.perform(post("/auth/reset-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"valid-token\",\"newPassword\":\"password\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Mật khẩu chưa đủ mạnh."))
+                .andExpect(jsonPath("$.details.code").value("WEAK_PASSWORD"))
+                .andExpect(jsonPath("$.details.reasons").value("TOO_COMMON"));
     }
 
     @Test

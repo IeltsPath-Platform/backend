@@ -43,6 +43,9 @@ app:
     avatar:
       bucket: ${USER_AVATAR_BUCKET:avatars}
   auth:
+    password:
+      min-length: ${APP_AUTH_PASSWORD_MIN_LENGTH:8}
+      bcrypt-cost: ${APP_AUTH_PASSWORD_BCRYPT_COST:12}
     google:
       client-ids: ${GOOGLE_CLIENT_IDS:}
     external-jwt-issuer: ${EXTERNAL_JWT_ISSUER:urn:code-base:auth}
@@ -60,6 +63,7 @@ app:
       same-site: ${APP_AUTH_COOKIE_SAME_SITE:LAX}
       secure: ${APP_AUTH_COOKIE_SECURE:false}
       http-only: ${APP_AUTH_COOKIE_HTTP_ONLY:true}
+      enforce-secure: ${APP_AUTH_COOKIE_ENFORCE_SECURE:false}
   security:
     public-endpoints:
       - method: POST

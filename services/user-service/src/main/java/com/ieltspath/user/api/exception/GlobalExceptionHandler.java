@@ -16,6 +16,7 @@ import com.ieltspath.user.domain.exception.UserNotFoundException;
 import com.ieltspath.user.domain.exception.UserManagementRuleViolationException;
 import com.ieltspath.user.domain.exception.PasswordChangeException;
 import com.ieltspath.user.domain.exception.PasswordNotConfiguredException;
+import com.ieltspath.user.domain.exception.WeakPasswordException;
 import com.ieltspath.user.application.exception.AvatarUploadRateLimitException;
 import com.ieltspath.user.application.exception.LoginLimiterUnavailableException;
 import com.ieltspath.user.application.exception.LoginRateLimitedException;
@@ -72,6 +73,12 @@ public class GlobalExceptionHandler {
     ResponseEntity<ErrorResponse> handlePasswordChange(PasswordChangeException exception, HttpServletRequest request) {
         HttpStatus status = exception.isRateLimited() ? HttpStatus.TOO_MANY_REQUESTS : HttpStatus.BAD_REQUEST;
         return error(status, exception.getMessage(), request, Map.of("code", exception.getCode()));
+    }
+
+    @ExceptionHandler(WeakPasswordException.class)
+    ResponseEntity<ErrorResponse> handleWeakPassword(WeakPasswordException exception, HttpServletRequest request) {
+        return error(HttpStatus.BAD_REQUEST, exception.getMessage(), request,
+                Map.of("code", "WEAK_PASSWORD", "reasons", String.join(",", exception.reasons())));
     }
 
     @ExceptionHandler(UploadRejectedException.class)

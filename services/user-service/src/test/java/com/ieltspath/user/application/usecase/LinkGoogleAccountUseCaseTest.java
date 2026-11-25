@@ -138,6 +138,22 @@ class LinkGoogleAccountUseCaseTest {
     }
 
     @Test
+    void acceptsAnAlreadyLinkedSubjectWhenItsCurrentEmailDomainIsUnsupported() {
+        OAuthIdentity linked = OAuthIdentity.builder().userId(userId).provider(OAuthProvider.GOOGLE)
+                .providerSubject("google-sub").build();
+        when(identities.findByProviderAndProviderSubject(OAuthProvider.GOOGLE, "google-sub"))
+                .thenReturn(Optional.of(linked));
+        when(identities.findByUserIdAndProvider(userId, OAuthProvider.GOOGLE)).thenReturn(Optional.of(linked));
+
+        var result = useCase.execute(new GoogleIdentity("google-sub", "person@unsupported.example", "Person", null));
+
+        assertThat(result.userId()).isEqualTo(userId);
+        assertThat(customerWithPassword.getEmail().value()).isEqualTo("learner@gmail.com");
+        verify(users, never()).findByEmail(any());
+        verify(users, never()).save(any());
+    }
+
+    @Test
     void rejectsDifferentGoogleIdentityAlreadyLinkedToEmail() {
         when(users.findByEmail("learner@gmail.com")).thenReturn(Optional.of(customerWithPassword));
         when(identities.findByProviderAndProviderSubject(OAuthProvider.GOOGLE, "new-sub"))

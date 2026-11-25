@@ -1,7 +1,7 @@
----
+﻿---
 title: "Nâng cấp xác thực (đăng nhập mật khẩu, phiên, token) và đăng nhập Google"
 description: "Phát hiện dùng lại refresh token, thu hồi access token, quản lý phiên, chính sách và băm mật khẩu, audit; chống phát lại ID token Google, xác thực lại trước khi gỡ liên kết, đặt mật khẩu cho tài khoản chỉ có Google; kèm phần frontend web"
-status: pending
+status: in_progress
 priority: P1
 branch: "fix/login-gg"
 tags: [auth, security, google, session, user-service, api-gateway, frontend]
@@ -14,8 +14,8 @@ updated: "2026-11-25T00:00:00.000Z"
 # Nâng cấp xác thực và đăng nhập Google
 
 Người dùng chốt ngày 2026-11-14: làm hai nhóm hạng mục (A: xác thực chung, G: Google sign-in). **Đã loại khỏi phạm vi:**
-xác thực hai lớp (MFA) và đổi cơ chế ký JWT (HS256 dùng chung, `kid`, RS256/ES256). Chưa có code nào được viết; plan này
-chỉ chốt thiết kế và thứ tự.
+xác thực hai lớp (MFA) và đổi cơ chế ký JWT (HS256 dùng chung, `kid`, RS256/ES256). Lô đầu gồm phase 1, 4 và 6 đã
+được triển khai; các phase còn lại vẫn theo trạng thái trong bảng bên dưới.
 
 ## Quyết định đã chốt (2026-11-25)
 
@@ -27,7 +27,7 @@ chỉ chốt thiết kế và thứ tự.
 | Kiểm tra mật khẩu bị lộ (HIBP) | **Bỏ**. Không làm, không để cờ |
 | CAPTCHA (A7, cũ là phase 9) | **Bỏ**. Chuyển vào backlog; giới hạn tốc độ hiện có (Gateway theo IP, `RedisLoginAttemptLimiter` theo email+IP) giữ nguyên |
 | Đặt mật khẩu lần đầu thành công | **Xóa `password_cleared_at`** (cột mới ở `main`, migration V16) |
-| Thông báo lỗi | Mọi thông báo lỗi trả cho client là **tiếng Việt có dấu**, `details.code` ổn định, dịch ngay tại nơi ném lỗi (AGENTS §3.3). Bảng ở mục "Thông báo lỗi tiếng Việt" |
+| Thông báo lỗi | Mọi thông báo lỗi trả cho client là **tiếng Việt có dấu**, `code` ổn định, dịch ngay tại nơi ném lỗi (AGENTS §3.3). Bảng ở mục "Thông báo lỗi tiếng Việt" |
 
 ## Bước 0 (bắt buộc, làm trước mọi phase backend)
 
@@ -108,12 +108,12 @@ sửa: `ForgotPasswordUseCase`, `User`, `UserJpaEntity`, `UserJpaRepository`, `R
 
 | Phase | Việc | Phụ thuộc | Status |
 | --- | --- | --- | --- |
-| 1 | [Nền tảng: A6, G2, G4, G8, dịch thông báo](./phase-01-foundation-quick-fixes.md) | Bước 0 | Pending |
+| 1 | [Nền tảng: A6, G2, G4, G8, dịch thông báo](./phase-01-foundation-quick-fixes.md) | Bước 0 | Done |
 | 2 | [Refresh token: A1, A3](./phase-02-refresh-token-families-and-sessions.md) | 1 | Pending |
 | 3 | [Thu hồi access token: A2](./phase-03-access-token-revocation.md) | 2 | Pending |
-| 4 | [Mật khẩu: A4, A5](./phase-04-password-policy-and-hashing.md) | Bước 0 | Pending |
+| 4 | [Mật khẩu: A4, A5](./phase-04-password-policy-and-hashing.md) | Bước 0 | Done |
 | 5 | [ID token Google: G1](./phase-05-google-id-token-replay.md) | 1 | Pending |
-| 6 | [Đủ điều kiện đăng nhập Google: G6](./phase-06-google-eligibility-by-subject.md) | Bước 0 | Pending |
+| 6 | [Đủ điều kiện đăng nhập Google: G6](./phase-06-google-eligibility-by-subject.md) | Bước 0 | Done |
 | 7 | [Xác thực lại, gỡ liên kết, đặt mật khẩu: G3, G5](./phase-07-reauth-unlink-set-password.md) | 2, 3, 4 | Pending |
 | 8 | [Audit và quan sát: A8](./phase-08-audit-and-observability.md) | 2, 7 | Pending |
 | 9 | [CAPTCHA có điều kiện: A7](./phase-09-optional-captcha.md) | - | **Dropped** |
@@ -149,14 +149,16 @@ dự án".
 
 ## Thông báo lỗi tiếng Việt (áp cho mọi phase)
 
-Quy tắc: thông báo có dấu, không nhắc lại mật khẩu, token, ID token, nonce hay dữ liệu của người khác; `details.code` là mã
-ổn định cho frontend phân nhánh, không đổi khi đổi chữ. Trước khi thêm mã mới, Codex đọc `GlobalExceptionHandler` và
+Quy tắc: thông báo có dấu, không nhắc lại mật khẩu, token, ID token, nonce hay dữ liệu của người khác; `code` là mã
+ổn định cho frontend phân nhánh, không đổi khi đổi chữ. Mã nằm ở `code` **cấp cao nhất** của `ErrorResponse` (frontend
+`HttpError.code` đọc đúng chỗ này). Một số handler cũ đặt mã trong `details.code` (xem `GlobalExceptionHandler`); mã mới
+**không** làm vậy. `details` chỉ chứa lỗi theo từng trường (ví dụ `details.password`) và `details.reasons`. Trước khi thêm mã mới, Codex đọc `GlobalExceptionHandler` và
 `VietnameseErrorMessages` trên `main` để dùng đúng kiểu `details` (nếu `details` là `Map<String,String>` thì `reasons` là
 chuỗi phân cách bằng dấu phẩy, ví dụ `TOO_SHORT,TOO_COMMON`) và **giữ nguyên mã đang dùng** cho các lỗi đã có.
 
 ### Lỗi mới
 
-| Tình huống | HTTP | `details.code` | Thông báo |
+| Tình huống | HTTP | `code` | Thông báo |
 | --- | --- | --- | --- |
 | Mật khẩu mới yếu | 400 | `WEAK_PASSWORD` (+ `reasons`) | "Mật khẩu chưa đủ mạnh." Lý do hiển thị ở frontend (xem bên dưới) |
 | Thao tác nhạy cảm thiếu hoặc sai token xác thực lại | 403 | `REAUTH_REQUIRED` | "Vui lòng xác thực lại để thực hiện thao tác này." |
@@ -186,7 +188,7 @@ chuỗi phân cách bằng dấu phẩy, ví dụ `TOO_SHORT,TOO_COMMON`) và **
 `GoogleAccountConflictException`, `GoogleAccountNotActiveException`, `GoogleEmailNotSupportedException`,
 `GoogleSignInNotAllowedException`, `GoogleSignInUnavailableException`, `LoginLimiterUnavailableException`,
 `LoginRateLimitedException`, và chuỗi "Google ID token is invalid" trong `NimbusGoogleIdTokenVerifier`. Giữ nguyên
-`details.code`/HTTP status; chỉ đổi chuỗi sang tiếng Việt có dấu, rồi cập nhật test đang assert chuỗi cũ và các contract
+`code`/HTTP status; chỉ đổi chuỗi sang tiếng Việt có dấu, rồi cập nhật test đang assert chuỗi cũ và các contract
 trong `docs/contracts/` nếu có trích thông báo. Mỗi thông báo mới cần một test chứng minh chuỗi tiếng Việt ra tới response.
 
 ## Quy ước chung mọi phase

@@ -47,7 +47,8 @@ class UserManagementRulesUseCaseTest {
         assignRole = new AssignRoleUseCase(users, roles, userLock);
         changeStatus = new ChangeUserStatusUseCase(users, userLock);
         deleteUser = new DeleteUserUseCase(users, userLock);
-        createUser = new CreateUserUseCase(users, roles, passwordEncoder);
+        createUser = new CreateUserUseCase(users, roles, passwordEncoder, new PasswordPolicyService(password -> false,
+                new com.ieltspath.user.config.AuthPasswordProperties(8, 12)));
     }
 
     @Test

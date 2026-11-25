@@ -20,6 +20,8 @@ User responses contain `id`, `email`, `fullName`, `phoneNumber`, `status`, `role
 `hasPassword` is `true` when a password hash exists; the hash is never returned.
 The create request defaults an omitted or empty role set to `CUSTOMER`.
 
+New passwords for registration, administrator-created users, password changes, and password resets must have at least 8 characters and no more than 72 UTF-8 bytes. Common passwords, passwords matching account details, and simple repeated or sequential strings return HTTP 400 with `details.code=WEAK_PASSWORD` and comma-separated `details.reasons` (`TOO_SHORT`, `TOO_COMMON`, `CONTAINS_ACCOUNT_INFO`, or `TOO_SIMPLE`). The client message is `Mật khẩu chưa đủ mạnh.`. Existing passwords are not checked at sign-in; old BCrypt hashes are upgraded after a successful sign-in when needed.
+
 ## Role and account rules
 
 - The supported roles are `ADMIN`, `CUSTOMER`, `CONTENT_AUTHOR`, `EXAMINER`, and `SALES_STAFF`.

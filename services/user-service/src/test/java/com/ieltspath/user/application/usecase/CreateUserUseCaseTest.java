@@ -36,7 +36,7 @@ class CreateUserUseCaseTest {
     @Test
     void createsLocalUserWithDefaultCustomerRole() {
         PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
-        CreateUserUseCase useCase = new CreateUserUseCase(userRepository, roleRepository, passwordEncoder);
+        CreateUserUseCase useCase = new CreateUserUseCase(userRepository, roleRepository, passwordEncoder, policy());
         Role customer = Role.builder().id(UUID.randomUUID()).name(RoleName.CUSTOMER).description("Customer user").build();
         when(userRepository.existsByEmail("john@example.com")).thenReturn(false);
         when(roleRepository.findByNames(Set.of("CUSTOMER"))).thenReturn(List.of(customer));
@@ -51,7 +51,11 @@ class CreateUserUseCaseTest {
     }
 
     private CreateUserUseCase useCase() {
-        return new CreateUserUseCase(userRepository, roleRepository, new BCryptPasswordEncoder());
+        return new CreateUserUseCase(userRepository, roleRepository, new BCryptPasswordEncoder(), policy());
+    }
+
+    private PasswordPolicyService policy() {
+        return new PasswordPolicyService(password -> false, new com.ieltspath.user.config.AuthPasswordProperties(8, 12));
     }
 
     @Test
@@ -60,7 +64,7 @@ class CreateUserUseCaseTest {
         assertThatThrownBy(() -> useCase().execute(
                 new CreateUserCommand("john@example.com", ninetyBytes, "John Doe", null, null)))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Mật khẩu phải có từ 6 đến 72 byte (chữ có dấu tính nhiều byte hơn)");
+                .hasMessage("Mật khẩu phải có từ 8 đến 72 ký tự (chữ có dấu tính nhiều byte hơn)");
         verify(userRepository, never()).save(any(User.class));
     }
 
