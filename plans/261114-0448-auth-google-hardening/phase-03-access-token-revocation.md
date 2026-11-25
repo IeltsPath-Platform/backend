@@ -1,4 +1,4 @@
----
+﻿---
 phase: 3
 title: "Thu hồi access token, đăng xuất thật sự (A2)"
 status: pending
@@ -51,8 +51,8 @@ Token cũ không có `jti/sid/iat` (cấp trước khi triển khai) **bỏ qua*
 - Không phải route công khai mới; không đổi tier rate limit.
 
 ### Lỗi trả client
-- Token bị thu hồi: 401, `details.code=SESSION_REVOKED`, "Phiên đăng nhập đã hết hiệu lực. Vui lòng đăng nhập lại."
-- `fail-closed=true` và Redis lỗi: 503, `details.code=AUTH_UNAVAILABLE`, "Hệ thống tạm thời không xác minh được phiên
+- Token bị thu hồi: 401, `code=SESSION_REVOKED`, "Phiên đăng nhập đã hết hiệu lực. Vui lòng đăng nhập lại."
+- `fail-closed=true` và Redis lỗi: 503, `code=AUTH_UNAVAILABLE`, "Hệ thống tạm thời không xác minh được phiên
   đăng nhập. Vui lòng thử lại sau." (cả hai theo định dạng lỗi của Gateway, tiếng Việt có dấu; xem `plan.md`).
 
 ### Thời hạn access token
@@ -78,7 +78,7 @@ Bật `exceptCurrent=true` và trường `current` của phase 2 bằng `current
   401, sau mốc → qua; token cũ không có claim → qua; Redis lỗi → qua và tăng metric; `fail-closed=true` → chặn.
 - user-service: `LogoutUseCase` ghi `revokeSession` đúng `family_id`; đổi mật khẩu ghi `revokeUser`; Redis lỗi không làm
   đổi mật khẩu thất bại.
-- Test Gateway kiểm thông báo 401/503 tiếng Việt và `details.code`.
+- Test Gateway kiểm thông báo 401/503 tiếng Việt và `code`.
 - **Chủ dự án chạy tay** trên stack local (không phải Codex): đăng nhập → gọi API (200) → đăng xuất → dùng lại access token
   cũ (401 trong 1 giây); đổi mật khẩu ở một thiết bị làm token của thiết bị khác mất hiệu lực.
 

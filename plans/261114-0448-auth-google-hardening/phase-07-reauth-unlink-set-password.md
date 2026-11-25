@@ -1,4 +1,4 @@
----
+﻿---
 phase: 7
 title: "Xác thực lại, gỡ liên kết Google (G3) và đặt mật khẩu lần đầu (G5)"
 status: pending
@@ -85,7 +85,7 @@ phải có `method=GOOGLE`:
   `WEAK_PASSWORD`; thu hồi token và phát `PasswordChangedV1`; `password_cleared_at` được xóa.
 - Notification: listener nhận sự kiện, gửi thư, retry/DLQ như listener liên kết hiện có.
 - `@WebMvcTest` các endpoint mới (xác thực, mã lỗi); `AuthRouteConsistencyTest` xanh.
-- Mọi lỗi mới có test kiểm thông báo tiếng Việt và `details.code`.
+- Mọi lỗi mới có test kiểm thông báo tiếng Việt và `code`.
 - **Chủ dự án chạy tay** (không phải Codex): bộ test bảo mật trên stack local, gỡ liên kết bằng access token trần bị
   `403 REAUTH_REQUIRED` khi cờ bật.
 

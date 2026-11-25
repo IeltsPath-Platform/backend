@@ -1,4 +1,4 @@
----
+﻿---
 phase: 10
 title: "Frontend web cho xác thực và Google sign-in"
 status: pending
@@ -26,7 +26,7 @@ chốt trong `docs/contracts/` của backend):
   chỉ cho thông báo trả về từ backend (thành công hoặc lỗi không gắn với ô nào).
 - Không thêm đoạn chữ giải thích (hint/caption) dưới ô hoặc tiêu đề mới; giải thích nằm trong tài liệu/chat. Các chuỗi
   `PASSWORD_LENGTH_HINT`, `PASSWORD_LENGTH_PLACEHOLDER` đã có chỉ được **cập nhật** cho đúng số 8, không thêm chuỗi hint mới.
-- Hiển thị thông báo lỗi của backend (tiếng Việt, có dấu) nguyên văn; phân nhánh bằng `details.code`, không so chuỗi.
+- Hiển thị thông báo lỗi của backend (tiếng Việt, có dấu) nguyên văn; phân nhánh bằng `code`, không so chuỗi.
 - Mọi chữ hiển thị là tiếng Việt có dấu. Dùng token màu và lớp CSS hiện có của `profile.css` và auth; không thêm thư viện mới.
 - Màn học viên/profile dùng component có sẵn (`SecuritySection` và các subcard hiện có). Quy ước drawer/modal của khu admin
   (`AdminLayer`) không áp dụng cho profile; hộp thoại xác nhận dùng cùng kiểu với hộp "Hủy liên kết" đang có.
@@ -39,7 +39,7 @@ chốt trong `docs/contracts/` của backend):
 - `src/features/auth/lib/passwordRules.ts`: `PASSWORD_MIN_LENGTH = 8`, `PASSWORD_LENGTH_HINT = 'Từ 8 đến 72 ký tự.'`,
   `PASSWORD_LENGTH_PLACEHOLDER = 'Từ 8 đến 72 ký tự'`, `PASSWORD_LENGTH_MESSAGE = 'Mật khẩu phải có từ 8 đến 72 ký tự.'`;
   sửa các regex trong `mapAuthPasswordHttpError` đang gắn cứng "6" ("từ 6", "6 đến 72") sang 8. Thêm hàm
-  `weakPasswordReasons(error)`: nếu `details.code === 'WEAK_PASSWORD'` thì tách `details.reasons` (kiểm kiểu thật mà backend
+  `weakPasswordReasons(error)`: nếu `code === 'WEAK_PASSWORD'` thì tách `details.reasons` (kiểm kiểu thật mà backend
   trả: chuỗi phân cách dấu phẩy hoặc mảng) và ánh xạ sang câu tiếng Việt của bảng "Lý do của `WEAK_PASSWORD`" trong
   `plan.md`; lý do lạ thì dùng thông báo `message` của backend.
 - `src/features/auth/components/AuthForm.tsx` (dùng `PASSWORD_MIN_LENGTH` quanh dòng 219, 242) và

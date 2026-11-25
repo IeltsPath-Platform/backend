@@ -1,4 +1,4 @@
----
+﻿---
 phase: 2
 title: "Refresh token: phát hiện dùng lại (A1) và quản lý phiên (A3)"
 status: pending
@@ -70,7 +70,7 @@ CREATE INDEX idx_refresh_tokens_user_active ON refresh_tokens (user_id, expires_
 - Quyền `CUSTOMER` và các role khác đều tự quản lý phiên của mình (`CurrentUserProvider`, không nhận id từ client).
 - Mỗi phần tử: `sessionId`, `startedAt`, `lastUsedAt`, `ipAddress` (che octet cuối, ví dụ `203.0.113.x`), `userAgent`,
   `current` (`null` đến phase 3; sau đó so với claim `sid`).
-- Phiên của người khác hoặc không tồn tại: **404** như nhau (không lộ sự tồn tại), `details.code=SESSION_NOT_FOUND`,
+- Phiên của người khác hoặc không tồn tại: **404** như nhau (không lộ sự tồn tại), `code=SESSION_NOT_FOUND`,
   thông báo "Không tìm thấy phiên đăng nhập." (xem bảng thông báo trong `plan.md`).
 - Tier rate limit `default` (route `/api/users/**` đã có), không phải route công khai mới.
 - Một token hoạt động duy nhất mỗi họ (xoay vòng thu hồi token trước) nên "phiên đang hoạt động" = token chưa thu hồi và
