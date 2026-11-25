@@ -141,9 +141,12 @@ INTERNAL_JWT_ISSUER=urn:code-base:api-gateway
 GATEWAY_INTERNAL_JWT_SECRET=<base64 32 bytes>
 ACCESS_TOKEN_MAX_AGE_SECONDS=3600
 REFRESH_TOKEN_MAX_AGE_SECONDS=604800
+APP_AUTH_REFRESH_REUSE_GRACE_SECONDS=10
+APP_AUTH_SESSION_MAX_AGE_SECONDS=0
 ```
 
 `EXTERNAL_JWT_SECRET` dùng để ký access token trả cho client. `GATEWAY_INTERNAL_JWT_SECRET` dùng để verify internal JWT từ gateway.
+Refresh token đã xoay vòng được chấp nhận trong cửa sổ đua mặc định 10 giây trước khi thu hồi cả phiên; thời hạn tuyệt đối của phiên mặc định không giới hạn (`0`).
 
 ## Endpoint chính
 
@@ -161,6 +164,9 @@ PUT  /api/users/me/profile
 POST /api/users/me/avatar
 DELETE /api/users/me/avatar
 POST /api/users/me/password
+GET  /api/users/me/sessions
+DELETE /api/users/me/sessions/{sessionId}
+DELETE /api/users/me/sessions
 GET  /api/users
 GET  /api/users/{id}
 PUT  /api/users/{id}

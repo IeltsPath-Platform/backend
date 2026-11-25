@@ -353,7 +353,7 @@ cùng course mở theo trạng thái suy ra khi đọc. Course test không chặ
 
 ## Scheduler và nhiều instance
 
-Backend hiện có 29 phương thức `@Scheduled` trong 28 file. Cơ chế chống xử lý trùng theo mã đang chạy:
+Backend hiện có 30 phương thức `@Scheduled` trong 29 file. Cơ chế chống xử lý trùng theo mã đang chạy:
 
 | Service | Job / lịch | Cơ chế cạnh tranh | HTTP/LLM khi giữ khóa hoặc transaction |
 |---|---|---|---|
@@ -386,6 +386,7 @@ Backend hiện có 29 phương thức `@Scheduled` trong 28 file. Cơ chế ch�
 | learning | `MasteryDecayJob` | Session advisory lock; các batch ghi theo transaction riêng | Không |
 | learning | `WorkItemSyncJob` | Đọc nguồn và lấy metadata Content trước; transaction ngắn lấy advisory lock rồi ghi snapshot; unique key loại mục trùng | Content HTTP ngoài transaction/khóa |
 | user | `LoginHistoryPurgeScheduler` | Xóa theo cutoff thời gian; chạy lặp an toàn | Không |
+| user | `RefreshTokenCleanupJob` | Xóa tối đa 1000 token hết hạn hoặc đã thu hồi quá 30 ngày bằng `FOR UPDATE SKIP LOCKED`; nhiều instance không giữ cùng hàng | Không |
 
 Game không cần thêm claim riêng: hàng trận được khóa trước khi cập nhật và trạng thái được kiểm lại. Relay dùng row claim để instance khác có thể xử lý các hàng còn lại. Việc đọc nguồn của `WorkItemSyncJob` có thể chạy đồng thời; phần ghi được tuần tự hóa và repository bỏ qua work item đã tồn tại.
 

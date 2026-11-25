@@ -24,6 +24,12 @@ New passwords for registration, administrator-created users, password changes, a
 
 ## Role and account rules
 
+Authenticated users can list up to 50 active sessions with `GET /api/users/me/sessions`, revoke one with
+`DELETE /api/users/me/sessions/{sessionId}`, or revoke all with `DELETE /api/users/me/sessions`. Session IDs that are
+malformed, absent, or owned by someone else all return 404 with top-level `code=SESSION_NOT_FOUND` and the message
+`Không tìm thấy phiên đăng nhập.`. IP addresses in session responses mask the final IPv4 octet. The
+`?exceptCurrent=true` option is accepted but does not take effect until access tokens carry a session ID.
+
 - The supported roles are `ADMIN`, `CUSTOMER`, `CONTENT_AUTHOR`, `EXAMINER`, and `SALES_STAFF`.
 - A user may have `ADMIN` with `CUSTOMER` or `SALES_STAFF`, but may not combine `ADMIN` with `CONTENT_AUTHOR` or `EXAMINER`. This is validated when creating a user or replacing roles. Existing accounts are not changed automatically, and sign-in is not blocked by this rule.
 - An administrator cannot remove their own `ADMIN` role, change their own status away from `ACTIVE`, or deactivate their own account.
