@@ -54,7 +54,7 @@ class RevocationCheckerTest {
 
     private Jwt jwt(long issuedAt) {
         return Jwt.withTokenValue("access").header("alg", "HS256").subject(UUID.randomUUID().toString())
-                .id(UUID.randomUUID().toString()).issuedAt(Instant.ofEpochSecond(issuedAt))
+                .jti(UUID.randomUUID().toString()).issuedAt(Instant.ofEpochSecond(issuedAt))
                 .expiresAt(Instant.ofEpochSecond(issuedAt + 300)).claim("sid", UUID.randomUUID().toString()).build();
     }
 
