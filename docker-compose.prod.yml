@@ -141,6 +141,7 @@ services:
       - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/postgres.env
         format: raw
     ports: !reset []
+    command: ["postgres", "-c", "max_connections=80", "-c", "shared_buffers=256MB"]
     restart: unless-stopped
     mem_limit: 1024m
     volumes: !override

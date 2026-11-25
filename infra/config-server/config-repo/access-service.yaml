@@ -3,6 +3,9 @@ spring:
     url: ${ACCESS_DB_URL:jdbc:postgresql://localhost:5440/access_db}
     username: ${ACCESS_DB_USERNAME:postgres}
     password: ${ACCESS_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${ACCESS_DB_POOL_MAX_SIZE:5}
+      minimum-idle: ${ACCESS_DB_POOL_MIN_IDLE:1}
   jpa:
     hibernate:
       ddl-auto: validate

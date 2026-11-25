@@ -9,6 +9,9 @@ spring:
     url: ${LEARNING_DB_URL:jdbc:postgresql://localhost:5440/learning_db}
     username: ${LEARNING_DB_USERNAME:postgres}
     password: ${LEARNING_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${LEARNING_DB_POOL_MAX_SIZE:8}
+      minimum-idle: ${LEARNING_DB_POOL_MIN_IDLE:1}
   jpa:
     hibernate:
       ddl-auto: validate

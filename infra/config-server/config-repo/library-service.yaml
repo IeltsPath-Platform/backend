@@ -3,6 +3,9 @@ spring:
     url: ${LIBRARY_DB_URL:jdbc:postgresql://localhost:5440/library_db}
     username: ${LIBRARY_DB_USERNAME:postgres}
     password: ${LIBRARY_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${LIBRARY_DB_POOL_MAX_SIZE:5}
+      minimum-idle: ${LIBRARY_DB_POOL_MIN_IDLE:1}
   jpa:
     hibernate:
       ddl-auto: validate
