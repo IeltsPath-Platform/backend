@@ -38,6 +38,10 @@ public class JdbcAuthorPackageReader implements AuthorPackageReader {
             where.append(" AND p.package_type = :type");
             params.addValue("type", filter.type().name());
         }
+        if (!filter.excludeTypes().isEmpty()) {
+            where.append(" AND p.package_type NOT IN (:excludeTypes)");
+            params.addValue("excludeTypes", filter.excludeTypes().stream().map(PackageType::name).toList());
+        }
         if (filter.placementPool() != null) {
             where.append(" AND p.placement_pool = :placementPool");
             params.addValue("placementPool", filter.placementPool().name());

@@ -78,15 +78,15 @@ Audio URLs use the same `MediaReferencePolicy` as preview; raw audio keys and op
 remain author-only. Asset selection uses the first link by `sort_order` and ID for each asset type.
 The reader loads relations in bounded bulk queries, never one query per version/section/question.
 
-`GET /api/content/admin/packages?type=&status=&lessonId=&topicId=&courseId=&q=&placementPool=&page=&size=` returns one page,
+`GET /api/content/admin/packages?type=&excludeType=&status=&lessonId=&topicId=&courseId=&q=&placementPool=&page=&size=` returns one page,
 `{ "content": [...], "page", "size", "totalElements", "totalPages" }`. `page` is zero-based (default `0`) and `size` is `1`
 to `100` (default `25`); a value outside those ranges returns `400`. `totalElements` counts every package that matches the
 filters. **Changed from the earlier version of this route:** the response was a bare array limited to the 500 most
 recently updated packages, so older packages could not be listed at all. Each item has the
 `ContentPackageResponse` fields plus `topicId`, `courseId`, `latestVersionNumber` (null if no version) and
-`hasDraft` (boolean) and `placementPool` (the pool enum for placement packages, null for others). Optional `placementPool` filters by `BAND_0_3`, `BAND_3_5` or `BAND_5_9` (added 2026-11-17). Optional `type` is a `PackageType`; `status` is a publication status; `lessonId`,
+`hasDraft` (boolean) and `placementPool` (the pool enum for placement packages, null for others). Optional `placementPool` filters by `BAND_0_3`, `BAND_3_5` or `BAND_5_9` (added 2026-11-17). Optional `type` is a `PackageType`; repeatable `excludeType` accepts one or more `PackageType` values to exclude. All filters combine with AND, including `type` and `excludeType`; if `type` is also excluded, the result is empty. `status` is a publication status; `lessonId`,
 `topicId` and `courseId` are UUIDs. `q` matches code or title case-insensitively as a literal substring (`%`
-and `_` are not wildcards). Results are ordered by decreasing `updatedAt` then ID, so pages do not overlap. An unknown `type`, `status` or `placementPool` value returns `400`.
+and `_` are not wildcards). Results are ordered by decreasing `updatedAt` then ID, so pages do not overlap. An unknown `type`, `excludeType`, `status` or `placementPool` value returns `400` with a Vietnamese error message.
 
 ## 2. Create a draft version
 
@@ -288,9 +288,9 @@ hidden; any other type answers `409` with `details.code = PACKAGE_ARCHIVE_NOT_SU
 
 ## 10. The author list
 
-`GET /api/content/admin/packages` accepts `type`, `status`, `lessonId`, `topicId`, `courseId`, `q`, `placementPool` and,
+`GET /api/content/admin/packages` accepts `type`, repeatable `excludeType`, `status`, `lessonId`, `topicId`, `courseId`, `q`, `placementPool` and,
 for the practice library and placement screens, `accessLevel` (`FREE` or `PREMIUM`) and `skill` (`READING`, `LISTENING`,
-`WRITING`, `SPEAKING`). The list is bounded (500 rows, most recently updated first). Each row also carries, for the
+`WRITING`, `SPEAKING`). All supplied filters combine with AND; an excluded `type` returns no rows. Unknown enum values, including `excludeType`, return `400` with a Vietnamese message. The database applies filters and pagination, ordered by most recently updated first. Each row also carries, for the
 version a learner would see (the published one, otherwise the latest):
 
 | Field | Meaning |

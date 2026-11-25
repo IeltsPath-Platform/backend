@@ -3,6 +3,7 @@ package com.ieltspath.content.infrastructure.persistence.adapter;
 import com.ieltspath.content.application.port.AuthorPackageReader;
 import com.ieltspath.content.application.result.AuthorPackageExtras;
 import com.ieltspath.content.application.result.AuthorPackageSummary;
+import com.ieltspath.content.application.usecase.ListAuthorPackagesUseCase;
 import com.ieltspath.content.domain.vo.PackageType;
 import com.ieltspath.content.domain.vo.PublicationStatus;
 import org.flywaydb.core.Flyway;
@@ -122,6 +123,60 @@ class JdbcAuthorPackageReaderTest {
         assertEquals(1, list(filter(null, PublicationStatus.DRAFT, tag)).size());
         assertEquals(0, list(filter(PackageType.QUIZ, PublicationStatus.DRAFT, tag)).size());
         assertEquals(1, list(filter(null, null, tag.toLowerCase() + "-quiz")).size());
+    }
+
+    @Test
+    void excludesOneOrSeveralTypesAndCombinesExclusionsWithOtherFilters() {
+        String tag = tag();
+        UUID practice = insertPackage(tag + "-PRACTICE", "PRACTICE_TEST", "DRAFT");
+        UUID placement = insertPackage(tag + "-PLACEMENT", "PLACEMENT_TEST", "DRAFT");
+        UUID anotherPlacement = insertPackage(tag + "-PLACEMENT-OTHER", "PLACEMENT_TEST", "DRAFT");
+        insertPackage(tag + "-QUIZ", "QUIZ", "DRAFT");
+        jdbc.update("UPDATE content_packages SET placement_pool='BAND_3_5' WHERE id=:id", Map.of("id", placement));
+        jdbc.update("UPDATE content_packages SET placement_pool='BAND_5_9' WHERE id=:id", Map.of("id", anotherPlacement));
+
+        var oneExcluded = new AuthorPackageReader.Filter(null, null, null, null, null, tag, null, null, null,
+                List.of(PackageType.PRACTICE_TEST));
+        assertEquals(3, reader.list(oneExcluded, 0, 100).totalElements());
+        assertFalse(ids(reader.list(oneExcluded, 0, 100).items()).contains(practice));
+
+        var twoExcluded = new AuthorPackageReader.Filter(null, null, null, null, null, tag, null, null, null,
+                List.of(PackageType.PRACTICE_TEST, PackageType.PLACEMENT_TEST));
+        assertEquals(1, reader.list(twoExcluded, 0, 100).totalElements());
+
+        var excludedTypeSelected = new AuthorPackageReader.Filter(PackageType.PRACTICE_TEST, null, null, null, null,
+                tag, null, null, null, List.of(PackageType.PRACTICE_TEST));
+        assertEquals(0, reader.list(excludedTypeSelected, 0, 100).totalElements());
+
+        var typeAndSearchAndPool = new AuthorPackageReader.Filter(PackageType.PLACEMENT_TEST, null, null, null, null,
+                tag + "-PLACEMENT", com.ieltspath.content.domain.vo.PlacementPool.BAND_3_5, null, null,
+                List.of(PackageType.PRACTICE_TEST));
+        assertEquals(List.of(placement), ids(reader.list(typeAndSearchAndPool, 0, 100).items()));
+    }
+
+    @Test
+    void excludedTypesKeepTotalsAndPageCountsAccurateAcrossSeveralPages() {
+        String tag = tag();
+        for (int i = 0; i < 5; i++) insertPackage(tag + "-QUIZ-" + i, "QUIZ", "DRAFT");
+        insertPackage(tag + "-PRACTICE", "PRACTICE_TEST", "DRAFT");
+        insertPackage(tag + "-PLACEMENT", "PLACEMENT_TEST", "DRAFT");
+        var filter = new AuthorPackageReader.Filter(null, null, null, null, null, tag, null, null, null,
+                List.of(PackageType.PRACTICE_TEST, PackageType.PLACEMENT_TEST));
+        var useCase = new ListAuthorPackagesUseCase(reader);
+
+        var first = useCase.execute(filter, 0, 2);
+        var second = useCase.execute(filter, 1, 2);
+        var last = useCase.execute(filter, 2, 2);
+
+        assertEquals(5, first.totalElements());
+        assertEquals(5, second.totalElements());
+        assertEquals(5, last.totalElements());
+        assertEquals(3, first.totalPages());
+        assertEquals(3, second.totalPages());
+        assertEquals(3, last.totalPages());
+        assertEquals(2, first.items().size());
+        assertEquals(2, second.items().size());
+        assertEquals(1, last.items().size());
     }
 
     @Test

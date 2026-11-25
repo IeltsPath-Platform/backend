@@ -14,14 +14,24 @@ public interface AuthorPackageReader {
 
     /** Any filter may be null; {@code q} matches the code or the title, ignoring case. */
     record Filter(PackageType type, PublicationStatus status, UUID lessonId, UUID topicId, UUID courseId, String q,
-                  PlacementPool placementPool, Boolean premium, String skill) {
+                  PlacementPool placementPool, Boolean premium, String skill, List<PackageType> excludeTypes) {
+        public Filter {
+            excludeTypes = excludeTypes == null ? List.of()
+                    : excludeTypes.stream().filter(java.util.Objects::nonNull).distinct().toList();
+        }
+
+        public Filter(PackageType type, PublicationStatus status, UUID lessonId, UUID topicId, UUID courseId, String q,
+                      PlacementPool placementPool, Boolean premium, String skill) {
+            this(type, status, lessonId, topicId, courseId, q, placementPool, premium, skill, List.of());
+        }
+
         public Filter(PackageType type, PublicationStatus status, UUID lessonId, UUID topicId, UUID courseId, String q,
                       PlacementPool placementPool) {
-            this(type, status, lessonId, topicId, courseId, q, placementPool, null, null);
+            this(type, status, lessonId, topicId, courseId, q, placementPool, null, null, List.of());
         }
 
         public Filter(PackageType type, PublicationStatus status, UUID lessonId, UUID topicId, UUID courseId, String q) {
-            this(type, status, lessonId, topicId, courseId, q, null, null, null);
+            this(type, status, lessonId, topicId, courseId, q, null, null, null, List.of());
         }
     }
 
