@@ -14,6 +14,8 @@ public final class AssessmentMessaging {
     public static final String GRADING_COMPLETED_ROUTING_KEY = GradingCompletedV1.EVENT_TYPE;
     /** An examiner finished a standalone Writing review: Learning applies the result to mastery; consumed by Learning. */
     public static final String HUMAN_REVIEW_COMPLETED_ROUTING_KEY = HumanReviewCompletedV1.EVENT_TYPE;
+    public static final String SPEAKING_GRADING_REQUESTED_ROUTING_KEY = SpeakingGradingRequestedV1.EVENT_TYPE;
+    public static final String SPEAKING_GRADING_COMPLETED_ROUTING_KEY = SpeakingGradingCompletedV1.EVENT_TYPE;
 
     private AssessmentMessaging() { }
 }

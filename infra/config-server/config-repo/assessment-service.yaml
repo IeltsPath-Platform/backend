@@ -32,6 +32,13 @@ spring:
       mandatory: true
 
 assessment:
+  placement:
+    speaking-grading:
+      enabled: ${ASSESSMENT_PLACEMENT_SPEAKING_GRADING_ENABLED:false}
+      timeout-seconds: ${ASSESSMENT_PLACEMENT_SPEAKING_GRADING_TIMEOUT_SECONDS:600}
+      timeout-poll-ms: ${ASSESSMENT_PLACEMENT_SPEAKING_GRADING_TIMEOUT_POLL_MS:30000}
+      retry-delay-ms: ${ASSESSMENT_PLACEMENT_SPEAKING_GRADING_RETRY_DELAY_MS:30000}
+      max-delivery-attempts: ${ASSESSMENT_PLACEMENT_SPEAKING_GRADING_MAX_DELIVERY_ATTEMPTS:5}
   speaking:
     bucket: ${ASSESSMENT_SPEAKING_BUCKET:speaking-recordings}
     retention-days: ${ASSESSMENT_SPEAKING_RETENTION_DAYS:90}

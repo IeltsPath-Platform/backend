@@ -13,7 +13,7 @@ import com.ieltspath.assessment.domain.vo.PlacementPool;
  */
 public record PlacementResultResponse(UUID attemptId, Double overallBand, Instant completedAt, List<SkillBand> skills,
                                       List<Section> sections, PlacementPool pool, Double ceiling,
-                                      boolean reachedCeiling, boolean partial) {
+                                      boolean reachedCeiling, boolean partial, SpeakingFeedback speakingFeedback) {
     public record SkillBand(String skill, double band) {}
 
     public record Section(String skill, String title, List<Question> questions, List<Essay> essays) {}
@@ -25,13 +25,23 @@ public record PlacementResultResponse(UUID attemptId, Double overallBand, Instan
 
     public record Feedback(String summary, List<Criterion> criteria, List<String> focus) {}
 
+    public record SpeakingFeedback(String summary, List<Criterion> criteria) {}
+
+    public PlacementResultResponse(UUID attemptId, Double overallBand, Instant completedAt, List<SkillBand> skills,
+                                    List<Section> sections, PlacementPool pool, Double ceiling,
+                                    boolean reachedCeiling, boolean partial) {
+        this(attemptId, overallBand, completedAt, skills, sections, pool, ceiling, reachedCeiling, partial, null);
+    }
+
     public record Criterion(String code, Double band, String comment) {}
 
     public static PlacementResultResponse from(PlacementResult r) {
         return new PlacementResultResponse(r.attemptId(), r.overallBand(), r.completedAt(),
                 r.skills().stream().map(s -> new SkillBand(s.skill().name(), s.band())).toList(),
                 r.sections().stream().map(PlacementResultResponse::section).toList(), r.pool(), r.ceiling(),
-                r.reachedCeiling(), r.partial());
+                r.reachedCeiling(), r.partial(), r.speakingFeedback() == null ? null : new SpeakingFeedback(
+                        r.speakingFeedback().summary(), r.speakingFeedback().criteria().stream()
+                        .map(c -> new Criterion(c.code(), c.band(), c.comment())).toList()));
     }
 
     private static Section section(PlacementResult.Section s) {

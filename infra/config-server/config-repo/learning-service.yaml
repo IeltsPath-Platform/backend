@@ -48,6 +48,15 @@ app:
           - /v3/api-docs/**
 
 learning:
+  speaking-grading:
+    poll-ms: ${LEARNING_PLACEMENT_SPEAKING_GRADING_POLL_MS:5000}
+    batch-size: ${LEARNING_PLACEMENT_SPEAKING_GRADING_BATCH_SIZE:5}
+    max-attempts: ${LEARNING_PLACEMENT_SPEAKING_GRADING_MAX_ATTEMPTS:3}
+    retry-delay-seconds: ${LEARNING_PLACEMENT_SPEAKING_GRADING_RETRY_DELAY_SECONDS:30}
+    retry-delay-ms: ${LEARNING_PLACEMENT_SPEAKING_GRADING_RETRY_DELAY_MS:30000}
+    max-delivery-attempts: ${LEARNING_PLACEMENT_SPEAKING_GRADING_MAX_DELIVERY_ATTEMPTS:5}
+    confirm-timeout: ${LEARNING_PLACEMENT_SPEAKING_GRADING_CONFIRM_TIMEOUT:PT5S}
+    outbox-poll-ms: ${LEARNING_PLACEMENT_SPEAKING_GRADING_OUTBOX_POLL_MS:1000}
   review:
     # After this many failed sets a blocking review remains available as optional practice.
     unblock-after-failed-sets: 4

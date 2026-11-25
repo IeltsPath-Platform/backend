@@ -68,7 +68,7 @@ Chỉ liệt kê pattern đã có trong code. Cột "Xem" trỏ tới nơi đọ
 
 | Pattern | Cách áp dụng | Xem |
 | :-- | :-- | :-- |
-| **Transactional Outbox + Relay** | Event ghi vào `outbox_events` cùng transaction với dữ liệu; relay publish với publisher confirm. Áp dụng ở assessment, access, community và learning (`reward_grants`) | `OutboxRelay*` trong từng service |
+| **Transactional Outbox + Relay** | Event ghi vào outbox cùng transaction với dữ liệu; relay publish với publisher confirm. Áp dụng ở assessment, access, community và learning (`reward_grants`, `placement_speaking_outbox`) | `OutboxRelay*` trong từng service |
 | **Retry queue + Dead-letter queue + Replay** | Consumer ack thủ công; lỗi tạm đi qua retry queue có TTL, lỗi contract hoặc hết lượt vào DLQ. Replay gửi lại đúng exchange và routing key gốc (`x-original-routing-key`) | `shared/common-events` (`MessageRetry`, `RetryTopology`) |
 | **Idempotent consumer** | Notification chống trùng theo `eventId`; Learning áp kết quả theo `(attempt, result_version)` | listener của notification, learning |
 | **Event có version** | Tên exchange, routing key, payload nằm ở `common-events`, có hậu tố `.v1`, `.v2`; đổi event phải đổi contract cùng lúc | `docs/contracts/` |
@@ -79,7 +79,7 @@ Chỉ liệt kê pattern đã có trong code. Cột "Xem" trỏ tới nơi đọ
 | :-- | :-- | :-- |
 | **Idempotency-Key** | Cấp Premium (Access) và mở khóa course (Learning) bắt buộc khóa này; gửi lại cùng khóa trả kết quả cũ, khác payload trả conflict | `docs/saga-course-unlock-and-human-grading.md` |
 | **Intent bền + đối soát (saga)** | Mở khóa course ghi `PENDING` trước, trừ điểm ở Access bằng cùng khóa, rồi kích hoạt; `ReconcilePendingCourseUnlocks` hoàn tất phần dang dở. Chấm bài người cũng dùng khóa tín dụng ổn định và hoàn điểm khi chắc chắn lỗi | `docs/saga-course-unlock-and-human-grading.md` |
-| **Claim hàng bằng `FOR UPDATE SKIP LOCKED`** | Relay outbox, chấm essay, bản nháp AI chạy an toàn trên nhiều instance | mục "Scheduler và nhiều instance" của system-architecture |
+| **Claim hàng bằng `FOR UPDATE SKIP LOCKED`** | Relay outbox, chấm essay, Speaking placement và bản nháp AI chạy an toàn trên nhiều instance | mục "Scheduler và nhiều instance" của system-architecture |
 | **Advisory lock** | Job định kỳ của learning, publish theo lịch của content, khóa theo user (`LearnerLock`, `AdvisoryUserLock`) | cùng mục trên |
 | **Graceful shutdown** | Spring drain 30 giây, scheduler đợi tối đa 20 giây | mục "Dừng một instance" |
 

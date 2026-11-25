@@ -13,13 +13,19 @@ import com.ieltspath.assessment.domain.vo.PlacementPool;
  */
 public record PlacementResult(UUID attemptId, Double overallBand, Instant completedAt, List<SkillBand> skills,
                               List<Section> sections, PlacementPool pool, Double ceiling,
-                              boolean reachedCeiling, boolean partial) {
+                              boolean reachedCeiling, boolean partial, SpeakingFeedback speakingFeedback) {
     public PlacementResult(UUID attemptId, Double overallBand, Instant completedAt, List<SkillBand> skills,
                            List<Section> sections) {
-        this(attemptId, overallBand, completedAt, skills, sections, null, null, false, false);
+        this(attemptId, overallBand, completedAt, skills, sections, null, null, false, false, null);
     }
     public PlacementResult(UUID attemptId, Double overallBand, Instant completedAt, List<SkillBand> skills) {
-        this(attemptId, overallBand, completedAt, skills, List.of(), null, null, false, false);
+        this(attemptId, overallBand, completedAt, skills, List.of(), null, null, false, false, null);
+    }
+
+    public PlacementResult(UUID attemptId, Double overallBand, Instant completedAt, List<SkillBand> skills,
+                           List<Section> sections, PlacementPool pool, Double ceiling,
+                           boolean reachedCeiling, boolean partial) {
+        this(attemptId, overallBand, completedAt, skills, sections, pool, ceiling, reachedCeiling, partial, null);
     }
 
     public record SkillBand(Skill skill, double band) {}
@@ -39,4 +45,8 @@ public record PlacementResult(UUID attemptId, Double overallBand, Instant comple
     public record Feedback(String summary, List<Criterion> criteria, List<String> focus) {}
 
     public record Criterion(String code, Double band, String comment) {}
+
+    public record SpeakingFeedback(String summary, List<Criterion> criteria) {
+        public SpeakingFeedback { criteria = criteria == null ? List.of() : List.copyOf(criteria); }
+    }
 }
