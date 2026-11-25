@@ -5,6 +5,7 @@ import com.ieltspath.user.domain.aggregate.Role;
 import com.ieltspath.user.domain.aggregate.User;
 import com.ieltspath.user.domain.vo.RoleName;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;

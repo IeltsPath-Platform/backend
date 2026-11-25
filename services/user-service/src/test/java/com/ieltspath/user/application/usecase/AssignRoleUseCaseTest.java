@@ -6,10 +6,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.ieltspath.user.domain.exception.RoleNotFoundException;
 import com.ieltspath.user.application.command.AssignRoleCommand;
 import com.ieltspath.user.application.port.UserLock;
+import com.ieltspath.user.application.port.AccessTokenRevocationStore;
 import com.ieltspath.user.domain.aggregate.Role;
 import com.ieltspath.user.domain.aggregate.User;
 import com.ieltspath.user.domain.repository.RoleRepository;
 import com.ieltspath.user.domain.repository.UserRepository;
+import com.ieltspath.user.domain.repository.RefreshTokenRepository;
 import com.ieltspath.user.domain.vo.Email;
 import com.ieltspath.user.domain.vo.RoleName;
 import com.ieltspath.user.domain.vo.UserStatus;
@@ -23,9 +25,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,6 +40,10 @@ class AssignRoleUseCaseTest {
     private RoleRepository roleRepository;
     @Mock
     private UserLock userLock;
+    @Mock
+    private RefreshTokenRepository refreshTokens;
+    @Mock
+    private AccessTokenRevocationStore accessTokens;
     @InjectMocks
     private AssignRoleUseCase useCase;
 
@@ -57,6 +65,7 @@ class AssignRoleUseCaseTest {
         User updated = useCase.execute(new AssignRoleCommand(userId, Set.of("ADMIN"), UUID.randomUUID()));
 
         assertThat(updated.getRoles()).extracting(role -> role.getName().name()).containsExactly("ADMIN");
+        verify(refreshTokens).revokeAllActiveForUser(eq(userId), any(LocalDateTime.class), eq("ADMIN"));
     }
 
     @Test
