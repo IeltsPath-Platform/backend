@@ -17,7 +17,7 @@ public class JdbcSpeakingTaskReader implements SpeakingTaskReader {
     @Override
     public Optional<SpeakingTask> find(UUID packageVersionId, UUID sectionId) {
         List<Row> rows = jdbc.query("""
-                SELECT p.id package_id, p.title package_title, s.title, s.part_no, s.time_limit_seconds, s.instructions,
+                SELECT p.id package_id, p.title package_title, p.required_feature_key, s.title, s.part_no, s.time_limit_seconds, s.instructions,
                        qv.id question_version_id, sq.sort_order, qv.stem,
                        (qv.answer_spec ->> 'durationSeconds')::int duration_seconds
                 FROM content_packages p
@@ -30,7 +30,7 @@ public class JdbcSpeakingTaskReader implements SpeakingTaskReader {
                   AND qv.answer_spec ->> 'type' = 'SPEAKING'
                 ORDER BY sq.sort_order
                 """, (row, index) -> new Row(row.getObject("package_id", UUID.class), row.getString("package_title"),
-                row.getString("title"), (Integer) row.getObject("part_no"), (Integer) row.getObject("time_limit_seconds"),
+                row.getString("required_feature_key"), row.getString("title"), (Integer) row.getObject("part_no"), (Integer) row.getObject("time_limit_seconds"),
                 row.getString("instructions"), new Question(row.getObject("question_version_id", UUID.class),
                 row.getInt("sort_order"), row.getString("stem"), (Integer) row.getObject("duration_seconds"))),
                 packageVersionId, sectionId);
@@ -38,9 +38,9 @@ public class JdbcSpeakingTaskReader implements SpeakingTaskReader {
         Row first = rows.getFirst();
         return Optional.of(new SpeakingTask(first.packageId(), packageVersionId, sectionId, first.packageTitle(),
                 first.title(), first.partNo(), first.timeLimitSeconds(), first.instructions(),
-                rows.stream().map(Row::question).toList()));
+                rows.stream().map(Row::question).toList(), first.requiredFeatureKey()));
     }
 
-    private record Row(UUID packageId, String packageTitle, String title, Integer partNo, Integer timeLimitSeconds,
+    private record Row(UUID packageId, String packageTitle, String requiredFeatureKey, String title, Integer partNo, Integer timeLimitSeconds,
                        String instructions, Question question) {}
 }

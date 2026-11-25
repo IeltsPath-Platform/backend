@@ -555,3 +555,7 @@ omit the field. `answerSpec` is never returned. Essay results are not tagged by 
 `GET /reviews/{reviewId}` and responses from review-basket start include `blocking`, copied from the stored review item.
 The review detail uses the stored value for both required and optional reviews. A review triggered as `ERROR_PATTERN`
 also has optional `errorTrap: {code, name, fixHint}` for the parent's current main error; ordinary reviews omit it.
+
+## Premium free practice tests
+
+A `PRACTICE_TEST` package with a non-null `requiredFeatureKey` requires an active Premium subscription before Assessment creates an `OFFICIAL_PRACTICE` attempt. Starting a tagged test without Premium returns HTTP 403 with `details.code = PREMIUM_REQUIRED`; if Access cannot confirm the subscription, it returns HTTP 503 with `details.code = ENTITLEMENT_UNAVAILABLE`. Free tests do not call Access. Existing owner-scoped attempt reads and answers use the snapshot captured at start.

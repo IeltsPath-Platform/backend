@@ -1,6 +1,7 @@
 package com.ieltspath.learning.application.usecase;
 
 import com.ieltspath.learning.application.exception.LearningRequestException;
+import com.ieltspath.learning.application.exception.AccessUnavailableException;
 import com.ieltspath.learning.application.port.LearnerLock;
 import com.ieltspath.learning.application.port.LearningContentClient.Item;
 import com.ieltspath.learning.application.result.WritingSubmissionResult;
@@ -65,7 +66,17 @@ public class SubmitFreeWritingToExaminerUseCase {
             // A new essay for a prompt whose last essay still waits for its examiner would spend another credit and take
             // another place of the examiner's day; the learner can send again once the examiner has graded.
             pending(userId, questionVersionId).ifPresent(waiting -> { throw reviewPending(waiting); });
-            Item item = prompts.find(packageVersionId, questionVersionId);
+            FreeWritingPrompts.ResolvedPrompt prompt = prompts.resolve(packageVersionId, questionVersionId);
+            if (prompt.requiredFeatureKey() != null) {
+                final boolean premium;
+                try {
+                    premium = flow.premiumStatus();
+                } catch (AccessUnavailableException exception) {
+                    throw entitlementUnavailable();
+                }
+                if (!premium) throw premiumRequired();
+            }
+            Item item = prompt.item();
             submission = transaction.execute(status -> store(userId, item, requestId, essayText, words));
             if (!sameEssay(submission, userId, questionVersionId)) throw EssaySubmissionFlow.requestConflict();
         }
@@ -88,6 +99,16 @@ public class SubmitFreeWritingToExaminerUseCase {
     private static LearningRequestException reviewPending(UUID submissionId) {
         return new LearningRequestException(409, "EXAMINER_REVIEW_PENDING",
                 "This essay was already sent to an examiner who has not graded it yet", submissionId);
+    }
+
+    private static LearningRequestException premiumRequired() {
+        return new LearningRequestException(403, "PREMIUM_REQUIRED",
+                "Đề này dành cho tài khoản Premium. Nâng cấp để luyện đề này.");
+    }
+
+    private static LearningRequestException entitlementUnavailable() {
+        return new LearningRequestException(503, "ENTITLEMENT_UNAVAILABLE",
+                "Chưa kiểm tra được gói Premium. Vui lòng thử lại sau.");
     }
 
     private static boolean sameEssay(WritingSubmission submission, UUID userId, UUID questionVersionId) {

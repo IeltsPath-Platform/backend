@@ -3,6 +3,7 @@ package com.ieltspath.content.api.controller;
 import com.ieltspath.content.api.exception.GlobalExceptionHandler;
 import com.ieltspath.content.application.result.ReadingPassageResult;
 import com.ieltspath.content.application.usecase.GetReadingPassageUseCase;
+import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.content.domain.exception.ReadingPassageNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,6 +16,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.Set;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -27,6 +29,9 @@ class ReadingControllerTest {
     @Mock
     private GetReadingPassageUseCase getReadingPassageUseCase;
 
+    @Mock
+    private CurrentUserProvider currentUser;
+
     @InjectMocks
     private ReadingController readingController;
 
@@ -34,6 +39,7 @@ class ReadingControllerTest {
 
     @BeforeEach
     void setUp() {
+        org.mockito.Mockito.when(currentUser.requireRoles()).thenReturn(Set.of("EXAMINER"));
         mockMvc = MockMvcBuilders.standaloneSetup(readingController)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
@@ -43,7 +49,7 @@ class ReadingControllerTest {
     void returnsLabelledParagraphs() throws Exception {
         UUID sectionId = UUID.randomUUID();
         UUID packageId = UUID.randomUUID();
-        when(getReadingPassageUseCase.execute(sectionId)).thenReturn(new ReadingPassageResult(
+        when(getReadingPassageUseCase.execute(sectionId, false)).thenReturn(new ReadingPassageResult(
                 sectionId, "Rooftops", "Read the passage.", packageId, "Practice set",
                 List.of(new ReadingPassageResult.Paragraph("A", "First."),
                         new ReadingPassageResult.Paragraph("B", "Second."))));
@@ -62,7 +68,7 @@ class ReadingControllerTest {
     @Test
     void unreadableSectionsAreNotFound() throws Exception {
         UUID sectionId = UUID.randomUUID();
-        when(getReadingPassageUseCase.execute(sectionId)).thenThrow(new ReadingPassageNotFoundException(sectionId));
+        when(getReadingPassageUseCase.execute(sectionId, false)).thenThrow(new ReadingPassageNotFoundException(sectionId));
 
         mockMvc.perform(get("/api/content/reading/sections/{id}", sectionId))
                 .andExpect(status().isNotFound());

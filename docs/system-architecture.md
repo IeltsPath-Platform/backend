@@ -71,6 +71,7 @@ Gateway giữ các path công khai nhưng trỏ từng nhóm tới chủ sở h�
 
 | Caller | Callee | Endpoint | Cấu hình base URL |
 | --- | --- | --- | --- |
+| content | access | `GET /api/access/me/subscription` (quyền Premium cho nội dung đề luyện, ngoài transaction) | `ACCESS_SERVICE_URL` (mặc định `http://localhost:8084`) |
 | assessment | content | `GET /internal/learning-content/package-versions/{id}` khi tạo attempt (ngoài transaction) | `CONTENT_SERVICE_URL` |
 | content | library | `GET /api/content/vocabulary/senses`, `POST /api/content/admin/vocabulary/bulk` khi duyệt course draft và soạn lesson, bearer của tác giả | `LIBRARY_SERVICE_URL` (khóa `content.library.base-url`, mặc định `http://localhost:8081`) |
 | community | user | `POST /internal/users/public-profiles`, `GET /internal/users/public-profiles/search`, bearer của người xem | `USER_SERVICE_URL` (khóa `community.user-service.base-url`) |

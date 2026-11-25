@@ -54,12 +54,12 @@ public class CreateSpeakingSubmissionUseCase {
     public SpeakingSubmissionResult execute(UUID userId, UUID requestId, UUID packageVersionId,
                                             List<UUID> partSectionIds, boolean consent) {
         requireAvailable(consent);
-        boolean premium = premiumLearner();
         Optional<SpeakingSubmission> existing = submissions.findByRequestId(requestId);
         if (existing.isPresent()) return SpeakingSubmissionResult.from(replay(existing.get(), userId, packageVersionId, null));
+        Resolved resolved = questions.resolve(packageVersionId, partSectionIds);
+        boolean premium = premiumFor(resolved.requiredFeatureKey());
         requireBalance(premium);
-        return open(userId, requestId, packageVersionId, questions.resolve(packageVersionId, partSectionIds), null, null,
-                pointCost(premium));
+        return open(userId, requestId, packageVersionId, resolved, null, null, pointCost(premium));
     }
 
     /**
@@ -70,14 +70,14 @@ public class CreateSpeakingSubmissionUseCase {
     public SpeakingSubmissionResult executeForAttempt(UUID userId, UUID requestId, UUID packageVersionId, UUID lessonId,
                                                       UUID attemptId, boolean consent) {
         requireAvailable(consent);
-        boolean premium = premiumLearner();
         Optional<SpeakingSubmission> existing = submissions.findByRequestId(requestId);
         if (existing.isPresent()) {
             return SpeakingSubmissionResult.from(replay(existing.get(), userId, packageVersionId, attemptId));
         }
+        Resolved resolved = questions.resolveSetItems(packageVersionId);
+        boolean premium = premiumFor(resolved.requiredFeatureKey());
         requireBalance(premium);
-        return open(userId, requestId, packageVersionId, questions.resolveSetItems(packageVersionId), lessonId, attemptId,
-                pointCost(premium));
+        return open(userId, requestId, packageVersionId, resolved, lessonId, attemptId, pointCost(premium));
     }
 
     private void requireAvailable(boolean consent) {
@@ -140,6 +140,22 @@ public class CreateSpeakingSubmissionUseCase {
         } catch (AccessUnavailableException exception) {
             return false;
         }
+    }
+
+    private boolean premiumFor(String requiredFeatureKey) {
+        if (requiredFeatureKey == null) return premiumLearner();
+        final boolean premium;
+        try {
+            premium = points.premium();
+        } catch (AccessUnavailableException exception) {
+            throw new LearningRequestException(503, "ENTITLEMENT_UNAVAILABLE",
+                    "Chưa kiểm tra được gói Premium. Vui lòng thử lại sau.");
+        }
+        if (!premium) {
+            throw new LearningRequestException(403, "PREMIUM_REQUIRED",
+                    "Đề này dành cho tài khoản Premium. Nâng cấp để luyện đề này.");
+        }
+        return true;
     }
 
     private int pointCost(boolean premium) {

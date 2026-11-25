@@ -1,5 +1,11 @@
 # Internal learning content API v1
 
+## Package-version entitlement metadata
+
+Package-version responses include nullable `requiredFeatureKey`, copied from the package's required feature. Learning and
+Assessment use it to gate tagged free-practice tests before returning a task or creating an attempt. Internal responses
+may still contain answer data and are never returned directly to learners.
+
 ## Course practice-test milestones
 
 `GET /internal/learning-content/courses/{id}/practice-test-milestones` returns up to 100 milestones for an ACTIVE

@@ -26,6 +26,7 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -216,9 +217,10 @@ class ContentAuthorizationWebMvcTest {
     @Test
     @WithMockUser(roles = "CUSTOMER")
     void learnerCanReadTopicsKnowledgePointsAndReading() throws Exception {
+        when(currentUser.requireRoles()).thenReturn(Set.of("CUSTOMER"));
         when(getTopicTree.execute()).thenReturn(List.of());
         when(getKnowledgePoints.execute(null)).thenReturn(List.of());
-        when(getReadingPassage.execute(id)).thenReturn(new ReadingPassageResult(
+        when(getReadingPassage.execute(id, true)).thenReturn(new ReadingPassageResult(
                 id, "Reading", null, id, "Package", List.of()));
 
         mockMvc.perform(get("/api/content/topics")).andExpect(status().isOk());

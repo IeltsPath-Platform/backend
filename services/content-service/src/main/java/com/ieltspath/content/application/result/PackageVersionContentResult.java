@@ -19,16 +19,23 @@ public record PackageVersionContentResult(
         UUID topicId,
         String rulesJson,
         List<Section> sections,
-        PlacementPool placementPool
+        PlacementPool placementPool,
+        String requiredFeatureKey
 ) {
     public PackageVersionContentResult(UUID packageVersionId, UUID packageId, PackageType packageType,
+                                       UUID topicId, String rulesJson, List<Section> sections,
+                                       PlacementPool placementPool) {
+        this(packageVersionId, packageId, packageType, topicId, rulesJson, sections, placementPool, null);
+    }
+
+    public PackageVersionContentResult(UUID packageVersionId, UUID packageId, PackageType packageType,
                                        UUID topicId, String rulesJson, List<Section> sections) {
-        this(packageVersionId, packageId, packageType, topicId, rulesJson, sections, null);
+        this(packageVersionId, packageId, packageType, topicId, rulesJson, sections, null, null);
     }
 
     public PackageVersionContentResult withSections(List<Section> newSections) {
         return new PackageVersionContentResult(packageVersionId, packageId, packageType, topicId, rulesJson,
-                newSections, placementPool);
+                newSections, placementPool, requiredFeatureKey);
     }
 
     /** {@code passage}: text of the section's PASSAGE asset, or null; {@code audio}: its AUDIO asset, or null. */

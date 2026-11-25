@@ -29,7 +29,11 @@ public class SpeakingTestQuestions {
         this.content = content;
     }
 
-    public record Resolved(SpeakingScope scope, List<SpeakingRecording> questions) { }
+    public record Resolved(SpeakingScope scope, List<SpeakingRecording> questions, String requiredFeatureKey) {
+        public Resolved(SpeakingScope scope, List<SpeakingRecording> questions) {
+            this(scope, questions, null);
+        }
+    }
 
     /**
      * The recorded answers a lesson's practice set asks for: its items whose answer spec is of type SPEAKING, in the
@@ -50,7 +54,7 @@ public class SpeakingTestQuestions {
             }
         }
         if (questions.isEmpty()) throw new LearningRequestException(422, "SPEAKING_NO_QUESTIONS", "Nothing to record");
-        return new Resolved(SpeakingScope.FULL, questions);
+        return new Resolved(SpeakingScope.FULL, questions, version == null ? null : version.requiredFeatureKey());
     }
 
     /** Whether the item is answered by a recording rather than by choosing or typing. */
@@ -91,6 +95,7 @@ public class SpeakingTestQuestions {
         }
         if (questions.isEmpty()) throw new LearningRequestException(422, "SPEAKING_NO_QUESTIONS", "Nothing to record");
         long partsWithQuestions = parts.stream().filter(part -> part.items() != null && !part.items().isEmpty()).count();
-        return new Resolved(included == partsWithQuestions ? SpeakingScope.FULL : SpeakingScope.PART, questions);
+        return new Resolved(included == partsWithQuestions ? SpeakingScope.FULL : SpeakingScope.PART, questions,
+                version.requiredFeatureKey());
     }
 }
