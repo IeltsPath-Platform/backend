@@ -1,6 +1,7 @@
 package com.ieltspath.content.application.usecase;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ieltspath.content.application.command.CreateContentPackageCommand;
 import com.ieltspath.content.application.port.VocabularySenseLookup;
 import com.ieltspath.content.application.service.CourseDraftAnalysisService;
 import com.ieltspath.content.application.service.CourseDraftCodec;
@@ -90,6 +91,7 @@ class CourseImportIntegrationTest {
         @Bean Clock clock() { return Clock.systemUTC(); }
         @Bean VocabularySenseLookup senses() { return ids -> Set.copyOf(ids); }
         @Bean ContentAiProperties properties() { return new ContentAiProperties(); }
+        @Bean CodeSettingsUseCases codeSettings() { return org.mockito.Mockito.mock(CodeSettingsUseCases.class); }
     }
 
     @Container
@@ -109,6 +111,11 @@ class CourseImportIntegrationTest {
     @Autowired jakarta.persistence.EntityManager entityManager;
     @Autowired CourseImportUseCases imports;
     @Autowired ContentAiProperties properties;
+    @Autowired CodeSettingsUseCases codeSettings;
+    @Autowired CreateCourseUseCase createCourse;
+    @Autowired CreateTopicUseCase createTopic;
+    @Autowired LessonAuthoringUseCase lessonAuthoring;
+    @Autowired CreateContentPackageUseCase createPackage;
     @MockitoSpyBean CreateDraftPackageVersionUseCase draftVersions;
 
     private final UUID author = UUID.randomUUID();
@@ -118,6 +125,25 @@ class CourseImportIntegrationTest {
 
     @BeforeEach
     void fixtures() {
+        org.mockito.Mockito.reset(codeSettings);
+        org.mockito.Mockito.when(codeSettings.createCourse(any()))
+                .thenAnswer(call -> createCourse.execute(call.getArgument(0)));
+        org.mockito.Mockito.when(codeSettings.createTopic(any()))
+                .thenAnswer(call -> createTopic.execute(call.getArgument(0)));
+        org.mockito.Mockito.when(codeSettings.createLesson(any(), any(), any(), any(), any(), any(), any()))
+                .thenAnswer(call -> lessonAuthoring.create(call.getArgument(0), call.getArgument(1),
+                        call.getArgument(2), call.getArgument(3), call.getArgument(4), call.getArgument(5),
+                        call.getArgument(6)));
+        org.mockito.Mockito.when(codeSettings.createPackage(any()))
+                .thenAnswer(call -> createPackage.executeAsAuthor(call.getArgument(0)));
+        org.mockito.Mockito.when(codeSettings.createGeneratedPackage(any(), any()))
+                .thenAnswer(call -> {
+                    CreateContentPackageCommand command = call.getArgument(0);
+                    String code = call.getArgument(1);
+                    return createPackage.executeAsAuthor(new CreateContentPackageCommand(code, command.title(),
+                            command.packageType(), command.requiredFeatureKey(), command.lessonId(),
+                            command.sourceCode(), command.topicId(), command.courseId(), command.placementPool()));
+                });
         properties.getAi().setDailyLimit(20);
         jdbc.update("DELETE FROM courses WHERE band_level = ?", BAND);
         fixtureTopic = UUID.randomUUID();

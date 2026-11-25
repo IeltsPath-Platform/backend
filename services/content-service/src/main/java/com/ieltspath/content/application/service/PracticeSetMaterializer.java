@@ -10,7 +10,7 @@ import com.ieltspath.content.application.result.AuthorVersionResult;
 import com.ieltspath.content.application.result.QuestionResult;
 import com.ieltspath.content.application.usecase.AddQuestionVersionUseCase;
 import com.ieltspath.content.application.usecase.AddSectionQuestionUseCase;
-import com.ieltspath.content.application.usecase.CreateContentPackageUseCase;
+import com.ieltspath.content.application.usecase.CodeSettingsUseCases;
 import com.ieltspath.content.application.usecase.CreateContentSectionUseCase;
 import com.ieltspath.content.application.usecase.CreateDraftPackageVersionUseCase;
 import com.ieltspath.content.application.usecase.CreateQuestionUseCase;
@@ -45,7 +45,7 @@ public class PracticeSetMaterializer {
 
     static final int MAX_CODE_PREFIX = 90;
 
-    private final CreateContentPackageUseCase createPackage;
+    private final CodeSettingsUseCases codeSettings;
     private final CreateDraftPackageVersionUseCase createVersion;
     private final CreateContentSectionUseCase createSection;
     private final SectionMediaUseCases media;
@@ -55,13 +55,13 @@ public class PracticeSetMaterializer {
     private final QuestionRepository questions;
     private final ContentPackageRepository packages;
 
-    public PracticeSetMaterializer(CreateContentPackageUseCase createPackage,
+    public PracticeSetMaterializer(CodeSettingsUseCases codeSettings,
                                    CreateDraftPackageVersionUseCase createVersion,
                                    CreateContentSectionUseCase createSection, SectionMediaUseCases media,
                                    CreateQuestionUseCase createQuestion, AddQuestionVersionUseCase addQuestionVersion,
                                    AddSectionQuestionUseCase addSectionQuestion, QuestionRepository questions,
                                    ContentPackageRepository packages) {
-        this.createPackage = createPackage;
+        this.codeSettings = codeSettings;
         this.createVersion = createVersion;
         this.createSection = createSection;
         this.media = media;
@@ -79,8 +79,8 @@ public class PracticeSetMaterializer {
     @Transactional
     public UUID create(UUID lessonId, String lessonCode, int ordinal, PracticeSetPlan plan) {
         String code = "PS-" + clip(lessonCode, MAX_CODE_PREFIX) + "-" + ordinal;
-        AuthorPackageResult pkg = createPackage.executeAsAuthor(new CreateContentPackageCommand(code,
-                clip(plan.title().trim(), 255), PackageType.PRACTICE_SET, null, null, null, null, null, null));
+        AuthorPackageResult pkg = codeSettings.createGeneratedPackage(new CreateContentPackageCommand(null,
+                clip(plan.title().trim(), 255), PackageType.PRACTICE_SET, null, lessonId, null, null, null, null), code);
         AuthorVersionResult version = createVersion.execute(pkg.id(), null);
         AuthorSectionResult section = createSection.execute(new SaveContentSectionCommand(pkg.id(), version.id(), null,
                 clip(plan.title().trim(), 255), Skill.READING, 1, null, blankToNull(plan.instructions()), null, null));

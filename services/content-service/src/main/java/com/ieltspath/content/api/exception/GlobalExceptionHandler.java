@@ -45,6 +45,7 @@ public class GlobalExceptionHandler {
             ContentSectionNotFoundException.class,
             SectionQuestionNotFoundException.class,
             AiDraftNotFoundException.class,
+            com.ieltspath.content.domain.exception.CourseImportDraftNotFoundException.class,
             DraftItemNotFoundException.class,
             RubricNotFoundException.class
     })
