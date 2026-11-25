@@ -78,6 +78,7 @@ public class ContentPackageAuthoringController {
             @RequestParam(value = "courseId", required = false) UUID courseId,
             @RequestParam(value = "q", required = false) String q,
             @RequestParam(value = "placementPool", required = false) PlacementPool placementPool,
+            @RequestParam(value = "excludeType", required = false) List<PackageType> excludeTypes,
             @RequestParam(value = "accessLevel", required = false) AccessLevel accessLevel,
             @RequestParam(value = "skill", required = false) String skill,
             @RequestParam(value = "page", defaultValue = "0") int page,
@@ -85,7 +86,7 @@ public class ContentPackageAuthoringController {
         return AuthorPackagePageResponse.from(listPackages.execute(
                 new AuthorPackageReader.Filter(type, status, lessonId, topicId, courseId, q, placementPool,
                         AccessLevelCompatibility.toFeatureRequiredFilter(accessLevel),
-                        skill == null || skill.isBlank() ? null : skill.strip().toUpperCase()), page, size));
+                        skill == null || skill.isBlank() ? null : skill.strip().toUpperCase(), excludeTypes), page, size));
     }
 
     @PostMapping

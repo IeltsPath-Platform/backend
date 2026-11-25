@@ -73,6 +73,35 @@ class ContentPackageAuthoringErrorTest {
     }
 
     @Test
+    void authorListPassesRepeatedExcludedPackageTypesToTheReader() throws Exception {
+        when(listPackages.execute(any(), org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(new com.ieltspath.content.application.usecase.ListAuthorPackagesUseCase.Page(
+                        0, 0, 25, java.util.List.of()));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/content/admin/packages")
+                        .param("excludeType", "PRACTICE_TEST", "PLACEMENT_TEST"))
+                .andExpect(status().isOk());
+
+        var filter = org.mockito.ArgumentCaptor.forClass(com.ieltspath.content.application.port.AuthorPackageReader.Filter.class);
+        org.mockito.Mockito.verify(listPackages).execute(filter.capture(), org.mockito.ArgumentMatchers.eq(0),
+                org.mockito.ArgumentMatchers.eq(25));
+        org.assertj.core.api.Assertions.assertThat(filter.getValue().excludeTypes()).containsExactly(
+                com.ieltspath.content.domain.vo.PackageType.PRACTICE_TEST,
+                com.ieltspath.content.domain.vo.PackageType.PLACEMENT_TEST);
+    }
+
+    @Test
+    void authorListRejectsUnknownExcludedPackageTypesWithVietnameseBadRequest() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/content/admin/packages").param("excludeType", "NOT_A_PACKAGE_TYPE"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Giá trị của tham số excludeType không hợp lệ"));
+
+        org.mockito.Mockito.verifyNoInteractions(listPackages);
+    }
+
+    @Test
     void placementRequiresPoolAndOtherTypesRejectPool() throws Exception {
         for (String body : java.util.List.of(
                 "{\"code\":\"P\",\"title\":\"Placement\",\"packageType\":\"PLACEMENT_TEST\"}",
