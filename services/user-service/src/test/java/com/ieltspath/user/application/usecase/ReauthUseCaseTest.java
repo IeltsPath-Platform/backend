@@ -57,11 +57,11 @@ class ReauthUseCaseTest {
     void setUp() {
         useCase = new ReauthUseCase(users, identities, encoder, lock, attempts, verifier, nonces,
                 new GoogleAuthProperties(), tokens);
-        when(users.findById(userId)).thenReturn(Optional.of(user));
     }
 
     @Test
     void verifiesThePasswordAndIssuesASessionBoundOneTimeToken() {
+        when(users.findById(userId)).thenReturn(Optional.of(user));
         when(encoder.matches("password", "hash")).thenReturn(true);
         when(tokens.issue(userId, "PASSWORD", sessionId)).thenReturn("reauth-token");
 
@@ -74,6 +74,7 @@ class ReauthUseCaseTest {
 
     @Test
     void rejectsAnIncorrectPasswordAndPersistsTheSharedFailureCounter() {
+        when(users.findById(userId)).thenReturn(Optional.of(user));
         when(encoder.matches("wrong", "hash")).thenReturn(false);
 
         assertThatThrownBy(() -> useCase.execute(userId, sessionId, "wrong", null))
@@ -85,6 +86,7 @@ class ReauthUseCaseTest {
 
     @Test
     void blocksPasswordReauthenticationWhileTheSharedFailureLockIsActive() {
+        when(users.findById(userId)).thenReturn(Optional.of(user));
         var now = java.time.LocalDateTime.now();
         when(attempts.findByUserId(userId)).thenReturn(Optional.of(
                 new PasswordChangeAttempts(userId, 5, now.minusMinutes(2), now.plusMinutes(10))));
@@ -104,6 +106,7 @@ class ReauthUseCaseTest {
 
     @Test
     void verifiesTheLinkedGoogleSubjectAndConsumesItsNonce() {
+        when(users.findById(userId)).thenReturn(Optional.of(user));
         var identity = OAuthIdentity.builder().userId(userId).provider(OAuthProvider.GOOGLE)
                 .providerSubject("linked-sub").build();
         when(verifier.verify("google-token")).thenReturn(new GoogleIdentity("linked-sub", "person@gmail.com", "Person", null, "nonce"));
@@ -119,6 +122,7 @@ class ReauthUseCaseTest {
 
     @Test
     void rejectsAnUnlinkedOrDifferentGoogleAccount() {
+        when(users.findById(userId)).thenReturn(Optional.of(user));
         when(verifier.verify("google-token")).thenReturn(new GoogleIdentity("other-sub", "person@gmail.com", "Person", null));
         when(identities.findByUserIdAndProvider(userId, OAuthProvider.GOOGLE)).thenReturn(Optional.empty());
 

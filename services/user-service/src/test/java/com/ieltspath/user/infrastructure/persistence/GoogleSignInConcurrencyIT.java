@@ -6,6 +6,8 @@ import com.ieltspath.user.application.result.AuthTokenResult;
 import com.ieltspath.user.application.result.GoogleIdentity;
 import com.ieltspath.user.application.port.UserLock;
 import com.ieltspath.user.application.usecase.AuthTokenIssuer;
+import com.ieltspath.user.application.usecase.AuthAuditSupport;
+import com.ieltspath.user.application.port.AuthMetrics;
 import com.ieltspath.user.application.usecase.GoogleSignInUseCase;
 import com.ieltspath.user.application.usecase.LinkGoogleAccountUseCase;
 import com.ieltspath.user.application.usecase.LoginHistoryRecorder;
@@ -84,6 +86,9 @@ class GoogleSignInConcurrencyIT {
 
     @TestConfiguration
     static class Fakes {
+        @Bean AuthAuditSupport authAuditSupport() { return mock(AuthAuditSupport.class); }
+        @Bean AuthMetrics authMetrics() { return mock(AuthMetrics.class); }
+
         @Bean GoogleIdTokenVerifier verifier() {
             return token -> "existing-token".equals(token)
                     ? new GoogleIdentity("existing-google-subject", "existing@gmail.com", "Existing Learner", null)

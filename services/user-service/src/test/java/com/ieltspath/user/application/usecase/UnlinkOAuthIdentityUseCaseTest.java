@@ -102,7 +102,7 @@ class UnlinkOAuthIdentityUseCaseTest {
 
         assertThatThrownBy(() -> useCase.execute(userId, "google"))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("không thể hủy liên kết");
+                .hasMessageContaining("Không thể hủy liên kết");
         verify(identities, never()).deleteByUserIdAndProvider(any(), any());
     }
 }

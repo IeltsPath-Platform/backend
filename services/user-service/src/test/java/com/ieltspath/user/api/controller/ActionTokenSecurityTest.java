@@ -15,6 +15,7 @@ import com.ieltspath.user.application.usecase.LogoutUseCase;
 import com.ieltspath.user.application.usecase.RefreshTokenUseCase;
 import com.ieltspath.user.application.usecase.EmailVerificationUseCase;
 import com.ieltspath.user.application.usecase.ResetPasswordUseCase;
+import com.ieltspath.user.application.port.GoogleNonceStore;
 import com.ieltspath.user.domain.exception.WeakPasswordException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,6 +50,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     "app.security.public-endpoints[0].patterns[3]=/auth/forgot-password",
     "app.security.public-endpoints[0].patterns[4]=/auth/reset-password",
     "app.security.public-endpoints[0].patterns[5]=/auth/google",
+    "app.security.public-endpoints[0].patterns[6]=/auth/google/nonce",
     "spring.cloud.config.enabled=false"
 })
 class ActionTokenSecurityTest {
@@ -76,6 +78,8 @@ class ActionTokenSecurityTest {
     private GetUserByIdUseCase getUserByIdUseCase;
     @MockBean
     private AuthCookieService authCookieService;
+    @MockBean
+    private GoogleNonceStore googleNonceStore;
 
     @DynamicPropertySource
     static void hmacProperties(DynamicPropertyRegistry registry) {

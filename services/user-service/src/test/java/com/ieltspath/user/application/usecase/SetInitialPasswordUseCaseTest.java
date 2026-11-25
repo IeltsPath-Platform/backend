@@ -53,13 +53,13 @@ class SetInitialPasswordUseCaseTest {
         useCase = new SetInitialPasswordUseCase(users, lock, reauthTokens, encoder, policy,
                 refreshTokens, accessTokens, notices);
         when(users.findById(userId)).thenReturn(Optional.of(user));
-        when(reauthTokens.consume("reauth-token")).thenReturn(Optional.of(
-                new ReauthTokenStore.Grant(userId, "GOOGLE", sessionId)));
-        when(encoder.encode("strong-password")).thenReturn("encoded-password");
     }
 
     @Test
     void setsPasswordClearsTheRemovedPasswordMarkerRevokesTokensAndPublishesNotice() {
+        when(encoder.encode("strong-password")).thenReturn("encoded-password");
+        when(reauthTokens.consume("reauth-token")).thenReturn(Optional.of(
+                new ReauthTokenStore.Grant(userId, "GOOGLE", sessionId)));
         useCase.execute(userId, sessionId, "reauth-token", "strong-password");
 
         assertThat(user.getPasswordHash()).isEqualTo("encoded-password");

@@ -4,6 +4,8 @@ import com.ieltspath.user.application.command.ChangePasswordCommand;
 import com.ieltspath.user.application.port.UserLock;
 import com.ieltspath.user.application.port.AccessTokenRevocationStore;
 import com.ieltspath.user.application.usecase.ChangePasswordUseCase;
+import com.ieltspath.user.application.usecase.AuthAuditSupport;
+import com.ieltspath.user.application.port.AuthMetrics;
 import com.ieltspath.user.application.usecase.PasswordPolicyService;
 import com.ieltspath.user.application.usecase.UserNoticeOutbox;
 import com.ieltspath.user.domain.aggregate.User;
@@ -69,6 +71,9 @@ class PasswordChangeAttemptsPersistenceTest {
 
     @TestConfiguration
     static class Fakes {
+        @Bean AuthAuditSupport authAuditSupport() { return mock(AuthAuditSupport.class); }
+        @Bean AuthMetrics authMetrics() { return mock(AuthMetrics.class); }
+
         @Bean UserNoticeOutbox userNoticeOutbox() {
             return mock(UserNoticeOutbox.class);
         }
