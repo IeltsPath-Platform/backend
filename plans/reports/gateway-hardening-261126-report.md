@@ -17,8 +17,8 @@ Chỉ thực hiện P1 trên nhánh `fix/gateway-hardening`. Không SSH vào ser
 - `docker compose config --quiet`: đạt.
 - `py -3 scripts/production/compose.py config --quiet` với env-file trống tạm và image sentinel: đạt.
 - Unit test mới bao phủ IP trực tiếp, proxy CIDR, XFF giả/từ nhiều hop và XFF malformed; test Redis bao phủ nhiều tài khoản hợp lệ một IP và thất bại phân tán theo IP.
-- `mvn -q -pl infra/api-gateway test`: chưa chạy được vì lỗi biên dịch có sẵn ngoài P1: `InternalJwtClaims.SESSION_ID` không tồn tại trong `common-security` nhưng bị `InternalJwtService` dùng.
-- `mvn -q -pl services/user-service -am test`: chưa hoàn tất trong môi trường này; lần chạy module trực tiếp xác nhận lỗi biên dịch ngoài P1: thiếu `com.ieltspath.events.user.GoogleAccountUnlinkedV1`, được dùng bởi `UnlinkOAuthIdentityUseCase` và `RabbitUserEventPublisher`.
+- `mvn -q -pl infra/api-gateway -am test`: đạt khi chạy với `-am`.
+- `mvn -q -pl services/user-service -am test`: đạt khi chạy với `-am`; các lỗi từng thấy khi chạy module trực tiếp là do artifact jar cũ trong `~/.m2`, không phải lỗi code hiện tại.
 - Không thêm metric mới: `management.endpoints.web.exposure.include` đã có `prometheus`, nên Hikari tự xuất `hikaricp_connections_*` qua Actuator.
 - Review bổ sung đã sửa nguy cơ production đếm IP Caddy thay vì IP người dùng: Gateway vouch client IP bằng header nội bộ sau khi xóa header giả từ client; ngưỡng IP dùng `>= 20` để request tiếp theo bị chặn đúng.
 
@@ -27,6 +27,6 @@ Chỉ thực hiện P1 trên nhánh `fix/gateway-hardening`. Không SSH vào ser
 - Khi deploy, giữ `GATEWAY_BEHIND_PROXY=true` và `GATEWAY_RATE_LIMIT_TRUSTED_PROXIES=172.28.0.2/32` cùng mạng Compose `172.28.0.0/24`; hướng dẫn chi tiết nằm trong `docs/deployment.md`.
 - Không đặt CIDR mạng công cộng vào danh sách trusted proxy.
 
-Status: DONE_WITH_CONCERNS
-Summary: Đã hoàn thành năm hạng mục P1 bằng năm commit độc lập và xác thực Compose; kiểm thử Maven bị chặn bởi hai lỗi biên dịch có sẵn ngoài phạm vi P1.
-Concerns/Blockers: Cần khôi phục các contract thiếu `InternalJwtClaims.SESSION_ID` và `GoogleAccountUnlinkedV1` trước khi CI có thể chạy lại test Gateway/User đầy đủ.
+Status: DONE
+Summary: Đã hoàn thành năm hạng mục P1 bằng năm commit độc lập; test Gateway/User với `-am` và kiểm tra Compose đều đạt.
+Concerns/Blockers: Không còn blocker đã biết trong phạm vi P1.
