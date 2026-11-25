@@ -33,7 +33,7 @@ public class ClientKeyResolver implements KeyResolver {
                 .switchIfEmpty(Mono.fromSupplier(() -> "ip:" + clientIp(exchange)));
     }
 
-    private String clientIp(ServerWebExchange exchange) {
+    public String clientIp(ServerWebExchange exchange) {
         InetSocketAddress remote = exchange.getRequest().getRemoteAddress();
         if (remote == null) return "unknown";
         String remoteIp = remote.getAddress() == null ? remote.getHostString() : remote.getAddress().getHostAddress();

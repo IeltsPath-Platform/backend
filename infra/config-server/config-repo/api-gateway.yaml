@@ -77,11 +77,20 @@ spring:
             - id: user-auth-limited
               uri: lb://USER-SERVICE
               predicates:
-                - Path=/auth/login,/auth/refresh,/auth/forgot-password,/auth/reset-password,/auth/google,/auth/google/nonce,/auth/verify-email,/auth/resend-verification,/api/users/register
+                - Path=/auth/login,/auth/forgot-password,/auth/reset-password,/auth/google,/auth/google/nonce,/auth/verify-email,/auth/resend-verification,/api/users/register
               filters:
                 - name: ClientRateLimit
                   args:
                     tier: auth
+
+            - id: user-refresh-limited
+              uri: lb://USER-SERVICE
+              predicates:
+                - Path=/auth/refresh
+              filters:
+                - name: ClientRateLimit
+                  args:
+                    tier: auth-refresh
 
             - id: user-reauth-limited
               uri: lb://USER-SERVICE
@@ -392,6 +401,7 @@ gateway:
     trusted-proxies: ${GATEWAY_RATE_LIMIT_TRUSTED_PROXIES:}
     tiers:
       auth: { replenish-rate: 1, burst-capacity: 5 }
+      auth-refresh: { replenish-rate: 1, burst-capacity: 20 }
       upload: { replenish-rate: 1, burst-capacity: 5 }
       ai: { replenish-rate: 1, burst-capacity: 3 }
       default: { replenish-rate: 20, burst-capacity: 40 }
