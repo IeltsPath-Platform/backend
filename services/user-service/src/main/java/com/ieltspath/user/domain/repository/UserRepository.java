@@ -1,6 +1,9 @@
 package com.ieltspath.user.domain.repository;
 
 import com.ieltspath.user.domain.aggregate.User;
+import com.ieltspath.user.domain.result.UserPage;
+import com.ieltspath.user.domain.vo.RoleName;
+import com.ieltspath.user.domain.vo.UserStatus;
 
 import java.util.List;
 import java.util.Optional;
@@ -16,6 +19,7 @@ public interface UserRepository {
     boolean existsByPhoneNumberAndIdNot(String phoneNumber, UUID id);
     List<UUID> lockActiveAdminUserIds();
     List<User> findAll();
+    UserPage findPage(RoleName role, UserStatus status, String search, int page, int size);
     /** Up to {@code limit} users whose id sorts after {@code lastId}, in id order, for walking all accounts in batches. */
     List<User> findAfterId(UUID lastId, int limit);
 }

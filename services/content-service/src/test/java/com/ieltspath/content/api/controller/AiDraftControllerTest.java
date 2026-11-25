@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.content.api.exception.GlobalExceptionHandler;
 import com.ieltspath.content.application.usecase.AiDraftReviewUseCases;
+import com.ieltspath.content.application.port.AiDraftOriginReader;
+import com.ieltspath.content.application.result.AiDraftOrigin;
 import com.ieltspath.content.domain.aggregate.AiDraft;
 import com.ieltspath.content.domain.exception.AiDraftNotFoundException;
 import com.ieltspath.content.domain.vo.DraftKind;
@@ -19,6 +21,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -32,12 +35,13 @@ class AiDraftControllerTest {
     private final UUID author = UUID.randomUUID();
     private final AiDraftReviewUseCases drafts = mock(AiDraftReviewUseCases.class);
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
+    private final AiDraftOriginReader origins = mock(AiDraftOriginReader.class);
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         when(currentUser.requireUserId()).thenReturn(author);
-        mockMvc = MockMvcBuilders.standaloneSetup(new AiDraftController(drafts, currentUser, new ObjectMapper()))
+        mockMvc = MockMvcBuilders.standaloneSetup(new AiDraftController(drafts, currentUser, new ObjectMapper(), origins))
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
     }
 
@@ -45,13 +49,39 @@ class AiDraftControllerTest {
     void listReturnsOnlyTheRequestersDraftsWithParsedJson() throws Exception {
         AiDraft ready = new AiDraft(UUID.randomUUID(), DraftKind.QUESTIONS, DraftStatus.READY, author,
                 "{\"count\":5}", "{\"items\":[]}", null, "m", "p1", Instant.now(), null, Instant.now(), null, null, null);
-        when(drafts.list(eq(author), any(), any(), anyInt(), anyInt())).thenReturn(List.of(ready));
+        when(drafts.list(eq(author), anyList(), any(), anyInt(), anyInt())).thenReturn(List.of(ready));
 
         mockMvc.perform(get("/api/content/admin/ai-drafts"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].status").value("READY"))
                 .andExpect(jsonPath("$[0].request.count").value(5))
-                .andExpect(jsonPath("$[0].result.items").isArray());
+                .andExpect(jsonPath("$[0].result.items").isArray())
+                .andExpect(jsonPath("$[0].itemCount").value(0));
+    }
+
+    @Test
+    void listFiltersMultipleKindsAndReturnsBatchedOriginWithoutSourceText() throws Exception {
+        UUID sectionId = UUID.randomUUID();
+        UUID lessonId = UUID.randomUUID();
+        AiDraft section = new AiDraft(UUID.randomUUID(), DraftKind.SECTION_QUESTIONS, DraftStatus.READY, author,
+                "{\"sectionId\":\"" + sectionId + "\",\"source\":{\"text\":\"private passage\"}}",
+                "{\"items\":[{},{}]}", null, "m", "p1", Instant.now(), null, Instant.now(), null, null, null);
+        AiDraft lesson = new AiDraft(UUID.randomUUID(), DraftKind.QUESTIONS, DraftStatus.READY, author,
+                "{\"lessonId\":\"" + lessonId + "\"}", "{\"items\":[{}]}", null, "m", "p1",
+                Instant.now(), null, Instant.now(), null, null, null);
+        when(drafts.list(eq(author), anyList(), any(), anyInt(), anyInt())).thenReturn(List.of(section, lesson));
+        when(origins.findOrigins(anyList())).thenReturn(java.util.Map.of(
+                section.getId(), new AiDraftOrigin("SECTION", "Phần Đọc · Đề luyện tập", null, null, sectionId, null, null, true, null),
+                lesson.getId(), new AiDraftOrigin("LESSON", "Bài học · Chính tả", null, null, null, null, lessonId, true, "Chính tả")));
+
+        mockMvc.perform(get("/api/content/admin/ai-drafts").param("kind", "QUESTIONS", "SECTION_QUESTIONS"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].origin.type").value("SECTION"))
+                .andExpect(jsonPath("$[0].origin.title").value("Phần Đọc · Đề luyện tập"))
+                .andExpect(jsonPath("$[0].itemCount").value(2))
+                .andExpect(jsonPath("$[0].request.source.text").doesNotExist())
+                .andExpect(jsonPath("$[1].origin.lessonId").value(lessonId.toString()))
+                .andExpect(jsonPath("$[1].itemCount").value(1));
     }
 
     @Test

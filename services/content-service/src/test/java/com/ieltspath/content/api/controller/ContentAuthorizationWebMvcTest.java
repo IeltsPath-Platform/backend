@@ -178,6 +178,7 @@ class ContentAuthorizationWebMvcTest {
                 .andExpect(jsonPath("$.message").value("Band phải từ 0 đến 9, theo bước 0,5."));
     }
     @MockitoBean ListQuestionsUseCase listQuestions;
+    @MockitoBean ListQuestionsWithIncludesUseCase listQuestionsWithIncludes;
     @MockitoBean GetQuestionDetailUseCase getQuestionDetail;
     @MockitoBean GetQuestionPassagesUseCase getQuestionPassages;
     @MockitoBean CreateQuestionUseCase createQuestion;
@@ -246,7 +247,7 @@ class ContentAuthorizationWebMvcTest {
     @Test
     @WithMockUser(roles = "CONTENT_AUTHOR")
     void contentAuthorCanReadQuestionAndPackageListsAndDetails() throws Exception {
-        when(listQuestions.execute(null, null, null, null, 0, 25))
+        when(listQuestions.execute(null, null, null, null, null, 0, 25))
                 .thenReturn(new ListQuestionsUseCase.Page(0, 0, 25, List.of()));
         when(listPackages.execute(null, null)).thenReturn(List.of());
         when(getQuestionDetail.execute(id)).thenReturn(new QuestionDetailResult(

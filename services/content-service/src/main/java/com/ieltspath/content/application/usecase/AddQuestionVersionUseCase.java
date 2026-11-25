@@ -1,6 +1,7 @@
 package com.ieltspath.content.application.usecase;
 
 import com.ieltspath.content.application.command.AddQuestionVersionCommand;
+import com.ieltspath.content.application.port.QuestionImageWriter;
 import com.ieltspath.content.application.result.QuestionResult;
 import com.ieltspath.content.domain.aggregate.Question;
 import com.ieltspath.content.domain.entity.QuestionKnowledgePoint;
@@ -34,9 +35,13 @@ public class AddQuestionVersionUseCase {
     private final QuestionRepository questionRepository;
     private final ErrorTypeRepository errorTypeRepository;
 
-    public AddQuestionVersionUseCase(QuestionRepository questionRepository, ErrorTypeRepository errorTypeRepository) {
+    private final QuestionImageWriter imageWriter;
+
+    public AddQuestionVersionUseCase(QuestionRepository questionRepository, ErrorTypeRepository errorTypeRepository,
+                                     QuestionImageWriter imageWriter) {
         this.questionRepository = questionRepository;
         this.errorTypeRepository = errorTypeRepository;
+        this.imageWriter = imageWriter;
     }
 
     public QuestionResult execute(AddQuestionVersionCommand command) {
@@ -83,6 +88,8 @@ public class AddQuestionVersionUseCase {
 
         question.addVersion(version);
         Question saved = questionRepository.save(question);
+        // A Writing prompt image stays with the question across versions, so the new draft starts with the last one.
+        imageWriter.copyFromPreviousVersion(version.getId());
 
         return QuestionResult.of(saved);
     }

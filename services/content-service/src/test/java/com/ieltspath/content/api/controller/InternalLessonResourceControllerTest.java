@@ -38,14 +38,17 @@ class InternalLessonResourceControllerTest {
         UUID lessonId = UUID.randomUUID();
         when(lessons.publishedLessonExists(lessonId)).thenReturn(true);
         when(repository.findSummaryMarkdown(lessonId)).thenReturn("## Outcomes");
+        String slideKey = "lesson-document/" + UUID.randomUUID() + "/" + UUID.randomUUID() + ".pdf";
+        when(files.signedUrl(slideKey)).thenReturn("https://storage.example/slide.pdf");
         when(repository.findByLessonId(lessonId)).thenReturn(List.of(
                 LessonResource.create(lessonId, LessonResourceType.DOCUMENT, "Giáo trình", "https://d.com/1", 0),
-                LessonResource.create(lessonId, LessonResourceType.SLIDE, "Slide", "https://docs.google.com/presentation/d/x", 0)));
+                LessonResource.createFile(lessonId, LessonResourceType.SLIDE, "Slide", slideKey, 0)));
 
         mvc.perform(get("/internal/learning-content/lessons/{id}/resources", lessonId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.summaryMarkdown").value("## Outcomes"))
-                .andExpect(jsonPath("$.slides[0].url").value("https://docs.google.com/presentation/d/x"))
+                .andExpect(jsonPath("$.slides[0].url").value("https://storage.example/slide.pdf"))
+                .andExpect(jsonPath("$.slides[0].fileKey").value(slideKey))
                 .andExpect(jsonPath("$.documents[0].title").value("Giáo trình"))
                 .andExpect(jsonPath("$.documents[0].sortOrder").value(0));
     }

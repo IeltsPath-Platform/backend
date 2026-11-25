@@ -6,6 +6,7 @@ import com.ieltspath.content.domain.exception.InvalidContentStateException;
 import com.ieltspath.content.domain.exception.InvalidPackageLessonException;
 import com.ieltspath.content.domain.exception.QuestionAlreadyUsedException;
 import com.ieltspath.content.domain.exception.QuestionPurposeMismatchException;
+import com.ieltspath.content.domain.exception.QuestionNotPublishedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -69,6 +70,7 @@ public class ScheduledPublishJob {
     private static String safeErrorCode(RuntimeException failure) {
         if (failure instanceof QuestionAlreadyUsedException) return "QUESTION_ALREADY_USED";
         if (failure instanceof QuestionPurposeMismatchException) return "QUESTION_PURPOSE_MISMATCH";
+        if (failure instanceof QuestionNotPublishedException) return "QUESTION_NOT_PUBLISHED";
         if (failure instanceof InvalidPackageLessonException) return "INVALID_PACKAGE_LESSON";
         if (failure instanceof InvalidContentStateException) return "INVALID_CONTENT_STATE";
         return RecordScheduledPublicationFailureUseCase.UNKNOWN_FAILURE;

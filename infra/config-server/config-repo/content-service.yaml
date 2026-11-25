@@ -38,9 +38,20 @@ content:
   ai:
     batch-size: 2
     stale-after: PT10M
+    max-attempts: 3
     daily-limit: 20
     max-items-per-request: 20
     quota-zone: Asia/Ho_Chi_Minh
+    section-questions:
+      min-source-words: 80
+      max-source-chars: 20000
+      max-count: 10
+      duplicate-threshold: 0.8
+      same-answer-threshold: 0.5
+      max-answer-words: 4
+      max-copied-words: 12
+      max-stem-chars: 400
+      ready-ttl: P14D
 
 app:
   storage:
@@ -49,6 +60,9 @@ app:
     supabase:
       url: ${SUPABASE_URL:}
       secret-key: ${SUPABASE_SECRET_KEY:}
+      # The default of 3 s is shorter than a slow TLS handshake to Supabase from some networks, which fails an
+      # upload as STORAGE_UNAVAILABLE before any byte is sent. The upload itself keeps its own 120 s limit.
+      connect-timeout: ${CONTENT_STORAGE_CONNECT_TIMEOUT:10s}
   auth:
     internal-jwt-issuer: ${INTERNAL_JWT_ISSUER:urn:code-base:api-gateway}
     internal-jwt-secret: ${GATEWAY_INTERNAL_JWT_SECRET}

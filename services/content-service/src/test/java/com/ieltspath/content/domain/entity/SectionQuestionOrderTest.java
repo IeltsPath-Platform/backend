@@ -2,6 +2,7 @@ package com.ieltspath.content.domain.entity;
 
 import com.ieltspath.content.domain.exception.QuestionAlreadyInVersionException;
 import com.ieltspath.content.domain.exception.SectionQuestionNotFoundException;
+import com.ieltspath.content.domain.vo.Skill;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -20,6 +21,32 @@ class SectionQuestionOrderTest {
         section.addQuestion(SectionQuestion.create(section.getId(), UUID.randomUUID(), 2, BigDecimal.ONE));
 
         assertEquals(3, section.nextQuestionSortOrder());
+    }
+
+    @Test
+    void aWritingSectionKeepsItsOneQuestion() {
+        ContentSection writing = ContentSection.create(UUID.randomUUID(), "Task 1", Skill.WRITING, 1, null, null);
+        SectionQuestion first = SectionQuestion.create(writing.getId(), UUID.randomUUID(), 1, BigDecimal.ONE);
+        writing.addQuestion(first);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> writing.addQuestion(SectionQuestion.create(writing.getId(), UUID.randomUUID(), 2, BigDecimal.ONE)));
+        assertThrows(IllegalArgumentException.class, () -> writing.removeQuestion(first.getId()));
+        assertEquals(1, writing.getQuestions().size());
+    }
+
+    @Test
+    void aWritingSectionThatAlreadyHoldsSeveralCanBeTrimmedDownToOne() {
+        UUID version = UUID.randomUUID();
+        SectionQuestion first = SectionQuestion.create(UUID.randomUUID(), UUID.randomUUID(), 1, BigDecimal.ONE);
+        SectionQuestion second = SectionQuestion.create(first.getSectionId(), UUID.randomUUID(), 2, BigDecimal.ONE);
+        ContentSection writing = new ContentSection(first.getSectionId(), version, "Task 1", Skill.WRITING, 1, null, null,
+                null, null, List.of(first, second));
+
+        writing.removeQuestion(second.getId());
+
+        assertEquals(1, writing.getQuestions().size());
+        assertThrows(IllegalArgumentException.class, () -> writing.removeQuestion(first.getId()));
     }
 
     @Test

@@ -164,7 +164,7 @@ class CourseDraftCodecTest {
     @Test
     void aLessonKeepsItsMarkdownSummaryMinutesAndResources() throws Exception {
         String lesson = "{\"code\":\"L1\",\"title\":\"Lesson\",\"summaryMarkdown\":\"- one\\n- two\",\"estimatedMinutes\":15,"
-                + "\"resources\":[{\"type\":\"SLIDE\",\"title\":\"Deck\",\"url\":\"https://slides.example/deck\"},"
+                + "\"resources\":[{\"type\":\"SLIDE\",\"title\":\"Deck\",\"fileKey\":\"lesson-document/00000000-0000-0000-0000-000000000001/00000000-0000-0000-0000-000000000002.pdf\"},"
                 + "{\"type\":\"DOCUMENT\",\"title\":\"Sheet\",\"url\":\"https://docs.example/sheet\"}]}";
 
         var read = codec.parse(node(draft(COURSE, "[" + topic("T1", 1, "[" + lesson + "]") + "]"))).topics().get(0).lessons().get(0);
@@ -172,7 +172,9 @@ class CourseDraftCodecTest {
         assertEquals("- one\n- two", read.summaryMarkdown());
         assertEquals(15, read.estimatedMinutes());
         assertEquals(2, read.resources().size());
-        assertEquals("https://slides.example/deck", read.resources().get(0).url());
+        assertEquals(null, read.resources().get(0).url());
+        assertEquals("lesson-document/00000000-0000-0000-0000-000000000001/00000000-0000-0000-0000-000000000002.pdf",
+                read.resources().get(0).fileKey());
     }
 
     @Test
@@ -187,21 +189,21 @@ class CourseDraftCodecTest {
     @Test
     void badLessonMinutesAndResourceLinksAreReportedWithTheirPath() throws Exception {
         String lesson = "{\"code\":\"L1\",\"title\":\"Lesson\",\"estimatedMinutes\":0,"
-                + "\"resources\":[{\"type\":\"SLIDE\",\"title\":\"Deck\",\"url\":\"ftp://nope\"},"
+                + "\"resources\":[{\"type\":\"SLIDE\",\"title\":\"Deck\",\"url\":\"https://slides.example/deck\"},"
                 + "{\"type\":\"DOCUMENT\",\"title\":\" \",\"url\":\"https://ok.example\"}]}";
 
         List<Problem> problems = problemsOf(draft(COURSE, "[" + topic("T1", 1, "[" + lesson + "]") + "]"));
 
         assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".lessons[0].estimatedMinutes") && p.problem().equals("OUT_OF_RANGE")));
-        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".resources[0].url") && p.problem().equals("INVALID")));
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".resources[0].fileKey") && p.problem().equals("FILE_REQUIRED")));
         assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".resources[1].title")));
     }
 
     @Test
     void aLessonMayHaveOnlyOneSlide() throws Exception {
         String lesson = "{\"code\":\"L1\",\"title\":\"Lesson\",\"resources\":["
-                + "{\"type\":\"SLIDE\",\"title\":\"A\",\"url\":\"https://slides.example/a\"},"
-                + "{\"type\":\"SLIDE\",\"title\":\"B\",\"url\":\"https://slides.example/b\"},"
+                + "{\"type\":\"SLIDE\",\"title\":\"A\",\"fileKey\":\"lesson-document/00000000-0000-0000-0000-000000000001/00000000-0000-0000-0000-000000000002.pdf\"},"
+                + "{\"type\":\"SLIDE\",\"title\":\"B\",\"fileKey\":\"lesson-document/00000000-0000-0000-0000-000000000001/00000000-0000-0000-0000-000000000003.pdf\"},"
                 + "{\"type\":\"DOCUMENT\",\"title\":\"D1\",\"url\":\"https://docs.example/1\"},"
                 + "{\"type\":\"DOCUMENT\",\"title\":\"D2\",\"url\":\"https://docs.example/2\"}]}";
 

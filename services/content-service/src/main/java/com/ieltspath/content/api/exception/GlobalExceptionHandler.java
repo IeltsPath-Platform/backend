@@ -5,6 +5,7 @@ import com.ieltspath.commonstorage.StorageException;
 import com.ieltspath.commonstorage.UploadRejectedException;
 import com.ieltspath.content.domain.exception.*;
 import com.ieltspath.content.application.exception.VocabularyServiceUnavailableException;
+import com.ieltspath.content.application.exception.SectionDraftException;
 import com.ieltspath.content.application.exception.EntitlementUnavailableException;
 import com.ieltspath.content.application.exception.PremiumRequiredException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -105,6 +106,20 @@ public class GlobalExceptionHandler {
                                                                HttpServletRequest request) {
         return buildResponse(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage(), request.getRequestURI(),
                 Map.of("code", "AI_QUOTA_EXCEEDED"));
+    }
+
+    @ExceptionHandler(SectionDraftOpenException.class)
+    public ResponseEntity<ErrorResponse> handleSectionDraftOpen(SectionDraftOpenException ex,
+                                                                 HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "SECTION_DRAFT_OPEN", "draftId", ex.draftId()));
+    }
+
+    @ExceptionHandler(SectionDraftException.class)
+    public ResponseEntity<ErrorResponse> handleSectionDraft(SectionDraftException ex, HttpServletRequest request) {
+        Map<String, Object> details = new HashMap<>(ex.details());
+        details.put("code", ex.code());
+        return buildResponse(ex.status(), ex.getMessage(), request.getRequestURI(), details);
     }
 
     @ExceptionHandler(DuplicateImportRefException.class)
@@ -243,6 +258,15 @@ public class GlobalExceptionHandler {
         log.warn("Package question purpose refused: {}", ex.getMessage());
         return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), request.getRequestURI(),
                 Map.of("code", "QUESTION_PURPOSE_MISMATCH"));
+    }
+
+    @ExceptionHandler(QuestionNotPublishedException.class)
+    public ResponseEntity<ErrorResponse> handleQuestionNotPublished(QuestionNotPublishedException ex,
+                                                                    HttpServletRequest request) {
+        return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "QUESTION_NOT_PUBLISHED", "questions", ex.questions().stream()
+                        .map(question -> Map.of("id", question.id(), "code", question.code(),
+                                "section", question.section())).toList()));
     }
 
     @ExceptionHandler(TopicSkillLockedException.class)

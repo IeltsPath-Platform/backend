@@ -6,5 +6,6 @@ public enum DraftStatus {
     READY,
     FAILED,
     APPROVED,
-    REJECTED
+    REJECTED,
+    EXPIRED
 }

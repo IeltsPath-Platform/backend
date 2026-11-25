@@ -12,11 +12,16 @@ import com.ieltspath.content.domain.exception.LessonNotPublishableException;
 import com.ieltspath.content.domain.exception.LessonSortConflictException;
 import com.ieltspath.content.domain.exception.TopicNotFoundException;
 import com.ieltspath.content.domain.repository.LessonAuthoringRepository;
+import com.ieltspath.content.domain.repository.QuestionRepository;
+import com.ieltspath.content.domain.aggregate.Question;
+import com.ieltspath.content.domain.entity.QuestionVersion;
+import com.ieltspath.content.domain.vo.PublicationStatus;
 import com.ieltspath.content.domain.vo.BlockType;
 import com.ieltspath.content.domain.vo.LessonAuthoringSnapshot;
 import com.ieltspath.content.domain.vo.LessonStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.HashSet;
 import java.util.List;
@@ -26,10 +31,20 @@ import java.util.UUID;
 public class LessonAuthoringUseCase {
     private final LessonAuthoringRepository repository;
     private final VocabularySenseLookup vocabulary;
+    private final QuestionRepository questions;
+    private final PublishQuestionVersionUseCase publisher;
 
-    public LessonAuthoringUseCase(LessonAuthoringRepository repository, VocabularySenseLookup vocabulary) {
+    @Autowired
+    public LessonAuthoringUseCase(LessonAuthoringRepository repository, VocabularySenseLookup vocabulary,
+                                  QuestionRepository questions, PublishQuestionVersionUseCase publisher) {
         this.repository = repository;
         this.vocabulary = vocabulary;
+        this.questions = questions;
+        this.publisher = publisher;
+    }
+
+    public LessonAuthoringUseCase(LessonAuthoringRepository repository, VocabularySenseLookup vocabulary) {
+        this(repository, vocabulary, null, null);
     }
 
     @Transactional(readOnly = true)
@@ -100,6 +115,15 @@ public class LessonAuthoringUseCase {
     public LessonAuthoringResult updateBlock(UUID lessonId, UUID blockId, BlockType blockType, Integer sortOrder,
                                              String textContent, UUID assetId, List<UUID> vocabularySenseIds,
                                              List<UUID> questionVersionIds, List<UUID> knowledgePointIds) {
+        return updateBlock(lessonId, blockId, blockType, sortOrder, textContent, assetId, vocabularySenseIds,
+                questionVersionIds, knowledgePointIds, null);
+    }
+
+    @Transactional
+    public LessonAuthoringResult updateBlock(UUID lessonId, UUID blockId, BlockType blockType, Integer sortOrder,
+                                             String textContent, UUID assetId, List<UUID> vocabularySenseIds,
+                                             List<UUID> questionVersionIds, List<UUID> knowledgePointIds,
+                                             List<UUID> expectedQuestionVersionIds) {
         Lesson lesson = requireLocked(lessonId);
         LessonBlock block = lesson.requireBlock(blockId);
         if (block.getType() != blockType) {
@@ -107,6 +131,12 @@ public class LessonAuthoringUseCase {
         }
         requireCourseSkill(lessonId, knowledgePointIds);
         List<UUID> requestedQuestions = questionVersionIds == null ? List.of() : questionVersionIds;
+        if (blockType == BlockType.EXERCISE && expectedQuestionVersionIds != null
+                && !block.getQuestionVersionIds().equals(expectedQuestionVersionIds)) {
+            throw new com.ieltspath.content.application.exception.SectionDraftException(
+                    org.springframework.http.HttpStatus.CONFLICT, "BLOCK_CHANGED",
+                    "Danh sách câu hỏi của khối đã thay đổi. Tải lại bài học rồi thử lại.", java.util.Map.of());
+        }
         if (blockType == BlockType.EXERCISE && !block.getQuestionVersionIds().equals(requestedQuestions)) {
             lesson.ensureExerciseEditable();
         }
@@ -150,6 +180,31 @@ public class LessonAuthoringUseCase {
         lesson.publish();
         repository.save(lesson);
         return get(lessonId);
+    }
+
+    @Transactional
+    public int publishDraftQuestions(UUID lessonId) {
+        Lesson lesson = requireLocked(lessonId);
+        lesson.ensureExerciseEditable();
+        List<UUID> ids = lesson.getBlocks().stream().filter(block -> block.getType() == BlockType.EXERCISE)
+                .flatMap(block -> block.getQuestionVersionIds().stream()).distinct().toList();
+        if (ids.isEmpty()) return 0;
+        List<Question> locked = questions.findByVersionIdsForUpdate(ids);
+        java.util.Map<UUID, Question> byVersion = new java.util.HashMap<>();
+        locked.forEach(question -> question.getVersions().forEach(version -> byVersion.put(version.getId(), question)));
+        if (!byVersion.keySet().containsAll(ids)) throw new LessonBlockInvalidException("Một số phiên bản câu hỏi không còn tồn tại.");
+        List<QuestionVersion> drafts = ids.stream().map(byVersion::get).flatMap(question -> question.getVersions().stream()
+                .filter(version -> ids.contains(version.getId()) && version.getStatus() == PublicationStatus.DRAFT)).toList();
+        for (QuestionVersion version : drafts) {
+            Question question = byVersion.get(version.getId());
+            publisher.validateForPublishing(question.getQuestionType(), version);
+        }
+        for (QuestionVersion version : drafts) {
+            Question question = byVersion.get(version.getId());
+            question.publishVersion(version.getId());
+            questions.save(question);
+        }
+        return drafts.size();
     }
 
     @Transactional

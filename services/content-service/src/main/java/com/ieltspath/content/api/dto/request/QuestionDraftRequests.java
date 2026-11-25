@@ -22,9 +22,15 @@ public final class QuestionDraftRequests {
             @NotNull UUID knowledgePointId,
             @NotNull QuestionType questionType,
             @Min(1) int count,
-            @NotNull QuestionDifficulty difficulty,
-            @Size(max = 500, message = "Hướng dẫn thêm không được dài quá 500 ký tự") String instructions
+            QuestionDifficulty difficulty,
+            @Size(max = 500, message = "Hướng dẫn thêm không được dài quá 500 ký tự") String instructions,
+            UUID lessonId,
+            UUID blockId
     ) {
+        public Request(UUID knowledgePointId, QuestionType questionType, int count, QuestionDifficulty difficulty,
+                       String instructions) {
+            this(knowledgePointId, questionType, count, difficulty, instructions, null, null);
+        }
     }
 
     /** Fields left out stay as they are; see {@code QuestionDraftItemPatch}. */
@@ -48,7 +54,8 @@ public final class QuestionDraftRequests {
         }
     }
 
-    /** Indexes of the items the author accepts from the draft's result. */
-    public record Approve(@NotEmpty List<Integer> itemIndexes) {
+    /** Stable item identifiers and the revision shown to the author. */
+    public record Approve(@NotEmpty List<UUID> itemIds, @Min(0) int revision, boolean createNewBlock) {
+        public Approve(List<UUID> itemIds, int revision) { this(itemIds, revision, false); }
     }
 }

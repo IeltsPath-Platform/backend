@@ -3,7 +3,7 @@ package com.ieltspath.content.api.controller;
 import com.ieltspath.commonsecurity.config.CommonSecurityAutoConfiguration;
 import com.ieltspath.content.application.usecase.CreateContentSectionUseCase;
 import com.ieltspath.content.application.usecase.CodeSettingsUseCases;
-import com.ieltspath.content.application.usecase.CreateDraftPackageVersionUseCase;
+import com.ieltspath.content.application.usecase.CreateDraftFromCurrentVersionUseCase;
 import com.ieltspath.content.application.usecase.DeleteContentSectionUseCase;
 import com.ieltspath.content.application.usecase.GetAuthorPackageUseCase;
 import com.ieltspath.content.application.usecase.ReorderContentSectionsUseCase;
@@ -51,13 +51,14 @@ class ContentPackageAuthoringControllerTest {
 
     @Autowired MockMvc mockMvc;
     @MockitoBean GetAuthorPackageUseCase getPackage;
-    @MockitoBean CreateDraftPackageVersionUseCase createDraft;
+    @MockitoBean CreateDraftFromCurrentVersionUseCase createDraft;
     @MockitoBean CreateContentSectionUseCase createSection;
     @MockitoBean UpdateContentSectionUseCase updateSection;
     @MockitoBean DeleteContentSectionUseCase deleteSection;
     @MockitoBean ReorderContentSectionsUseCase reorderSections;
     @MockitoBean com.ieltspath.content.application.usecase.AddSectionQuestionUseCase addSectionQuestion;
     @MockitoBean com.ieltspath.content.application.usecase.RemoveAndReorderSectionQuestionsUseCase removeAndReorderQuestions;
+    @MockitoBean com.ieltspath.content.application.usecase.UseNewerSectionQuestionVersionUseCase useNewerQuestionVersion;
     @MockitoBean com.ieltspath.content.application.usecase.ListAuthorPackagesUseCase listPackages;
     @MockitoBean com.ieltspath.content.application.usecase.CreateContentPackageUseCase createPackage;
     @MockitoBean CodeSettingsUseCases codeSettings;

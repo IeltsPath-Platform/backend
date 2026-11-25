@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** A lesson document is either a link or an uploaded file, and only a document can be a file. */
+/** Lesson resources support uploaded files, and every slide is an uploaded file. */
 @Testcontainers(disabledWithoutDocker = true)
 class LessonResourceFileMigrationTest {
     @Container
@@ -27,7 +27,7 @@ class LessonResourceFileMigrationTest {
     @BeforeAll
     static void migrate() {
         Flyway.configure().dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
-                .locations("classpath:db/migration").target("114").load().migrate();
+                .locations("classpath:db/migration").target("147").load().migrate();
     }
 
     @Test
@@ -36,7 +36,6 @@ class LessonResourceFileMigrationTest {
             UUID lessonId = insertLesson(sql, "FILE_OK");
             sql.executeUpdate(row(lessonId, "DOCUMENT", "'Giáo trình'", "NULL", "'" + KEY + "'", 0));
             sql.executeUpdate(row(lessonId, "DOCUMENT", "'Liên kết'", "'https://drive.google.com/x'", "NULL", 1));
-            sql.executeUpdate(row(lessonId, "SLIDE", "'Slide'", "'https://docs.google.com/presentation/d/x'", "NULL", 0));
             try (var rows = sql.executeQuery("SELECT count(*) FROM lesson_resources WHERE lesson_id='" + lessonId
                     + "' AND file_key IS NOT NULL AND url IS NULL")) {
                 assertTrue(rows.next());
@@ -46,17 +45,48 @@ class LessonResourceFileMigrationTest {
     }
 
     @Test
-    void aRowNeedsExactlyOneOfLinkAndFileAndOnlyADocumentMayBeAFile() throws Exception {
+    void aDocumentRowNeedsExactlyOneOfLinkAndFileAndAValidTarget() throws Exception {
         try (var connection = connect(); var sql = connection.createStatement()) {
             UUID lessonId = insertLesson(sql, "FILE_BAD");
             for (String bad : new String[]{
                     row(lessonId, "DOCUMENT", "'Cả hai'", "'https://a.com'", "'" + KEY + "'", 0),
                     row(lessonId, "DOCUMENT", "'Không có gì'", "NULL", "NULL", 1),
-                    row(lessonId, "SLIDE", "'Slide là file'", "NULL", "'" + KEY + "'", 0),
                     row(lessonId, "DOCUMENT", "'Khóa lạ'", "NULL", "'content-image/x/y.png'", 2),
                     row(lessonId, "DOCUMENT", "'Link hỏng'", "'ftp://a.com'", "NULL", 3)}) {
                 assertEquals("23514", assertThrows(SQLException.class, () -> sql.executeUpdate(bad)).getSQLState(), bad);
             }
+        }
+    }
+
+    @Test
+    void slideFileMigrationRemovesOldLinksAndRequiresAFile() throws Exception {
+        UUID lessonId = UUID.randomUUID();
+        try (var connection = connect(); var sql = connection.createStatement()) {
+            UUID topicId = UUID.randomUUID();
+            sql.executeUpdate("INSERT INTO topics (id,code,name) VALUES ('" + topicId + "','RES_V148','Resources')");
+            sql.executeUpdate("INSERT INTO lessons (id,topic_id,code,title,sort_order) VALUES ('" + lessonId + "','"
+                    + topicId + "','RES_V148','Slides',1)");
+            sql.executeUpdate(row(lessonId, "SLIDE", "'Slide cũ'", "'https://docs.google.com/presentation/d/demo'", "NULL", 0));
+            sql.executeUpdate(row(lessonId, "DOCUMENT", "'Tài liệu'", "'https://example.com/doc.pdf'", "NULL", 0));
+        }
+
+        Flyway.configure().dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
+                .locations("classpath:db/migration").target("148").load().migrate();
+
+        try (var connection = connect(); var sql = connection.createStatement()) {
+            try (var rows = sql.executeQuery("SELECT count(*) FROM lesson_resources WHERE lesson_id='" + lessonId
+                    + "' AND resource_type='SLIDE'")) {
+                assertTrue(rows.next());
+                assertEquals(0, rows.getInt(1));
+            }
+            try (var rows = sql.executeQuery("SELECT count(*) FROM lesson_resources WHERE lesson_id='" + lessonId
+                    + "' AND resource_type='DOCUMENT' AND url='https://example.com/doc.pdf'")) {
+                assertTrue(rows.next());
+                assertEquals(1, rows.getInt(1));
+            }
+            assertEquals("23514", assertThrows(SQLException.class, () -> sql.executeUpdate(
+                    row(lessonId, "SLIDE", "'Link mới'", "'https://example.com/slide'", "NULL", 0))).getSQLState());
+            sql.executeUpdate(row(lessonId, "SLIDE", "'PDF mới'", "NULL", "'" + KEY + "'", 0));
         }
     }
 

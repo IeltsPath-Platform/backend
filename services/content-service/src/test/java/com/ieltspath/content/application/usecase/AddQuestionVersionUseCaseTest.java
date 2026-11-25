@@ -43,6 +43,9 @@ class AddQuestionVersionUseCaseTest {
     @Mock
     private ErrorTypeRepository errorTypeRepository;
 
+    @Mock
+    private com.ieltspath.content.application.port.QuestionImageWriter imageWriter;
+
     @InjectMocks
     private AddQuestionVersionUseCase addQuestionVersionUseCase;
 

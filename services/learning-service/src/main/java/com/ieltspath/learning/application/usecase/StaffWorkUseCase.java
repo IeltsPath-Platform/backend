@@ -2,6 +2,7 @@ package com.ieltspath.learning.application.usecase;
 
 import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.result.WorkItemView;
+import com.ieltspath.learning.application.result.WorkItemPage;
 import com.ieltspath.learning.application.service.WorkItemSubjectResolver;
 import com.ieltspath.learning.application.service.WorkItemSync;
 import com.ieltspath.learning.domain.repository.StaffInsightRepository;
@@ -46,6 +47,29 @@ public class StaffWorkUseCase {
         List<WorkItem> items = listItems(allowed, requested, status, kind);
         Map<UUID, Map<String, Object>> named = subjects.resolve(items);
         return items.stream().map(item -> new WorkItemView(item, named.get(item.id()))).toList();
+    }
+
+    @Transactional
+    public WorkItemPage listPageWithSubjects(Set<Queue> allowed, Queue requested, WorkStatus status, WorkKind kind,
+                                             boolean activeOnly, int page, int size) {
+        if (page < 0 || size < 1 || size > 100 || page > Integer.MAX_VALUE / size) {
+            throw new LearningRequestException(400, "INVALID_PAGE", "Thông số phân trang không hợp lệ.");
+        }
+        Set<Queue> queues = queues(allowed, requested);
+        sync.sync();
+        int offset = page * size;
+        long total = insight.countWorkItems(queues, status, kind, activeOnly);
+        List<WorkItem> items = insight.workItems(queues, status, kind, activeOnly, offset, size);
+        Map<UUID, Map<String, Object>> named = subjects.resolve(items);
+        List<WorkItemView> content = items.stream().map(item -> new WorkItemView(item, named.get(item.id()))).toList();
+        return new WorkItemPage(content, page, size, total, (int) ((total + size - 1) / size));
+    }
+
+    private static Set<Queue> queues(Set<Queue> allowed, Queue requested) {
+        if (requested != null && !allowed.contains(requested)) {
+            throw new LearningRequestException(403, "QUEUE_NOT_ALLOWED", "Bạn không có quyền xem hàng đợi này.");
+        }
+        return requested == null ? allowed : Set.of(requested);
     }
 
     private List<WorkItem> listItems(Set<Queue> allowed, Queue requested, WorkStatus status, WorkKind kind) {

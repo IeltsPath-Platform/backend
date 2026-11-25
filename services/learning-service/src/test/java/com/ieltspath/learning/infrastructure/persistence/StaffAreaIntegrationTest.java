@@ -66,6 +66,7 @@ class StaffAreaIntegrationTest {
     @Autowired FlagDetector detector;
     @Autowired WorkItemSync sync;
     @Autowired StaffWorkUseCase work;
+    @Autowired com.ieltspath.learning.domain.repository.StaffInsightRepository staffRepository;
     @Autowired StaffInsightUseCase insight;
     @Autowired com.ieltspath.learning.infrastructure.scheduler.WorkItemSyncJob job;
     @Autowired javax.sql.DataSource dataSource;
@@ -167,6 +168,27 @@ class StaffAreaIntegrationTest {
         assertEquals(3, work.list(ADMIN, null, null).size());
         var denied = assertThrows(LearningRequestException.class, () -> work.list(EXAMINER, Queue.CONTENT_AUTHOR, null));
         assertEquals(403, denied.getStatus());
+    }
+
+    @Test
+    void workItemPagesAreStableAndCountTheSameFilteredRows() {
+        UUID first = UUID.randomUUID();
+        UUID second = UUID.randomUUID();
+        jdbc.update("INSERT INTO work_items (id, queue, kind, subject_ref, status, created_at) "
+                        + "VALUES (?, 'CONTENT_AUTHOR', 'CONTENT_GAP', ?, 'OPEN', '2026-01-01T00:00:00Z'), "
+                        + "(?, 'CONTENT_AUTHOR', 'CONTENT_GAP', ?, 'IN_PROGRESS', '2026-01-01T00:00:00Z')",
+                UUID.randomUUID(), first, UUID.randomUUID(), second);
+        jdbc.update("INSERT INTO work_items (id, queue, kind, subject_ref, status) "
+                        + "VALUES (?, 'CONTENT_AUTHOR', 'CONTENT_GAP', ?, 'DONE')", UUID.randomUUID(), UUID.randomUUID());
+
+        var queues = Set.of(Queue.CONTENT_AUTHOR);
+        var pageOne = staffRepository.workItems(queues, null, WorkKind.CONTENT_GAP, true, 0, 1);
+        var pageTwo = staffRepository.workItems(queues, null, WorkKind.CONTENT_GAP, true, 1, 1);
+
+        assertEquals(2, staffRepository.countWorkItems(queues, null, WorkKind.CONTENT_GAP, true));
+        assertEquals(1, pageOne.size());
+        assertEquals(1, pageTwo.size());
+        assertNotEquals(pageOne.getFirst().id(), pageTwo.getFirst().id());
     }
 
     @Test

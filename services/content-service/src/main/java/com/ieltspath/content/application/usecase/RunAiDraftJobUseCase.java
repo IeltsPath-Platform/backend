@@ -1,14 +1,13 @@
 package com.ieltspath.content.application.usecase;
 
 import com.ieltspath.content.application.port.AiDraftGenerator;
-import com.ieltspath.content.application.port.AiUsageQuota;
 import com.ieltspath.content.application.port.ContentGenerationException;
 import com.ieltspath.content.application.result.GenerationOutcome;
 import com.ieltspath.content.domain.aggregate.AiDraft;
 import com.ieltspath.content.domain.repository.AiDraftRepository;
-import com.ieltspath.content.domain.vo.AiUsageKind;
 import com.ieltspath.content.domain.vo.DraftKind;
 import com.ieltspath.content.domain.vo.DraftStatus;
+import com.ieltspath.content.domain.vo.AiDraftClaim;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -16,10 +15,8 @@ import org.springframework.stereotype.Service;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -35,14 +32,14 @@ public class RunAiDraftJobUseCase {
     private static final String INTERNAL = "INTERNAL";
 
     private final AiDraftRepository drafts;
-    private final AiUsageQuota quota;
+    private final AiDraftJobStateUseCases state;
     private final Map<DraftKind, AiDraftGenerator> generators;
     private final Clock clock;
 
-    public RunAiDraftJobUseCase(AiDraftRepository drafts, AiUsageQuota quota, List<AiDraftGenerator> generators,
+    public RunAiDraftJobUseCase(AiDraftRepository drafts, AiDraftJobStateUseCases state, List<AiDraftGenerator> generators,
                                 Clock clock) {
         this.drafts = drafts;
-        this.quota = quota;
+        this.state = state;
         this.generators = generators.stream()
                 .collect(Collectors.toMap(AiDraftGenerator::kind, Function.identity()));
         this.clock = clock;
@@ -50,43 +47,53 @@ public class RunAiDraftJobUseCase {
 
     /** Returns how many drafts this run claimed. */
     public int runBatch(int batchSize, Duration staleAfter) {
-        int requeued = drafts.requeueStaleGenerating(clock.instant().minus(staleAfter));
-        if (requeued > 0) {
-            log.info("Requeued {} stale AI drafts", requeued);
-        }
-        List<UUID> claimed = drafts.claimQueued(batchSize);
-        claimed.forEach(this::process);
-        return claimed.size();
+        return runBatch(batchSize, staleAfter, 3);
     }
 
-    private void process(UUID id) {
-        AiDraft draft = drafts.findById(id).orElse(null);
+    public int runBatch(int batchSize, Duration staleAfter, int maxAttempts) {
+        int failed = state.recoverStale(clock.instant().minus(staleAfter), maxAttempts, clock.instant());
+        if (failed > 0) {
+            log.warn("Failed {} AI drafts after repeated interrupted attempts", failed);
+        }
+        int claimedCount = 0;
+        for (int index = 0; index < batchSize; index++) {
+            List<AiDraftClaim> claimed = drafts.claimQueued(1);
+            if (claimed.isEmpty()) break;
+            claimedCount++;
+            process(claimed.getFirst());
+        }
+        return claimedCount;
+    }
+
+    private void process(AiDraftClaim claim) {
+        AiDraft draft = drafts.findById(claim.draftId()).orElse(null);
         if (draft == null || draft.getStatus() != DraftStatus.GENERATING) {
             return;
         }
         AiDraftGenerator generator = generators.get(draft.getKind());
         if (generator == null) {
-            fail(draft, UNSUPPORTED_KIND);
+            fail(claim, draft, UNSUPPORTED_KIND);
             return;
         }
         try {
             GenerationOutcome outcome = generator.generate(draft);
-            draft.complete(outcome.resultJson(), outcome.model(), outcome.promptVersion(), clock.instant());
-            drafts.save(draft);
+            if (!state.complete(claim, outcome.resultJson(), outcome.model(), outcome.promptVersion(), clock.instant())) {
+                log.info("Ignored completion of replaced AI draft claim {}", draft.getId());
+            }
         } catch (ContentGenerationException failure) {
-            fail(draft, failure.code());
+            fail(claim, draft, failure.code());
         } catch (RuntimeException unexpected) {
             log.error("AI draft {} failed unexpectedly: {}", draft.getId(), unexpected.getClass().getSimpleName());
-            fail(draft, INTERNAL);
+            fail(claim, draft, INTERNAL);
         }
     }
 
     /** Every failure gives the author's use back: they received nothing usable for it. */
-    private void fail(AiDraft draft, String errorCode) {
-        draft.fail(errorCode, clock.instant());
-        drafts.save(draft);
-        LocalDate day = draft.getCreatedAt().atZone(clock.getZone()).toLocalDate();
-        quota.refund(draft.getRequestedBy(), day, AiUsageKind.AI);
-        log.warn("AI draft {} failed with {}", draft.getId(), errorCode);
+    private void fail(AiDraftClaim claim, AiDraft draft, String errorCode) {
+        if (state.fail(claim, draft, errorCode, clock.instant())) {
+            log.warn("AI draft {} failed with {}", draft.getId(), errorCode);
+        } else {
+            log.info("Ignored failure of replaced AI draft claim {}", draft.getId());
+        }
     }
 }

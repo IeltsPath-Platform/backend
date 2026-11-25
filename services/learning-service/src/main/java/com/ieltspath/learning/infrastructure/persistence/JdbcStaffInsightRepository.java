@@ -195,6 +195,34 @@ public class JdbcStaffInsightRepository implements StaffInsightRepository {
     }
 
     @Override
+    public long countWorkItems(Collection<Queue> queues, WorkStatus status, WorkKind kind, boolean activeOnly) {
+        if (queues.isEmpty()) return 0;
+        return jdbc.queryForObject("SELECT count(*) FROM work_items WHERE queue IN (:queues) "
+                        + "AND (CAST(:status AS varchar) IS NULL OR status = :status) "
+                        + "AND (CAST(:kind AS varchar) IS NULL OR kind = :kind) "
+                        + "AND (:activeOnly = false OR status <> 'DONE')",
+                workItemParams(queues, status, kind).addValue("activeOnly", activeOnly), Long.class);
+    }
+
+    @Override
+    public List<WorkItem> workItems(Collection<Queue> queues, WorkStatus status, WorkKind kind, boolean activeOnly,
+                                    int offset, int limit) {
+        if (queues.isEmpty()) return List.of();
+        return jdbc.query("SELECT " + ITEM_COLUMNS + " FROM work_items WHERE queue IN (:queues) "
+                        + "AND (CAST(:status AS varchar) IS NULL OR status = :status) "
+                        + "AND (CAST(:kind AS varchar) IS NULL OR kind = :kind) "
+                        + "AND (:activeOnly = false OR status <> 'DONE') ORDER BY created_at, id OFFSET :offset LIMIT :limit",
+                workItemParams(queues, status, kind).addValue("activeOnly", activeOnly)
+                        .addValue("offset", offset).addValue("limit", limit), ITEM);
+    }
+
+    private static MapSqlParameterSource workItemParams(Collection<Queue> queues, WorkStatus status, WorkKind kind) {
+        return params("queues", queues.stream().map(Enum::name).toList())
+                .addValue("status", status == null ? null : status.name())
+                .addValue("kind", kind == null ? null : kind.name());
+    }
+
+    @Override
     public List<WorkItem> openWorkItemsOf(UUID userId) {
         return jdbc.query("SELECT " + ITEM_COLUMNS + " FROM work_items WHERE subject_user_id = :userId "
                 + "AND status <> 'DONE' ORDER BY created_at", params("userId", userId), ITEM);

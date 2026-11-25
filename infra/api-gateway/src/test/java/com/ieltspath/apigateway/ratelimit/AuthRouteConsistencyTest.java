@@ -59,6 +59,20 @@ class AuthRouteConsistencyTest {
         assertThat(actual).containsAll(expected);
     }
 
+    @Test
+    void sectionQuestionGenerationUsesTheAiTierOnlyForPost() throws IOException {
+        Map<String, Object> config = loadConfig();
+        List<Map<String, Object>> routes = nested(config, "spring", "cloud", "gateway", "server", "webflux", "routes");
+        Map<String, Object> route = routes.stream().filter(item -> "content-ai-drafts-limited".equals(item.get("id")))
+                .findFirst().orElseThrow();
+        Set<String> paths = routePaths(route);
+        assertThat(paths).contains("/api/content/admin/ai-drafts/section-questions");
+        assertThat(paths).doesNotContain("/api/content/admin/ai-drafts/section-questions/open");
+        assertThat(castList(route.get("predicates"))).contains("Method=POST");
+        Object filter = ((List<?>) route.get("filters")).get(0);
+        assertThat(castMap(filter).get("args").toString()).contains("ai");
+    }
+
     private Map<String, Object> loadConfig() throws IOException {
         Path configPath = Path.of("..", "config-server", "config-repo", "api-gateway.yaml");
         try (InputStream input = Files.newInputStream(configPath)) {

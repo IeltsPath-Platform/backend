@@ -11,6 +11,12 @@ public record QuestionDraftRequest(
         QuestionType questionType,
         int count,
         QuestionDifficulty difficulty,
-        String instructions
+        String instructions,
+        UUID lessonId,
+        UUID blockId
 ) {
+    public QuestionDraftRequest(UUID knowledgePointId, QuestionType questionType, int count,
+                                QuestionDifficulty difficulty, String instructions) {
+        this(knowledgePointId, questionType, count, difficulty, instructions, null, null);
+    }
 }

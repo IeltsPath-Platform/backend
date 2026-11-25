@@ -4,12 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.content.api.exception.GlobalExceptionHandler;
 import com.ieltspath.content.application.command.QuestionDraftItemPatch;
+import com.ieltspath.content.application.exception.SectionDraftException;
 import com.ieltspath.content.application.usecase.ApproveQuestionDraftUseCase;
 import com.ieltspath.content.application.usecase.EditDraftItemUseCase;
 import com.ieltspath.content.application.usecase.RequestQuestionDraftUseCase;
 import com.ieltspath.content.domain.aggregate.AiDraft;
 import com.ieltspath.content.domain.exception.DraftItemNotFoundException;
-import com.ieltspath.content.domain.exception.InvalidContentStateException;
 import com.ieltspath.content.domain.exception.InvalidDraftItemException;
 import com.ieltspath.content.domain.vo.DraftKind;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,6 +29,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -45,6 +46,7 @@ class QuestionDraftControllerTest {
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private final UUID author = UUID.randomUUID();
     private final UUID id = UUID.randomUUID();
+    private final UUID itemId = UUID.randomUUID();
 
     private MockMvc mockMvc;
 
@@ -62,9 +64,9 @@ class QuestionDraftControllerTest {
 
     @Test
     void anEditPassesOnlyTheFieldsGivenAndReturnsTheDraft() throws Exception {
-        when(edit.edit(eq(author), eq(id), eq(1), any())).thenReturn(ready());
+        when(edit.edit(eq(author), eq(id), eq(itemId), eq(0), any())).thenReturn(ready());
 
-        mockMvc.perform(patch("/api/content/admin/ai-drafts/{id}/items/{index}", id, 1)
+        mockMvc.perform(patch("/api/content/admin/ai-drafts/{id}/items/{itemId}?revision=0", id, itemId)
                         .contentType("application/json")
                         .content("{\"stem\":\"New stem\",\"correct\":\"B\",\"distractors\":{\"A\":\"PARAPHRASE_TRAP\"},"
                                 + "\"options\":[{\"optionKey\":\"A\",\"content\":\"x\"},{\"optionKey\":\"B\",\"content\":\"y\"}]}"))
@@ -73,7 +75,7 @@ class QuestionDraftControllerTest {
                 .andExpect(jsonPath("$.result.items[0].stem").value("Q"));
 
         ArgumentCaptor<QuestionDraftItemPatch> patch = ArgumentCaptor.forClass(QuestionDraftItemPatch.class);
-        verify(edit).edit(eq(author), eq(id), eq(1), patch.capture());
+        verify(edit).edit(eq(author), eq(id), eq(itemId), eq(0), patch.capture());
         assertEquals("New stem", patch.getValue().stem());
         assertEquals(null, patch.getValue().explanation());
         assertEquals("B", patch.getValue().correct());
@@ -85,9 +87,9 @@ class QuestionDraftControllerTest {
 
     @Test
     void anEditThatBreaksARuleIsUnprocessableWithItsReason() throws Exception {
-        when(edit.edit(eq(author), eq(id), eq(0), any())).thenThrow(new InvalidDraftItemException("DUPLICATE_STEM"));
+        when(edit.edit(eq(author), eq(id), eq(itemId), eq(0), any())).thenThrow(new InvalidDraftItemException("DUPLICATE_STEM"));
 
-        mockMvc.perform(patch("/api/content/admin/ai-drafts/{id}/items/{index}", id, 0)
+        mockMvc.perform(patch("/api/content/admin/ai-drafts/{id}/items/{itemId}?revision=0", id, itemId)
                         .contentType("application/json").content("{\"stem\":\"Same\"}"))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.details.code").value("INVALID_DRAFT_ITEM"))
@@ -96,10 +98,10 @@ class QuestionDraftControllerTest {
 
     @Test
     void anOversizeEditIsBadRequestAndNothingIsEdited() throws Exception {
-        mockMvc.perform(patch("/api/content/admin/ai-drafts/{id}/items/{index}", id, 0)
+        mockMvc.perform(patch("/api/content/admin/ai-drafts/{id}/items/{itemId}?revision=0", id, itemId)
                         .contentType("application/json").content("{\"stem\":\"" + "s".repeat(4001) + "\"}"))
                 .andExpect(status().isBadRequest());
-        mockMvc.perform(patch("/api/content/admin/ai-drafts/{id}/items/{index}", id, 0)
+        mockMvc.perform(patch("/api/content/admin/ai-drafts/{id}/items/{itemId}?revision=0", id, itemId)
                         .contentType("application/json")
                         .content("{\"options\":[{\"optionKey\":null,\"content\":\"x\"}]}"))
                 .andExpect(status().isBadRequest());
@@ -109,20 +111,22 @@ class QuestionDraftControllerTest {
 
     @Test
     void aMissingItemIsNotFoundAndADraftNotReadyIsBadRequest() throws Exception {
-        when(edit.remove(author, id, 9)).thenThrow(new DraftItemNotFoundException(9));
-        when(edit.remove(author, id, 0)).thenThrow(new InvalidContentStateException("AI draft is APPROVED"));
+        when(edit.remove(author, id, itemId, 0)).thenThrow(new DraftItemNotFoundException(-1));
+        when(edit.remove(author, id, itemId, 1)).thenThrow(new SectionDraftException(org.springframework.http.HttpStatus.CONFLICT,
+                "DRAFT_CHANGED", "Bản nháp đã được thay đổi. Tải lại rồi thử lại.", Map.of()));
 
-        mockMvc.perform(delete("/api/content/admin/ai-drafts/{id}/items/{index}", id, 9))
+        mockMvc.perform(delete("/api/content/admin/ai-drafts/{id}/items/{itemId}?revision=0", id, itemId))
                 .andExpect(status().isNotFound());
-        mockMvc.perform(delete("/api/content/admin/ai-drafts/{id}/items/{index}", id, 0))
-                .andExpect(status().isBadRequest());
+        mockMvc.perform(delete("/api/content/admin/ai-drafts/{id}/items/{itemId}?revision=1", id, itemId))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Bản nháp đã được thay đổi. Tải lại rồi thử lại."));
     }
 
     @Test
     void removingAnItemReturnsTheDraft() throws Exception {
-        when(edit.remove(author, id, 0)).thenReturn(ready());
+        when(edit.remove(author, id, itemId, 0)).thenReturn(ready());
 
-        mockMvc.perform(delete("/api/content/admin/ai-drafts/{id}/items/{index}", id, 0))
+        mockMvc.perform(delete("/api/content/admin/ai-drafts/{id}/items/{itemId}?revision=0", id, itemId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("READY"));
     }
@@ -131,10 +135,10 @@ class QuestionDraftControllerTest {
     void approveReturnsTheApprovedDraft() throws Exception {
         AiDraft draft = ready();
         draft.approve(author, Instant.parse("2026-10-23T01:00:00Z"));
-        when(approve.execute(eq(author), eq(id), eq(List.of(0, 2)))).thenReturn(draft);
+        when(approve.execute(eq(author), eq(id), eq(List.of(itemId, UUID.nameUUIDFromBytes((id + ":2").getBytes(java.nio.charset.StandardCharsets.UTF_8)))), eq(0), eq(false))).thenReturn(draft);
 
         mockMvc.perform(post("/api/content/admin/ai-drafts/{id}/approve", id).contentType("application/json")
-                        .content("{\"itemIndexes\":[0,2]}"))
+                        .content("{\"itemIds\":[\"" + itemId + "\",\"" + UUID.nameUUIDFromBytes((id + ":2").getBytes(java.nio.charset.StandardCharsets.UTF_8)) + "\"],\"revision\":0}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("APPROVED"));
     }
@@ -142,9 +146,39 @@ class QuestionDraftControllerTest {
     @Test
     void approvingNoItemIsBadRequest() throws Exception {
         mockMvc.perform(post("/api/content/admin/ai-drafts/{id}/approve", id).contentType("application/json")
-                        .content("{\"itemIndexes\":[]}"))
+                        .content("{\"itemIds\":[],\"revision\":0}"))
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(approve);
+    }
+
+    @Test
+    void requestAcceptsLessonAndBlockWithoutClientDifficulty() throws Exception {
+        UUID lessonId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        when(request.execute(eq(author), any())).thenReturn(ready());
+
+        mockMvc.perform(post("/api/content/admin/ai-drafts/questions").contentType("application/json")
+                        .content("{\"knowledgePointId\":\"" + UUID.randomUUID() + "\",\"questionType\":\"MULTIPLE_CHOICE\",\"count\":3,\"lessonId\":\"" + lessonId + "\",\"blockId\":\"" + blockId + "\"}"))
+                .andExpect(status().isAccepted());
+
+        org.mockito.ArgumentCaptor<com.ieltspath.content.application.command.QuestionDraftRequest> command =
+                forClass(com.ieltspath.content.application.command.QuestionDraftRequest.class);
+        verify(request).execute(eq(author), command.capture());
+        assertEquals(lessonId, command.getValue().lessonId());
+        assertEquals(blockId, command.getValue().blockId());
+        assertEquals(null, command.getValue().difficulty());
+    }
+
+    @Test
+    void readsTheAuthorsOpenLessonDraft() throws Exception {
+        UUID lessonId = UUID.randomUUID();
+        when(request.findOpen(author, lessonId)).thenReturn(ready());
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                        "/api/content/admin/ai-drafts/questions/open").param("lessonId", lessonId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.kind").value("QUESTIONS"));
+        verify(request).findOpen(author, lessonId);
     }
 }

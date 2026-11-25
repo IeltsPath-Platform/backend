@@ -46,7 +46,7 @@ class ApproveQuestionDraftUseCaseTest {
         AiDraft ready = ready("{\"items\":[{\"stem\":\"Q\",\"explanation\":\"E\",\"difficulty\":\"MEDIUM\","
                 + "\"options\":[{\"optionKey\":\"A\",\"content\":\"x\",\"sortOrder\":1}],"
                 + "\"answerSpec\":{\"type\":\"CHOICE\",\"correct\":\"A\"}}]}");
-        when(drafts.findById(ready.getId())).thenReturn(Optional.of(ready));
+        when(drafts.findByIdForUpdate(ready.getId())).thenReturn(Optional.of(ready));
         when(drafts.save(any(AiDraft.class))).thenAnswer(call -> call.getArgument(0));
         when(create.execute(any(CreateQuestionCommand.class))).thenReturn(new QuestionResult(UUID.randomUUID(),
                 QuestionType.MULTIPLE_CHOICE, null, null, PublicationStatus.DRAFT, null, Instant.now(), Instant.now()));
@@ -62,7 +62,7 @@ class ApproveQuestionDraftUseCaseTest {
     @Test
     void indexThatDoesNotExistCreatesNothing() throws Exception {
         AiDraft ready = ready("{\"items\":[]}");
-        when(drafts.findById(ready.getId())).thenReturn(Optional.of(ready));
+        when(drafts.findByIdForUpdate(ready.getId())).thenReturn(Optional.of(ready));
 
         assertThrows(IllegalArgumentException.class, () -> useCase().execute(author, ready.getId(), List.of(0)));
         verify(create, never()).execute(any());
@@ -72,10 +72,30 @@ class ApproveQuestionDraftUseCaseTest {
     void draftThatIsNotReadyCannotBeApproved() throws Exception {
         AiDraft queued = new AiDraft(UUID.randomUUID(), DraftKind.QUESTIONS, DraftStatus.QUEUED, author,
                 request(), null, null, null, null, Instant.now(), null, null, null, null, null);
-        when(drafts.findById(queued.getId())).thenReturn(Optional.of(queued));
+        when(drafts.findByIdForUpdate(queued.getId())).thenReturn(Optional.of(queued));
 
         assertThrows(InvalidContentStateException.class, () -> useCase().execute(author, queued.getId(), List.of(0)));
         verify(create, never()).execute(any());
+    }
+
+    @Test
+    void returnsAnExistingApprovalOnlyForTheSameQuestionSelection() throws Exception {
+        AiDraft draft = ready("{\"revision\":0,\"items\":[{\"itemId\":\"" + kpId + "\",\"stem\":\"Q\","
+                + "\"explanation\":\"E\",\"difficulty\":\"MEDIUM\",\"options\":[{\"optionKey\":\"A\","
+                + "\"content\":\"x\",\"sortOrder\":1}],\"answerSpec\":{\"type\":\"CHOICE\",\"correct\":\"A\"}}]}");
+        when(drafts.findById(draft.getId())).thenReturn(Optional.of(draft));
+        when(drafts.findByIdForUpdate(draft.getId())).thenReturn(Optional.of(draft));
+        when(drafts.save(any(AiDraft.class))).thenAnswer(call -> call.getArgument(0));
+        when(create.execute(any(CreateQuestionCommand.class))).thenReturn(new QuestionResult(UUID.randomUUID(),
+                QuestionType.MULTIPLE_CHOICE, null, null, PublicationStatus.DRAFT, null, Instant.now(), Instant.now()));
+
+        AiDraft approved = useCase().execute(author, draft.getId(), List.of(kpId), 0);
+        assertEquals(DraftStatus.APPROVED, approved.getStatus());
+        assertEquals(approved, useCase().execute(author, draft.getId(), List.of(kpId), 0));
+        var failure = assertThrows(com.ieltspath.content.application.exception.SectionDraftException.class,
+                () -> useCase().execute(author, draft.getId(), List.of(UUID.randomUUID()), 0));
+        assertEquals("DRAFT_ALREADY_REVIEWED", failure.code());
+        verify(create).execute(any(CreateQuestionCommand.class));
     }
 
     private ApproveQuestionDraftUseCase useCase() {

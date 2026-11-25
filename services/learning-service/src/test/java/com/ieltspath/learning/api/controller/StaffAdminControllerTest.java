@@ -56,11 +56,12 @@ class StaffAdminControllerTest {
     @ParameterizedTest
     @CsvSource({"EXAMINER,EXAMINER", "CONTENT_AUTHOR,CONTENT_AUTHOR"})
     void eachRoleListsOnlyTheQueuesItMayWork(String role, String queues) throws Exception {
-        when(work.listWithSubjects(any(), any(), any(), any())).thenReturn(List.of());
+        when(work.listPageWithSubjects(any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean(), org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(new com.ieltspath.learning.application.result.WorkItemPage(List.of(), 0, 25, 0, 0));
         mvc.perform(get("/api/learning/admin/work-items").with(user("staff").roles(role))).andExpect(status().isOk());
         Set<Queue> expected = new java.util.HashSet<>();
         for (String queue : queues.split("\\+")) expected.add(Queue.valueOf(queue));
-        verify(work).listWithSubjects(eq(expected), eq(null), eq(null), eq(null));
+        verify(work).listPageWithSubjects(eq(expected), eq(null), eq(null), eq(null), eq(false), eq(0), eq(25));
     }
 
     @Test
@@ -69,21 +70,23 @@ class StaffAdminControllerTest {
                 com.ieltspath.learning.domain.vo.StaffRecords.WorkKind.CONTENT_GAP, null, id, "{}",
                 com.ieltspath.learning.domain.vo.StaffRecords.WorkStatus.OPEN, null, null, null, null, false,
                 java.time.Instant.parse("2026-10-01T00:00:00Z"), java.time.Instant.parse("2026-10-01T00:00:00Z"));
-        when(work.listWithSubjects(any(), any(), any(), any())).thenReturn(List.of(
-                new com.ieltspath.learning.application.result.WorkItemView(item,
-                        java.util.Map.of("type", "KNOWLEDGE_POINT", "name", "Paraphrase"))));
+        when(work.listPageWithSubjects(any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean(), org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(new com.ieltspath.learning.application.result.WorkItemPage(List.of(
+                        new com.ieltspath.learning.application.result.WorkItemView(item,
+                                java.util.Map.of("type", "KNOWLEDGE_POINT", "name", "Paraphrase"))), 0, 25, 1, 1));
 
         mvc.perform(get("/api/learning/admin/work-items?kind=CONTENT_GAP")
                         .with(user("staff").roles("CONTENT_AUTHOR")))
                 .andExpect(status().isOk())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
-                        .jsonPath("$[0].subject.name").value("Paraphrase"))
+                        .jsonPath("$.content[0].subject.name").value("Paraphrase"))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
-                        .jsonPath("$[0].subjectRef").value(id.toString()))
+                        .jsonPath("$.content[0].subjectRef").value(id.toString()))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
-                        .jsonPath("$[0].detail").value("{}"));
-        verify(work).listWithSubjects(eq(Set.of(Queue.CONTENT_AUTHOR)), eq(null), eq(null),
-                eq(com.ieltspath.learning.domain.vo.StaffRecords.WorkKind.CONTENT_GAP));
+                        .jsonPath("$.content[0].detail").value("{}"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.totalElements").value(1));
+        verify(work).listPageWithSubjects(eq(Set.of(Queue.CONTENT_AUTHOR)), eq(null), eq(null),
+                eq(com.ieltspath.learning.domain.vo.StaffRecords.WorkKind.CONTENT_GAP), eq(false), eq(0), eq(25));
     }
 
     @Test

@@ -33,19 +33,30 @@ public class AiDraftReviewUseCases {
     }
 
     @Transactional(readOnly = true)
+    public List<AiDraft> list(UUID requestedBy, List<DraftKind> kinds, DraftStatus status, int page, int size) {
+        return drafts.findByRequester(requestedBy, kinds, status, page, size);
+    }
+
+    @Transactional(readOnly = true)
     public AiDraft get(UUID requestedBy, UUID id) {
         return owned(requestedBy, id);
     }
 
     @Transactional
     public AiDraft reject(UUID requestedBy, UUID id, String note) {
-        AiDraft draft = owned(requestedBy, id);
+        AiDraft draft = ownedForUpdate(requestedBy, id);
         draft.reject(requestedBy, note, clock.instant());
         return drafts.save(draft);
     }
 
     private AiDraft owned(UUID requestedBy, UUID id) {
         return drafts.findById(id)
+                .filter(draft -> draft.getRequestedBy().equals(requestedBy))
+                .orElseThrow(() -> new AiDraftNotFoundException(id));
+    }
+
+    private AiDraft ownedForUpdate(UUID requestedBy, UUID id) {
+        return drafts.findByIdForUpdate(id)
                 .filter(draft -> draft.getRequestedBy().equals(requestedBy))
                 .orElseThrow(() -> new AiDraftNotFoundException(id));
     }

@@ -50,7 +50,7 @@ public class CourseDraftUseCases {
 
     @Transactional
     public AiDraft save(UUID author, UUID draftId, JsonNode structure) {
-        AiDraft draft = ownReadyDraft(author, draftId);
+        AiDraft draft = ownReadyDraftForUpdate(author, draftId);
         draft.replaceResult(codec.write(codec.parse(structure)));
         return drafts.save(draft);
     }
@@ -77,6 +77,17 @@ public class CourseDraftUseCases {
         return drafts.findById(draftId)
                 .filter(found -> found.getRequestedBy().equals(author) && found.getKind() == DraftKind.COURSE)
                 .orElseThrow(() -> new AiDraftNotFoundException(draftId));
+    }
+
+    /** The author's own course draft loaded under a row lock for edits or approval. */
+    AiDraft ownReadyDraftForUpdate(UUID author, UUID draftId) {
+        AiDraft draft = drafts.findByIdForUpdate(draftId)
+                .filter(found -> found.getRequestedBy().equals(author) && found.getKind() == DraftKind.COURSE)
+                .orElseThrow(() -> new AiDraftNotFoundException(draftId));
+        if (draft.getStatus() != DraftStatus.READY) {
+            throw new InvalidContentStateException("Bản nháp đang ở trạng thái " + draft.getStatus() + ", cần ở trạng thái READY");
+        }
+        return draft;
     }
 
     /** The author's own course draft, which must still be waiting for review. Another author's is not found. */

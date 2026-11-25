@@ -6,7 +6,8 @@ Base path: `/api/users`. Every endpoint in this contract requires the `ADMIN` ro
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/users` | List all users. The response is an unpaginated array; clients may filter it locally. |
+| GET | `/api/users` | List a filtered page of users. |
+| GET | `/api/users/admin/all` | Read the complete user list for the bounded system overview aggregate. |
 | POST | `/api/users` | Create a user with `email`, `password`, `fullName`, optional `phoneNumber`, and optional `roles`. |
 | GET | `/api/users/{id}` | Get a user. |
 | PUT | `/api/users/{id}` | Update `fullName` and optional `phoneNumber`. |
@@ -19,6 +20,13 @@ Base path: `/api/users`. Every endpoint in this contract requires the `ADMIN` ro
 User responses contain `id`, `email`, `fullName`, `phoneNumber`, `status`, `roles`, `createdAt`, `updatedAt`, and `hasPassword`.
 `hasPassword` is `true` when a password hash exists; the hash is never returned.
 The create request defaults an omitted or empty role set to `CUSTOMER`.
+
+### User list pagination
+
+Compared with the previous contract, `GET /api/users` returned an array; it now returns `{ "content": [...], "page": 0, "size": 25, "totalElements": 0, "totalPages": 0 }`.
+`page` is zero-based. `size` defaults to 25 and must be 1–100. Optional `role`, `status`, and `search` filters are applied in the database; `search` matches email or full name without case sensitivity. Results are ordered by creation time and then `id` for a stable page boundary. Invalid page parameters return HTTP 400 with a Vietnamese message.
+
+The system overview uses `GET /api/users/admin/all` to calculate totals across all accounts. This endpoint retains the existing user response fields and is restricted by the same `ADMIN` role.
 
 ## Role and account rules
 
