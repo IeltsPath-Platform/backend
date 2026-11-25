@@ -25,11 +25,11 @@ class PaywallPolicyTest {
     }
 
     @Test
-    void activeSkillComboGrandfatheringAndPremiumOpenTheLesson() {
+    void activeSkillComboAndGrandfatheringOpenTheLesson() {
         assertTrue(open(Set.of(LearningSkill.READING), false, false, false));
         assertTrue(open(Set.of(), true, false, false));
         assertTrue(open(Set.of(), false, true, false));
-        assertTrue(open(Set.of(), false, false, true));
+        assertFalse(open(Set.of(), false, false, true));
     }
 
     @Test

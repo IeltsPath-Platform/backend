@@ -246,7 +246,7 @@ class EssayGraderTaskChecksTest {
     void grammarErrorsInMostSentencesCapGrammaticalRangeWhenTheCapIsOn() {
         var density = new WritingSettings.Density(new BigDecimal("0.75"), new BigDecimal("0.5"), new BigDecimal("0.5"),
                 new BigDecimal("4.0"), null, null, null, null, null, null, null);
-        var settings = new WritingSettings(3, 50, 1000, 10000, 20, 120, 10, "Asia/Ho_Chi_Minh", 2, true,
+        var settings = new WritingSettings(3, 50, 1000, 10000, 20, 120, 10, 20, "Asia/Ho_Chi_Minh", 2, true,
                 null, null, null, null, null, 30, "v1", density);
         var densityGrader = new EssayGrader(llm, new ObjectMapper(), content, activations, new EssayKnowledgeJudge(), "m", settings);
         llm.reply(reply("TA", "\"corrections\":["
@@ -265,7 +265,7 @@ class EssayGraderTaskChecksTest {
     private EssayGrader impedingGrader() {
         var density = new WritingSettings.Density(null, null, null, null, null, null, null, null, null,
                 new BigDecimal("0.5"), new BigDecimal("4.0"));
-        var settings = new WritingSettings(3, 50, 1000, 10000, 20, 120, 10, "Asia/Ho_Chi_Minh", 2, true,
+        var settings = new WritingSettings(3, 50, 1000, 10000, 20, 120, 10, 20, "Asia/Ho_Chi_Minh", 2, true,
                 null, null, null, null, null, 30, "v1", density);
         return new EssayGrader(llm, new ObjectMapper(), content, activations, new EssayKnowledgeJudge(), "m", settings);
     }

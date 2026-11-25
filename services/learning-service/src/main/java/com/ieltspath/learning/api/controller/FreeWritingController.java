@@ -42,7 +42,7 @@ public class FreeWritingController {
     }
 
     /**
-     * Sends the essay to an examiner instead of the AI. Needs Premium with a grading credit left (402
+     * Sends the essay to an examiner instead of the AI. Needs active Premium; requests are unlimited (402
      * {@code HUMAN_GRADING_CREDIT_REQUIRED}); the chosen examiner may refuse (409 {@code EXAMINER_UNAVAILABLE}). The result
      * is AWAITING_EXAMINER; the review is read from {@code /api/learning/writing-submissions/{id}/human-review}.
      */

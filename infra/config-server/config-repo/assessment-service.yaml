@@ -46,6 +46,7 @@ assessment:
     poll-interval: PT5S
     batch-size: 10
     daily-limit: ${ASSESSMENT_LLM_DAILY_LIMIT:20}
+    premium-daily-limit: ${ASSESSMENT_LLM_PREMIUM_DAILY_LIMIT:40}
     stuck-after: PT10M
     quota-timezone: Asia/Ho_Chi_Minh
   ai-eval:

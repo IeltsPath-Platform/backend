@@ -6,6 +6,7 @@ import com.ieltspath.learning.application.exception.LlmUnavailableException;
 import com.ieltspath.learning.application.exception.SpeechUnavailableException;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.port.LlmUsageQuota;
+import com.ieltspath.learning.application.port.AccessClient;
 import com.ieltspath.learning.application.port.SpeakingGradingTrigger;
 import com.ieltspath.learning.application.port.SpeechAnalysisClient;
 import com.ieltspath.learning.application.service.SpeakingGrader;
@@ -99,6 +100,7 @@ public class SpeakingGradingJob implements SpeakingGradingTrigger {
     private final SpeakingGrader grader;
     private final LlmUsageQuota quota;
     private final SpeakingPracticeSettings settings;
+    private final AccessClient access;
     private final ObjectMapper json;
     private final SpeakingGradingContextCapture contexts;
     private final SpeakingHistorySummarizer history;
@@ -110,7 +112,7 @@ public class SpeakingGradingJob implements SpeakingGradingTrigger {
 
     public SpeakingGradingJob(SpeakingSubmissionRepository submissions, @Lazy ObjectStorage storage,
                               SpeechAnalysisClient speech, SpeakingGrader grader, LlmUsageQuota quota,
-                              SpeakingPracticeSettings settings,
+                              SpeakingPracticeSettings settings, AccessClient access,
                               ObjectMapper json, SpeakingGradingContextCapture contexts, SpeakingHistorySummarizer history) {
         this.contexts = contexts;
         this.history = history;
@@ -120,6 +122,7 @@ public class SpeakingGradingJob implements SpeakingGradingTrigger {
         this.grader = grader;
         this.quota = quota;
         this.settings = settings;
+        this.access = access;
         this.json = json;
         this.workerSlots = new Semaphore(settings.gradingWorkers());
     }
@@ -464,7 +467,14 @@ public class SpeakingGradingJob implements SpeakingGradingTrigger {
     /** Takes one unit of the learner's day; returns the day, so the same unit can be given back. */
     private LocalDate quota(UUID userId) {
         LocalDate date = LocalDate.now(clock.withZone(ZoneId.of(settings.timezone())));
-        if (!quota.tryConsume(userId, date, USAGE_KIND, settings.dailyGradingLimit())) {
+        boolean premium;
+        try {
+            premium = access.premiumOf(userId);
+        } catch (RuntimeException failure) {
+            premium = false;
+        }
+        int limit = premium ? settings.premiumDailyGradingLimit() : settings.dailyGradingLimit();
+        if (!quota.tryConsume(userId, date, USAGE_KIND, limit)) {
             throw new DailyLimitException();
         }
         return date;

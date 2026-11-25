@@ -11,6 +11,8 @@ import com.ieltspath.content.application.port.VocabularySenseWriter;
 import com.ieltspath.content.application.service.CourseDraftAnalysisService;
 import com.ieltspath.content.application.service.CourseDraftCodec;
 import com.ieltspath.content.application.service.CourseMaterializer;
+import com.ieltspath.content.application.command.CreateContentPackageCommand;
+import com.ieltspath.content.application.usecase.CodeSettingsUseCases;
 import com.ieltspath.content.domain.exception.CourseDraftErrorsException;
 import com.ieltspath.content.domain.exception.InvalidContentStateException;
 import com.ieltspath.content.domain.repository.AiDraftRepository;
@@ -93,6 +95,7 @@ class ApproveCourseDraftIntegrationTest {
         }
         @Bean Clock clock() { return Clock.systemUTC(); }
         @Bean FakeLibrary library() { return new FakeLibrary(); }
+        @Bean CodeSettingsUseCases codeSettings() { return org.mockito.Mockito.mock(CodeSettingsUseCases.class); }
     }
 
     /** The vocabulary library as the approval sees it: which senses are switched off, and the words it is given. */
@@ -142,6 +145,11 @@ class ApproveCourseDraftIntegrationTest {
     @Autowired AiDraftRepository draftStore;
     @Autowired FakeLibrary library;
     @Autowired JdbcLearningContentReader reader;
+    @Autowired CodeSettingsUseCases codeSettings;
+    @Autowired CreateCourseUseCase createCourse;
+    @Autowired CreateTopicUseCase createTopic;
+    @Autowired LessonAuthoringUseCase lessonAuthoring;
+    @Autowired CreateContentPackageUseCase createPackage;
     @MockitoSpyBean CreateDraftPackageVersionUseCase draftVersions;
 
     private final UUID author = UUID.randomUUID();
@@ -155,6 +163,25 @@ class ApproveCourseDraftIntegrationTest {
 
     @BeforeEach
     void fixtures() {
+        org.mockito.Mockito.reset(codeSettings);
+        org.mockito.Mockito.when(codeSettings.createCourse(any()))
+                .thenAnswer(call -> createCourse.execute(call.getArgument(0)));
+        org.mockito.Mockito.when(codeSettings.createTopic(any()))
+                .thenAnswer(call -> createTopic.execute(call.getArgument(0)));
+        org.mockito.Mockito.when(codeSettings.createLesson(any(), any(), any(), any(), any(), any(), any()))
+                .thenAnswer(call -> lessonAuthoring.create(call.getArgument(0), call.getArgument(1),
+                        call.getArgument(2), call.getArgument(3), call.getArgument(4), call.getArgument(5),
+                        call.getArgument(6)));
+        org.mockito.Mockito.when(codeSettings.createPackage(any()))
+                .thenAnswer(call -> createPackage.executeAsAuthor(call.getArgument(0)));
+        org.mockito.Mockito.when(codeSettings.createGeneratedPackage(any(), any()))
+                .thenAnswer(call -> {
+                    CreateContentPackageCommand command = call.getArgument(0);
+                    String code = call.getArgument(1);
+                    return createPackage.executeAsAuthor(new CreateContentPackageCommand(code, command.title(),
+                            command.packageType(), command.requiredFeatureKey(), command.lessonId(),
+                            command.sourceCode(), command.topicId(), command.courseId(), command.placementPool()));
+                });
         library.inactive.clear();
         library.writes.clear();
         library.texts.clear();

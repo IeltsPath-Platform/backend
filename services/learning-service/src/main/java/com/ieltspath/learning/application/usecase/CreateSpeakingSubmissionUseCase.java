@@ -54,10 +54,12 @@ public class CreateSpeakingSubmissionUseCase {
     public SpeakingSubmissionResult execute(UUID userId, UUID requestId, UUID packageVersionId,
                                             List<UUID> partSectionIds, boolean consent) {
         requireAvailable(consent);
+        boolean premium = premiumLearner();
         Optional<SpeakingSubmission> existing = submissions.findByRequestId(requestId);
         if (existing.isPresent()) return SpeakingSubmissionResult.from(replay(existing.get(), userId, packageVersionId, null));
-        requireBalance();
-        return open(userId, requestId, packageVersionId, questions.resolve(packageVersionId, partSectionIds), null, null);
+        requireBalance(premium);
+        return open(userId, requestId, packageVersionId, questions.resolve(packageVersionId, partSectionIds), null, null,
+                pointCost(premium));
     }
 
     /**
@@ -68,12 +70,14 @@ public class CreateSpeakingSubmissionUseCase {
     public SpeakingSubmissionResult executeForAttempt(UUID userId, UUID requestId, UUID packageVersionId, UUID lessonId,
                                                       UUID attemptId, boolean consent) {
         requireAvailable(consent);
+        boolean premium = premiumLearner();
         Optional<SpeakingSubmission> existing = submissions.findByRequestId(requestId);
         if (existing.isPresent()) {
             return SpeakingSubmissionResult.from(replay(existing.get(), userId, packageVersionId, attemptId));
         }
-        requireBalance();
-        return open(userId, requestId, packageVersionId, questions.resolveSetItems(packageVersionId), lessonId, attemptId);
+        requireBalance(premium);
+        return open(userId, requestId, packageVersionId, questions.resolveSetItems(packageVersionId), lessonId, attemptId,
+                pointCost(premium));
     }
 
     private void requireAvailable(boolean consent) {
@@ -87,14 +91,14 @@ public class CreateSpeakingSubmissionUseCase {
     }
 
     private SpeakingSubmissionResult open(UUID userId, UUID requestId, UUID packageVersionId, Resolved resolved,
-                                          UUID lessonId, UUID attemptId) {
+                                          UUID lessonId, UUID attemptId, int pointCost) {
         SpeakingSubmission created = transaction.execute(status -> start(userId, requestId, packageVersionId, resolved,
-                lessonId, attemptId));
+                lessonId, attemptId, pointCost));
         return SpeakingSubmissionResult.from(created);
     }
 
     private SpeakingSubmission start(UUID userId, UUID requestId, UUID packageVersionId, Resolved resolved,
-                                     UUID lessonId, UUID attemptId) {
+                                     UUID lessonId, UUID attemptId, int pointCost) {
         lock.lock(userId);
         Optional<SpeakingSubmission> existing = submissions.findByRequestId(requestId);
         if (existing.isPresent()) return replay(existing.get(), userId, packageVersionId, attemptId);
@@ -115,7 +119,7 @@ public class CreateSpeakingSubmissionUseCase {
             }
         }
         SpeakingSubmission submission = SpeakingSubmission.start(UUID.randomUUID(), userId, requestId, packageVersionId,
-                resolved.scope(), settings.pointCost(), now, resolved.questions(), now);
+                resolved.scope(), pointCost, now, resolved.questions(), now);
         if (attemptId != null) submission.forPracticeAttempt(lessonId, attemptId);
         submissions.save(submission);
         return submission;
@@ -130,7 +134,20 @@ public class CreateSpeakingSubmissionUseCase {
         return existing;
     }
 
-    private void requireBalance() {
+    private boolean premiumLearner() {
+        try {
+            return points.premium();
+        } catch (AccessUnavailableException exception) {
+            return false;
+        }
+    }
+
+    private int pointCost(boolean premium) {
+        return premium ? 0 : settings.pointCost();
+    }
+
+    private void requireBalance(boolean premium) {
+        if (premium) return;
         long balance;
         try {
             balance = points.balance();

@@ -27,8 +27,8 @@ import java.util.UUID;
 
 /**
  * Sends an essay of a lesson's practice attempt to the examiner the learner chose, in place of the AI grade. The essay is
- * stored first as AWAITING_EXAMINER with its lesson, then the review is asked for: Access spends one Premium grading credit
- * and Assessment queues it for that examiner. Nothing is graded or charged in points here. The examiner's grade reaches
+ * stored first as AWAITING_EXAMINER with its lesson, then the review is asked for: an active Premium subscription enables
+ * unlimited requests and Assessment queues it for that examiner. Nothing is graded or charged in points here. The examiner's grade reaches
  * the learner's mastery when Assessment reports it (see {@link ApplyHumanReviewResultUseCase}), so the AI must not grade
  * the same question of the attempt as well: that would count one essay twice. A resend with the same {@code requestId}
  * continues the same essay, also to another examiner after a refusal.

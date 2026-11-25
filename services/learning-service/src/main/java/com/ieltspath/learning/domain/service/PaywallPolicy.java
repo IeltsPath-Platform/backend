@@ -16,7 +16,7 @@ public final class PaywallPolicy {
                                   boolean grandfathered, boolean premium) {
         if (courseId == null) return true;
         if (skillPosition != null && skillPosition <= FREE_LESSONS_PER_SKILL) return true;
-        if (comboUnlocked || intersects(lessonSkills, unlockedSkills) || grandfathered || premium) return true;
+        if (comboUnlocked || intersects(lessonSkills, unlockedSkills) || grandfathered) return true;
         return false;
     }
 

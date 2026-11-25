@@ -8,6 +8,7 @@ import com.ieltspath.content.application.command.CreateTopicCommand;
 import com.ieltspath.content.domain.aggregate.Course;
 import com.ieltspath.content.domain.exception.InvalidContentStateException;
 import com.ieltspath.content.domain.repository.CourseRepository;
+import com.ieltspath.content.domain.repository.ContentPackageRepository;
 import com.ieltspath.content.domain.repository.TopicRepository;
 import com.ieltspath.content.domain.service.CodePattern;
 import com.ieltspath.content.domain.vo.BandRange;
@@ -83,6 +84,39 @@ class CodeSettingsUseCasesTest {
         when(store.find("COURSE")).thenReturn(Optional.of(setting));
         assertEquals("IELTS_6_0", useCases.suggest("COURSE", "6").code());
         assertEquals("IELTS_6_5", useCases.suggest("COURSE", "6.5").code());
+    }
+
+    @Test
+    void importSuggestionsPeekForwardWithoutAllocatingCodes() {
+        setting = new CodeSetting("COURSE", true, "COURSE_{SEQ:3}", 1, false);
+        when(store.find("COURSE")).thenReturn(Optional.of(setting));
+        when(store.peek("COURSE", "", 1)).thenReturn(4L);
+
+        var suggestion = useCases.suggestForImport("COURSE", "6.5", null, null, null, null, 2);
+
+        assertEquals("COURSE_006", suggestion.code());
+        assertFalse(suggestion.editable());
+        verify(store, never()).allocate(anyString(), anyString(), anyLong());
+    }
+
+    @Test
+    void packageImportSuggestionsUseCourseAndPackageTypeContext() {
+        setting = new CodeSetting("PACKAGE", true, "{COURSE}_{TYPE}_{SEQ:2}", 1, false);
+        when(store.find("PACKAGE")).thenReturn(Optional.of(setting));
+        when(store.peek("PACKAGE", "IMPORT:COURSE_001:PS", 1)).thenReturn(4L);
+
+        ContentPackageRepository packages = mock(ContentPackageRepository.class);
+        CodeExistence existence = new CodeExistence(courses, null, null, packages);
+        CodeSettingsUseCases packageUseCases = new CodeSettingsUseCases(store, new CodePattern(), courses, null,
+                createCourse, null, null, null, null, existence);
+        when(packages.existsByCode(anyString())).thenReturn(false);
+
+        var suggestion = packageUseCases.suggestForImport("PACKAGE", "6.5", "COURSE_001", null, null,
+                com.ieltspath.content.domain.vo.PackageType.PRACTICE_SET, 1);
+
+        assertEquals("COURSE_001_PS_05", suggestion.code());
+        assertFalse(suggestion.editable());
+        verify(store, never()).allocate(anyString(), anyString(), anyLong());
     }
 
     @Test

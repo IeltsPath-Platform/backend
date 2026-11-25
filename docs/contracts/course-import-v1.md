@@ -24,9 +24,11 @@ An exhausted allowance returns `429 IMPORT_QUOTA_EXCEEDED` and nothing is writte
 ## Template
 
 Sheet `Info` has `key`/`value` rows; `templateVersion` must be `1` (`TEMPLATE_VERSION_MISMATCH` otherwise). In every
-other sheet row 1 holds the column titles, row 2 describes each column with an example (it is skipped), and the data
+input sheet row 1 holds the column titles, row 2 describes each column with an example (it is skipped), and the data
 starts in row 3. Titles are matched exactly; their order does not matter. Columns with a fixed set of values have a
-drop-down, and each title has a cell note.
+drop-down, and each title has a cell note. The downloaded template is generated from the maintained workbook and current
+active catalogue: read-only `KnowledgePoints` and `ErrorTypes` sheets list available codes. Error types are active and approved. These two sheets are ignored
+by the importer; the first data row in each input sheet can include a code suggestion.
 
 | Sheet | Columns |
 | --- | --- |
@@ -45,9 +47,12 @@ topics, lessons, packages and `importRef` match `[A-Za-z0-9._-]{1,100}`.
   kept. `Topics.sortOrder` is the position among all top-level topics and must be free.
 - `questionRefs` name `Questions.importRef` values of the file, or `importRef` values of questions that already exist.
 - `Questions.type` is `MULTIPLE_CHOICE`, `TRUE_FALSE_NOT_GIVEN`, `FILL_IN_BLANK` or `SHORT_ANSWER`. A choice question
-  needs at least two of `optionA` to `optionF`; `answer` is the letter of the right option. A typed question lists
+  needs at least two of `optionA` to `optionF`; `answer` is the letter of the right option. A
+  `TRUE_FALSE_NOT_GIVEN` question uses the fixed options `TRUE`, `FALSE`, and `NOT_GIVEN`; its `answer` is one of
+  those keys. A typed question lists
   every accepted answer in `answer`, separated by `|`. `difficulty` is `EASY`, `MEDIUM` or `HARD`.
   `distractorErrorCodes` is `B=ERROR_CODE;C=ERROR_CODE`: the wrong options that point at an active, approved error code.
+  Excel import supports one correct answer per multiple-choice question; multi-select questions are not supported.
 - `Tests.topicCode` is required for `TOPIC_TEST` and names a topic of the file. `COURSE_TEST` belongs to the course of
   the file and has no `topicCode`. `PRACTICE_TEST_MILESTONE` creates a practice test, with no test source, that sits
   after topic number `afterTopicSequence` (1 to the number of topics).
@@ -79,7 +84,8 @@ contents. `valid` means no errors.
 | `SHEET_MISSING`, `COLUMN_MISSING`, `TEMPLATE_VERSION_MISMATCH` | Wrong shape or template version. |
 | `FORMULA_NOT_ALLOWED` | A cell holds a formula. Only values are read. |
 | `REQUIRED`, `TOO_LONG`, `INVALID_VALUE`, `DUPLICATE` | A cell is empty, too long, malformed or used twice in the file. |
-| `CODE_CONFLICT` | A code, `importRef`, band or topic sort order is already used. |
+| `CODE_CONFLICT` | A code, `importRef`, band or topic sort order is already used, or a code conflicts with a locked code setting. |
+| `MIXED_SKILLS` | A practice package references questions with different skills; put one skill in each package. |
 | `UNKNOWN_REFERENCE` | A `topicCode` or `lessonCode` names nothing in the file. |
 | `UNKNOWN_KNOWLEDGE_POINT` | A knowledge point code is not an active one. |
 | `UNKNOWN_QUESTION_REF` | A `questionRefs` entry is neither in `Questions` nor an existing import reference. |
@@ -112,11 +118,37 @@ Any failure rolls everything back. Response `201`:
 
 ```json
 { "courseId": "<uuid>", "topicIds": ["<uuid>"], "lessonIds": ["<uuid>"], "questionIds": ["<uuid>"],
-  "packageIds": ["<uuid>"], "warnings": [ … ] }
+  "packageIds": ["<uuid>"], "packageTitles": { "<uuid>": "Package title" }, "warnings": [ … ] }
 ```
 
 The practice sets and tests still need their own publication, which checks usage, purpose and gradability like any
-other package.
+other package. The response includes each created package title keyed by its id for the authoring follow-up links.
+
+## Outline of a check
+
+Every check (`validate` and the draft routes) also returns `outline` when the workbook could be read, even if it has
+errors: the course, its topics with their lessons, blocks and practice sets, the topic tests, the course tests and
+milestones, and the questions. Each node carries its Excel `row` and `cells` (the values of that row, by column), so a
+screen can show the course as it will be made and mark the rows the errors point at. Values are shown as written and are
+not validated in the outline.
+
+## Drafts
+
+A check can keep the workbook as a draft: the rows as read, so the author opens it again, sees the problems, corrects
+them and imports it. Routes under `/api/content/admin/course-import/drafts`, all `CONTENT_AUTHOR`, and an author sees
+only their own drafts (another author's draft is `404`).
+
+| Method | Path | Behaviour |
+| --- | --- | --- |
+| POST | `/drafts` | Multipart field `file`. Keeps the rows and answers `201` with the draft. A file that cannot be read as a whole (wrong shape, formula, macro, oversize cell) answers `422` with the report and keeps nothing. Rows with errors are kept. At most 20 open drafts per author. |
+| GET | `/drafts` | The author's drafts: `id`, `filename`, `status`, `importedCourseId`, `courseCode`, `courseName`, `updatedAt`. |
+| GET | `/drafts/{id}` | The draft with `sheets` (rows by sheet, each `{number, cells}`) and a `report` checked now against the catalogue as it is, so it is never stale. |
+| PUT | `/drafts/{id}` | Body `{ "sheets": { ... } }`. Replaces the rows (only template sheets and columns are kept; a cell is at most 20000 characters, 2000 rows in all), checks again and answers like `GET`. A draft already imported is `409`. |
+| POST | `/drafts/{id}/import` | Checks again and creates the course exactly like the file import (same transaction, same daily allowance, same `422` report on errors), then marks the draft `IMPORTED`. |
+| DELETE | `/drafts/{id}` | `204`. |
+
+`status` is `DRAFT` or `IMPORTED`. Creating, saving and reading a draft take no use of the daily import allowance; only
+the import does.
 
 ## File safety
 

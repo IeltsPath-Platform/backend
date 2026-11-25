@@ -51,9 +51,9 @@ class SpeakingSubmissionTest {
     void refusesToStartWithoutQuestionsOrCost() {
         assertThrows(IllegalArgumentException.class, () -> SpeakingSubmission.start(UUID.randomUUID(), UUID.randomUUID(),
                 UUID.randomUUID(), UUID.randomUUID(), SpeakingScope.FULL, 5, NOW, List.of(), NOW));
-        assertThrows(IllegalArgumentException.class, () -> SpeakingSubmission.start(UUID.randomUUID(), UUID.randomUUID(),
-                UUID.randomUUID(), UUID.randomUUID(), SpeakingScope.FULL, 0, NOW,
-                List.of(SpeakingRecording.expected(Q1, SECTION_1, 1, 1)), NOW));
+        assertEquals(0, SpeakingSubmission.start(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                UUID.randomUUID(), SpeakingScope.FULL, 0, NOW,
+                List.of(SpeakingRecording.expected(Q1, SECTION_1, 1, 1)), NOW).pointCost());
     }
 
     @Test

@@ -77,6 +77,18 @@ class SettleSpeakingSubmissionUseCaseTest {
     }
 
     @Test
+    void premiumGradeSettlesWithoutDebitOrLedgerEntry() {
+        when(submission.status()).thenReturn(SpeakingSubmissionStatus.PAYMENT_PENDING);
+        when(submission.pointCost()).thenReturn(0);
+
+        useCase.execute(USER, SUBMISSION);
+
+        verify(points, never()).debit(any(), anyInt(), any(), any(), any(), any());
+        verify(submission).graded(eq(null), any());
+        verify(submissions).save(submission);
+    }
+
+    @Test
     void anUnreachablePointsServiceChargesNothing() {
         when(submission.status()).thenReturn(SpeakingSubmissionStatus.PAYMENT_PENDING);
         when(points.debit(any(), anyInt(), any(), any(), any(), any())).thenThrow(new AccessUnavailableException(503));
