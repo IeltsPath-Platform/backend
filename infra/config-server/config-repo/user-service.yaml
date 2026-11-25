@@ -50,6 +50,7 @@ app:
       client-ids: ${GOOGLE_CLIENT_IDS:}
       max-token-age-seconds: ${APP_AUTH_GOOGLE_MAX_TOKEN_AGE_SECONDS:300}
       require-nonce: ${APP_AUTH_GOOGLE_REQUIRE_NONCE:false}
+    reauth-required-for-unlink: ${APP_AUTH_REAUTH_REQUIRED_FOR_UNLINK:false}
     external-jwt-issuer: ${EXTERNAL_JWT_ISSUER:urn:code-base:auth}
     external-jwt-secret: ${EXTERNAL_JWT_SECRET}
     internal-jwt-issuer: ${INTERNAL_JWT_ISSUER:urn:code-base:api-gateway}

@@ -34,6 +34,7 @@ import java.util.TimeZone;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -134,6 +135,26 @@ class ActionTokenUseCaseTest {
 
         forgotPasswordUseCase.execute(new ForgotPasswordCommand("c@gmail.com"));
 
+        verify(accountActionTokenRepository).save(any());
+        verify(outboxEventRepository).save(any());
+        verify(notices, never()).enqueue(any(), any(), any(), any());
+    }
+
+    @Test
+    void anAccountThatSetsAPasswordAgainCanUseThePasswordResetFlow() {
+        UUID userId = UUID.randomUUID();
+        User restored = User.builder().id(userId).email(new Email("restored@gmail.com")).passwordHash("old")
+                .status(UserStatus.ACTIVE).build();
+        restored.clearPassword();
+        restored.changePassword("new-hash");
+        when(userRepository.findByEmail("restored@gmail.com")).thenReturn(Optional.of(restored));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(restored));
+        when(accountActionTokenRepository.findLatestCreatedAt(userId, ActionTokenPurpose.PASSWORD_RESET)).thenReturn(Optional.empty());
+        when(tokenHashService.hash(any(String.class))).thenReturn("hashed-token");
+
+        forgotPasswordUseCase.execute(new ForgotPasswordCommand("restored@gmail.com"));
+
+        assertFalse(restored.hasNeverHadPassword());
         verify(accountActionTokenRepository).save(any());
         verify(outboxEventRepository).save(any());
         verify(notices, never()).enqueue(any(), any(), any(), any());

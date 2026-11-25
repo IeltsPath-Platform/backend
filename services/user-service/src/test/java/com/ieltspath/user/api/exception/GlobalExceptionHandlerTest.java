@@ -9,6 +9,10 @@ import com.ieltspath.user.application.exception.LoginLimiterUnavailableException
 import com.ieltspath.user.application.exception.LoginRateLimitedException;
 import com.ieltspath.user.application.exception.GoogleAccountNotActiveException;
 import com.ieltspath.user.application.exception.GoogleNonceRejectedException;
+import com.ieltspath.user.application.exception.ReauthRequiredException;
+import com.ieltspath.user.application.exception.ReauthAccountMismatchException;
+import com.ieltspath.user.application.exception.PasswordAlreadySetException;
+import com.ieltspath.user.application.exception.ReauthUnavailableException;
 import com.ieltspath.user.domain.exception.WeakPasswordException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
@@ -118,5 +122,24 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().message()).isEqualTo("Phiên đăng nhập Google không hợp lệ hoặc đã hết hạn. Vui lòng thử lại.");
         assertThat(response.getBody().code()).isEqualTo("GOOGLE_ID_TOKEN_INVALID");
         assertThat(response.getBody().details()).isNull();
+    }
+
+    @Test
+    void sensitiveActionErrorsUseTopLevelCodesAndVietnameseMessages() {
+        when(request.getRequestURI()).thenReturn("/api/users/me/oauth/google");
+        var required = handler.handleReauthRequired(new ReauthRequiredException(), request);
+        var mismatch = handler.handleReauthAccountMismatch(new ReauthAccountMismatchException(), request);
+        var alreadySet = handler.handlePasswordAlreadySet(new PasswordAlreadySetException(), request);
+        var unavailable = handler.handleReauthUnavailable(new ReauthUnavailableException(), request);
+
+        assertThat(required.getStatusCode().value()).isEqualTo(403);
+        assertThat(required.getBody().code()).isEqualTo("REAUTH_REQUIRED");
+        assertThat(required.getBody().message()).isEqualTo("Vui lòng xác thực lại để thực hiện thao tác này.");
+        assertThat(mismatch.getBody().code()).isEqualTo("REAUTH_ACCOUNT_MISMATCH");
+        assertThat(mismatch.getBody().message()).isEqualTo("Tài khoản Google không khớp với tài khoản Google đã liên kết.");
+        assertThat(alreadySet.getStatusCode().value()).isEqualTo(409);
+        assertThat(alreadySet.getBody().code()).isEqualTo("PASSWORD_ALREADY_SET");
+        assertThat(unavailable.getStatusCode().value()).isEqualTo(503);
+        assertThat(unavailable.getBody().code()).isEqualTo("REAUTH_UNAVAILABLE");
     }
 }

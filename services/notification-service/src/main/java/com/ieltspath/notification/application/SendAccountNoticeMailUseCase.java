@@ -3,6 +3,7 @@ package com.ieltspath.notification.application;
 import com.ieltspath.events.access.SubscriptionExpiryNoticeV1;
 import com.ieltspath.events.user.EmailVerificationRequestedV1;
 import com.ieltspath.events.user.GoogleAccountLinkedV1;
+import com.ieltspath.events.user.GoogleAccountUnlinkedV1;
 import com.ieltspath.events.user.PasswordResetGoogleOnlyV1;
 import com.ieltspath.events.user.PasswordChangedV1;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,7 @@ public class SendAccountNoticeMailUseCase {
 
     @Value("${notification.mail.templates.password-changed.enabled:true}") private boolean passwordChangedEnabled;
     @Value("${notification.mail.templates.google-account-linked.enabled:true}") private boolean googleAccountLinkedEnabled;
+    @Value("${notification.mail.templates.google-account-unlinked.enabled:true}") private boolean googleAccountUnlinkedEnabled;
     @Value("${notification.mail.templates.password-reset-google-only.enabled:true}") private boolean passwordResetGoogleOnlyEnabled;
     @Value("${notification.mail.templates.email-verification.enabled:true}") private boolean emailVerificationEnabled;
     @Value("${notification.mail.frontend-base-url:}") private String frontendBaseUrl;
@@ -61,6 +63,16 @@ public class SendAccountNoticeMailUseCase {
         }
         if (!googleAccountLinkedEnabled) return;
         send(MailTemplate.GOOGLE_ACCOUNT_LINKED, event.eventId(), event.email(), Map.of(
+                "displayName", name(event.displayName())));
+    }
+
+    public void googleAccountUnlinked(GoogleAccountUnlinkedV1 event) {
+        if (event == null || event.eventId() == null || !GoogleAccountUnlinkedV1.EVENT_TYPE.equals(event.eventType())
+                || event.userId() == null || isBlank(event.email()) || event.occurredAt() == null) {
+            throw new IllegalArgumentException("Google account unlinked event is invalid");
+        }
+        if (!googleAccountUnlinkedEnabled) return;
+        send(MailTemplate.GOOGLE_ACCOUNT_UNLINKED, event.eventId(), event.email(), Map.of(
                 "displayName", name(event.displayName())));
     }
 

@@ -516,3 +516,7 @@ Library owns curated vocabulary units, immutable revisions, attempt snapshots, u
 Gateway xác thực external JWT, sau đó kiểm tra các khóa `auth:revoked:*` trong Redis trước khi chuyển tiếp request; cùng
 lớp kiểm tra áp dụng cho WebSocket notifications. User-service chỉ ghi dấu thu hồi sau commit. Mặc định Redis lỗi được
 xử lý fail-open và ghi metric; cờ `gateway.auth.revocation.fail-closed` cho phép trả 503 khi cần.
+
+Sensitive account changes can require a one-time reauthentication grant stored by SHA-256 hash in Redis and bound to
+the active user session. User-service publishes Google unlink notices through the user outbox; Notification owns the
+mail queue, retries, and dead-letter queue.

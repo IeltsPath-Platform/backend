@@ -57,6 +57,9 @@ reset flow stays open for it; an account created by Google has no password and g
 password and can sign in with either method. A `user.google-account-linked.v1` event is published whenever a Google identity
 is newly linked to an account that already existed, whether or not its password is cleared.
 
+When a Google identity is unlinked, User-service publishes `user.google-account-unlinked.v1` through the outbox and
+Notification emails the account owner. See [user-google-account-unlinked-v1](user-google-account-unlinked-v1.md).
+
 An access token issued before linking remains valid until it expires (at most one hour). Access tokens are not revoked by
 this flow. Unlinking the only login identity remains prohibited by the existing OAuth unlink rule.
 

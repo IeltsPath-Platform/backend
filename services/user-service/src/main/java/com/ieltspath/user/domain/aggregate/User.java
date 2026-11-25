@@ -62,6 +62,7 @@ public class User {
             throw new IllegalArgumentException("Mật khẩu băm không được để trống");
         }
         this.passwordHash = newPasswordHash;
+        this.passwordClearedAt = null;
         touch();
     }
 

@@ -1,0 +1,5 @@
+Xin chào [(${displayName})],
+
+Liên kết Google với tài khoản IELTSPath của bạn vừa được gỡ. Bạn sẽ không thể đăng nhập bằng Google cho đến khi liên kết lại.
+
+Nếu đây không phải bạn thực hiện, hãy đổi mật khẩu và liên hệ đội ngũ hỗ trợ ngay.

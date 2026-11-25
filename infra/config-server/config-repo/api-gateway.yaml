@@ -83,6 +83,15 @@ spring:
                   args:
                     tier: auth
 
+            - id: user-reauth-limited
+              uri: lb://USER-SERVICE
+              predicates:
+                - Path=/api/users/me/reauth
+              filters:
+                - name: ClientRateLimit
+                  args:
+                    tier: auth
+
             - id: user-avatar-upload-limited
               uri: lb://USER-SERVICE
               predicates:

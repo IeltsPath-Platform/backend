@@ -26,6 +26,10 @@ import com.ieltspath.user.application.exception.GoogleEmailNotSupportedException
 import com.ieltspath.user.application.exception.GoogleSignInNotAllowedException;
 import com.ieltspath.user.application.exception.GoogleSignInUnavailableException;
 import com.ieltspath.user.application.exception.GoogleIdTokenInvalidException;
+import com.ieltspath.user.application.exception.ReauthAccountMismatchException;
+import com.ieltspath.user.application.exception.ReauthRequiredException;
+import com.ieltspath.user.application.exception.PasswordAlreadySetException;
+import com.ieltspath.user.application.exception.ReauthUnavailableException;
 import com.ieltspath.commonstorage.UploadRejectedException;
 import com.ieltspath.commonstorage.StorageException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -140,6 +144,33 @@ public class GlobalExceptionHandler {
     ResponseEntity<ErrorResponse> handleInvalidGoogleToken(GoogleIdTokenInvalidException exception, HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(errorBody(HttpStatus.UNAUTHORIZED, exception.getMessage(), request, null, "GOOGLE_ID_TOKEN_INVALID"));
+    }
+
+    @ExceptionHandler(ReauthRequiredException.class)
+    ResponseEntity<ErrorResponse> handleReauthRequired(ReauthRequiredException exception, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(errorBody(HttpStatus.FORBIDDEN, exception.getMessage(), request, null, "REAUTH_REQUIRED"));
+    }
+
+    @ExceptionHandler(ReauthAccountMismatchException.class)
+    ResponseEntity<ErrorResponse> handleReauthAccountMismatch(ReauthAccountMismatchException exception,
+                                                               HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(errorBody(HttpStatus.FORBIDDEN, exception.getMessage(), request, null, "REAUTH_ACCOUNT_MISMATCH"));
+    }
+
+    @ExceptionHandler(PasswordAlreadySetException.class)
+    ResponseEntity<ErrorResponse> handlePasswordAlreadySet(PasswordAlreadySetException exception,
+                                                            HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(errorBody(HttpStatus.CONFLICT, exception.getMessage(), request, null, "PASSWORD_ALREADY_SET"));
+    }
+
+    @ExceptionHandler(ReauthUnavailableException.class)
+    ResponseEntity<ErrorResponse> handleReauthUnavailable(ReauthUnavailableException exception,
+                                                            HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(errorBody(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage(), request, null, "REAUTH_UNAVAILABLE"));
     }
 
     @ExceptionHandler({GoogleSignInNotAllowedException.class, GoogleEmailNotSupportedException.class})

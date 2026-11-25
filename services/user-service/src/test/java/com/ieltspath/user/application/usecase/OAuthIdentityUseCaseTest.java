@@ -1,6 +1,8 @@
 package com.ieltspath.user.application.usecase;
 
 import com.ieltspath.user.application.result.OAuthIdentityResult;
+import com.ieltspath.user.application.port.ReauthTokenStore;
+import com.ieltspath.user.domain.vo.Email;
 import com.ieltspath.user.domain.aggregate.OAuthIdentity;
 import com.ieltspath.user.domain.aggregate.User;
 import com.ieltspath.user.domain.exception.OAuthIdentityNotFoundException;
@@ -27,6 +29,8 @@ import static org.mockito.Mockito.when;
 class OAuthIdentityUseCaseTest {
     @Mock private OAuthIdentityRepository oauthIdentityRepository;
     @Mock private UserRepository userRepository;
+    @Mock private ReauthTokenStore reauthTokens;
+    @Mock private UserNoticeOutbox notices;
 
     private GetOAuthIdentitiesUseCase getOAuthIdentitiesUseCase;
     private UnlinkOAuthIdentityUseCase unlinkOAuthIdentityUseCase;
@@ -34,7 +38,7 @@ class OAuthIdentityUseCaseTest {
     @BeforeEach
     void setUp() {
         getOAuthIdentitiesUseCase = new GetOAuthIdentitiesUseCase(oauthIdentityRepository);
-        unlinkOAuthIdentityUseCase = new UnlinkOAuthIdentityUseCase(oauthIdentityRepository, userRepository);
+        unlinkOAuthIdentityUseCase = new UnlinkOAuthIdentityUseCase(oauthIdentityRepository, userRepository, reauthTokens, notices);
     }
 
     @Test
@@ -66,6 +70,8 @@ class OAuthIdentityUseCaseTest {
 
         User user = User.builder()
                 .id(userId)
+                .email(new Email("person@example.test"))
+                .fullName("Person")
                 .passwordHash("hashed-password")
                 .build();
 
@@ -88,6 +94,8 @@ class OAuthIdentityUseCaseTest {
 
         User user = User.builder()
                 .id(userId)
+                .email(new Email("person@example.test"))
+                .fullName("Person")
                 .passwordHash(null)
                 .build();
 
