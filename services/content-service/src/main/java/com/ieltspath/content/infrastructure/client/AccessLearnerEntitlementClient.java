@@ -32,7 +32,7 @@ public class AccessLearnerEntitlementClient implements LearnerEntitlement {
 
     @Autowired
     public AccessLearnerEntitlementClient(RestClient.Builder builder,
-                                         @Value("${ACCESS_SERVICE_URL:http://localhost:8084}") String baseUrl,
+                                         @Value("${content.access.base-url:http://localhost:8084}") String baseUrl,
                                          ResilientCall resilientCall) {
         var factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofSeconds(2));

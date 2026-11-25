@@ -62,6 +62,9 @@ assessment:
   user:
     # Display names of examiners in the quality table; the table is still returned when this service is down.
     base-url: ${USER_SERVICE_URL:http://localhost:8085}
+  # Premium entitlement and human-grading credits.
+  access:
+    base-url: ${ACCESS_SERVICE_URL:http://localhost:8084}
   messaging:
     exchange: ${ASSESSMENT_EVENTS_EXCHANGE:assessment.events}
   outbox:

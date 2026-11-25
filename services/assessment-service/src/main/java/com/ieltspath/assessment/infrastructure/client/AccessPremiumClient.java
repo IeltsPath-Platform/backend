@@ -21,7 +21,7 @@ public class AccessPremiumClient implements PremiumLookup {
 
     @Autowired
     public AccessPremiumClient(RestClient.Builder builder,
-                              @Value("${ACCESS_SERVICE_URL:http://localhost:8084}") String baseUrl,
+                              @Value("${assessment.access.base-url:http://localhost:8084}") String baseUrl,
                               ResilientCall resilientCall, AssessmentServiceTokenProvider serviceTokens) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofSeconds(2));

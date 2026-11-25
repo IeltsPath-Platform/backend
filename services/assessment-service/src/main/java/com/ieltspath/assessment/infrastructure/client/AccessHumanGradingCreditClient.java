@@ -28,7 +28,7 @@ public class AccessHumanGradingCreditClient implements HumanGradingCreditPort {
 
     @Autowired
     public AccessHumanGradingCreditClient(RestClient.Builder builder,
-            @Value("${ACCESS_SERVICE_URL:http://localhost:8084}") String baseUrl, ResilientCall resilientCall) {
+            @Value("${assessment.access.base-url:http://localhost:8084}") String baseUrl, ResilientCall resilientCall) {
         var factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofSeconds(2));
         factory.setReadTimeout(Duration.ofSeconds(5));
