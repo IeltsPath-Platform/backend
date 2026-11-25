@@ -24,6 +24,11 @@ public class ContentPackageRepositoryAdapter implements ContentPackageRepository
     }
 
     @Override
+    public long countPublishedPlacementInPool(com.ieltspath.content.domain.vo.PlacementPool pool, UUID excludedPackageId) {
+        return contentPackageJpaRepository.countPublishedPlacementInPool(pool, excludedPackageId);
+    }
+
+    @Override
     public ContentPackage save(ContentPackage pkg) {
         var entity = mapper.toEntity(pkg);
         var saved = contentPackageJpaRepository.save(entity);

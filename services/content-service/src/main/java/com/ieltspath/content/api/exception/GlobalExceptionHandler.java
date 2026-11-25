@@ -114,6 +114,27 @@ public class GlobalExceptionHandler {
                 Map.of("code", "IMPORT_REF_CONFLICT"));
     }
 
+    @ExceptionHandler(com.ieltspath.content.domain.exception.PlacementPoolLockedException.class)
+    public ResponseEntity<ErrorResponse> handlePlacementPoolLocked(
+            com.ieltspath.content.domain.exception.PlacementPoolLockedException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "PLACEMENT_POOL_LOCKED"));
+    }
+
+    @ExceptionHandler(com.ieltspath.content.domain.exception.PlacementPoolLastPublishedException.class)
+    public ResponseEntity<ErrorResponse> handlePlacementPoolLastPublished(
+            com.ieltspath.content.domain.exception.PlacementPoolLastPublishedException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "PLACEMENT_POOL_LAST_PUBLISHED"));
+    }
+
+    @ExceptionHandler(com.ieltspath.content.domain.exception.PackageArchiveNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handlePackageArchiveNotSupported(
+            com.ieltspath.content.domain.exception.PackageArchiveNotSupportedException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "PACKAGE_ARCHIVE_NOT_SUPPORTED"));
+    }
+
     @ExceptionHandler(DraftVersionExistsException.class)
     public ResponseEntity<ErrorResponse> handleDraftVersionExists(DraftVersionExistsException ex,
                                                                   HttpServletRequest request) {

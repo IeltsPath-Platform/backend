@@ -1,5 +1,6 @@
 package com.ieltspath.content.infrastructure.persistence.repository;
 
+import com.ieltspath.content.domain.vo.PlacementPool;
 import com.ieltspath.content.domain.vo.PublicationStatus;
 import com.ieltspath.content.infrastructure.persistence.entity.ContentPackageJpaEntity;
 import jakarta.persistence.LockModeType;
@@ -17,6 +18,11 @@ import java.util.UUID;
 
 @Repository
 public interface ContentPackageJpaRepository extends JpaRepository<ContentPackageJpaEntity, UUID> {
+
+    @Query("SELECT COUNT(p) FROM ContentPackageJpaEntity p WHERE p.packageType = com.ieltspath.content.domain.vo.PackageType.PLACEMENT_TEST "
+            + "AND p.placementPool = :pool AND p.status = com.ieltspath.content.domain.vo.PublicationStatus.PUBLISHED AND p.id <> :excludedId")
+    long countPublishedPlacementInPool(@Param("pool") PlacementPool pool, @Param("excludedId") UUID excludedId);
+
 
     @EntityGraph(attributePaths = {"versions"})
     Optional<ContentPackageJpaEntity> findByCode(String code);
