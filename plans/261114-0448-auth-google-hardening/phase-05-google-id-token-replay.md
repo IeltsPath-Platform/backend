@@ -1,7 +1,7 @@
 ---
 phase: 5
 title: "Chống phát lại ID token Google (G1)"
-status: pending
+status: done
 priority: P1
 dependencies: [1]
 ---

@@ -1,7 +1,7 @@
-﻿---
+---
 phase: 2
 title: "Refresh token: phát hiện dùng lại (A1) và quản lý phiên (A3)"
-status: pending
+status: done
 priority: P1
 dependencies: [1]
 ---

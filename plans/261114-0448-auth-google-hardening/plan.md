@@ -109,13 +109,13 @@ sửa: `ForgotPasswordUseCase`, `User`, `UserJpaEntity`, `UserJpaRepository`, `R
 | Phase | Việc | Phụ thuộc | Status |
 | --- | --- | --- | --- |
 | 1 | [Nền tảng: A6, G2, G4, G8, dịch thông báo](./phase-01-foundation-quick-fixes.md) | Bước 0 | Done |
-| 2 | [Refresh token: A1, A3](./phase-02-refresh-token-families-and-sessions.md) | 1 | Pending |
-| 3 | [Thu hồi access token: A2](./phase-03-access-token-revocation.md) | 2 | Pending |
+| 2 | [Refresh token: A1, A3](./phase-02-refresh-token-families-and-sessions.md) | 1 | Done |
+| 3 | [Thu hồi access token: A2](./phase-03-access-token-revocation.md) | 2 | Done |
 | 4 | [Mật khẩu: A4, A5](./phase-04-password-policy-and-hashing.md) | Bước 0 | Done |
-| 5 | [ID token Google: G1](./phase-05-google-id-token-replay.md) | 1 | Pending |
+| 5 | [ID token Google: G1](./phase-05-google-id-token-replay.md) | 1 | Done |
 | 6 | [Đủ điều kiện đăng nhập Google: G6](./phase-06-google-eligibility-by-subject.md) | Bước 0 | Done |
-| 7 | [Xác thực lại, gỡ liên kết, đặt mật khẩu: G3, G5](./phase-07-reauth-unlink-set-password.md) | 2, 3, 4 | Pending |
-| 8 | [Audit và quan sát: A8](./phase-08-audit-and-observability.md) | 2, 7 | Pending |
+| 7 | [Xác thực lại, gỡ liên kết, đặt mật khẩu: G3, G5](./phase-07-reauth-unlink-set-password.md) | 2, 3, 4 | Done |
+| 8 | [Audit và quan sát: A8](./phase-08-audit-and-observability.md) | 2, 7 | Done |
 | 9 | [CAPTCHA có điều kiện: A7](./phase-09-optional-captcha.md) | - | **Dropped** |
 | 10 | [Frontend web](./phase-10-frontend-web.md) | từng nhóm theo backend (xem file) | Pending |
 

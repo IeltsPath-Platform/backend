@@ -1,7 +1,7 @@
-﻿---
+---
 phase: 7
 title: "Xác thực lại, gỡ liên kết Google (G3) và đặt mật khẩu lần đầu (G5)"
-status: pending
+status: done
 priority: P1
 dependencies: [2, 3, 4]
 ---

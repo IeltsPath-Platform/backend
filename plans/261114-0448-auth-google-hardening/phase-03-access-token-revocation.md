@@ -1,7 +1,7 @@
-﻿---
+---
 phase: 3
 title: "Thu hồi access token, đăng xuất thật sự (A2)"
-status: pending
+status: done
 priority: P1
 dependencies: [2]
 ---

@@ -1,7 +1,7 @@
 ---
 phase: 8
 title: "Audit sự kiện nhạy cảm, metric và cảnh báo (A8)"
-status: pending
+status: done
 priority: P2
 dependencies: [2, 7]
 ---
