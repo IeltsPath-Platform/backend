@@ -51,7 +51,7 @@ class JwtTokenServiceTest {
         assertThat(claims.getId()).isNotBlank().isNotEqualTo(secondClaims.getId());
         assertThat(claims.getIssuedAt()).isNotNull();
         assertThat(claims.<String>getClaim("sid")).isEqualTo(sessionId.toString());
-        assertThat(claims.getIssuer().toString()).isEqualTo("issuer");
+        assertThat(claims.<String>getClaim("iss")).isEqualTo("issuer");
         assertThat(claims.<java.util.List<String>>getClaim("roles")).isEqualTo(java.util.List.of("CUSTOMER"));
         assertThat(claims.getExpiresAt()).isAfter(claims.getIssuedAt());
     }
