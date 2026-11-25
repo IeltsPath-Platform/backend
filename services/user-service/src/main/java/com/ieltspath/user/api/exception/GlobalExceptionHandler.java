@@ -12,6 +12,7 @@ import com.ieltspath.user.domain.exception.OAuthIdentityNotFoundException;
 import com.ieltspath.user.domain.exception.PhoneAlreadyExistsException;
 import com.ieltspath.user.domain.exception.RoleNotFoundException;
 import com.ieltspath.user.domain.exception.ResourceNotFoundException;
+import com.ieltspath.user.domain.exception.SessionNotFoundException;
 import com.ieltspath.user.domain.exception.UserNotFoundException;
 import com.ieltspath.user.domain.exception.UserManagementRuleViolationException;
 import com.ieltspath.user.domain.exception.PasswordChangeException;
@@ -61,6 +62,12 @@ public class GlobalExceptionHandler {
     })
     ResponseEntity<ErrorResponse> handleNotFound(RuntimeException exception, HttpServletRequest request) {
         return error(HttpStatus.NOT_FOUND, exception.getMessage(), request, null);
+    }
+
+    @ExceptionHandler(SessionNotFoundException.class)
+    ResponseEntity<ErrorResponse> handleSessionNotFound(SessionNotFoundException exception, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(errorBody(HttpStatus.NOT_FOUND, exception.getMessage(), request, null, "SESSION_NOT_FOUND"));
     }
 
     @ExceptionHandler({EmailAlreadyExistsException.class, PhoneAlreadyExistsException.class,
