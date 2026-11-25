@@ -5,6 +5,7 @@ import com.ieltspath.assessment.application.port.LearnerEntitlement;
 import com.ieltspath.commonresilience.CallKind;
 import com.ieltspath.commonresilience.DownstreamUnavailableException;
 import com.ieltspath.commonresilience.ResilientCall;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -21,6 +22,7 @@ public class AccessLearnerEntitlementClient implements LearnerEntitlement {
     private final RestClient client;
     private final ResilientCall resilientCall;
 
+    @Autowired
     public AccessLearnerEntitlementClient(RestClient.Builder builder,
                                          @Value("${ACCESS_SERVICE_URL:http://localhost:8084}") String baseUrl,
                                          ResilientCall resilientCall) {
