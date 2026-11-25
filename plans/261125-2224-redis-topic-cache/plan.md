@@ -1,204 +1,130 @@
 # Cache cây topic bằng Redis ở learning-service
 
-Trạng thái: **đã duyệt 2026-11-25** (mục 9). Đang ở bước 1, chưa có code.
+Trạng thái: **plan chi tiết, đã chốt quyết định 2026-11-25; chưa có code**. Người làm chạy các phase theo thứ tự.
 
 | Repo | Nhánh | Tách từ |
 | --- | --- | --- |
 | backend | `feat/redis-content-cache` | `main` tại `221f2efa` |
 
-Không đổi API công khai, event, database hay frontend.
+Không đổi API công khai, event, database, Content hay frontend.
 
 ## 1. Mục tiêu
 
 Learning gọi `GET /internal/learning-content/topic-sequence` của Content mỗi lần cần tên, kỹ năng, band của điểm kiến thức
-(KP). Response là toàn bộ cây topic, giống nhau cho mọi người học, và Content chạy nhiều truy vấn để dựng.
-Plan này lưu response vào Redis trong 60 giây cho các luồng **chỉ để hiển thị hoặc mô tả**.
-
-Redis là phần phụ: Redis lỗi hoặc tắt thì Learning gọi thẳng Content như hiện nay.
+(KP). Response là toàn bộ cây topic và giống nhau cho mọi người học. Plan này lưu response vào Redis 60 giây cho các luồng
+**chỉ để hiển thị hoặc mô tả**. Redis là phần phụ: lỗi hoặc tắt thì Learning gọi thẳng Content như hiện nay.
 
 ### Ngoài phạm vi
 
-- Mã lỗi và rubric: nếu làm thì dùng RAM, plan riêng. Lợi ích thấp vì chủ yếu đọc lúc chấm bài.
-- Nội dung đề (`package-versions/{id}`): chỉ xem lại khi có số đo.
+- Mã lỗi, rubric: nếu làm thì dùng RAM, plan riêng.
+- Nội dung đề (`package-versions/{id}`): xem lại khi có số đo.
 - Không cache: quyền Premium, khóa miễn phí/trả phí, điểm, quota, mastery, tiến độ, URL ký.
-- Lỗi có sẵn: một số use case gọi HTTP khi giữ transaction hoặc khóa (`RefreshLearningTopicsUseCase`,
-  `GetQuestsUseCase`, `GetLearnerTreeUseCase`...). Đây là việc riêng; không lấy cache làm cách sửa.
+- Các use case đang gọi HTTP khi giữ transaction hoặc khóa (`RefreshLearningTopicsUseCase`, `GetQuestsUseCase`,
+  `GetLearnerTreeUseCase`...): lỗi có sẵn, sửa ở việc khác.
 
-## 2. Hiện trạng (đã đọc code trên `main`)
+## 2. Điều kiện trước khi làm
+
+1. **`main` phải khởi động được.** Tại `84b78fc7`, Content có hai migration V148 nên Flyway từ chối chạy. Bản sửa nằm ở nhánh
+   local `fix/content-migration-version`, chưa vào `main` lúc viết plan. Cập nhật nhánh này từ `main` sau khi bản sửa được merge.
+2. Docker chạy được (Testcontainers) và máy không có container khởi động lại liên tục, nếu không số đo sai.
+
+## 3. Các phase
+
+| Phase | Nội dung | Phụ thuộc |
+| --- | --- | --- |
+| [01](phase-01-measure.md) | Đo trước khi sửa. **Có điểm dừng, phải chờ duyệt** | Điều kiện 2 |
+| [02](phase-02-infrastructure.md) | Dependency, cấu hình, Compose, production | 01 được duyệt, điều kiện 1 |
+| [03](phase-03-code.md) | Port, cache Redis, chuyển nơi gọi | 02 |
+| [04](phase-04-tests.md) | Test tự động và kiểm tra thật | 03 |
+| [05](phase-05-docs-and-release.md) | Tài liệu, PR, deploy, lùi lại | 04 |
+
+Phase 02 đến 05 nằm trong một PR.
+
+## 4. Hiện trạng đã đọc từ code
 
 - `GetTopicSequenceUseCase` (Content) chỉ nhận `includeErrorTraps`, không nhận user hay role.
-- `RestLearningContentClient.getTopicSequence()` và `getTopicSequence(true)` là hai response khác nhau.
-- `Topic` chứa cả dữ liệu dùng cho quyền và giá: `requiredFeatureKey`, `earliestLessonPosition`,
-  `skillUnlockPoints`, `comboUnlockPoints`, `active`. Vì vậy không được cache ngầm cho mọi nơi gọi.
-- Learning chưa có Redis. Năm module khác đã dùng `spring-boot-starter-data-redis`.
-- Docker healthcheck đọc `/actuator/health`. Thêm starter Redis mà không cấu hình thì Redis chết sẽ làm Learning `DOWN`.
-- Redis production (`docker-compose.prod.yml`, `infra/redis/start-production.sh`): `mem_limit: 192m`, bật AOF, không đặt
-  `maxmemory`, dùng chung với rate limit, giới hạn đăng nhập, vé WebSocket và pub/sub.
-- `scripts/production/render-env.py` sinh file env production và chọn service nào nhận biến Redis (dòng 101).
+- `getTopicSequence()` và `getTopicSequence(true)` là hai response khác nhau.
+- `Topic` chứa cả dữ liệu quyền và giá: `requiredFeatureKey`, `active`, `KnowledgePoint.earliestLessonPosition`,
+  `Course.skillUnlockPoints`, `Course.comboUnlockPoints`. Vì vậy không cache ngầm cho mọi nơi gọi.
+- Learning chưa có Redis; api-gateway, user, game, notification và community đã có.
+- Healthcheck Docker của Learning đọc `/actuator/health`; thêm starter Redis mà không cấu hình thì Redis chết làm Learning `DOWN`.
+- Redis production: `mem_limit: 192m`, AOF bật, không có `maxmemory`. Redis này còn giữ rate limit, giới hạn đăng nhập, vé
+  WebSocket, pub/sub, dấu thu hồi token `auth:revoked:*` và grant xác thực lại. **Không đặt chính sách evict toàn bộ khóa** để
+  nhường chỗ cho cache, vì có thể làm mất dấu thu hồi token.
 
-## 3. Thiết kế
+## 5. Thiết kế
 
-### Cache là tùy chọn, mặc định đọc mới
-
-`LearningContentClient.getTopicSequence(...)` giữ nguyên và luôn gọi Content. Thêm port riêng để nơi nào cần cache phải gọi
-rõ ràng; chỗ bị bỏ sót vẫn đúng, chỉ là không nhanh hơn.
+`LearningContentClient.getTopicSequence(...)` giữ nguyên, luôn gọi Content. Nơi cần cache gọi port riêng `TopicCatalog`. Chỗ bị
+bỏ sót vẫn đúng, chỉ không nhanh hơn.
 
 ```text
-use case hiển thị -> TopicCatalog (application/port)
-                       `-- RedisTopicCatalog (infrastructure/cache)
-                             |-- trúng  -> trả từ Redis
-                             `-- trượt/lỗi -> LearningContentClient -> ghi Redis (bỏ qua nếu lỗi)
+luồng hiển thị -> TopicCatalog (application/port)
+                    `-- RedisTopicCatalog (infrastructure/cache)
+                          |-- trúng         -> trả từ Redis
+                          `-- trượt hoặc lỗi -> LearningContentClient -> ghi Redis (lỗi ghi thì bỏ qua)
 ```
 
-- `TopicCatalog.topics(boolean includeErrorTraps)`.
-- `KnowledgePointDirectory`: giữ `describe(...)` đọc mới; thêm `describeForDisplay(...)` đi qua `TopicCatalog`.
-- Khóa: `cache:learning:topic-sequence:v1:{base|error-traps}`. Giá trị: JSON qua `StringRedisTemplate` và `ObjectMapper`.
-- TTL 60 giây, chỉ hết hạn theo TTL. Người soạn sửa nội dung thì phần hiển thị trễ tối đa 60 giây.
-- Không lưu khi Content lỗi hoặc danh sách rỗng.
-- JSON hỏng hoặc Redis lỗi: coi là trượt, log một dòng `warn` không kèm nội dung, gọi Content.
-- Hai request cùng trượt có thể cùng gọi Content. Chấp nhận, giống `PlacementCatalog`; không thêm khóa phân tán.
-- Đổi hình dạng `Topic`, `Course` hoặc `KnowledgePoint` thì phải tăng `v1`. Một test chốt danh sách trường để không quên.
+| Mục | Quyết định |
+| --- | --- |
+| Khóa | `cache:learning:topic-sequence:v1:base` và `cache:learning:topic-sequence:v1:error-traps` |
+| Giá trị | JSON của `List<Topic>`, qua `StringRedisTemplate` |
+| TTL | 60 giây, đặt cùng lệnh `SET`; không xóa chủ động |
+| Không lưu | Content lỗi, kết quả `null` hoặc rỗng |
+| JSON hỏng, Redis lỗi | Coi là trượt, gọi Content |
+| Hai request cùng trượt | Cùng gọi Content; chấp nhận như `PlacementCatalog`, không khóa phân tán |
+| Đổi trường của `Topic`, `Course`, `KnowledgePoint` | Tăng `v1`; có test chốt danh sách trường |
+| Timeout Redis | Kết nối và lệnh 200 ms; mất kết nối thì từ chối lệnh ngay. Không tự viết circuit breaker |
+| Công tắc | `learning.topic-cache.enabled`: mặc định trong code `false`, config-repo `true` |
 
-### Redis lỗi không làm chậm request
+Mặc định trong code là `false` để hơn 40 test của Learning dùng Spring context hoặc kiểm health không vô tình đọc hay ghi Redis
+đang chạy trên máy.
 
-- Connect timeout và command timeout 200 ms.
-- Lettuce `disconnectedBehavior = REJECT_COMMANDS`, để mất kết nối thì lỗi ngay thay vì xếp hàng chờ timeout.
-- `management.health.redis.enabled: false` cho Learning.
-- `spring.data.redis.repositories.enabled: false`, vì Learning chỉ dùng JPA repository.
-- Không tự viết circuit breaker. `ResilientCall` vẫn bọc lời gọi HTTP sang Content.
-
-### Cấu hình
-
-```yaml
-learning:
-  topic-cache:
-    enabled: ${LEARNING_TOPIC_CACHE_ENABLED:true}
-    ttl-seconds: 60
-```
-
-`enabled: false` thì `TopicCatalog` gọi thẳng Content. Đây là đường lùi không cần deploy lại code.
-
-## 4. Nơi dùng cache và nơi đọc mới
+## 6. Nơi dùng cache và nơi đọc mới
 
 | Nơi gọi | Cách đọc | Lý do |
 | --- | --- | --- |
-| `GetLearnerReportUseCase` | Cache | Tên, kỹ năng, band trong báo cáo |
+| `GetLearnerReportUseCase` (kèm bẫy lỗi) | Cache | Tên, kỹ năng, band trong báo cáo |
 | `GetReviewBasketUseCase` | Cache | Tên KP; lúc bắt đầu ôn kiểm tra lại |
 | `ListSubmissionHistoryUseCase` | Cache | Tên KP trong lịch sử |
 | `GetQuestsUseCase` | Cache | Tên KP của nhiệm vụ |
 | `GetDiagnosticUseCase` | Cache | Tên KP của phiên chẩn đoán |
-| `GetSuggestionsUseCase` (2 lần gọi) | Cache | Gợi ý; phần quyền do `PaywallGate` kiểm tra ứng viên riêng |
-| `QuestService.weaknessTarget` | Cache | Chọn KP cho nhiệm vụ; lỗi Content vẫn có phương án dự phòng |
+| `GetSuggestionsUseCase` (`describe` và `currentBand`) | Cache | Gợi ý; quyền mở bài do `PaywallGate` kiểm tra riêng trên bài ứng viên |
+| `QuestService.weaknessTarget` | Cache | Chọn KP cho nhiệm vụ; đã có phương án dự phòng khi lỗi |
 | `EssayGrader.knowledgePointCatalog` | Cache | Tên, mô tả KP khi chấm |
-| `SpeakingGradingContextCapture` | Cache | Mô tả KP đưa vào ngữ cảnh chấm |
-| `ApplyHumanReviewResultUseCase.knowledgePointDetails` | Cache | Chi tiết KP đưa vào phản hồi |
+| `SpeakingGradingContextCapture` | Cache | Mô tả KP trong ngữ cảnh chấm |
+| `ApplyHumanReviewResultUseCase.knowledgePointDetails` | Cache | Chi tiết KP trong phản hồi |
 | `RefreshLearningTopicsUseCase` | **Mới** | Ghi lộ trình và catalog KP vào DB |
-| `StartFreePracticeUseCase` | **Mới** | `PaywallGate`, khóa đang mở, kỹ năng ghi vào bài luyện |
+| `StartFreePracticeUseCase` (`topicOf`, `skillOf`) | **Mới** | `PaywallGate`, khóa đang mở, kỹ năng ghi vào bài luyện |
 | `StartBasketReviewUseCase` | **Mới** | `PaywallGate` |
-| `DiagnosticPreparation` | **Mới** | Kỹ năng KP được ghi vào bài ôn chẩn đoán |
+| `DiagnosticPreparation` (4 chỗ) | **Mới** | `DiagnosticFlow` ghi kỹ năng KP vào bài ôn |
 | `GetLearnerTreeUseCase` | **Mới** | Trả trạng thái khóa và chặn khóa học đã đóng |
 | `StaffInsightUseCase` | **Mới** | Nhân viên ít dùng, cần thấy dữ liệu vừa sửa |
 
-Trước khi đổi từng dòng "Cache", kiểm tra lại dữ liệu lấy ra không được dùng để quyết định quyền, giá hoặc cổng mở bài.
-Nếu có thì chuyển sang đọc mới và sửa bảng này.
+Nếu khi làm phát hiện nơi "Cache" dùng dữ liệu cho quyền, giá hoặc cổng mở bài thì chuyển sang "Mới" và sửa bảng này.
 
-## 5. Các bước
-
-### Bước 1. Đo trước khi sửa
-
-1. Đo kích thước JSON của hai response với dữ liệu seed và thời gian Content trả về (p50, p95, tối thiểu 50 lần).
-2. Ghi số lần gọi Content của: báo cáo, giỏ ôn, gợi ý, nhiệm vụ, lịch sử.
-3. Lưu kết quả vào `plans/261125-2224-redis-topic-cache/reports/`.
-
-**Điểm dừng:** báo lại trước khi làm tiếp nếu một response lớn hơn 1 MB (ảnh hưởng RAM và AOF của Redis), hoặc p95 của
-Content dưới 20 ms (cache gần như không đáng làm).
-
-### Bước 2. Hạ tầng
-
-| File | Thay đổi |
-| --- | --- |
-| `services/learning-service/pom.xml` | Thêm `spring-boot-starter-data-redis` |
-| `infra/config-server/config-repo/learning-service.yaml` | `spring.data.redis` (host, port, `password: ${REDIS_PASSWORD}`, timeout), tắt health và Redis repository, `learning.topic-cache` |
-| `docker-compose.yml` | `REDIS_HOST`, `REDIS_PASSWORD` cho `learning-service`; không thêm `depends_on` redis vì Redis là phần phụ |
-| `scripts/production/render-env.py` | Thêm `learning-service` vào nhóm nhận biến Redis |
-| `scripts/production/test-production.py` | Kiểm tra env của Learning có biến Redis |
-
-`REDIS_PASSWORD` không có giá trị dự phòng, đúng quy tắc secret. Hệ quả: **thiếu biến này thì Learning không khởi động**,
-dù Redis chỉ là phần phụ. Cấu hình production phải được render lại trước khi deploy bản mới.
-
-### Bước 3. Code
-
-1. `application/port/TopicCatalog.java`.
-2. `infrastructure/cache/RedisTopicCatalog.java` và cấu hình Lettuce.
-3. `KnowledgePointDirectory.describeForDisplay(...)`.
-4. Chuyển các nơi gọi ghi "Cache" ở mục 4; các nơi "Mới" không sửa.
-5. Metric Micrometer `learning.topic.cache` với tag `result=hit|miss|error`. Không đưa id hay nội dung vào tag.
-
-### Bước 4. Kiểm thử
-
-| Trường hợp | Loại |
-| --- | --- |
-| Trượt rồi trúng: Content chỉ bị gọi một lần; hai khóa độc lập | Testcontainers Redis |
-| Khóa có TTL không quá 60 giây | Testcontainers Redis |
-| Ghi rồi đọc lại ra object bằng nhau, gồm KP bẫy lỗi và course có giá | Testcontainers Redis |
-| Không có Redis: vẫn trả dữ liệu, không ném lỗi, không chờ quá timeout | Unit |
-| Mất kết nối giữa chừng | Testcontainers Redis |
-| JSON hỏng: gọi Content và ghi đè | Testcontainers Redis |
-| Content lỗi hoặc trả rỗng: không lưu; lỗi giữ nguyên contract | Unit |
-| `enabled: false`: không đụng Redis | Unit |
-| Danh sách trường của `Topic`, `Course`, `KnowledgePoint` khớp phiên bản khóa | Unit |
-| Các use case "Mới" không gọi `TopicCatalog` | Unit/ArchUnit |
-| `/actuator/health` vẫn `UP` khi Redis tắt | Integration |
-
-Cập nhật mock trong test của các use case được chuyển.
-
-```powershell
-mvn -q -pl services/learning-service -am test
-mvn -q -pl infra/config-server test
-python scripts/production/test-production.py
-docker compose config --quiet
-```
-
-Chạy thật: mở báo cáo hai lần, xem metric `hit` tăng; `docker compose stop redis`, báo cáo vẫn mở được và Learning vẫn `UP`.
-
-### Bước 5. Tài liệu
-
-- `AGENTS.md`: dòng Redis ở §2 thêm cache; §3.9 thêm dòng "cache dữ liệu dùng chung" (tùy chọn, có TTL, Redis lỗi thì gọi
-  nguồn, không cache quyền/tiền/quota).
-- `docs/system-architecture.md` §9: khóa, TTL, nơi dùng.
-- `docs/local-development.md`: `REDIS_PASSWORD` nay cần cho Learning; chạy IDE dùng
-  `docker compose up -d postgres rabbitmq redis`.
-- `docs/deployment.md`: render lại env trước khi deploy Learning.
-- README của learning-service: khóa `learning.topic-cache`.
-
-## 6. Rủi ro
+## 7. Rủi ro
 
 | Rủi ro | Cách xử lý |
 | --- | --- |
-| Dữ liệu cũ dùng cho quyền hoặc giá | Cache tùy chọn, bảng mục 4, test các nơi đọc mới |
-| Redis đầy, ảnh hưởng rate limit và đăng nhập | Chỉ 2 khóa; đo kích thước ở bước 1; không đổi `maxmemory` dùng chung trong plan này |
-| AOF production ghi cả cache mỗi lần nạp | Tính dung lượng ghi mỗi ngày ở bước 1; nếu lớn thì tăng TTL hoặc nén, cần duyệt |
-| Hai phiên bản code chạy cùng lúc đọc JSON khác nhau | Phiên bản trong khóa và test chốt trường |
+| Dữ liệu cũ dùng cho quyền hoặc giá | Cache tùy chọn, bảng mục 6, test các nơi đọc mới |
+| Redis đầy, ảnh hưởng đăng nhập và thu hồi token | Chỉ 2 khóa; đo kích thước; không đổi `maxmemory` hay chính sách evict |
+| AOF production ghi lại payload mỗi lần nạp | Khoảng 153 MB/ngày cho khóa `base` khi có người dùng liên tục; tính cả khóa thứ hai ở phase 01 |
+| Hai phiên bản code chạy cùng lúc | Phiên bản trong khóa và test chốt trường |
 | Redis chậm kéo dài request | Timeout 200 ms, từ chối lệnh khi mất kết nối |
-| Thiếu `REDIS_PASSWORD` khi deploy | Render env và kiểm tra bằng test production trước |
-
-## 7. Lùi lại
-
-1. `LEARNING_TOPIC_CACHE_ENABLED=false` rồi restart Learning.
-2. Nếu cần, revert PR. Không có migration; khóa Redis tự hết hạn sau 60 giây.
+| Thiếu `REDIS_PASSWORD` làm Learning không khởi động | Render env trước khi deploy, có test production |
+| Đổi constructor làm Spring không chọn được | Chỉ một constructor có `@Autowired`; chạy test khởi động context |
 
 ## 8. Tiêu chí hoàn thành
 
-- Khi trúng cache, các luồng "Cache" không gọi `topic-sequence` của Content.
-- Tắt Redis không làm hỏng luồng nào, và Learning vẫn `UP`.
-- Các luồng "Mới" vẫn thấy thay đổi của Content ngay.
-- Toàn bộ test Learning đạt; test Redis chạy thật với Docker, không bị bỏ qua.
-- Có số đo trước và sau trong `reports/`.
-- Tài liệu ở bước 5 đã cập nhật.
+- Trúng cache thì các luồng "Cache" không gọi `topic-sequence`.
+- Tắt Redis không làm hỏng luồng nào, Learning vẫn `UP`.
+- Các luồng "Mới" thấy thay đổi của Content ngay.
+- Toàn bộ test Learning đạt, test Redis chạy thật chứ không bị bỏ qua.
+- Có số đo trước và sau trong `reports/`; tài liệu ở phase 05 đã cập nhật.
 
 ## 9. Quyết định đã chốt (2026-11-25)
 
-1. **Cây kiến thức (`GetLearnerTreeUseCase`)**: đọc mới ở bản đầu; xem lại khi có số đo.
-2. **TTL**: 60 giây.
-3. **Redis làm cache**: đã duyệt; sửa `AGENTS.md` cùng PR với code.
-4. **Thứ tự**: commit plan, chạy bước 1, báo kết quả đo trước khi code.
+1. Cây kiến thức đọc mới ở bản đầu; xem lại khi có số đo.
+2. TTL 60 giây.
+3. Redis được dùng làm cache; sửa `AGENTS.md` cùng PR với code.
+4. Phải có kết quả phase 01 và được duyệt trước khi làm phase 02.
