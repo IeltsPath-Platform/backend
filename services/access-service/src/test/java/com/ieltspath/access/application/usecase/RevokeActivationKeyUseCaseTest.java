@@ -54,7 +54,7 @@ class RevokeActivationKeyUseCaseTest {
 
         assertThatThrownBy(() -> useCase.execute(key.getId()))
                 .isInstanceOf(InvalidKeyOperationException.class)
-                .hasMessage("Cannot revoke a redeemed activation key");
+                .hasMessage("Không thu hồi được mã đã kích hoạt.");
         assertThat(key.getStatus()).isEqualTo(KeyStatus.REDEEMED);
         verify(keys, never()).save(any());
     }
