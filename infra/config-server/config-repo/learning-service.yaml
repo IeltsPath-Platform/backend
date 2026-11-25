@@ -74,6 +74,7 @@ learning:
     point-cost: ${LEARNING_WRITING_POINT_COST:3}
     # LLM gradings per learner and calendar day in quota-timezone.
     daily-grading-limit: ${LEARNING_WRITING_DAILY_GRADING_LIMIT:20}
+    premium-daily-grading-limit: ${LEARNING_WRITING_PREMIUM_DAILY_GRADING_LIMIT:20}
     quota-timezone: Asia/Ho_Chi_Minh
     # Template v2 with deepseek-flash took 17 to 20 s for a 200-word Task 1; 25 is the most WritingSettings allows and
     # stays under the Gateway's 60 s timeout for essay submissions.
@@ -140,6 +141,7 @@ learning:
     retention-days: ${LEARNING_SPEAKING_RETENTION_DAYS:90}
     timezone: Asia/Ho_Chi_Minh
     daily-grading-limit: ${LEARNING_SPEAKING_DAILY_LIMIT:5}
+    premium-daily-grading-limit: ${LEARNING_SPEAKING_PREMIUM_DAILY_LIMIT:10}
     # A row being graded that has not changed for this long is taken over. The job touches the row of every submission it
     # works on at a third of this time and after every recording, so this only has to cover a stopped instance, not a slow step.
     stale-after-seconds: 300

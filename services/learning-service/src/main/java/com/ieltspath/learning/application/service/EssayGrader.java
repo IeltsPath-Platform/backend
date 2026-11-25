@@ -621,7 +621,9 @@ public class EssayGrader {
     private static String loadTemplate(String version) {
         try (InputStream input = EssayGrader.class.getResourceAsStream("/essay-prompt-template-" + version + ".txt")) {
             if (input == null) throw new IllegalStateException("Essay prompt template missing");
-            return withoutNotes(new String(input.readAllBytes(), StandardCharsets.UTF_8));
+            String template = new String(input.readAllBytes(), StandardCharsets.UTF_8)
+                    .replace("\r\n", "\n").replace('\r', '\n');
+            return withoutNotes(template);
         } catch (IOException exception) {
             throw new IllegalStateException("Essay prompt template unreadable", exception);
         }

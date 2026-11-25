@@ -13,6 +13,9 @@ public interface AccessClient {
     /** Whether the learner has an active subscription (PREMIUM) right now. */
     boolean premium();
 
+    /** Premium status for a learner when a background job has no learner bearer token. */
+    boolean premiumOf(UUID userId);
+
     /** Idempotent by {@code idempotencyKey}; a resend returns the original ledger entry. */
     default UUID debit(UUID userId, int amount, UUID referenceId, String idempotencyKey, String description) {
         return debit(userId, amount, "LESSON_WRITING", referenceId, idempotencyKey, description);

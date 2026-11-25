@@ -48,6 +48,7 @@ public class SubmitFreeWritingUseCase {
 
     public WritingSubmissionResult execute(UUID userId, UUID packageVersionId, UUID questionVersionId, UUID requestId,
                                            String essayText) {
+        boolean premium = flow.premiumLearner();
         int words = flow.validate(essayText);
 
         Optional<WritingSubmission> existing = essays.findByRequestId(requestId);
@@ -63,11 +64,11 @@ public class SubmitFreeWritingUseCase {
         flow.requireGraderAvailable();
 
         Item item = prompts.find(packageVersionId, questionVersionId);
-        flow.requireBalance();
+        flow.requireBalance(premium);
 
         WritingSubmission grading = transaction.execute(status -> startGrading(userId, item, requestId, essayText,
-                words));
-        flow.grade(grading);
+                words, premium));
+        flow.grade(grading, premium);
         return charge(grading);
     }
 
@@ -77,7 +78,8 @@ public class SubmitFreeWritingUseCase {
                         status -> finish(charged, ledgerEntryId)));
     }
 
-    private WritingSubmission startGrading(UUID userId, Item item, UUID requestId, String essayText, int words) {
+    private WritingSubmission startGrading(UUID userId, Item item, UUID requestId, String essayText, int words,
+                                           boolean premium) {
         lock.lock(userId);
         Instant now = clock.instant();
         boolean gradingInProgress = false;
@@ -93,7 +95,7 @@ public class SubmitFreeWritingUseCase {
         Optional<WritingSubmission> existing = essays.findByRequestId(requestId);
         if (existing.isEmpty()) {
             WritingSubmission submission = WritingSubmission.startFree(UUID.randomUUID(), userId, requestId,
-                    essayText, words, EssayPrompts.of(item), flow.pointCost(), now);
+                    essayText, words, EssayPrompts.of(item), flow.pointCost(premium), now);
             essays.save(submission);
             return submission;
         }

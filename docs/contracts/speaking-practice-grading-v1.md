@@ -115,6 +115,10 @@ Daily limit. One unit of `speaking_grading` is taken just before the LLM call an
 grade. A learner who has reached the limit has the submission wait (`FAILED_RETRYABLE`, `DAILY_LIMIT_REACHED`); that wait
 does not count as a grading attempt, so it never turns into `NEEDS_EXAMINER`.
 
+Premium grading. An active Premium learner's Speaking submission has `pointCost: 0`; creation does not check the point
+balance and settling the grade does not debit points. The daily limit is `learning.speaking.premium-daily-grading-limit`
+(default 10), compared with 5 for other learners. A failed background Premium lookup uses the normal limit.
+
 Transcript quality is `LOW` only when the mean ASR confidence is under 0.85. A high share of badly pronounced words keeps
 a transcript from being `HIGH` but does not make it `LOW`, so weak speakers' results still reach the learning path.
 

@@ -7,6 +7,7 @@ import com.ieltspath.assessment.application.port.AssessmentLlmQuota;
 import com.ieltspath.assessment.application.port.EssayGradingPort;
 import com.ieltspath.assessment.application.port.GateEssayJobStore;
 import com.ieltspath.assessment.application.port.PromptActivationProvider;
+import com.ieltspath.assessment.application.port.PremiumLookup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,6 +43,8 @@ public class GradeGateEssayJobUseCase {
     private final ObjectMapper json;
     private final int batchSize;
     private final int dailyLimit;
+    private final int premiumDailyLimit;
+    private final PremiumLookup premiumLookup;
     private final Duration stuckAfter;
     private final ZoneId quotaZone;
     private final Clock clock;
@@ -49,19 +52,23 @@ public class GradeGateEssayJobUseCase {
     @Autowired
     public GradeGateEssayJobUseCase(GateEssayJobStore jobs, EssayGradingPort grader, AssessmentLlmQuota quota,
                                     GateResultAssembler assembler, PlacementGradingService placement,
-                                    PromptActivationProvider activations, PlatformTransactionManager transactionManager, ObjectMapper json,
+                                    PromptActivationProvider activations, PremiumLookup premiumLookup,
+                                    PlatformTransactionManager transactionManager, ObjectMapper json,
                                     @Value("${assessment.llm-grading.batch-size:10}") int batchSize,
                                     @Value("${assessment.llm-grading.daily-limit:20}") int dailyLimit,
+                                    @Value("${assessment.llm-grading.premium-daily-limit:40}") int premiumDailyLimit,
                                     @Value("${assessment.llm-grading.stuck-after:PT10M}") Duration stuckAfter,
                                     @Value("${assessment.llm-grading.quota-timezone:Asia/Ho_Chi_Minh}") String quotaZone) {
-        this(jobs, grader, quota, assembler, placement, activations, transactionManager, json, batchSize, dailyLimit, stuckAfter,
-                ZoneId.of(quotaZone), Clock.systemUTC());
+        this(jobs, grader, quota, assembler, placement, activations, premiumLookup, transactionManager, json, batchSize,
+                dailyLimit, premiumDailyLimit, stuckAfter, ZoneId.of(quotaZone), Clock.systemUTC());
     }
 
     GradeGateEssayJobUseCase(GateEssayJobStore jobs, EssayGradingPort grader, AssessmentLlmQuota quota,
                              GateResultAssembler assembler, PlacementGradingService placement,
-                             PromptActivationProvider activations, PlatformTransactionManager transactionManager,
-                             ObjectMapper json, int batchSize, int dailyLimit, Duration stuckAfter, ZoneId quotaZone,
+                             PromptActivationProvider activations, PremiumLookup premiumLookup,
+                             PlatformTransactionManager transactionManager,
+                             ObjectMapper json, int batchSize, int dailyLimit, int premiumDailyLimit,
+                             Duration stuckAfter, ZoneId quotaZone,
                              Clock clock) {
         this.jobs = jobs;
         this.activations = activations;
@@ -73,6 +80,8 @@ public class GradeGateEssayJobUseCase {
         this.json = json;
         this.batchSize = batchSize;
         this.dailyLimit = dailyLimit;
+        this.premiumDailyLimit = premiumDailyLimit;
+        this.premiumLookup = premiumLookup;
         this.stuckAfter = stuckAfter;
         this.quotaZone = quotaZone;
         this.clock = clock;
@@ -83,7 +92,7 @@ public class GradeGateEssayJobUseCase {
                              PlatformTransactionManager transactionManager, ObjectMapper json, int batchSize,
                              int dailyLimit, Duration stuckAfter, ZoneId quotaZone, Clock clock) {
         this(jobs, grader, quota, assembler, placement, task -> EssayGradingPort.PROMPT_VERSION,
-                transactionManager, json, batchSize, dailyLimit, stuckAfter, quotaZone, clock);
+                userId -> false, transactionManager, json, batchSize, dailyLimit, 40, stuckAfter, quotaZone, clock);
     }
 
     /** @return how many jobs were claimed. */
@@ -103,7 +112,11 @@ public class GradeGateEssayJobUseCase {
         try {
             EssayGradingPort.Prompt gradingPrompt = prompt(job, activatedVersion(job));
             if (!grader.available()) throw new EssayGradingException("LLM_UNAVAILABLE");
-            if (!quota.tryConsume(job.userId(), LocalDate.now(clock.withZone(quotaZone)), dailyLimit)) {
+            boolean premium;
+            try { premium = premiumLookup.isPremium(job.userId()); }
+            catch (RuntimeException failure) { premium = false; }
+            if (!quota.tryConsume(job.userId(), LocalDate.now(clock.withZone(quotaZone)),
+                    premium ? premiumDailyLimit : dailyLimit)) {
                 throw new EssayGradingException("DAILY_LIMIT_REACHED");
             }
             grade = grader.grade(gradingPrompt, job.essay());

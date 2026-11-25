@@ -25,7 +25,8 @@ public record WritingSettings(
         @DefaultValue("10000") @Min(1) int maxChars,
         @DefaultValue("20") @Min(1) @Max(25) int gradingTimeoutSeconds,
         @DefaultValue("120") @Min(1) int staleGradingSeconds,
-        @DefaultValue("10") @Min(1) int dailyGradingLimit,
+        @DefaultValue("20") @Min(1) int dailyGradingLimit,
+        @DefaultValue("20") @Min(1) int premiumDailyGradingLimit,
         @DefaultValue("Asia/Ho_Chi_Minh") @NotBlank String quotaTimezone,
         @DefaultValue("2") @Min(1) int progressFixedAfter,
         // Band caps stay off until an examiner has set the thresholds; a null cap switches its rule off.
@@ -77,15 +78,27 @@ public record WritingSettings(
                            boolean bandCapsEnabled, BigDecimal tooShortBandCap, BigDecimal offTopicBandCap,
                            BigDecimal noOverviewBandCap, BigDecimal partialAnswerBandCap, BigDecimal noPositionBandCap,
                            int maxCorrections, String defaultTemplate) {
-        this(pointCost, minWords, maxWords, maxChars, gradingTimeoutSeconds, staleGradingSeconds, dailyGradingLimit,
+        this(pointCost, minWords, maxWords, maxChars, gradingTimeoutSeconds, staleGradingSeconds, dailyGradingLimit, 20,
                 quotaTimezone, progressFixedAfter, bandCapsEnabled, tooShortBandCap, offTopicBandCap, noOverviewBandCap,
                 partialAnswerBandCap, noPositionBandCap, maxCorrections, defaultTemplate, Density.OFF);
     }
 
     /** Settings for a grader built without Spring, as unit tests do: caps off and the first prompt template. */
     public static WritingSettings defaults() {
-        return new WritingSettings(3, 50, 1000, 10000, 20, 120, 10, "Asia/Ho_Chi_Minh", 2, false,
+        return new WritingSettings(3, 50, 1000, 10000, 20, 120, 20, "Asia/Ho_Chi_Minh", 2, false,
                 null, null, null, null, null, 30, "v1");
+    }
+
+    public WritingSettings(int pointCost, int minWords, int maxWords, int maxChars, int gradingTimeoutSeconds,
+                           int staleGradingSeconds, int dailyGradingLimit, int premiumDailyGradingLimit,
+                           String quotaTimezone, int progressFixedAfter, boolean bandCapsEnabled,
+                           BigDecimal tooShortBandCap, BigDecimal offTopicBandCap, BigDecimal noOverviewBandCap,
+                           BigDecimal partialAnswerBandCap, BigDecimal noPositionBandCap, int maxCorrections,
+                           String defaultTemplate) {
+        this(pointCost, minWords, maxWords, maxChars, gradingTimeoutSeconds, staleGradingSeconds, dailyGradingLimit,
+                premiumDailyGradingLimit, quotaTimezone, progressFixedAfter, bandCapsEnabled, tooShortBandCap,
+                offTopicBandCap, noOverviewBandCap, partialAnswerBandCap, noPositionBandCap, maxCorrections,
+                defaultTemplate, Density.OFF);
     }
 
     @AssertTrue(message = "minWords must be below maxWords")

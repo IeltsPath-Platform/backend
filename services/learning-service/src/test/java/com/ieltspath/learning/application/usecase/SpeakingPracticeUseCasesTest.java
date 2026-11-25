@@ -180,6 +180,16 @@ class SpeakingPracticeUseCasesTest {
     }
 
     @Test
+    void premiumSubmissionCostsNothingAndDoesNotReadTheBalance() {
+        when(points.premium()).thenReturn(true);
+
+        SpeakingSubmissionResult result = open(UUID.randomUUID());
+
+        assertEquals(0, result.pointCost());
+        verify(points, never()).balance();
+    }
+
+    @Test
     void anUnreachablePointsServiceIsReportedNotTreatedAsEnough() {
         when(points.balance()).thenThrow(new AccessUnavailableException(503));
 

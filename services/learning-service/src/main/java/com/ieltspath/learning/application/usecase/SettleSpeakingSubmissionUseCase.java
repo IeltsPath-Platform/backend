@@ -20,11 +20,10 @@ import java.util.UUID;
 
 /**
  * Charges a graded Speaking submission and releases the grade to the learner. The background job stops at
- * {@code PAYMENT_PENDING} because only the learner may spend their points: the access service accepts a debit only from
- * the wallet's owner, and a job holds no learner token. So the debit runs here, in the learner's own request, once per
- * submission (the idempotency key makes a repeated call harmless): debit, then in one transaction {@code GRADED}.
- * Not enough points leaves the submission {@code PAYMENT_PENDING}, to be settled after a top-up. Speaking practice is
- * outside the course, so a grade never reaches the learner's mastery.
+ * {@code PAYMENT_PENDING} because only the learner may spend points; a Premium submission has cost zero. The debit, if
+ * needed, runs in the learner's own request once per submission (the idempotency key makes a repeated call harmless),
+ * then one transaction moves it to {@code GRADED}. Not enough points leaves a paid submission {@code PAYMENT_PENDING}.
+ * Speaking practice is outside the course, so a grade never reaches the learner's mastery.
  */
 @Service
 public class SettleSpeakingSubmissionUseCase {
@@ -53,8 +52,9 @@ public class SettleSpeakingSubmissionUseCase {
                         "Speaking submission not found"));
         if (submission.status() != SpeakingSubmissionStatus.PAYMENT_PENDING) return SpeakingSubmissionResult.from(submission);
 
-        UUID ledgerEntry = points.debit(userId, submission.pointCost(), "SPEAKING_AI", submission.id(),
-                "speaking:" + userId + ":" + submission.requestId(), "AI Speaking practice grading");
+        UUID ledgerEntry = submission.pointCost() == 0 ? null : points.debit(userId, submission.pointCost(),
+                "SPEAKING_AI", submission.id(), "speaking:" + userId + ":" + submission.requestId(),
+                "AI Speaking practice grading");
         boolean[] released = {false};
         SpeakingSubmission settled = transaction.execute(status -> {
             learnerLock.lock(userId);

@@ -23,8 +23,8 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Loads purchase and progress facts once per request, and asks Access for Premium only when required. A free course is
- * open to everyone, so it is checked before Premium and its lessons never reach the paywall.
+ * Loads purchase and progress facts once per request. Premium status is reserved for plan features and does not open
+ * paid course content. A free course is open to everyone.
  */
 @Component
 public class PaywallGate {
@@ -69,16 +69,13 @@ public class PaywallGate {
 
         /**
          * The lesson rule on raw facts, for callers that hold only a catalog summary. A paid lesson whose Premium state
-         * cannot be read throws {@link AccessUnavailableException}; a lesson opened by a purchase, a free course or the
-         * free preview never asks.
+         * Whether a learner is Premium does not affect this paywall; a purchase, free course, free preview or prior
+         * progress can open the lesson.
          */
         public boolean lessonOpen(UUID courseId, Integer skillPosition, Set<LearningSkill> skills, boolean grandfathered) {
             Ownership ownership = ownership(courseId);
-            if (PaywallPolicy.isOpen(courseId, skillPosition, skills, ownership.skills, ownership.combo,
-                    grandfathered, false)) return true;
-            if (freeCourse(courseId)) return true;
             return PaywallPolicy.isOpen(courseId, skillPosition, skills, ownership.skills, ownership.combo,
-                    grandfathered, premium());
+                    grandfathered, false) || freeCourse(courseId);
         }
 
         private static boolean grandfathered(LessonProgress lessonProgress) {
@@ -107,11 +104,8 @@ public class PaywallGate {
             if (skill == null) skill = topic.skill();
             Set<LearningSkill> pointSkills = skill == null ? Set.of() : Set.of(skill);
             Ownership ownership = ownership(courseId);
-            if (PaywallPolicy.isOpen(courseId, position, pointSkills, ownership.skills, ownership.combo,
-                    grandfathered, false)) return true;
-            if (freeCourse(courseId)) return true;
             return PaywallPolicy.isOpen(courseId, position, pointSkills, ownership.skills, ownership.combo,
-                    grandfathered, premium());
+                    grandfathered, false) || freeCourse(courseId);
         }
 
         /**
