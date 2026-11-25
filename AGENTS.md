@@ -337,7 +337,7 @@ src/main/java/com/ieltspath/<service>
   vẫn chỉ có sau khi block đạt. Package đã nộp ở Practice hoặc đã giao trong
   bài ôn không bao giờ được giao lại làm set ôn cho chính học viên đó (hết package thì bài ôn `SKIPPED`).
 - Consumer không gọi HTTP; ACK sau khi transaction commit; vi phạm contract hoặc hết lượt thử → DLQ.
-- Tác vụ LLM mới cho học viên (chấm Writing) phải có hạn mức theo ngày (plan 0737).
+- Tác vụ LLM cho học viên phải có hạn mức theo ngày; Writing và Speaking áp dụng quota riêng cho Premium và không trừ điểm khi Premium được xác nhận.
 ### 3.9 Pattern hệ thống: bắt buộc áp dụng
 
 Mỗi thay đổi thuộc các tình huống dưới đây PHẢI dùng pattern đã có và đúng thư viện dùng chung; không tự dựng cơ chế

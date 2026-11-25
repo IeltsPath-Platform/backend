@@ -24,22 +24,23 @@ public class JdbcHumanGradingCreditConsumptionRepository implements HumanGrading
     @Override
     public Optional<HumanGradingCreditConsumption> findBySubmissionId(UUID submissionId) {
         return jdbc.query("""
-                SELECT submission_id, user_id, subscription_id, remaining_credits, refunded_at
+                SELECT submission_id, user_id, subscription_id, remaining_credits, refunded_at, credit_spent
                 FROM human_grading_credit_consumptions WHERE submission_id = ?
                 """, (rs, row) -> new HumanGradingCreditConsumption(
                 rs.getObject("submission_id", UUID.class), rs.getObject("user_id", UUID.class),
                 rs.getObject("subscription_id", UUID.class), rs.getInt("remaining_credits"),
-                rs.getTimestamp("refunded_at") == null ? null : rs.getTimestamp("refunded_at").toInstant()), submissionId)
+                rs.getTimestamp("refunded_at") == null ? null : rs.getTimestamp("refunded_at").toInstant(),
+                rs.getBoolean("credit_spent")), submissionId)
                 .stream().findFirst();
     }
 
     @Override
     public void save(HumanGradingCreditConsumption consumption) {
         jdbc.update("""
-                INSERT INTO human_grading_credit_consumptions(submission_id,user_id,subscription_id,remaining_credits)
-                VALUES (?,?,?,?)
+                INSERT INTO human_grading_credit_consumptions(submission_id,user_id,subscription_id,remaining_credits,credit_spent)
+                VALUES (?,?,?,?,?)
                 """, consumption.submissionId(), consumption.userId(), consumption.subscriptionId(),
-                consumption.remainingCredits());
+                consumption.remainingCredits(), consumption.creditSpent());
     }
 
     @Override
@@ -52,11 +53,11 @@ public class JdbcHumanGradingCreditConsumptionRepository implements HumanGrading
     }
 
     @Override
-    public void markReconsumed(UUID submissionId, UUID subscriptionId, int remainingCredits) {
+    public void markReconsumed(UUID submissionId, UUID subscriptionId, int remainingCredits, boolean creditSpent) {
         jdbc.update("""
                 UPDATE human_grading_credit_consumptions
-                SET refunded_at = NULL, subscription_id = ?, remaining_credits = ?
+                SET refunded_at = NULL, subscription_id = ?, remaining_credits = ?, credit_spent = ?
                 WHERE submission_id = ? AND refunded_at IS NOT NULL
-                """, subscriptionId, remainingCredits, submissionId);
+                """, subscriptionId, remainingCredits, creditSpent, submissionId);
     }
 }

@@ -115,6 +115,10 @@ Daily limit. One unit of `speaking_grading` is taken just before the LLM call an
 grade. A learner who has reached the limit has the submission wait (`FAILED_RETRYABLE`, `DAILY_LIMIT_REACHED`); that wait
 does not count as a grading attempt, so it never turns into `NEEDS_EXAMINER`.
 
+Premium grading. An active Premium learner's Speaking submission has `pointCost: 0`; creation does not check the point
+balance and settling the grade does not debit points. The daily limit is `learning.speaking.premium-daily-grading-limit`
+(default 10), compared with 5 for other learners. A failed background Premium lookup uses the normal limit.
+
 Transcript quality is `LOW` only when the mean ASR confidence is under 0.85. A high share of badly pronounced words keeps
 a transcript from being `HIGH` but does not make it `LOW`, so weak speakers' results still reach the learning path.
 
@@ -155,3 +159,7 @@ make an optional `ERROR_PATTERN` review of the error's parent point, by the rule
 heart, and is not part of the clearance of the lesson's Practice beyond the set's own score: the multiple-choice sets of the
 lesson remain a way to clear it. A practice outside the course (the catalogue's tests) has no lesson or attempt and never
 writes evidence or reviews.
+
+## Free Speaking practice tests
+
+Creating a Speaking submission for a tagged free practice test requires an active Premium subscription before a submission or upload is opened. A missing subscription returns HTTP 403 PREMIUM_REQUIRED; an unavailable entitlement lookup returns HTTP 503 ENTITLEMENT_UNAVAILABLE. Both responses contain details.code and a Vietnamese user message. Existing submission uploads, grading and settlement do not repeat the check.

@@ -176,6 +176,15 @@ spring:
                   args:
                     tier: upload
 
+            - id: content-course-import-limited
+              uri: lb://CONTENT-SERVICE
+              predicates:
+                - Path=/api/content/admin/course-import/**
+              filters:
+                - name: ClientRateLimit
+                  args:
+                    tier: upload
+
             - id: content-service
               uri: lb://CONTENT-SERVICE
               predicates:

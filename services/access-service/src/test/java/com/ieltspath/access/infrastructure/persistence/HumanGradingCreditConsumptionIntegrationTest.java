@@ -5,6 +5,7 @@ import com.ieltspath.access.application.command.RefundHumanGradingCreditCommand;
 import com.ieltspath.access.application.usecase.ConsumeHumanGradingCreditUseCase;
 import com.ieltspath.access.domain.exception.DuplicateIdempotencyException;
 import com.ieltspath.access.infrastructure.persistence.adapter.JdbcHumanGradingCreditConsumptionRepository;
+import com.ieltspath.access.infrastructure.persistence.adapter.PlanRepositoryAdapter;
 import com.ieltspath.access.infrastructure.persistence.adapter.OutboxEventRepositoryAdapter;
 import com.ieltspath.access.infrastructure.persistence.adapter.SubscriptionRepositoryAdapter;
 import com.ieltspath.access.infrastructure.persistence.mapper.AccessPersistenceMapper;
@@ -31,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({ConsumeHumanGradingCreditUseCase.class, SubscriptionRepositoryAdapter.class,
         OutboxEventRepositoryAdapter.class, JdbcHumanGradingCreditConsumptionRepository.class,
-        AccessPersistenceMapper.class, CorrelationRabbitAutoConfiguration.class})
+        PlanRepositoryAdapter.class, AccessPersistenceMapper.class, CorrelationRabbitAutoConfiguration.class})
 class HumanGradingCreditConsumptionIntegrationTest {
     @Container static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:15-alpine");
 
@@ -103,12 +104,40 @@ class HumanGradingCreditConsumptionIntegrationTest {
         assertEquals(1, usedCredits(subscription));
     }
 
+    @Test
+    void unlimitedConsumptionIsPersistedAndRefundDoesNotMintCredit() {
+        UUID user = UUID.randomUUID();
+        UUID subscription = activePremiumSubscription(user, 2);
+        UUID submission = UUID.randomUUID();
+
+        var first = credits.consume(new ConsumeHumanGradingCreditCommand(user, submission));
+        assertFalse(first.charged());
+        assertFalse(credits.consume(new ConsumeHumanGradingCreditCommand(user, submission)).charged());
+        entityManager.flush();
+        assertEquals(0, usedCredits(subscription));
+        assertEquals(2, credits.refund(new RefundHumanGradingCreditCommand(user, submission)));
+        assertEquals(0, usedCredits(subscription));
+        entityManager.flush();
+        assertEquals(1, count("SELECT count(*) FROM outbox_events WHERE event_type='HumanGradingCreditConsumed'"));
+        assertEquals(1, count("SELECT count(*) FROM outbox_events WHERE event_type='HumanGradingCreditRefunded'"));
+    }
+
     private UUID activeSubscription(UUID user, int total) {
         UUID subscription = UUID.randomUUID();
         jdbc.update("""
                 INSERT INTO subscriptions(id,user_id,plan_id,status,starts_at,source_type,
                     human_grading_credits_total,human_grading_credits_used)
-                SELECT ?,?,p.id,'ACTIVE',CURRENT_TIMESTAMP,'ADMIN',?,0 FROM plans p ORDER BY p.created_at LIMIT 1
+                VALUES (?,?,'11111111-1111-1111-1111-111111111111','ACTIVE',CURRENT_TIMESTAMP,'ADMIN',?,0)
+                """, subscription, user, total);
+        return subscription;
+    }
+
+    private UUID activePremiumSubscription(UUID user, int total) {
+        UUID subscription = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO subscriptions(id,user_id,plan_id,status,starts_at,source_type,
+                    human_grading_credits_total,human_grading_credits_used)
+                VALUES (?,?,'22222222-2222-2222-2222-222222222222','ACTIVE',CURRENT_TIMESTAMP,'ADMIN',?,0)
                 """, subscription, user, total);
         return subscription;
     }

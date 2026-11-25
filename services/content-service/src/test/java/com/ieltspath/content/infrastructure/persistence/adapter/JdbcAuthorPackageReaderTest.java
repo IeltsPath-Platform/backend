@@ -145,6 +145,57 @@ class JdbcAuthorPackageReaderTest {
     }
 
     @Test
+    void listFiltersByAccessLevelAndReportsSkillPartsAndCounts() {
+        String tag = tag();
+        UUID free = insertPackage(tag + "-FREE", "PRACTICE_TEST", "PUBLISHED");
+        UUID premium = insertPackage(tag + "-PREM", "PRACTICE_TEST", "PUBLISHED");
+        jdbc.update("UPDATE content_packages SET required_feature_key='PREMIUM_CONTENT' WHERE id=:id", Map.of("id", premium));
+        UUID mixed = insertPackage(tag + "-MIX", "PRACTICE_TEST", "DRAFT");
+
+        UUID premiumVersion = insertVersion(premium, 1, "PUBLISHED");
+        jdbc.update("UPDATE content_packages SET current_published_version_id=:v WHERE id=:id",
+                Map.of("v", premiumVersion, "id", premium));
+        UUID part1 = insertSection(premiumVersion, 1);
+        UUID part2 = insertSection(premiumVersion, 2);
+        jdbc.update("UPDATE content_sections SET part_no=1, skill='LISTENING' WHERE id=:id", Map.of("id", part1));
+        jdbc.update("UPDATE content_sections SET part_no=2, skill='LISTENING' WHERE id=:id", Map.of("id", part2));
+        insertSectionQuestion(part1, insertQuestion("EXAM", "PUBLISHED", "q1"), 1);
+        insertSectionQuestion(part1, insertQuestion("EXAM", "PUBLISHED", "q2"), 2);
+        insertSectionQuestion(part2, insertQuestion("EXAM", "PUBLISHED", "q3"), 1);
+
+        UUID mixedVersion = insertVersion(mixed, 1, "DRAFT");
+        UUID reading = insertSection(mixedVersion, 1);
+        UUID writing = insertSection(mixedVersion, 2);
+        jdbc.update("UPDATE content_sections SET skill='WRITING' WHERE id=:id", Map.of("id", writing));
+
+        List<AuthorPackageSummary> all = list(filter(PackageType.PRACTICE_TEST, null, tag));
+        assertEquals(3, all.size());
+
+        AuthorPackageSummary row = byId(all, premium);
+        assertEquals("LISTENING", row.skill());
+        assertEquals(List.of(1, 2), row.partNos());
+        assertEquals(2, row.sectionCount());
+        assertEquals(3, row.questionCount());
+        assertNull(byId(all, mixed).skill(), "sections of different skills have no single skill");
+        assertEquals(2, byId(all, mixed).sectionCount());
+        assertEquals(0, byId(all, free).sectionCount());
+        assertEquals(List.of(), byId(all, free).partNos());
+
+        assertEquals(List.of(premium), ids(list(withAccess(tag, Boolean.TRUE, null))));
+        assertEquals(2, list(withAccess(tag, Boolean.FALSE, null)).size());
+        assertEquals(List.of(premium), ids(list(withAccess(tag, null, "LISTENING"))));
+        assertEquals(0, list(withAccess(tag, Boolean.FALSE, "LISTENING")).size());
+    }
+
+    private static List<UUID> ids(List<AuthorPackageSummary> rows) {
+        return rows.stream().map(AuthorPackageSummary::id).toList();
+    }
+
+    private static AuthorPackageReader.Filter withAccess(String q, Boolean premium, String skill) {
+        return new AuthorPackageReader.Filter(PackageType.PRACTICE_TEST, null, null, null, null, q, null, premium, skill);
+    }
+
+    @Test
     void extrasCarryPassageAudioAndQuestionDetails() {
         String tag = tag();
         UUID pkg = insertPackage(tag, "PRACTICE_SET", "DRAFT");

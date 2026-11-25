@@ -55,6 +55,7 @@ class InternalUserControllerTest {
     @Autowired MockMvc mockMvc;
     @MockBean GetUserDisplayNamesUseCase displayNames;
     @MockBean GetStudyTimezoneUseCase studyTimezone;
+    @MockBean com.ieltspath.user.application.usecase.ListSalesStaffUseCase salesStaff;
 
     @DynamicPropertySource
     static void hmacProperties(DynamicPropertyRegistry registry) {
@@ -103,6 +104,27 @@ class InternalUserControllerTest {
                 .andExpect(jsonPath("$.items[0].displayName").value("Mina"))
                 .andExpect(jsonPath("$.items[0].email").doesNotExist());
         verify(displayNames).execute(eq(List.of(existingId, unknownId)));
+    }
+
+    @Test
+    void salesStaffListIsReadWithAnInternalTokenAndShowsLockedAccountsMarked() throws Exception {
+        UUID sale = UUID.randomUUID();
+        UUID locked = UUID.randomUUID();
+        when(salesStaff.execute()).thenReturn(List.of(
+                new com.ieltspath.user.application.port.SalesStaffReader.SalesAccount(sale, "Sale A", true),
+                new com.ieltspath.user.application.port.SalesStaffReader.SalesAccount(locked, "Sale khóa", false)));
+
+        mockMvc.perform(get("/internal/users/sales-staff").header(HttpHeaders.AUTHORIZATION, bearer(UUID.randomUUID())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[1].active").value(false))
+                .andExpect(jsonPath("$[0].email").doesNotExist());
+    }
+
+    @Test
+    void salesStaffListRequiresAnInternalToken() throws Exception {
+        mockMvc.perform(get("/internal/users/sales-staff")).andExpect(status().isUnauthorized());
+        verifyNoInteractions(salesStaff);
     }
 
     @Test

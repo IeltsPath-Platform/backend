@@ -2,6 +2,7 @@ package com.ieltspath.learning.api.exception;
 
 import com.ieltspath.commonstorage.StorageException;
 import com.ieltspath.commonstorage.UploadRejectedException;
+import com.ieltspath.commonsecurity.error.VietnameseErrorMessages;
 import com.ieltspath.events.messaging.InvalidDeadLetterBatchException;
 import com.ieltspath.events.messaging.UnknownDeadLetterQueueException;
 import com.ieltspath.learning.application.exception.AccessUnavailableException;
@@ -84,9 +85,15 @@ public class GlobalExceptionHandler {
         ResponseEntity.BodyBuilder response = ResponseEntity.status(exception.getStatus());
         if ("AI_BUSY".equals(exception.getCode())) response.header("Retry-After", "5");
         if ("CONTENT_UNAVAILABLE".equals(exception.getCode())) response.header("Retry-After", "30");
-        return response
-                .body(new LearningErrorResponse(exception.getMessage(), exception.getCode(), null,
-                        exception.getSubmissionId(), exception.getLessonIds()));
+        boolean premiumDenied = "PREMIUM_REQUIRED".equals(exception.getCode());
+        boolean entitlementUnavailable = "ENTITLEMENT_UNAVAILABLE".equals(exception.getCode());
+        String detail = premiumDenied || entitlementUnavailable
+                ? VietnameseErrorMessages.userFacing(exception.getStatus(), exception.getMessage())
+                : exception.getMessage();
+        Map<String, String> details = premiumDenied || entitlementUnavailable
+                ? Map.of("code", exception.getCode()) : null;
+        return response.body(new LearningErrorResponse(detail, exception.getCode(), null,
+                exception.getSubmissionId(), exception.getLessonIds(), null, null, details));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

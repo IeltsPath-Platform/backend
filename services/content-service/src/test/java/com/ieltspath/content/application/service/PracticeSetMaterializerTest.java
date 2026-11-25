@@ -10,7 +10,7 @@ import com.ieltspath.content.application.result.AuthorVersionResult;
 import com.ieltspath.content.application.result.QuestionResult;
 import com.ieltspath.content.application.usecase.AddQuestionVersionUseCase;
 import com.ieltspath.content.application.usecase.AddSectionQuestionUseCase;
-import com.ieltspath.content.application.usecase.CreateContentPackageUseCase;
+import com.ieltspath.content.application.usecase.CodeSettingsUseCases;
 import com.ieltspath.content.application.usecase.CreateContentSectionUseCase;
 import com.ieltspath.content.application.usecase.CreateDraftPackageVersionUseCase;
 import com.ieltspath.content.application.usecase.CreateQuestionUseCase;
@@ -38,6 +38,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -49,7 +50,7 @@ import static org.mockito.Mockito.when;
 /** The order of what a proposed set creates, and what each part is given. The use cases themselves are tested on their own. */
 class PracticeSetMaterializerTest {
 
-    private final CreateContentPackageUseCase createPackage = mock(CreateContentPackageUseCase.class);
+    private final CodeSettingsUseCases codeSettings = mock(CodeSettingsUseCases.class);
     private final CreateDraftPackageVersionUseCase createVersion = mock(CreateDraftPackageVersionUseCase.class);
     private final CreateContentSectionUseCase createSection = mock(CreateContentSectionUseCase.class);
     private final SectionMediaUseCases media = mock(SectionMediaUseCases.class);
@@ -58,7 +59,7 @@ class PracticeSetMaterializerTest {
     private final AddSectionQuestionUseCase addSectionQuestion = mock(AddSectionQuestionUseCase.class);
     private final QuestionRepository questions = mock(QuestionRepository.class);
     private final ContentPackageRepository packages = mock(ContentPackageRepository.class);
-    private final PracticeSetMaterializer materializer = new PracticeSetMaterializer(createPackage, createVersion,
+    private final PracticeSetMaterializer materializer = new PracticeSetMaterializer(codeSettings, createVersion,
             createSection, media, createQuestion, addVersion, addSectionQuestion, questions, packages);
 
     private final UUID lesson = UUID.randomUUID();
@@ -79,7 +80,7 @@ class PracticeSetMaterializerTest {
     private void stubCreation(List<UUID> questionVersions) {
         AuthorPackageResult pkg = mock(AuthorPackageResult.class);
         when(pkg.id()).thenReturn(packageId);
-        when(createPackage.executeAsAuthor(any())).thenReturn(pkg);
+        when(codeSettings.createGeneratedPackage(any(), any())).thenReturn(pkg);
         AuthorVersionResult version = mock(AuthorVersionResult.class);
         when(version.id()).thenReturn(versionId);
         when(createVersion.execute(packageId, null)).thenReturn(version);
@@ -114,16 +115,16 @@ class PracticeSetMaterializerTest {
         verify(addSectionQuestion).execute(packageId, versionId, sectionId, firstVersion, BigDecimal.ONE);
         verify(addSectionQuestion).execute(packageId, versionId, sectionId, secondVersion, BigDecimal.ONE);
         ArgumentCaptor<CreateContentPackageCommand> packageCommand = ArgumentCaptor.forClass(CreateContentPackageCommand.class);
-        verify(createPackage).executeAsAuthor(packageCommand.capture());
-        assertEquals("PS-LESSON_01-1", packageCommand.getValue().code());
+        verify(codeSettings).createGeneratedPackage(packageCommand.capture(), eq("PS-LESSON_01-1"));
+        assertNull(packageCommand.getValue().code());
         assertEquals("Set title", packageCommand.getValue().title());
         assertEquals(PackageType.PRACTICE_SET, packageCommand.getValue().packageType());
         ArgumentCaptor<SaveContentSectionCommand> sectionCommand = ArgumentCaptor.forClass(SaveContentSectionCommand.class);
         verify(createSection).execute(sectionCommand.capture());
         assertEquals(Skill.READING, sectionCommand.getValue().skill());
         assertEquals(null, sectionCommand.getValue().instructions());
-        InOrder order = inOrder(createPackage, createVersion, createSection, media, packages);
-        order.verify(createPackage).executeAsAuthor(any());
+        InOrder order = inOrder(codeSettings, createVersion, createSection, media, packages);
+        order.verify(codeSettings).createGeneratedPackage(any(), eq("PS-LESSON_01-1"));
         order.verify(createVersion).execute(packageId, null);
         order.verify(createSection).execute(any());
         order.verify(media).setPassage(packageId, versionId, sectionId, "A. The passage.");
@@ -207,7 +208,8 @@ class PracticeSetMaterializerTest {
         materializer.create(lesson, "L".repeat(100), 3, single);
 
         ArgumentCaptor<CreateContentPackageCommand> packageCommand = ArgumentCaptor.forClass(CreateContentPackageCommand.class);
-        verify(createPackage).executeAsAuthor(packageCommand.capture());
-        assertEquals(PracticeSetMaterializer.MAX_CODE_PREFIX + 5, packageCommand.getValue().code().length());
+        ArgumentCaptor<String> generatedCode = ArgumentCaptor.forClass(String.class);
+        verify(codeSettings).createGeneratedPackage(packageCommand.capture(), generatedCode.capture());
+        assertEquals(PracticeSetMaterializer.MAX_CODE_PREFIX + 5, generatedCode.getValue().length());
     }
 }

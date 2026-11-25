@@ -193,7 +193,9 @@ public class AccessPersistenceMapper {
                 entity.getExpiresAt(),
                 entity.getCreatedBy(),
                 entity.getCreatedAt(),
-                entity.getRedeemedAt()
+                entity.getRedeemedAt(),
+                entity.getBatchCode(),
+                entity.getIssuedAt()
         );
     }
 

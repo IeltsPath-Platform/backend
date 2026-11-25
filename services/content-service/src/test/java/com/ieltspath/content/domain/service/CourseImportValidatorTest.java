@@ -320,6 +320,59 @@ class CourseImportValidatorTest {
     }
 
     @Test
+    void invalidQuestionsRemainDeclaredSoReferencesDoNotCascade() {
+        Sheets sheets = good();
+        sheets.rows.get("Questions").set(0, new Row(3, merge(sheets.rows.get("Questions").get(0), "answer", "Z")));
+        List<String> errors = where(check(sheets));
+        assertTrue(errors.contains("Questions:3:answer:ANSWER_NOT_IN_OPTIONS"), errors.toString());
+        assertTrue(!errors.contains("Blocks:4:questionRefs:UNKNOWN_QUESTION_REF"), errors.toString());
+    }
+
+    @Test
+    void invalidTopicCodeDoesNotCauseAnUnknownReferenceCascade() {
+        Sheets sheets = good();
+        sheets.rows.get("Topics").set(0, new Row(3, merge(sheets.rows.get("Topics").get(0), "code", "bad code")));
+        sheets.rows.get("Lessons").set(0, new Row(3, merge(sheets.rows.get("Lessons").get(0), "topicCode", "bad code")));
+        List<String> errors = where(check(sheets));
+        assertTrue(errors.contains("Topics:3:code:INVALID_VALUE"), errors.toString());
+        assertTrue(!errors.contains("Lessons:3:topicCode:UNKNOWN_REFERENCE"), errors.toString());
+    }
+
+    @Test
+    void trueFalseNotGivenUsesStandardOptionKeysAndAnswer() {
+        Sheets sheets = good();
+        Row question = sheets.rows.get("Questions").get(0);
+        sheets.rows.get("Questions").set(0, new Row(3, merge(question, "type", "TRUE_FALSE_NOT_GIVEN",
+                "answer", "NOT_GIVEN", "optionA", "", "optionB", "", "optionC", "",
+                "distractorErrorCodes", "")));
+        var plan = check(sheets).plan().questions().get(0);
+        assertEquals(List.of("TRUE", "FALSE", "NOT_GIVEN"), plan.options().stream().map(option -> option.key()).toList());
+        assertEquals("NOT_GIVEN", plan.correct());
+    }
+
+    @Test
+    void mixedSkillPracticePackageIsRejected() {
+        Sheets sheets = good();
+        Row question = sheets.rows.get("Questions").get(1);
+        sheets.rows.get("Questions").set(1, new Row(4, merge(question, "skill", "WRITING")));
+        assertTrue(where(check(sheets)).contains("PracticeSets:3:questionRefs:MIXED_SKILLS"));
+    }
+
+    @Test
+    void conflictsAgainstCatalogueAreReportedWithWorkbookRowNumbers() {
+        ImportCatalogFacts occupied = new ImportCatalogFacts(facts.knowledgePointIdsByCode(), facts.activeErrorCodes(),
+                facts.existingImportRefs(), facts.takenPackageCodes(), Set.of("C1"), Set.of("T1"), Set.of("L1"),
+                Set.of("6.5"), Set.of(970), Map.of());
+        Validated result = CourseImportValidator.validate(good().model(), occupied);
+        List<String> errors = where(result);
+        assertTrue(errors.contains("Course:3:code:CODE_CONFLICT"), errors.toString());
+        assertTrue(errors.contains("Course:3:bandLevel:CODE_CONFLICT"), errors.toString());
+        assertTrue(errors.contains("Topics:3:code:CODE_CONFLICT"), errors.toString());
+        assertTrue(errors.contains("Topics:3:sortOrder:CODE_CONFLICT"), errors.toString());
+        assertTrue(errors.contains("Lessons:3:code:CODE_CONFLICT"), errors.toString());
+    }
+
+    @Test
     void issuesNeverQuoteACell() {
         Sheets sheets = good();
         sheets.rows.get("Topics").set(0, new Row(3, Map.of("code", "SECRET CODE", "name", "n", "skill", "READING",

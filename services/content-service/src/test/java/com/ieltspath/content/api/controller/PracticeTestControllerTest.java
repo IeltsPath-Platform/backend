@@ -1,6 +1,7 @@
 package com.ieltspath.content.api.controller;
 
 import com.ieltspath.commonsecurity.config.CommonSecurityAutoConfiguration;
+import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.content.application.usecase.ListTestSourcesUseCase;
 import com.ieltspath.content.application.usecase.SearchPracticeTestsUseCase;
 import com.ieltspath.content.application.port.PracticeTestCatalogReader;
@@ -20,6 +21,7 @@ import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
+import java.util.Set;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -64,13 +66,17 @@ class PracticeTestControllerTest {
     @MockitoBean
     private com.ieltspath.content.application.usecase.GetSpeakingTaskUseCase speakingTask;
 
+    @MockitoBean
+    private CurrentUserProvider currentUser;
+
     @Test
     @WithMockUser(roles = "CUSTOMER")
     void speakingTaskRouteReturnsThePartAndItsQuestions() throws Exception {
+        when(currentUser.requireRoles()).thenReturn(Set.of("CUSTOMER"));
         UUID versionId = UUID.randomUUID();
         UUID sectionId = UUID.randomUUID();
         UUID questionId = UUID.randomUUID();
-        when(speakingTask.execute(versionId, sectionId)).thenReturn(new com.ieltspath.content.application.port
+        when(speakingTask.execute(versionId, sectionId, true)).thenReturn(new com.ieltspath.content.application.port
                 .SpeakingTaskReader.SpeakingTask(UUID.randomUUID(), versionId, sectionId, "Speaking Practice Test 1",
                 "Part 1: Hometown", 1, 300, "Answer each question in about 20-30 seconds.", List.of(
                 new com.ieltspath.content.application.port.SpeakingTaskReader.Question(questionId, 1,

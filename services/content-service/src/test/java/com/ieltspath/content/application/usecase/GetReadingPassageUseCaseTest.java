@@ -1,6 +1,7 @@
 package com.ieltspath.content.application.usecase;
 
 import com.ieltspath.content.application.result.ReadingPassageResult;
+import com.ieltspath.content.application.exception.PremiumRequiredException;
 import com.ieltspath.content.domain.aggregate.ContentAsset;
 import com.ieltspath.content.domain.aggregate.ContentPackage;
 import com.ieltspath.content.domain.entity.ContentPackageVersion;
@@ -47,11 +48,16 @@ class GetReadingPassageUseCaseTest {
     }
 
     private ContentPackage pkg(PackageType type, PublicationStatus status, UUID publishedVersionId, Skill skill) {
+        return pkg(type, status, publishedVersionId, skill, null);
+    }
+
+    private ContentPackage pkg(PackageType type, PublicationStatus status, UUID publishedVersionId, Skill skill,
+                               String requiredFeatureKey) {
         ContentSection section = new ContentSection(sectionId, versionId, "Rooftops", skill, 1, 600,
                 "Read the passage.", Instant.now(), Instant.now(), List.of());
         ContentPackageVersion version = new ContentPackageVersion(versionId, packageId, 1, PublicationStatus.PUBLISHED,
                 "{}", 1, Instant.now(), null, Instant.now(), Instant.now(), List.of(section));
-        return new ContentPackage(packageId, "CODE", "Practice set", type, null, status, publishedVersionId,
+        return new ContentPackage(packageId, "CODE", "Practice set", type, requiredFeatureKey, status, publishedVersionId,
                 Instant.now(), Instant.now(), List.of(version), null);
     }
 
@@ -69,7 +75,7 @@ class GetReadingPassageUseCaseTest {
                 asset(AssetType.IMAGE, "ignored"),
                 asset(AssetType.PASSAGE, "Third paragraph.")));
 
-        ReadingPassageResult result = useCase.execute(sectionId);
+        ReadingPassageResult result = useCase.execute(sectionId, false);
 
         assertThat(result.sectionTitle()).isEqualTo("Rooftops");
         assertThat(result.instructions()).isEqualTo("Read the passage.");
@@ -86,7 +92,17 @@ class GetReadingPassageUseCaseTest {
                 pkg(PackageType.LESSON, PublicationStatus.PUBLISHED, versionId, Skill.READING)));
         when(assets.findBySectionId(sectionId)).thenReturn(List.of(asset(AssetType.PASSAGE, "Text.")));
 
-        assertThat(useCase.execute(sectionId).paragraphs()).hasSize(1);
+        assertThat(useCase.execute(sectionId, false).paragraphs()).hasSize(1);
+    }
+
+    @Test
+    void premiumPracticePassageIsBlockedBeforeReadingItsAssetsForNonPremiumLearner() {
+        when(packages.findBySectionId(sectionId)).thenReturn(Optional.of(pkg(PackageType.PRACTICE_TEST,
+                PublicationStatus.PUBLISHED, versionId, Skill.READING, "PREMIUM_PRACTICE")));
+        var learnerUseCase = new GetReadingPassageUseCase(packages, assets, () -> false);
+
+        assertThrows(PremiumRequiredException.class, () -> learnerUseCase.execute(sectionId, true));
+        org.mockito.Mockito.verifyNoInteractions(assets);
     }
 
     @Test
@@ -94,7 +110,7 @@ class GetReadingPassageUseCaseTest {
         for (PackageType type : List.of(PackageType.MOCK_TEST, PackageType.PLACEMENT_TEST, PackageType.QUIZ)) {
             when(packages.findBySectionId(sectionId)).thenReturn(Optional.of(
                     pkg(type, PublicationStatus.PUBLISHED, versionId, Skill.READING)));
-            assertThrows(ReadingPassageNotFoundException.class, () -> useCase.execute(sectionId), type.name());
+            assertThrows(ReadingPassageNotFoundException.class, () -> useCase.execute(sectionId, false), type.name());
         }
     }
 
@@ -102,27 +118,27 @@ class GetReadingPassageUseCaseTest {
     void unpublishedPackagesOldVersionsAndOtherSkillsAreNotReadable() {
         when(packages.findBySectionId(sectionId)).thenReturn(Optional.of(
                 pkg(PackageType.PRACTICE_SET, PublicationStatus.DRAFT, versionId, Skill.READING)));
-        assertThrows(ReadingPassageNotFoundException.class, () -> useCase.execute(sectionId));
+        assertThrows(ReadingPassageNotFoundException.class, () -> useCase.execute(sectionId, false));
 
         when(packages.findBySectionId(sectionId)).thenReturn(Optional.of(
                 pkg(PackageType.PRACTICE_SET, PublicationStatus.PUBLISHED, UUID.randomUUID(), Skill.READING)));
-        assertThrows(ReadingPassageNotFoundException.class, () -> useCase.execute(sectionId));
+        assertThrows(ReadingPassageNotFoundException.class, () -> useCase.execute(sectionId, false));
 
         when(packages.findBySectionId(sectionId)).thenReturn(Optional.of(
                 pkg(PackageType.PRACTICE_SET, PublicationStatus.PUBLISHED, versionId, Skill.LISTENING)));
-        assertThrows(ReadingPassageNotFoundException.class, () -> useCase.execute(sectionId));
+        assertThrows(ReadingPassageNotFoundException.class, () -> useCase.execute(sectionId, false));
     }
 
     @Test
     void unknownSectionsAndSectionsWithoutPassageTextAreNotReadable() {
         when(packages.findBySectionId(sectionId)).thenReturn(Optional.empty());
-        assertThrows(ReadingPassageNotFoundException.class, () -> useCase.execute(sectionId));
+        assertThrows(ReadingPassageNotFoundException.class, () -> useCase.execute(sectionId, false));
 
         when(packages.findBySectionId(sectionId)).thenReturn(Optional.of(
                 pkg(PackageType.PRACTICE_SET, PublicationStatus.PUBLISHED, versionId, Skill.READING)));
         when(assets.findBySectionId(sectionId)).thenReturn(List.of(
                 asset(AssetType.PASSAGE, "  \n\n "), asset(AssetType.AUDIO, null)));
-        assertThrows(ReadingPassageNotFoundException.class, () -> useCase.execute(sectionId));
+        assertThrows(ReadingPassageNotFoundException.class, () -> useCase.execute(sectionId, false));
     }
 
     @Test
@@ -133,7 +149,7 @@ class GetReadingPassageUseCaseTest {
                 AssetValidationStatus.INVALID, Instant.now());
         when(assets.findBySectionId(sectionId)).thenReturn(List.of(invalid, asset(AssetType.PASSAGE, "Shown.")));
 
-        assertThat(useCase.execute(sectionId).paragraphs())
+        assertThat(useCase.execute(sectionId, false).paragraphs())
                 .containsExactly(new ReadingPassageResult.Paragraph("A", "Shown."));
     }
 

@@ -490,7 +490,11 @@ public interface LearningContentClient {
     }
 
     record PackageVersion(UUID packageVersionId, UUID packageId, String packageType, UUID topicId,
-                          Map<String, Object> rules, List<Section> sections) {
+                          Map<String, Object> rules, List<Section> sections, String requiredFeatureKey) {
+        public PackageVersion(UUID packageVersionId, UUID packageId, String packageType, UUID topicId,
+                              Map<String, Object> rules, List<Section> sections) {
+            this(packageVersionId, packageId, packageType, topicId, rules, sections, null);
+        }
     }
 
     record Section(UUID sectionId, String title, String skill, String instructions, int sortOrder,

@@ -8,6 +8,20 @@ import java.util.Objects;
 
 public record ActivationKeyCode(String rawKey, String codeHash, String codeHint) {
 
+    /** No 0, 1, I or O, so a code read aloud or copied by hand is not misread. */
+    private static final String CHARSET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+    private static final java.security.SecureRandom RANDOM = new java.security.SecureRandom();
+
+    /** A new random code in the form IP-XXXX-XXXX-XXXX. */
+    public static String generateRaw() {
+        StringBuilder code = new StringBuilder("IP");
+        for (int group = 0; group < 3; group++) {
+            code.append('-');
+            for (int i = 0; i < 4; i++) code.append(CHARSET.charAt(RANDOM.nextInt(CHARSET.length())));
+        }
+        return code.toString();
+    }
+
     public ActivationKeyCode {
         Objects.requireNonNull(codeHash, "codeHash must not be null");
     }

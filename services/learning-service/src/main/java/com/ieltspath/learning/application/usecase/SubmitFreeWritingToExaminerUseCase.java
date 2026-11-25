@@ -1,6 +1,7 @@
 package com.ieltspath.learning.application.usecase;
 
 import com.ieltspath.learning.application.exception.LearningRequestException;
+import com.ieltspath.learning.application.exception.AccessUnavailableException;
 import com.ieltspath.learning.application.port.LearnerLock;
 import com.ieltspath.learning.application.port.LearningContentClient.Item;
 import com.ieltspath.learning.application.result.WritingSubmissionResult;
@@ -22,8 +23,8 @@ import java.util.UUID;
 
 /**
  * Sends a free-writing essay to the examiner the learner chose, in place of the AI grade. The essay is stored first as
- * AWAITING_EXAMINER, then sent for review: Access spends one Premium grading credit (402 when the learner has no Premium
- * or no credit left) and Assessment queues it for that examiner (409 when the examiner cannot take it). Nothing here
+ * AWAITING_EXAMINER, then sent for review: an active Premium subscription enables unlimited requests (402 without one),
+ * and Assessment queues it for that examiner (409 when the examiner cannot take it). Nothing here
  * grades or charges points. The credit is idempotent by essay, and Mentor requests are idempotent by essay too, so a
  * resend with the same {@code requestId} continues the same essay: after a refusal the learner sends it again, possibly
  * to another examiner, without storing a second essay. A different {@code requestId} is a new essay: it is refused with
@@ -65,7 +66,17 @@ public class SubmitFreeWritingToExaminerUseCase {
             // A new essay for a prompt whose last essay still waits for its examiner would spend another credit and take
             // another place of the examiner's day; the learner can send again once the examiner has graded.
             pending(userId, questionVersionId).ifPresent(waiting -> { throw reviewPending(waiting); });
-            Item item = prompts.find(packageVersionId, questionVersionId);
+            FreeWritingPrompts.ResolvedPrompt prompt = prompts.resolve(packageVersionId, questionVersionId);
+            if (prompt.requiredFeatureKey() != null) {
+                final boolean premium;
+                try {
+                    premium = flow.premiumStatus();
+                } catch (AccessUnavailableException exception) {
+                    throw entitlementUnavailable();
+                }
+                if (!premium) throw premiumRequired();
+            }
+            Item item = prompt.item();
             submission = transaction.execute(status -> store(userId, item, requestId, essayText, words));
             if (!sameEssay(submission, userId, questionVersionId)) throw EssaySubmissionFlow.requestConflict();
         }
@@ -88,6 +99,16 @@ public class SubmitFreeWritingToExaminerUseCase {
     private static LearningRequestException reviewPending(UUID submissionId) {
         return new LearningRequestException(409, "EXAMINER_REVIEW_PENDING",
                 "This essay was already sent to an examiner who has not graded it yet", submissionId);
+    }
+
+    private static LearningRequestException premiumRequired() {
+        return new LearningRequestException(403, "PREMIUM_REQUIRED",
+                "Đề này dành cho tài khoản Premium. Nâng cấp để luyện đề này.");
+    }
+
+    private static LearningRequestException entitlementUnavailable() {
+        return new LearningRequestException(503, "ENTITLEMENT_UNAVAILABLE",
+                "Chưa kiểm tra được gói Premium. Vui lòng thử lại sau.");
     }
 
     private static boolean sameEssay(WritingSubmission submission, UUID userId, UUID questionVersionId) {

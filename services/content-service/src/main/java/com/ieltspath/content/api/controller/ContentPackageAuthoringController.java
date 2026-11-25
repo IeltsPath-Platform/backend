@@ -8,7 +8,12 @@ import com.ieltspath.content.api.dto.response.AuthorPackageSummaryResponse;
 import com.ieltspath.content.application.command.CreateContentPackageCommand;
 import com.ieltspath.content.application.command.SaveContentSectionCommand;
 import com.ieltspath.content.application.port.AuthorPackageReader;
+import com.ieltspath.content.application.command.UpdatePackageInfoCommand;
+import com.ieltspath.content.application.usecase.ChangePackageVisibilityUseCase;
 import com.ieltspath.content.application.usecase.CodeSettingsUseCases;
+import com.ieltspath.content.application.usecase.UpdatePackageInfoUseCase;
+import com.ieltspath.content.api.dto.AccessLevel;
+import org.springframework.web.bind.annotation.PatchMapping;
 import com.ieltspath.content.application.usecase.ListAuthorPackagesUseCase;
 import com.ieltspath.content.domain.vo.PackageType;
 import com.ieltspath.content.domain.vo.PlacementPool;
@@ -61,6 +66,8 @@ public class ContentPackageAuthoringController {
     private final UseNewerSectionQuestionVersionUseCase useNewerQuestionVersion;
     private final ListAuthorPackagesUseCase listPackages;
     private final CodeSettingsUseCases codeSettings;
+    private final UpdatePackageInfoUseCase updatePackageInfo;
+    private final ChangePackageVisibilityUseCase packageVisibility;
 
     @GetMapping
     public AuthorPackagePageResponse list(
@@ -71,10 +78,14 @@ public class ContentPackageAuthoringController {
             @RequestParam(value = "courseId", required = false) UUID courseId,
             @RequestParam(value = "q", required = false) String q,
             @RequestParam(value = "placementPool", required = false) PlacementPool placementPool,
+            @RequestParam(value = "accessLevel", required = false) AccessLevel accessLevel,
+            @RequestParam(value = "skill", required = false) String skill,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "25") int size) {
         return AuthorPackagePageResponse.from(listPackages.execute(
-                new AuthorPackageReader.Filter(type, status, lessonId, topicId, courseId, q, placementPool), page, size));
+                new AuthorPackageReader.Filter(type, status, lessonId, topicId, courseId, q, placementPool,
+                        AccessLevelCompatibility.toFeatureRequiredFilter(accessLevel),
+                        skill == null || skill.isBlank() ? null : skill.strip().toUpperCase()), page, size));
     }
 
     @PostMapping
@@ -84,6 +95,25 @@ public class ContentPackageAuthoringController {
                 request.code(), request.title(), request.packageType(),
                 AccessLevelCompatibility.toRequiredFeatureKey(request.accessLevel(), "PREMIUM_CONTENT"),
                 request.lessonId(), request.sourceCode(), request.topicId(), request.courseId(), request.placementPool())));
+    }
+
+    @PatchMapping("/{packageId}")
+    public AuthorPackageResponse updateInfo(@PathVariable("packageId") UUID packageId,
+                                            @Valid @RequestBody AuthorPackageRequests.UpdatePackageInfo request) {
+        boolean accessChange = request.accessLevel() != null;
+        return AuthorPackageResponse.from(updatePackageInfo.execute(new UpdatePackageInfoCommand(packageId, request.title(),
+                accessChange, accessChange ? AccessLevelCompatibility.toRequiredFeatureKey(request.accessLevel(),
+                        "PREMIUM_CONTENT") : null, request.sourceCode(), request.placementPool())));
+    }
+
+    @PostMapping("/{packageId}/archive")
+    public AuthorPackageResponse archive(@PathVariable("packageId") UUID packageId) {
+        return AuthorPackageResponse.from(packageVisibility.archive(packageId));
+    }
+
+    @PostMapping("/{packageId}/restore")
+    public AuthorPackageResponse restore(@PathVariable("packageId") UUID packageId) {
+        return AuthorPackageResponse.from(packageVisibility.restore(packageId));
     }
 
     @GetMapping("/{packageId}")

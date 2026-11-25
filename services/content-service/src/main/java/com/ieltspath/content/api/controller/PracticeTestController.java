@@ -7,6 +7,7 @@ import com.ieltspath.content.api.dto.response.SpeakingTaskResponse;
 import com.ieltspath.content.api.dto.response.WritingTaskResponse;
 import com.ieltspath.content.application.command.SearchPracticeTestsCommand;
 import com.ieltspath.content.application.port.PracticeTestCatalogReader;
+import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.content.application.usecase.GetSpeakingTaskUseCase;
 import com.ieltspath.content.application.usecase.GetWritingTaskUseCase;
 import com.ieltspath.content.application.usecase.ListPracticeTestFormatsUseCase;
@@ -30,6 +31,7 @@ public class PracticeTestController {
     private final ListPracticeTestFormatsUseCase formats;
     private final GetWritingTaskUseCase writingTask;
     private final GetSpeakingTaskUseCase speakingTask;
+    private final CurrentUserProvider currentUser;
 
     @PostMapping("/search")
     @PreAuthorize("hasAnyRole('CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
@@ -64,7 +66,7 @@ public class PracticeTestController {
     @PreAuthorize("hasAnyRole('CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
     public WritingTaskResponse writingTask(@PathVariable("packageVersionId") UUID packageVersionId,
                                            @PathVariable("sectionId") UUID sectionId) {
-        return WritingTaskResponse.from(writingTask.execute(packageVersionId, sectionId));
+        return WritingTaskResponse.from(writingTask.execute(packageVersionId, sectionId, isLearner()));
     }
 
     /** The questions of one Speaking part (Part 1, 2 or 3), for the recording workspace. */
@@ -72,7 +74,12 @@ public class PracticeTestController {
     @PreAuthorize("hasAnyRole('CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
     public SpeakingTaskResponse speakingTask(@PathVariable("packageVersionId") UUID packageVersionId,
                                              @PathVariable("sectionId") UUID sectionId) {
-        return SpeakingTaskResponse.from(speakingTask.execute(packageVersionId, sectionId));
+        return SpeakingTaskResponse.from(speakingTask.execute(packageVersionId, sectionId, isLearner()));
+    }
+
+    private boolean isLearner() {
+        var roles = currentUser.requireRoles();
+        return roles.contains("CUSTOMER") && !roles.contains("CONTENT_AUTHOR") && !roles.contains("EXAMINER");
     }
 
     private static List<PracticeTestCatalogReader.Key> map(List<SearchPracticeTestsRequest.Key> keys) {

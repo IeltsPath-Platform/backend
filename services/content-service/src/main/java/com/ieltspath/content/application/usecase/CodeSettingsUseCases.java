@@ -146,6 +146,51 @@ public class CodeSettingsUseCases {
         return changed;
     }
 
+    /** Read-only code suggestions for a workbook that has not created its course, topics or lessons yet. */
+    @Transactional(readOnly = true)
+    public CodeSuggestion suggestForImport(String kind, String band, String courseCode, Skill skill,
+                                           String topicCode, PackageType packageType) {
+        return suggestForImport(kind, band, courseCode, skill, topicCode, packageType, 0);
+    }
+
+    @Transactional(readOnly = true)
+    public CodeSuggestion suggestForImport(String kind, String band, String courseCode, Skill skill,
+                                           String topicCode, PackageType packageType, long sequenceOffset) {
+        CodeSetting setting = setting(kind);
+        validateBand(band);
+        if (!setting.applied()) return new CodeSuggestion("", false, setting.editable());
+        Map<String, String> context = new HashMap<>();
+        if (band != null && !band.isBlank()) context.put("band", band);
+        String scope = "";
+        String pattern = setting.pattern();
+        if (TOPIC.equals(kind)) {
+            if (courseCode == null || courseCode.isBlank()) return new CodeSuggestion("", true, setting.editable());
+            context.put("course", courseCode);
+            if (skill != null && skill != Skill.ALL) context.put("skill", skillCode(skill));
+            scope = "IMPORT:" + courseCode;
+        } else if (LESSON.equals(kind)) {
+            if (topicCode == null || topicCode.isBlank()) return new CodeSuggestion("", true, setting.editable());
+            context.put("topic", topicCode);
+            scope = "IMPORT:" + topicCode;
+        } else if (PACKAGE.equals(kind)) {
+            if (packageType == null) return new CodeSuggestion("", true, setting.editable());
+            context.put("course", courseCode == null ? "" : courseCode);
+            context.put("type", packageType.codeAbbreviation());
+            scope = "IMPORT:" + courseCode + ":" + packageType.codeAbbreviation();
+            if (courseCode == null || courseCode.isBlank()) pattern = PACKAGE_FALLBACK_PATTERN;
+        } else if (!COURSE.equals(kind)) {
+            return new CodeSuggestion("", true, setting.editable());
+        }
+        if (patterns.requiresContext(pattern, context)) return new CodeSuggestion("", true, setting.editable());
+        long sequence = store.peek(setting.kind(), scope, setting.startNumber()) + Math.max(0, sequenceOffset);
+        String candidate = patterns.render(setting.kind(), pattern, sequence, context);
+        if (patterns.usesSequence(pattern)) {
+            while (exists(setting.kind(), candidate)) candidate = patterns.render(setting.kind(), pattern, ++sequence, context);
+        } else {
+            candidate = uniqueSuffix(setting.kind(), candidate);
+        }
+        return new CodeSuggestion(candidate, true, setting.editable());
+    }
     @Transactional(readOnly = true)
     public CodeSuggestion suggest(String kind, String band) {
         return suggest(kind, band, null, null);
@@ -358,6 +403,13 @@ public class CodeSettingsUseCases {
             throw InvalidContentStateException.codeLocked();
         }
         return lessonAuthoring.create(topicId, code, title, summary, summaryMarkdown, estimatedMinutes, sortOrder);
+    }
+
+    /** Creates a package whose code is generated unless codes are not configured. */
+    @Transactional
+    public AuthorPackageResult createGeneratedPackage(CreateContentPackageCommand command, String fallbackCode) {
+        String supplied = setting(PACKAGE).applied() ? "" : fallbackCode;
+        return createPackage(withCode(command, supplied));
     }
 
     @Transactional

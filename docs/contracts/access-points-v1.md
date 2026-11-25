@@ -14,6 +14,18 @@ Points again. Learning uses `referenceType: "COURSE_UNLOCK"` for durable course-
 type is `COURSE_UNLOCK_DEBIT`. The caller records a pending purchase before this debit and replays it with the same key
 if the response is lost.
 
+## Premium lookup and human-grading credits
+
+`GET /internal/access/users/{userId}/premium` returns `{"premium": true|false}`. It accepts an internal `CUSTOMER` or
+`ADMIN` token and deliberately does not require the token subject to equal `{userId}`: Learning and Assessment background
+workers use service-subject tokens. The response contains only the boolean. Public clients cannot reach `/internal/**`.
+
+`POST /internal/access/human-grading/consume` and `/refund` are idempotent by `submissionId`. For a subscription whose
+active plan enables `HUMAN_GRADING_UNLIMITED`, consume still records the consumption and outbox event but does not spend
+a credit; the response is `{ "submissionId", "remainingCredits", "charged": false }`. A repeat also returns
+`charged: false`. Refunding an unlimited consumption marks it refunded without increasing `human_grading_credits_used`
+in reverse or minting a credit. Without an active subscription, consume remains `402 HUMAN_GRADING_CREDIT_REQUIRED`.
+
 ## Earning points
 
 Points are earned only through the `points.grant.requested` message below. Access exposes no HTTP route that credits

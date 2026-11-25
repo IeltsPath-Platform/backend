@@ -37,7 +37,7 @@ public class ContentPackageJpaEntity {
     private PackageType packageType;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "placement_pool", length = 20, updatable = false)
+    @Column(name = "placement_pool", length = 20)
     private PlacementPool placementPool;
 
     @Column(name = "required_feature_key", length = 100)

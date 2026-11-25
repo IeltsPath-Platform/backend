@@ -881,16 +881,18 @@ public class JdbcLearningContentReader implements LearningContentReader {
     }
 
     private Optional<PackageVersionContentResult> packageVersionContent(UUID packageVersionId, boolean publishedOnly) {
-        record VersionRow(UUID packageId, PackageType packageType, UUID topicId, String rules, PlacementPool placementPool) {}
+        record VersionRow(UUID packageId, PackageType packageType, String requiredFeatureKey, UUID topicId,
+                          String rules, PlacementPool placementPool) {}
         Map<String, Object> byVersion = Map.of("versionId", packageVersionId);
         String publicationFilter = publishedOnly ? " AND v.status = 'PUBLISHED'" : "";
         List<VersionRow> found = jdbc.query(("""
-                SELECT v.package_id, p.package_type, p.topic_id, v.rules::text AS rules, p.placement_pool
+                SELECT v.package_id, p.package_type, p.required_feature_key, p.topic_id, v.rules::text AS rules, p.placement_pool
                 FROM content_package_versions v
                 JOIN content_packages p ON p.id = v.package_id
                 WHERE v.id = :versionId%s
                 """).formatted(publicationFilter), byVersion, (rs, i) -> new VersionRow(uuid(rs, "package_id"),
-                PackageType.valueOf(rs.getString("package_type")), uuid(rs, "topic_id"), rs.getString("rules"), placementPool(rs)));
+                PackageType.valueOf(rs.getString("package_type")), rs.getString("required_feature_key"),
+                uuid(rs, "topic_id"), rs.getString("rules"), placementPool(rs)));
         if (found.isEmpty()) {
             return Optional.empty();
         }
@@ -990,7 +992,8 @@ public class JdbcLearningContentReader implements LearningContentReader {
         });
 
         return Optional.of(new PackageVersionContentResult(packageVersionId, version.packageId(),
-                version.packageType(), version.topicId(), version.rules(), sections, version.placementPool()));
+                version.packageType(), version.topicId(), version.rules(), sections, version.placementPool(),
+                version.requiredFeatureKey()));
     }
 
     @Override

@@ -126,6 +126,9 @@ here: the author asks for questions with the [question drafts](question-drafts-v
 `409 CODE_CONFLICT` with `details.conflicts`, the list of those errors. Any other error returns `422
 COURSE_DRAFT_INVALID` with `details.errors`. Neither changes anything. A draft that is not `READY` returns `400`.
 
+During approval, course, topic, lesson and package creation uses the configured code settings. If a locked setting
+would assign a different code from the one stored in the draft, approval fails and the transaction creates no content.
+
 Two more `422 COURSE_DRAFT_INVALID` errors come from the vocabulary library, after the analysis and before anything is
 created: `VOCABULARY_SENSE_UNAVAILABLE` (`subject` is a `vocabularySenseIds` entry that is no longer active) and
 `VOCABULARY_REJECTED` (`subject` is the library's reason, for example a word that is switched off there). If the library

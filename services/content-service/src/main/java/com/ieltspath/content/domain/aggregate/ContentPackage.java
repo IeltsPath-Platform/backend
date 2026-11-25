@@ -5,6 +5,8 @@ import com.ieltspath.content.domain.entity.ContentSection;
 import com.ieltspath.content.domain.exception.ContentSectionNotFoundException;
 import com.ieltspath.content.domain.exception.DraftVersionExistsException;
 import com.ieltspath.content.domain.exception.InvalidPackageLessonException;
+import com.ieltspath.content.domain.exception.PackageArchiveNotSupportedException;
+import com.ieltspath.content.domain.exception.PlacementPoolLockedException;
 import com.ieltspath.content.domain.exception.PackageVersionNotFoundException;
 import com.ieltspath.content.domain.vo.PackageType;
 import com.ieltspath.content.domain.vo.PlacementPool;
@@ -28,7 +30,7 @@ public class ContentPackage {
     private final UUID lessonId;
     private final UUID courseId;
     private final UUID topicId;
-    private final PlacementPool placementPool;
+    private PlacementPool placementPool;
 
     /** {@code lessonId} makes a practice set part of that lesson's Practice; other package types have none. */
     public ContentPackage(UUID id, String code, String title, PackageType packageType,
@@ -136,6 +138,71 @@ public class ContentPackage {
         this.currentPublishedVersionId = versionId;
         this.status = PublicationStatus.PUBLISHED;
         this.updatedAt = Instant.now();
+    }
+
+    public void rename(String newTitle) {
+        if (newTitle == null || newTitle.isBlank()) {
+            throw new IllegalArgumentException("Tiêu đề không được để trống");
+        }
+        this.title = newTitle.strip();
+        this.updatedAt = Instant.now();
+    }
+
+    /** A null key makes the package free; the Premium key makes it Premium. Takes effect for learners at once. */
+    public void changeRequiredFeatureKey(String newKey) {
+        this.requiredFeatureKey = newKey;
+        this.updatedAt = Instant.now();
+    }
+
+    /** Only a practice test has a source; a null source takes it out of the learner library. */
+    public void changeSource(String newSourceCode) {
+        if (packageType != PackageType.PRACTICE_TEST) {
+            throw new IllegalArgumentException("Nguồn đề chỉ dùng cho đề luyện tập");
+        }
+        this.sourceCode = newSourceCode;
+        this.updatedAt = Instant.now();
+    }
+
+    /** True while no version of the package has ever been published or archived. */
+    public boolean neverPublished() {
+        return currentPublishedVersionId == null && status == PublicationStatus.DRAFT
+                && versions.stream().allMatch(v -> v.getStatus() == PublicationStatus.DRAFT);
+    }
+
+    /** The band pool of a placement test changes only before its first publication. */
+    public void changePlacementPool(PlacementPool newPool) {
+        if (packageType != PackageType.PLACEMENT_TEST) {
+            throw new IllegalArgumentException("Kho band chỉ dùng cho đề đầu vào");
+        }
+        if (newPool == null) {
+            throw new IllegalArgumentException("Chọn kho band cho đề đầu vào");
+        }
+        if (newPool == placementPool) return;
+        if (!neverPublished()) {
+            throw new PlacementPoolLockedException();
+        }
+        this.placementPool = newPool;
+        this.updatedAt = Instant.now();
+    }
+
+    /** Practice tests and placement tests can be hidden from learners and brought back. */
+    public void archive() {
+        requireArchivable();
+        this.status = PublicationStatus.ARCHIVED;
+        this.updatedAt = Instant.now();
+    }
+
+    /** Back to published when a version was published, otherwise to draft. */
+    public void restore() {
+        requireArchivable();
+        this.status = currentPublishedVersionId != null ? PublicationStatus.PUBLISHED : PublicationStatus.DRAFT;
+        this.updatedAt = Instant.now();
+    }
+
+    private void requireArchivable() {
+        if (packageType != PackageType.PRACTICE_TEST && packageType != PackageType.PLACEMENT_TEST) {
+            throw new PackageArchiveNotSupportedException();
+        }
     }
 
     public void addVersion(ContentPackageVersion version) {

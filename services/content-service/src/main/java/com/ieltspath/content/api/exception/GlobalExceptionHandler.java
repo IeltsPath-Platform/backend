@@ -6,6 +6,8 @@ import com.ieltspath.commonstorage.UploadRejectedException;
 import com.ieltspath.content.domain.exception.*;
 import com.ieltspath.content.application.exception.VocabularyServiceUnavailableException;
 import com.ieltspath.content.application.exception.SectionDraftException;
+import com.ieltspath.content.application.exception.EntitlementUnavailableException;
+import com.ieltspath.content.application.exception.PremiumRequiredException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,6 +32,19 @@ public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    @ExceptionHandler(PremiumRequiredException.class)
+    public ResponseEntity<ErrorResponse> premiumRequired(PremiumRequiredException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.FORBIDDEN, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "PREMIUM_REQUIRED"));
+    }
+
+    @ExceptionHandler(EntitlementUnavailableException.class)
+    public ResponseEntity<ErrorResponse> entitlementUnavailable(EntitlementUnavailableException ex,
+                                                                  HttpServletRequest request) {
+        return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "ENTITLEMENT_UNAVAILABLE"));
+    }
+
     @ExceptionHandler({
             TopicNotFoundException.class,
             CourseNotFoundException.class,
@@ -46,6 +61,7 @@ public class GlobalExceptionHandler {
             ContentSectionNotFoundException.class,
             SectionQuestionNotFoundException.class,
             AiDraftNotFoundException.class,
+            com.ieltspath.content.domain.exception.CourseImportDraftNotFoundException.class,
             DraftItemNotFoundException.class,
             RubricNotFoundException.class
     })
@@ -111,6 +127,27 @@ public class GlobalExceptionHandler {
                                                                   HttpServletRequest request) {
         return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
                 Map.of("code", "IMPORT_REF_CONFLICT"));
+    }
+
+    @ExceptionHandler(com.ieltspath.content.domain.exception.PlacementPoolLockedException.class)
+    public ResponseEntity<ErrorResponse> handlePlacementPoolLocked(
+            com.ieltspath.content.domain.exception.PlacementPoolLockedException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "PLACEMENT_POOL_LOCKED"));
+    }
+
+    @ExceptionHandler(com.ieltspath.content.domain.exception.PlacementPoolLastPublishedException.class)
+    public ResponseEntity<ErrorResponse> handlePlacementPoolLastPublished(
+            com.ieltspath.content.domain.exception.PlacementPoolLastPublishedException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "PLACEMENT_POOL_LAST_PUBLISHED"));
+    }
+
+    @ExceptionHandler(com.ieltspath.content.domain.exception.PackageArchiveNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handlePackageArchiveNotSupported(
+            com.ieltspath.content.domain.exception.PackageArchiveNotSupportedException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "PACKAGE_ARCHIVE_NOT_SUPPORTED"));
     }
 
     @ExceptionHandler(DraftVersionExistsException.class)

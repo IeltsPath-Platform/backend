@@ -71,6 +71,7 @@ Gateway giữ các path công khai nhưng trỏ từng nhóm tới chủ sở h�
 
 | Caller | Callee | Endpoint | Cấu hình base URL |
 | --- | --- | --- | --- |
+| content | access | `GET /api/access/me/subscription` (quyền Premium cho nội dung đề luyện, ngoài transaction) | `ACCESS_SERVICE_URL` (mặc định `http://localhost:8084`) |
 | assessment | content | `GET /internal/learning-content/package-versions/{id}` khi tạo attempt (ngoài transaction) | `CONTENT_SERVICE_URL` |
 | content | library | `GET /api/content/vocabulary/senses`, `POST /api/content/admin/vocabulary/bulk` khi duyệt course draft và soạn lesson, bearer của tác giả | `LIBRARY_SERVICE_URL` (khóa `content.library.base-url`, mặc định `http://localhost:8081`) |
 | community | user | `POST /internal/users/public-profiles`, `GET /internal/users/public-profiles/search`, bearer của người xem | `USER_SERVICE_URL` (khóa `community.user-service.base-url`) |
@@ -82,6 +83,8 @@ Gateway giữ các path công khai nhưng trỏ từng nhóm tới chủ sở h�
 | learning | assessment | `GET /api/assessments/me/statistics/study-context` xác minh bài thi của người học khi mở phiên học | `ASSESSMENT_SERVICE_URL` (mặc định `http://localhost:8083`) |
 | library | access | `GET /api/access/me/subscription` for cached Premium heart capacity; `POST /internal/access/points/debit` for durable vocabulary heart/freeze purchases, outside transactions and user locks | `ACCESS_SERVICE_URL` (key `library.access.base-url`, default `http://localhost:8084`) |
 | learning | access | `GET /api/access/me/points` (số dư), `POST /internal/access/points/debit` (AI grading and durable course-skill unlock purchases) | `ACCESS_SERVICE_URL` (mặc định `http://localhost:8084`) |
+| learning | access | `GET /internal/access/users/{userId}/premium` (quota job Speaking, ngoài transaction và khóa) | `ACCESS_SERVICE_URL` (mặc định `http://localhost:8084`) |
+| assessment | access | `GET /internal/access/users/{userId}/premium` (quota chấm essay nền, ngoài transaction và khóa) | `ACCESS_SERVICE_URL` |
 | learning | LLM (ngoài hệ thống) | `POST {base}/chat/completions` (OpenAI-compatible) khi chấm bài luận, ngoài mọi transaction | `LEARNING_LLM_BASE_URL`, `LEARNING_LLM_API_KEY`, `LEARNING_LLM_MODEL` |
 | learning | Azure Speech (ngoài hệ thống) | Speech SDK (`client-sdk` 1.53.0), một lượt nhận dạng liên tục cho cả ghi âm, đẩy audio qua stream (không ghi file); chạy ngoài transaction. Không qua `ResilientCall` (SDK tự mở kết nối); số phân tích chạy cùng lúc bị giới hạn bằng `learning.speech.max-concurrent` | `LEARNING_SPEECH_KEY`, `LEARNING_SPEECH_REGION`, `LEARNING_SPEECH_LOCALE` |
 | assessment | LLM (ngoài hệ thống) | `POST {base}/chat/completions` cho essay đã nộp trong `TOPIC_GATE`/`COURSE_GATE`, ngoài transaction | `ASSESSMENT_LLM_BASE_URL`, `ASSESSMENT_LLM_API_KEY`, `ASSESSMENT_LLM_MODEL`; quota ngày `ASSESSMENT_LLM_DAILY_LIMIT` |
@@ -501,7 +504,7 @@ hoạt động upload.
 | Writing trong Practice và gate dùng chính sách phí khác nhau | Practice trừ điểm; essay trong `TOPIC_GATE`/`COURSE_GATE` chấm miễn phí và có quota riêng ở Assessment |
 | Một số ghi Writing chưa theo quy tắc khóa mọi lượt ghi theo user | Bắt đầu/kết thúc chấm có transaction và advisory lock; quota, lưu grade và lỗi trung gian dùng SQL nguyên tử có điều kiện ngoài các transaction này. Dữ kiện hiện tại, không thay quy tắc AGENTS.md §3.8 |
 | Listener nhiệm vụ hằng ngày có thể gọi Content trong transaction | `QuestRecorder` chạy ở `BEFORE_COMMIT`; `QuestService.ensureToday` → `weaknessTarget` đọc `Content.getTopicSequence()`. Đây là ngoại lệ hiện hữu với quy tắc §3.9, cần tách bước lấy dữ liệu nếu sửa luồng này. |
-| Cổng bài học là authority cho luồng học | `LessonAccessGate` giữ tiến trình review/topic/bài; `PaywallGate` mở 3 bài đầu mỗi skill, unlock skill/combo, tiến độ grandfathered, rồi Premium. Access outage chỉ chặn nội dung cần kiểm tra Premium. |
+| Cổng bài học là authority cho luồng học | `LessonAccessGate` giữ tiến trình review/topic/bài; `PaywallGate` mở 3 bài đầu mỗi skill, skill/combo đã mua, course miễn phí và tiến độ grandfathered. Premium không tự mở bài trả phí. |
 | Sơ đồ §1 còn cạnh assessment → user từ baseline cũ | Tạo attempt hiện chỉ đọc Content; không gọi User để lấy goal (xem §3 và §6) |
 
 ### Mobile vocabulary study ownership

@@ -122,7 +122,8 @@ public class EssayKnowledgeJudge {
     private static String loadTemplate(String resource) {
         try (var input = EssayKnowledgeJudge.class.getResourceAsStream("/" + resource)) {
             if (input == null) throw new IllegalStateException("Knowledge judgment prompt template missing");
-            return new String(input.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            return new String(input.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8)
+                    .replace("\r\n", "\n").replace('\r', '\n');
         } catch (java.io.IOException exception) {
             throw new IllegalStateException("Knowledge judgment prompt template unreadable", exception);
         }

@@ -15,11 +15,18 @@ public record PackageVersionContentResponse(
         UUID packageVersionId,
         UUID packageId,
         PackageType packageType,
+        String requiredFeatureKey,
         UUID topicId,
         @JsonRawValue String rules,
         List<Section> sections,
         PlacementPool placementPool
 ) {
+    public PackageVersionContentResponse(UUID packageVersionId, UUID packageId, PackageType packageType,
+                                         UUID topicId, String rules, List<Section> sections,
+                                         PlacementPool placementPool) {
+        this(packageVersionId, packageId, packageType, null, topicId, rules, sections, placementPool);
+    }
+
     /** {@code audio} appears only on sections with an AUDIO asset; its transcript is internal-only. */
     public record Section(UUID sectionId, String title, Skill skill, String instructions, int sortOrder,
                           Integer partNo, Integer timeLimitSeconds, String passage,
@@ -49,7 +56,7 @@ public record PackageVersionContentResponse(
 
     public static PackageVersionContentResponse from(PackageVersionContentResult result) {
         return new PackageVersionContentResponse(result.packageVersionId(), result.packageId(), result.packageType(),
-                result.topicId(), result.rulesJson(),
+                result.requiredFeatureKey(), result.topicId(), result.rulesJson(),
                 result.sections().stream()
                         .map(s -> new Section(s.sectionId(), s.title(), s.skill(), s.instructions(), s.sortOrder(),
                                 s.partNo(), s.timeLimitSeconds(),

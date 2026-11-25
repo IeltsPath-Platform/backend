@@ -12,6 +12,18 @@ Gói học, subscription, activation key và ví point. Cổng 8084, DB `access_
 | Admin | `/api/access/admin/**` | `ADMIN` |
 | Thao tác trên user khác | `GET /api/access/users/{userId}/entitlement`, `POST /api/access/users/{userId}/consume-human-grading`, `POST /api/access/points/refund` | Chỉ `ADMIN`; chưa service nào gọi |
 | Nội bộ | `POST /internal/access/points/debit` | Service khác, mang bearer của học viên. Không có route cộng điểm: điểm chỉ được cộng qua message `points.grant.requested` (queue `access.points-grant`) |
+| Quản lý bán hàng | `/api/access/manager/**` (tạo đợt, giao, thu hồi, phát, xuất CSV) | `STAFF_MANAGER` (không có ADMIN) |
+| Sale | `/api/access/sale/**` (kho của tôi, phát key, key đã phát) | `SALES_STAFF`, chỉ key của chính mình |
+
+Hợp đồng đầy đủ, trạng thái key và mã lỗi: `docs/contracts/key-distribution-v1.md`.
+
+## Key theo đợt
+
+- Đợt tối đa 1000 key, key mã hóa AES-256-GCM. Khóa `ACCESS_KEY_CODE_SECRET` (Base64 của 32 byte) chỉ đặt trong `.env`;
+  thiếu thì không tạo được đợt, kích hoạt key vẫn chạy.
+- Key của đợt chỉ kích hoạt được sau khi đã phát (`issued_at`). Key sinh từ `/admin/keys/generate` không thuộc đợt, kích hoạt như cũ.
+- Mọi lần xem mã, xuất CSV, giao, cân lại, thu hồi, phát được ghi vào `key_audit_log` (V13). Nhật ký không chứa mã.
+- Danh sách sale lấy từ user-service qua `USER_SERVICE_URL` (`GET /internal/users/sales-staff`).
 
 ## Luật của `/internal/access/**`
 
