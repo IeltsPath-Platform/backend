@@ -36,6 +36,7 @@ import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.context.NoOpServerSecurityContextRepository;
+import org.springframework.security.web.server.ServerAuthenticationEntryPoint;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsWebFilter;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
@@ -67,6 +68,11 @@ public class SecurityConfig {
             AuthProperties authProperties,
             PublicEndpointProperties publicEndpointProperties
     ) {
+        // Mot entry point cho moi 401: thieu token, token sai, token het han. Neu de oauth2ResourceServer dung entry
+        // point mac dinh thi 401 do token het han khong co header CORS, browser giau response va web khong tu refresh token.
+        ServerAuthenticationEntryPoint unauthorized = (exchange, exception) ->
+                writeError(exchange, objectMapper, authProperties, HttpStatus.UNAUTHORIZED, "Unauthorized");
+
         return http
                 // Tat CSRF vi gateway dung stateless JWT, khong dung session/cookie form.
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
@@ -82,9 +88,8 @@ public class SecurityConfig {
 
                 // Ghi JSON loi thong nhat khi token sai hoac khong du quyen.
                 .exceptionHandling(exceptionHandling -> exceptionHandling
-                        // Thieu token, token sai, token het han -> 401.
-                        .authenticationEntryPoint((exchange, exception) ->
-                                writeError(exchange, objectMapper, authProperties, HttpStatus.UNAUTHORIZED, "Unauthorized"))
+                        // Thieu token -> 401.
+                        .authenticationEntryPoint(unauthorized)
                         // Token hop le nhung khong du quyen -> 403.
                         .accessDeniedHandler((exchange, exception) ->
                                 writeError(exchange, objectMapper, authProperties, HttpStatus.FORBIDDEN, "Forbidden")))
@@ -129,6 +134,8 @@ public class SecurityConfig {
 
                 // Bat OAuth2 Resource Server de Spring parse/verify Bearer JWT.
                 .oauth2ResourceServer(oauth2 -> oauth2
+                        // Token sai hoac het han -> cung 401 va cung header CORS nhu tren.
+                        .authenticationEntryPoint(unauthorized)
                         // Convert claim roles thanh GrantedAuthority cua Spring Security.
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())))
 

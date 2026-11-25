@@ -33,7 +33,7 @@ public class JdbcQuestionPassageReader implements QuestionPassageReader {
                          'DIRECT' AS source, NULL AS source_name, 0 AS rank, 0 AS position
                   FROM content_asset_links link
                   JOIN content_assets a ON a.id = link.asset_id
-                  WHERE link.question_version_id = ? AND ((a.asset_type = 'PASSAGE' AND a.text_content IS NOT NULL) OR (a.asset_type = 'AUDIO' AND a.media_reference IS NOT NULL))
+                  WHERE link.question_version_id = ? AND ((a.asset_type = 'PASSAGE' AND a.text_content IS NOT NULL) OR (a.asset_type IN ('AUDIO', 'IMAGE') AND a.media_reference IS NOT NULL))
                   UNION ALL
                   SELECT a.id, a.asset_type, a.text_content, a.media_reference, a.access_tier, a.duration_seconds, 'LESSON', lesson.title, 1, 0
                   FROM lesson_block_questions held

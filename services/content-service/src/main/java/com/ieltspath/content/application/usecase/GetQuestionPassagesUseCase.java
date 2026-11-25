@@ -36,9 +36,9 @@ public class GetQuestionPassagesUseCase {
      * link; it is not stored.
      */
     private Passage withPlayableUrl(Passage passage) {
-        if (passage.type() != AssetType.AUDIO) return passage;
+        if (passage.type() != AssetType.AUDIO && passage.type() != AssetType.IMAGE) return passage;
         try {
-            return passage.withMediaUrl(mediaUrls.resolve(AssetType.AUDIO, passage.mediaReference(), passage.tier(), true));
+            return passage.withMediaUrl(mediaUrls.resolve(passage.type(), passage.mediaReference(), passage.tier(), true));
         } catch (RuntimeException failed) {
             log.warn("Could not make a playable link for an audio asset of a question: {}", failed.getClass().getSimpleName());
             return passage;

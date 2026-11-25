@@ -106,9 +106,9 @@ class JdbcQuestionPassageReaderTest {
         UUID noFile = UUID.randomUUID();
         jdbc.update("INSERT INTO content_assets(id,asset_type,text_content) VALUES(?,'AUDIO','Only a transcript')", noFile);
         jdbc.update("INSERT INTO content_asset_links(id,asset_id,question_version_id,sort_order) VALUES(?,?,?,0)", UUID.randomUUID(), noFile, version);
-        UUID image = UUID.randomUUID();
-        jdbc.update("INSERT INTO content_assets(id,asset_type,media_reference) VALUES(?,'IMAGE','chart.png')", image);
-        jdbc.update("INSERT INTO content_asset_links(id,asset_id,question_version_id,sort_order) VALUES(?,?,?,1)", UUID.randomUUID(), image, version);
+        UUID video = UUID.randomUUID();
+        jdbc.update("INSERT INTO content_assets(id,asset_type,media_reference) VALUES(?,'VIDEO','lesson.mp4')", video);
+        jdbc.update("INSERT INTO content_asset_links(id,asset_id,question_version_id,sort_order) VALUES(?,?,?,1)", UUID.randomUUID(), video, version);
 
         assertThat(reader.passagesOf(version)).isEmpty();
         assertThat(reader.passagesOf(UUID.randomUUID())).isEmpty();

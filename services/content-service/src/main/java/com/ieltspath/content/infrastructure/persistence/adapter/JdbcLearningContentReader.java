@@ -21,6 +21,7 @@ import com.ieltspath.content.domain.vo.LessonBlockKind;
 import com.ieltspath.content.domain.vo.LearningType;
 import com.ieltspath.content.domain.vo.PackageType;
 import com.ieltspath.content.domain.vo.QuestionUsageConflict;
+import com.ieltspath.content.domain.vo.UnpublishedPackageQuestion;
 import com.ieltspath.content.domain.vo.QuestionPurpose;
 import com.ieltspath.content.domain.vo.QuestionDifficulty;
 import com.ieltspath.content.domain.vo.Skill;
@@ -711,6 +712,21 @@ public class JdbcLearningContentReader implements LearningContentReader {
     }
 
     @Override
+    public List<UnpublishedPackageQuestion> unpublishedQuestions(UUID packageVersionId) {
+        return jdbc.query("""
+                SELECT DISTINCT q.id, q.code, s.title AS section, qv.status
+                FROM content_sections s
+                JOIN section_questions sq ON sq.section_id = s.id
+                JOIN question_versions qv ON qv.id = sq.question_version_id
+                JOIN questions q ON q.id = qv.question_id
+                WHERE s.package_version_id = :versionId AND qv.status <> 'PUBLISHED'
+                ORDER BY q.id, s.title
+                """, Map.of("versionId", packageVersionId),
+                (rs, row) -> new UnpublishedPackageQuestion(uuid(rs, "id"), rs.getString("code"),
+                        rs.getString("section"), rs.getString("status")));
+    }
+
+    @Override
     public List<UUID> questionsWithWrongPurpose(UUID packageVersionId, QuestionPurpose requiredPurpose) {
         return jdbc.query("""
                 SELECT DISTINCT q.id FROM content_sections s
@@ -756,6 +772,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
             poolFilter = " AND p.placement_pool = :pool";
             params.addValue("pool", pool.name());
         }
+
         return jdbc.query("""
                 SELECT p.id, p.current_published_version_id, p.code, p.placement_pool
                 FROM content_packages p

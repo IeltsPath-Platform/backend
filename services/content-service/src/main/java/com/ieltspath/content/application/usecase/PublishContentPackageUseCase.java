@@ -14,6 +14,7 @@ import com.ieltspath.content.domain.exception.ContentPackageNotFoundException;
 import com.ieltspath.content.domain.exception.InvalidContentStateException;
 import com.ieltspath.content.domain.exception.QuestionAlreadyUsedException;
 import com.ieltspath.content.domain.exception.QuestionPurposeMismatchException;
+import com.ieltspath.content.domain.exception.QuestionNotPublishedException;
 import com.ieltspath.content.domain.repository.ContentPackageRepository;
 import com.ieltspath.content.domain.vo.QuestionUsageConflict;
 import com.ieltspath.content.domain.vo.QuestionPurpose;
@@ -104,6 +105,9 @@ public class PublishContentPackageUseCase {
         switch (pkg.getPackageType()) {
             case PRACTICE_SET, TOPIC_TEST, COURSE_TEST, MOCK_TEST, PLACEMENT_TEST, PRACTICE_TEST -> {
                 lessons.lockQuestionsForPublishing(targetVersion.getId());
+                List<com.ieltspath.content.domain.vo.UnpublishedPackageQuestion> unpublished =
+                        lessons.unpublishedQuestions(targetVersion.getId());
+                if (!unpublished.isEmpty()) throw new QuestionNotPublishedException(unpublished);
                 List<QuestionUsageConflict> conflicts = lessons.questionsUsedElsewhere(targetVersion.getId());
                 if (!conflicts.isEmpty()) {
                     throw new QuestionAlreadyUsedException(conflicts);

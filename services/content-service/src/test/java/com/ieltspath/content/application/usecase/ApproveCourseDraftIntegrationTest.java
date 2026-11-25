@@ -73,7 +73,8 @@ import static org.mockito.Mockito.when;
  */
 @DataJpaTest(properties = {"spring.cloud.config.enabled=false", "spring.jpa.hibernate.ddl-auto=none"})
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({ApproveCourseDraftUseCase.class, CourseDraftUseCases.class, CourseMaterializer.class, CourseDraftCodec.class,
+@Import({ApproveCourseDraftUseCase.class, CommitCourseDraftApprovalUseCase.class, CourseDraftUseCases.class,
+        CourseMaterializer.class, CourseDraftCodec.class,
         CourseDraftAnalysisService.class, JdbcCourseCatalogReader.class, JdbcUnlinkedPracticeSetReader.class, CreateCourseUseCase.class,
         UpdateCourseUseCase.class, CourseRepositoryAdapter.class, CoursePersistenceMapperImpl.class,
         CreateTopicUseCase.class, UpdateTopicUseCase.class, TopicRepositoryAdapter.class,
@@ -82,6 +83,9 @@ import static org.mockito.Mockito.when;
         CreateContentPackageUseCase.class, CreateDraftPackageVersionUseCase.class, JdbcLearningContentReader.class,
         JdbcPracticeTestMilestoneRepository.class, JdbcAiDraftRepository.class,
         CreateLessonResourceUseCase.class, LessonResourceRepositoryAdapter.class, LessonResourcePersistenceMapperImpl.class,
+        com.ieltspath.content.infrastructure.persistence.adapter.QuestionRepositoryAdapter.class,
+        com.ieltspath.content.infrastructure.persistence.mapper.QuestionPersistenceMapper.class,
+        PublishQuestionVersionUseCase.class,
         ApproveCourseDraftIntegrationTest.Beans.class})
 @Testcontainers(disabledWithoutDocker = true)
 class ApproveCourseDraftIntegrationTest {

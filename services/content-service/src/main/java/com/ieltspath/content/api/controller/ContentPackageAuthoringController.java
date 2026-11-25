@@ -19,11 +19,12 @@ import com.ieltspath.content.application.usecase.AddSectionQuestionUseCase;
 import com.ieltspath.content.application.usecase.RemoveAndReorderSectionQuestionsUseCase;
 import com.ieltspath.content.api.dto.response.AuthorPackageResponse;
 import com.ieltspath.content.application.usecase.CreateContentSectionUseCase;
-import com.ieltspath.content.application.usecase.CreateDraftPackageVersionUseCase;
+import com.ieltspath.content.application.usecase.CreateDraftFromCurrentVersionUseCase;
 import com.ieltspath.content.application.usecase.DeleteContentSectionUseCase;
 import com.ieltspath.content.application.usecase.GetAuthorPackageUseCase;
 import com.ieltspath.content.application.usecase.ReorderContentSectionsUseCase;
 import com.ieltspath.content.application.usecase.UpdateContentSectionUseCase;
+import com.ieltspath.content.application.usecase.UseNewerSectionQuestionVersionUseCase;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -50,13 +51,14 @@ import java.util.UUID;
 public class ContentPackageAuthoringController {
 
     private final GetAuthorPackageUseCase getPackage;
-    private final CreateDraftPackageVersionUseCase createDraft;
+    private final CreateDraftFromCurrentVersionUseCase createDraft;
     private final CreateContentSectionUseCase createSection;
     private final UpdateContentSectionUseCase updateSection;
     private final DeleteContentSectionUseCase deleteSection;
     private final ReorderContentSectionsUseCase reorderSections;
     private final AddSectionQuestionUseCase addSectionQuestion;
     private final RemoveAndReorderSectionQuestionsUseCase removeAndReorderQuestions;
+    private final UseNewerSectionQuestionVersionUseCase useNewerQuestionVersion;
     private final ListAuthorPackagesUseCase listPackages;
     private final CodeSettingsUseCases codeSettings;
 
@@ -137,6 +139,15 @@ public class ContentPackageAuthoringController {
                                                       @Valid @RequestBody AuthorPackageRequests.AddSectionQuestion request) {
         return AuthorPackageResponse.Question.from(addSectionQuestion.execute(packageId, versionId, sectionId,
                 request.questionVersionId(), request.maxScore()));
+    }
+
+    @PutMapping("/{packageId}/versions/{versionId}/sections/{sectionId}/questions/{sectionQuestionId}/newer-version")
+    public AuthorPackageResponse.Question useNewerQuestionVersion(@PathVariable("packageId") UUID packageId,
+                                                                  @PathVariable("versionId") UUID versionId,
+                                                                  @PathVariable("sectionId") UUID sectionId,
+                                                                  @PathVariable("sectionQuestionId") UUID sectionQuestionId) {
+        return AuthorPackageResponse.Question.from(
+                useNewerQuestionVersion.execute(packageId, versionId, sectionId, sectionQuestionId));
     }
 
     @DeleteMapping("/{packageId}/versions/{versionId}/sections/{sectionId}/questions/{sectionQuestionId}")

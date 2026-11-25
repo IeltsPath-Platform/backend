@@ -47,6 +47,7 @@ public record AuthorPackageExtras(Map<UUID, SectionMedia> sections, Map<UUID, Qu
         }
     }
 
-    public record QuestionInfo(UUID questionId, String stem, String status, String purpose) {
+    /** {@code newerVersionNumber} is the newest published version after the attached one, or null when there is none. */
+    public record QuestionInfo(UUID questionId, String stem, String status, String purpose, Integer newerVersionNumber) {
     }
 }

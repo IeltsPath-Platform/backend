@@ -90,12 +90,21 @@ and `_` are not wildcards). Results are ordered by decreasing `updatedAt` then I
 
 ## 2. Create a draft version
 
-`POST /api/content/admin/packages/{packageId}/versions`, body `{ "rulesJson": "{}" }`.
+`POST /api/content/admin/packages/{packageId}/versions`, body `{ "rulesJson": "..." }` (optional).
 
-Returns `201` with the version shape above and `sections: []`. The server chooses maximum existing
-version number plus one (one for an empty package). At most one draft may be created per package
-through this endpoint; an existing draft returns `409 DRAFT_EXISTS`. `rulesJson` defaults to `{}`
-and must contain valid JSON. Draft creation is serialized per package.
+Returns `201` with the version shape above and `sections: []`; the response does not list the copied
+sections, so a client reads the package again. The server chooses maximum existing version number plus
+one (one for an empty package). At most one draft may be created per package through this endpoint; an
+existing draft returns `409 DRAFT_EXISTS`. `rulesJson` must contain valid JSON when sent. Draft creation
+is serialized per package.
+
+**Change from the previous version of this contract: the draft is no longer empty.** It starts as a copy
+of the version learners currently get (`currentPublishedVersionId`); a package that was never published
+uses the highest numbered non-draft version; a package with no earlier version gets an empty draft. The
+copy has new ids for sections, question groups, question links and passage/audio links, in the same
+transaction as the draft. The questions and assets themselves are shared with the source version, not
+duplicated. When `rulesJson` is omitted or blank the draft takes the source version's rules (`{}` when
+there is no source); an explicit value is kept. A scheduled publication time is not copied.
 
 The legacy `POST /api/content/packages/{id}/versions` keeps its existing explicit-number behavior.
 
@@ -112,7 +121,9 @@ Prefix: `/api/content/admin/packages/{packageId}/versions/{versionId}`.
 Create/update use the existing `AddContentSectionRequest` fields: required `title` (up to 255
 characters), optional `skill`, integer `sortOrder`, optional `timeLimitSeconds`, `instructions`,
 `partNo` (1..4) and `coverAssetId`. Section responses include these fields plus `id`, passage,
-audio and questions as in detail. A conflicting section sort order returns `400`.
+audio and questions as in detail. A conflicting section sort order returns `400`. A `partNo` can be used once per skill
+in a version (Listening Part 1 and Reading Passage 1 may coexist); sections with no skill share one group. Before
+2026-11-24 it was unique across the whole version.
 
 The legacy `POST /api/content/packages/versions/{versionId}/sections` also rejects non-drafts.
 
@@ -123,8 +134,15 @@ Prefix: `/api/content/admin/packages/{packageId}/versions/{versionId}/sections/{
 - `POST /questions`: `{ "questionVersionId": "<uuid>", "maxScore": 1.0 }`, `201` with the
   question row from detail. Adds after the highest existing sort order; `maxScore` defaults to
   1.0 and must be positive. A question version already in any section of this version returns
-  `409 QUESTION_ALREADY_IN_VERSION`; missing question version returns `404`.
-- `DELETE /questions/{sectionQuestionId}`: `204`, reassigns remaining sort orders `1..n`.
+  `409 QUESTION_ALREADY_IN_VERSION`; missing question version returns `404`. A section whose
+  skill is `WRITING` holds one question: adding a second returns `400` (added 2026-11-24).
+- `PUT /questions/{sectionQuestionId}/newer-version` (added 2026-11-24): no body, `200` with the question row.
+  Moves the row to the newest `PUBLISHED` version of the same question, keeping its order, score and group; a
+  draft package version only. A question with no newer published version returns `400`. Each question row in the
+  detail carries `newerVersionNumber`, the number of that newer version or `null`.
+- `POST /api/content/admin/packages/{packageId}/versions/{versionId}/sections/{sectionId}/questions/publish-drafts`: publishes all attached question versions that are currently `DRAFT`, after locking the package and question rows in question-ID order. Returns `{ "publishedCount": n }`; no draft questions returns zero. Validation is completed for the full set before any version changes. A validation failure returns `422 QUESTION_VERSION_NOT_PUBLISHABLE` and no version is published.
+- `DELETE /questions/{sectionQuestionId}`: `204`, reassigns remaining sort orders `1..n`. The only question of a
+  `WRITING` section cannot be removed (`400`, added 2026-11-24): the prompt is edited, not swapped.
 - `PUT /questions/order`: `{ "sectionQuestionIds": ["<uuid>"] }`, `204`; requires exactly all
   current rows, each once, and assigns sort orders `1..n` atomically.
 
@@ -132,6 +150,8 @@ New rows have `group_id = null`. Adding a question does not check its publicatio
 or use in another published package: existing publication validation remains authoritative.
 It continues returning `422 QUESTION_ALREADY_USED`, `QUESTION_PURPOSE_MISMATCH` and
 `INVALID_PACKAGE_LESSON` according to the existing publish contract.
+
+Package publication returns `422 QUESTION_NOT_PUBLISHED` if any question version used by the target version is not `PUBLISHED`; the error identifies affected question versions. This applies to immediate and scheduled publication.
 
 ## 5. Section passage and audio
 

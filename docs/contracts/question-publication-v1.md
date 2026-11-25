@@ -13,6 +13,7 @@ then `id`). The equivalent `/api/content/questions` alias behaves the same. Both
 | `purpose` | Optional. `LEARNING`, `EXAM` or `PLACEMENT`. |
 | `status` | Optional. `DRAFT`, `PUBLISHED` or `ARCHIVED` (the question's own status). |
 | `code` | Optional. Case-insensitive partial match against the stable question code. |
+| `knowledgePointIds` | Repeatable, up to 50 UUIDs. Keeps questions whose current published version is related to at least one listed knowledge point. Filter runs in the database before pagination. |
 | `page` | Zero-based page index. Default `0`. |
 | `size` | Page size, `1` to `100`. Default `25`. |
 | `include` | Optional, comma-separated `ownership` and/or `preview`. Unknown values return `400`. Without this parameter the response shape and query behavior are unchanged. |
@@ -137,3 +138,23 @@ Each item is `{ assetId, text, source, sourceName, type, mediaUrl, durationSecon
 an `AUDIO` item: public audio uses the public media policy, private (`PREMIUM`) audio gets a signed link that expires in the
 configured premium window and is never stored. When a link cannot be made the item keeps its transcript and `mediaUrl` is null.
 `type`, `mediaUrl` and `durationSeconds` were added on 2026-11-24; earlier responses carried only passages.
+
+`type` can also be `IMAGE` (added 2026-11-24): the prompt image of a Writing question, linked directly to the version. `text` is its
+description (may be null) and `mediaUrl` the link that shows it (null when it cannot be made). Clients must accept the new value.
+
+## Prompt image of a Writing question version
+
+`PUT /api/content/admin/questions/{questionId}/versions/{versionId}/image` (`CONTENT_AUTHOR`), body
+`{ "mediaReference": "<key returned by POST /api/content/admin/media/image>", "altText": "..." }` (`altText` optional, at most 500
+characters), sets the image and replaces any earlier one. `DELETE` on the same path removes it. Both return `204`.
+
+Only a `DRAFT` or `PUBLISHED` version of a `WRITING` question changes (a published version too since 2026-11-24, because a Writing
+task in an exam cannot swap its question): an archived version returns `409` and another skill returns `400`, each with a Vietnamese
+message. The question is locked while the image changes, so it cannot race a publication or an archive. Replacing or removing
+keeps the old asset row, because another version may still use it. A new version of a question starts with the image of the latest earlier
+version that has one (since 2026-11-24); the asset is shared, so replacing the image on the new version leaves the old one untouched.
+
+## Where a question is used
+
+`GET /api/content/admin/questions/{questionId}/usages` (`CONTENT_AUTHOR`, added 2026-11-25) lists every place a version of the question is held: a section of a package version or an exercise block of a lesson. Each item is `{ kind, targetId, targetCode, targetTitle, location, targetVersionNumber, targetStatus, questionVersionId, questionVersionNumber }`. `kind` is `PACKAGE` (`location` is the section title, `targetVersionNumber` and `targetStatus` describe the package version) or `LESSON` (`location` is `Kh?i <n>`, `targetVersionNumber` is null, `targetStatus` is the lesson status). Packages come first, newest package version first. An unused question returns an empty array.
+

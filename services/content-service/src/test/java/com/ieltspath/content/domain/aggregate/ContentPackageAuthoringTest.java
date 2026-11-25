@@ -120,6 +120,38 @@ class ContentPackageAuthoringTest {
         assertEquals(0, draft.getSections().size());
     }
 
+    @Test
+    void aNewDraftStartsFromTheVersionLearnersGet() {
+        ContentPackage pkg = newPackage();
+        ContentPackageVersion first = publishedVersion(pkg.getId(), 1);
+        ContentPackageVersion second = publishedVersion(pkg.getId(), 2);
+        pkg.addVersion(first);
+        pkg.addVersion(second);
+        pkg.publishVersion(first.getId());
+
+        assertEquals(first.getId(), pkg.copySourceVersion().orElseThrow().getId());
+    }
+
+    @Test
+    void withoutACurrentVersionTheHighestNonDraftIsTheSource() {
+        ContentPackage pkg = newPackage();
+        ContentPackageVersion first = publishedVersion(pkg.getId(), 1);
+        ContentPackageVersion second = publishedVersion(pkg.getId(), 2);
+        pkg.addVersion(first);
+        pkg.addVersion(second);
+        pkg.createDraftVersion("{}");
+
+        assertEquals(second.getId(), pkg.copySourceVersion().orElseThrow().getId());
+    }
+
+    @Test
+    void aPackageWithOnlyADraftHasNoSource() {
+        ContentPackage pkg = newPackage();
+        pkg.createDraftVersion("{}");
+
+        assertEquals(java.util.Optional.empty(), pkg.copySourceVersion());
+    }
+
     private static ContentPackage newPackage() {
         return ContentPackage.create("PKG-" + UUID.randomUUID(), "Authoring test", PackageType.PRACTICE_SET, null);
     }

@@ -69,6 +69,7 @@ import static org.mockito.Mockito.doThrow;
         AddQuestionVersionUseCase.class, QuestionRepositoryAdapter.class, QuestionPersistenceMapper.class,
         CreateContentSectionUseCase.class, AddSectionQuestionUseCase.class, CourseMaterializer.class,
         CreateLessonResourceUseCase.class, LessonResourceRepositoryAdapter.class, LessonResourcePersistenceMapperImpl.class,
+        PublishQuestionVersionUseCase.class,
         CourseDraftCodec.class, CourseDraftAnalysisService.class, JdbcCourseCatalogReader.class,
         CreateCourseUseCase.class, UpdateCourseUseCase.class, CourseRepositoryAdapter.class,
         CoursePersistenceMapperImpl.class, CreateTopicUseCase.class, UpdateTopicUseCase.class,
@@ -86,6 +87,9 @@ class CourseImportIntegrationTest {
         /** These tests only create link resources, so the document storage is never reached. */
         @Bean com.ieltspath.content.application.port.LessonDocumentFiles documentFiles() {
             return org.mockito.Mockito.mock(com.ieltspath.content.application.port.LessonDocumentFiles.class);
+        }
+        @Bean com.ieltspath.content.application.port.QuestionImageWriter questionImageWriter() {
+            return org.mockito.Mockito.mock(com.ieltspath.content.application.port.QuestionImageWriter.class);
         }
         @Bean Clock clock() { return Clock.systemUTC(); }
         @Bean VocabularySenseLookup senses() { return ids -> Set.copyOf(ids); }

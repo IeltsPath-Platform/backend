@@ -48,6 +48,7 @@ class CourseDraftUseCasesTest {
         AiDraft draft = new AiDraft(UUID.randomUUID(), kind, status, owner, "{}", "{\"topics\":[]}", null, null, null,
                 clock.instant(), null, null, null, null, null);
         when(store.findById(draft.getId())).thenReturn(Optional.of(draft));
+        when(store.findByIdForUpdate(draft.getId())).thenReturn(Optional.of(draft));
         return draft;
     }
 

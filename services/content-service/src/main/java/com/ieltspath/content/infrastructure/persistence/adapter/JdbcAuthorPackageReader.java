@@ -119,7 +119,10 @@ public class JdbcAuthorPackageReader implements AuthorPackageReader {
         Map<UUID, AuthorPackageExtras.QuestionInfo> questions = new LinkedHashMap<>();
         jdbc.query("""
                 SELECT sq.id AS section_question_id, q.id AS question_id, left(qv.stem, %d) AS stem,
-                       qv.status, q.purpose
+                       qv.status, q.purpose,
+                       (SELECT max(newer.version_number) FROM question_versions newer
+                        WHERE newer.question_id = qv.question_id AND newer.status = 'PUBLISHED'
+                          AND newer.version_number > qv.version_number) AS newer_version_number
                 FROM section_questions sq
                 JOIN content_sections s ON s.id = sq.section_id
                 JOIN content_package_versions v ON v.id = s.package_version_id
@@ -128,7 +131,8 @@ public class JdbcAuthorPackageReader implements AuthorPackageReader {
                 WHERE v.package_id = :packageId
                 """.formatted(STEM_PREVIEW_LENGTH), byPackage, rs -> {
             questions.put(uuid(rs, "section_question_id"), new AuthorPackageExtras.QuestionInfo(
-                    uuid(rs, "question_id"), rs.getString("stem"), rs.getString("status"), rs.getString("purpose")));
+                    uuid(rs, "question_id"), rs.getString("stem"), rs.getString("status"), rs.getString("purpose"),
+                    (Integer) rs.getObject("newer_version_number")));
         });
         return new AuthorPackageExtras(sections, questions);
     }

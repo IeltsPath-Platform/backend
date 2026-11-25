@@ -143,6 +143,17 @@ public class ContentPackage {
         this.updatedAt = Instant.now();
     }
 
+    /** The version a new draft starts from: the one learners get, else the highest numbered one that is not a draft. */
+    public Optional<ContentPackageVersion> copySourceVersion() {
+        if (currentPublishedVersionId != null) {
+            Optional<ContentPackageVersion> current = versions.stream()
+                    .filter(v -> v.getId().equals(currentPublishedVersionId)).findFirst();
+            if (current.isPresent()) return current;
+        }
+        return versions.stream().filter(v -> v.getStatus() != PublicationStatus.DRAFT)
+                .max(Comparator.comparingInt(ContentPackageVersion::getVersionNumber));
+    }
+
     /** Starts the next draft. A package has at most one draft; the number follows the highest existing version. */
     public ContentPackageVersion createDraftVersion(String rulesJson) {
         if (versions.stream().anyMatch(v -> v.getStatus() == PublicationStatus.DRAFT)) {

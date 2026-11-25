@@ -9,16 +9,13 @@ import com.ieltspath.content.application.service.CourseDraftCodec;
 import com.ieltspath.content.application.service.CourseMaterializer;
 import com.ieltspath.content.domain.aggregate.AiDraft;
 import com.ieltspath.content.domain.exception.CourseDraftErrorsException;
-import com.ieltspath.content.domain.repository.AiDraftRepository;
 import com.ieltspath.content.domain.vo.CourseDraftAnalysis;
 import com.ieltspath.content.domain.vo.CourseDraftAnalysis.Issue;
 import com.ieltspath.content.domain.vo.CourseDraftStructure;
 import com.ieltspath.content.domain.vo.CourseDraftStructure.LessonPlan;
 import com.ieltspath.content.domain.vo.CourseDraftStructure.NewWord;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Clock;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -43,28 +40,23 @@ public class ApproveCourseDraftUseCase {
     private static final int SENSE_BATCH = 100;
 
     private final CourseDraftUseCases draftAccess;
-    private final AiDraftRepository drafts;
+    private final CommitCourseDraftApprovalUseCase commit;
     private final CourseDraftCodec codec;
     private final CourseDraftAnalysisService analysis;
-    private final CourseMaterializer materializer;
     private final VocabularySenseLookup senses;
     private final VocabularySenseWriter words;
-    private final Clock clock;
 
-    public ApproveCourseDraftUseCase(CourseDraftUseCases draftAccess, AiDraftRepository drafts, CourseDraftCodec codec,
-                                     CourseDraftAnalysisService analysis, CourseMaterializer materializer,
-                                     VocabularySenseLookup senses, VocabularySenseWriter words, Clock clock) {
+    public ApproveCourseDraftUseCase(CourseDraftUseCases draftAccess, CommitCourseDraftApprovalUseCase commit,
+                                     CourseDraftCodec codec, CourseDraftAnalysisService analysis,
+                                     VocabularySenseLookup senses, VocabularySenseWriter words) {
         this.draftAccess = draftAccess;
-        this.drafts = drafts;
+        this.commit = commit;
         this.codec = codec;
         this.analysis = analysis;
-        this.materializer = materializer;
         this.senses = senses;
         this.words = words;
-        this.clock = clock;
     }
 
-    @Transactional
     public Approved execute(UUID reviewer, UUID draftId) {
         AiDraft draft = draftAccess.ownReadyDraft(reviewer, draftId);
         CourseDraftStructure plan = codec.read(draft.getResultJson());
@@ -75,13 +67,8 @@ public class ApproveCourseDraftUseCase {
         requireChosenSensesAvailable(plan);
         Map<String, UUID> newWordSenses = resolveNewWords(plan);
 
-        CourseMaterializer.Created created = materializer.create(plan, checked.facts().resolvedQuestionRefs(),
-                newWordSenses, describeChosenSenses(plan), reviewer);
-
-        draft.approve(reviewer, clock.instant());
-        drafts.save(draft);
-        return new Approved(draftId, created.courseId(), created.topicIds(), created.lessonIds(),
-                created.finalTestPackageIds());
+        return commit.execute(reviewer, draftId, draft.getResultJson(), plan, checked,
+                newWordSenses, describeChosenSenses(plan));
     }
 
     /** A sense picked from the library must still be active, or its lesson cannot get a vocabulary block. */

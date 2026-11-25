@@ -15,6 +15,7 @@ import com.ieltspath.content.application.result.KnowledgeTreeNodeResult;
 import com.ieltspath.content.domain.vo.QuestionUsageConflict;
 import com.ieltspath.content.domain.vo.QuestionPurpose;
 import com.ieltspath.content.domain.vo.QuestionDifficulty;
+import com.ieltspath.content.domain.vo.UnpublishedPackageQuestion;
 import com.ieltspath.content.domain.vo.Skill;
 
 import java.util.Collection;
@@ -91,6 +92,9 @@ public interface LearningContentReader {
 
     /** Lock this version's question rows in id order until transaction commit, before checking ownership. */
     void lockQuestionsForPublishing(UUID packageVersionId);
+
+    /** Questions in the package version whose versions are not published, read after locking the question rows. */
+    default List<UnpublishedPackageQuestion> unpublishedQuestions(UUID packageVersionId) { return List.of(); }
 
     /** Distinct question ids in this version whose purpose differs from the required package purpose. */
     List<UUID> questionsWithWrongPurpose(UUID packageVersionId, QuestionPurpose requiredPurpose);

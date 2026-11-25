@@ -10,7 +10,7 @@ import com.ieltspath.content.application.usecase.ListAuthorPackagesUseCase;
 import com.ieltspath.content.domain.exception.InvalidPackageCourseException;
 import com.ieltspath.content.domain.exception.InvalidPackageTopicException;
 import com.ieltspath.content.domain.exception.InvalidContentStateException;
-import com.ieltspath.content.application.usecase.CreateDraftPackageVersionUseCase;
+import com.ieltspath.content.application.usecase.CreateDraftFromCurrentVersionUseCase;
 import com.ieltspath.content.application.usecase.DeleteContentSectionUseCase;
 import com.ieltspath.content.application.usecase.GetAuthorPackageUseCase;
 import com.ieltspath.content.application.usecase.ReorderContentSectionsUseCase;
@@ -36,7 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /** Error mapping for the author routes. Security is covered by the web authorization test. */
 class ContentPackageAuthoringErrorTest {
 
-    private final CreateDraftPackageVersionUseCase createDraft = mock(CreateDraftPackageVersionUseCase.class);
+    private final CreateDraftFromCurrentVersionUseCase createDraft = mock(CreateDraftFromCurrentVersionUseCase.class);
     private final UpdateContentSectionUseCase updateSection = mock(UpdateContentSectionUseCase.class);
     private final ReorderContentSectionsUseCase reorderSections = mock(ReorderContentSectionsUseCase.class);
     private final CodeSettingsUseCases codeSettings = mock(CodeSettingsUseCases.class);
@@ -50,6 +50,7 @@ class ContentPackageAuthoringErrorTest {
                         mock(GetAuthorPackageUseCase.class), createDraft, mock(CreateContentSectionUseCase.class),
                         updateSection, mock(DeleteContentSectionUseCase.class), reorderSections,
                         mock(AddSectionQuestionUseCase.class), mock(RemoveAndReorderSectionQuestionsUseCase.class),
+                        mock(com.ieltspath.content.application.usecase.UseNewerSectionQuestionVersionUseCase.class),
                         listPackages, codeSettings))
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
     }

@@ -73,6 +73,10 @@ public class PublishQuestionVersionUseCase {
         }
     }
 
+    public void validateForPublishing(QuestionType questionType, QuestionVersion version) {
+        validate(questionType, version);
+    }
+
     private static void validateEssay(QuestionType questionType, JsonNode spec) {
         if (questionType != QuestionType.ESSAY || !"ESSAY".equals(spec.path("type").asText())) {
             throw new QuestionVersionNotPublishableException();
