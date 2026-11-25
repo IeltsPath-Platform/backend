@@ -85,6 +85,7 @@ app:
           - /auth/verify-email
           - /auth/resend-verification
           - /auth/google
+          - /auth/google/nonce
           - /api/users/register
       - method: GET
         patterns:

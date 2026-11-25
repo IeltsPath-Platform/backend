@@ -1,5 +1,6 @@
 package com.ieltspath.user.api.controller;
 
+import com.ieltspath.commonsecurity.config.CommonSecurityAutoConfiguration;
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.user.api.exception.GlobalExceptionHandler;
 import com.ieltspath.user.application.result.AuthAuditEventResult;
@@ -7,10 +8,14 @@ import com.ieltspath.user.application.result.PageResult;
 import com.ieltspath.user.application.usecase.GetAuthAuditEventsUseCase;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
@@ -24,11 +29,24 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(SecurityEventsController.class)
+@ImportAutoConfiguration(CommonSecurityAutoConfiguration.class)
 @Import(GlobalExceptionHandler.class)
+@TestPropertySource(properties = {
+        "app.auth.external-jwt-issuer=urn:code-base:auth",
+        "app.auth.internal-jwt-issuer=urn:code-base:api-gateway",
+        "spring.cloud.config.enabled=false"
+})
 class SecurityEventsControllerTest {
+    private static final String INTERNAL_SECRET = "ZmVkY2JhOTg3NjU0MzIxMGZlZGNiYTk4NzY1NDMyMTA=";
+
     @Autowired MockMvc mvc;
     @MockBean CurrentUserProvider currentUser;
     @MockBean GetAuthAuditEventsUseCase getEvents;
+
+    @DynamicPropertySource
+    static void hmacProperties(DynamicPropertyRegistry registry) {
+        registry.add("app.auth.internal-jwt-secret", () -> INTERNAL_SECRET);
+    }
 
     @Test
     @WithMockUser
@@ -50,7 +68,9 @@ class SecurityEventsControllerTest {
     @WithMockUser(roles = "USER")
     void deniesSecurityEventsForAnotherUserToNonAdministrators() throws Exception {
         mvc.perform(get("/api/users/{id}/auth-events", UUID.randomUUID()))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"))
+                .andExpect(jsonPath("$.message").value("Bạn không có quyền thực hiện thao tác này."));
         verifyNoInteractions(getEvents);
     }
 

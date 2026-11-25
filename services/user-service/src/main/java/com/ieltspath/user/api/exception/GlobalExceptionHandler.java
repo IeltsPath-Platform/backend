@@ -224,7 +224,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(AccessDeniedException.class)
     ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException exception, HttpServletRequest request) {
-        return error(HttpStatus.FORBIDDEN, "Forbidden", request, null);
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(errorBody(HttpStatus.FORBIDDEN, "Bạn không có quyền thực hiện thao tác này.", request,
+                        null, "FORBIDDEN"));
     }
 
     @ExceptionHandler({
