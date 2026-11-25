@@ -1,6 +1,6 @@
 ---
 phase: 1
-title: "Nền tảng: A6, G2, G4, G8"
+title: "Nền tảng: A6, G2, G4, G8, dịch thông báo lỗi"
 status: pending
 priority: P1
 dependencies: []
@@ -8,7 +8,32 @@ dependencies: []
 
 # Phase 1: Các sửa nhỏ, rủi ro thấp
 
-Bốn việc độc lập, không đổi API, không cần migration. Làm đầu tiên để có metric đo các phase sau.
+Năm việc độc lập, không đổi API, không cần migration. Làm đầu tiên (sau Bước 0 trong `plan.md`) để có metric đo các phase
+sau. Các bước "đo tay" thuộc chủ dự án, không phải Codex (xem `plan.md`, mục "Việc chủ dự án tự làm").
+
+## I18N. Dịch thông báo lỗi tiếng Anh còn sót (AGENTS §3.3)
+
+**Vấn đề:** các exception sau trả chuỗi tiếng Anh ra client: `GoogleAccountConflictException`,
+`GoogleAccountNotActiveException`, `GoogleEmailNotSupportedException`, `GoogleSignInNotAllowedException`,
+`GoogleSignInUnavailableException`, `LoginLimiterUnavailableException`, `LoginRateLimitedException`, và chuỗi
+"Google ID token is invalid" trong `NimbusGoogleIdTokenVerifier`.
+
+**Việc:** dịch tại nguồn sang tiếng Việt có dấu, giữ nguyên HTTP status và `details.code` đang dùng; đọc `GlobalExceptionHandler`
+và `VietnameseErrorMessages` (đã có trên `main`) để chọn câu và không trùng lặp với lưới dịch. Câu gợi ý (chỉnh cho khớp
+ngữ cảnh khi viết):
+- Xung đột tài khoản Google: "Tài khoản Google này đã được liên kết với một tài khoản khác."
+- Tài khoản không hoạt động: "Tài khoản không còn hoạt động nên không thể đăng nhập bằng Google."
+- Email Google không được hỗ trợ: "Địa chỉ email Google này chưa được hỗ trợ để đăng nhập."
+- Vai trò không được phép đăng nhập Google: "Loại tài khoản này không được đăng nhập bằng Google."
+- Dịch vụ đăng nhập Google tạm thời không dùng được: "Đăng nhập Google tạm thời không khả dụng. Vui lòng thử lại sau."
+- ID token không hợp lệ: "Phiên đăng nhập Google không hợp lệ hoặc đã hết hạn. Vui lòng thử lại."
+- Quá nhiều lần đăng nhập sai: "Bạn đã thử đăng nhập sai quá nhiều lần. Vui lòng thử lại sau." (giữ thông tin thời gian chờ nếu code đang trả).
+- Bộ giới hạn đăng nhập không dùng được: "Hệ thống tạm thời không thể xử lý đăng nhập. Vui lòng thử lại sau."
+
+**Test:** mỗi exception có một test (`@WebMvcTest` hoặc test handler) chứng minh response chứa chuỗi tiếng Việt và đúng
+`details.code`; cập nhật test/contract đang assert chuỗi tiếng Anh. Không đổi hành vi nào khác.
+
+**Success:** không còn exception nào trong danh sách trả chuỗi tiếng Anh; test xanh.
 
 ## A6. Chống dò email qua thời gian phản hồi
 
@@ -24,8 +49,10 @@ không tồn tại, tài khoản bị khóa hay tài khoản chỉ có Google tr
 
 **File:** `services/user-service/.../application/usecase/LoginUseCase.java`; test `LoginUseCaseTest`.
 
-**Test:** Mockito `verify(passwordEncoder).matches(...)` ở bốn nhánh (email không tồn tại, không ACTIVE, hash null, mật khẩu
-sai). Đo tay: 50 lần đăng nhập cho mỗi loại trên stack local, hai nhóm lệch nhau dưới 20% trung vị.
+**Test (Codex):** Mockito `verify(passwordEncoder).matches(...)` ở bốn nhánh (email không tồn tại, không ACTIVE, hash null,
+mật khẩu sai).
+
+**Đo tay (chủ dự án, không phải Codex):** 50 lần đăng nhập cho mỗi loại trên stack local, hai nhóm lệch nhau dưới 20% trung vị.
 
 ## G2. Cookie `Secure` bắt buộc ở production
 
@@ -73,8 +100,10 @@ hành vi an toàn hơn cho chủ tài khoản nên **sửa tài liệu theo code
 **Test:** `GoogleSignInUseCaseTest` kiểm counter đúng tag cho từng nhánh; test cấu hình đo gauge 0/1.
 
 ## Success Criteria
-- [ ] Bốn nhánh thất bại của `LoginUseCase` đều gọi `matches`; đo tay không còn chênh lệch rõ giữa các loại tài khoản.
+- [ ] Bốn nhánh thất bại của `LoginUseCase` đều gọi `matches` (test Mockito xanh).
 - [ ] Bật `enforce-secure` với `secure=false` làm service không khởi động; hai tổ hợp còn lại chạy bình thường.
 - [ ] Hai contract Google khớp với code, có test chứng minh.
-- [ ] Prometheus thấy `auth_google_signin_total{result=...}` sau một lần gọi `/auth/google` sai token.
+- [ ] Counter `auth.google.signin` tăng đúng tag cho từng nhánh (test đơn vị).
+- [ ] Mọi exception trong danh sách I18N trả thông báo tiếng Việt có dấu, có test.
 - [ ] `mvn -q -pl services/user-service -am test` xanh; `ArchitectureTest` không có vi phạm mới.
+- [ ] Chủ dự án: đo tay thời gian đăng nhập và kiểm `auth_google_signin_total` trên Prometheus (ngoài phạm vi Codex).

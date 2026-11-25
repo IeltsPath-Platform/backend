@@ -13,7 +13,10 @@ dependencies: [1]
   Kẻ trộm và chủ thật dùng cùng một token, người đến sau chỉ nhận 401, phiên của kẻ trộm vẫn sống.
 - Người dùng không xem hay thu hồi được từng thiết bị. `login_history` có IP và user agent nhưng không có API.
 
-## Thiết kế dữ liệu: `V16__refresh_token_sessions.sql`
+## Thiết kế dữ liệu: `V17__refresh_token_sessions.sql`
+
+`main` đã dùng V16 (`V16__users_password_cleared_at.sql`), nên migration này là **V17**. Sau Bước 0 (merge `origin/main`),
+chạy lại kiểm tra số migration trước khi tạo file.
 
 ```sql
 ALTER TABLE refresh_tokens
@@ -67,7 +70,8 @@ CREATE INDEX idx_refresh_tokens_user_active ON refresh_tokens (user_id, expires_
 - Quyền `CUSTOMER` và các role khác đều tự quản lý phiên của mình (`CurrentUserProvider`, không nhận id từ client).
 - Mỗi phần tử: `sessionId`, `startedAt`, `lastUsedAt`, `ipAddress` (che octet cuối, ví dụ `203.0.113.x`), `userAgent`,
   `current` (`null` đến phase 3; sau đó so với claim `sid`).
-- Phiên của người khác hoặc không tồn tại: **404** như nhau (không lộ sự tồn tại).
+- Phiên của người khác hoặc không tồn tại: **404** như nhau (không lộ sự tồn tại), `details.code=SESSION_NOT_FOUND`,
+  thông báo "Không tìm thấy phiên đăng nhập." (xem bảng thông báo trong `plan.md`).
 - Tier rate limit `default` (route `/api/users/**` đã có), không phải route công khai mới.
 - Một token hoạt động duy nhất mỗi họ (xoay vòng thu hồi token trước) nên "phiên đang hoạt động" = token chưa thu hồi và
   chưa hết hạn; truy vấn có `LIMIT 50`, có chỉ mục `idx_refresh_tokens_user_active`.
@@ -79,7 +83,7 @@ An toàn nhiều instance nhờ `SKIP LOCKED`; ghi một dòng vào bảng "Sche
 `docs/system-architecture.md`. Giữ 30 ngày để vẫn phát hiện dùng lại token cũ.
 
 ## Files
-- Mới: `V16__refresh_token_sessions.sql`, `api/controller/SessionController.java`, `api/dto/response/SessionResponse.java`,
+- Mới: `V17__refresh_token_sessions.sql`, `api/controller/SessionController.java`, `api/dto/response/SessionResponse.java`,
   `application/usecase/{ListMySessions,RevokeMySession,RevokeAllMySessions}UseCase.java`,
   `infrastructure/scheduler/RefreshTokenCleanupJob.java`, `docs/contracts/auth-sessions-v1.md`.
 - Sửa: `domain/aggregate/RefreshToken.java` (thêm trường và `revoke(reason)`), `RefreshTokenRepository` +
@@ -92,14 +96,16 @@ An toàn nhiều instance nhờ `SKIP LOCKED`; ghi một dòng vào bảng "Sche
 - `RefreshTokenUseCaseTest`: xoay vòng giữ `family_id`; dùng lại sau ân hạn thu hồi cả họ và trả 401; dùng lại trong ân
   hạn không thu hồi; token bị thu hồi do `LOGOUT` không kích hoạt thu hồi họ; user không ACTIVE; phiên quá hạn tuyệt đối.
 - Integration (Testcontainers): `RefreshTokenFamilyIT` hai request refresh đồng thời cùng một token: đúng một thành công;
-  migration V16 chạy trên dữ liệu cũ (token cũ thành họ riêng).
+  migration V17 chạy trên dữ liệu cũ (token cũ thành họ riêng).
 - `@WebMvcTest SessionController`: cần xác thực; danh sách che IP; thu hồi phiên của người khác trả 404; thu hồi phiên rồi
-  refresh bằng token của phiên đó trả 401.
+  refresh bằng token của phiên đó trả 401; thông báo 404 là tiếng Việt.
 - Job dọn dữ liệu: hai instance chạy song song không xóa trùng, không xóa token còn hiệu lực.
 
 ## Success Criteria
 - [ ] Gửi lại refresh token đã xoay vòng sau 10 giây làm mọi phiên cùng họ mất hiệu lực và có metric/audit.
 - [ ] Hai tab refresh cùng lúc không bị đăng xuất.
 - [ ] Người dùng liệt kê và thu hồi được từng phiên; phiên đã thu hồi không refresh được.
-- [ ] Migration V16 chạy trên bản sao dữ liệu cũ không lỗi; code cũ và mới cùng chạy được trong lúc triển khai.
+- [ ] Migration V17 chạy trên dữ liệu cũ (Testcontainers, chèn token kiểu cũ trước khi migrate) không lỗi; code cũ và mới
+  cùng chạy được trong lúc triển khai.
 - [ ] `ArchitectureTest` xanh; `docs/contracts/auth-sessions-v1.md` đã viết cùng PR.
+- [ ] Chủ dự án: chạy lại bộ test bảo mật trên stack local sau phase này (ngoài phạm vi Codex).

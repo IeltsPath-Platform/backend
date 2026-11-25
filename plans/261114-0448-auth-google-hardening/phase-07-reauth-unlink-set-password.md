@@ -18,11 +18,15 @@ dependencies: [2, 3, 4]
 ## Thiết kế
 
 ### Token xác thực lại (reauth), dùng một lần
-`POST /api/users/me/reauth` (cần JWT; **cần duyệt** vì là endpoint mới), body đúng một trong hai:
+`POST /api/users/me/reauth` (cần JWT; endpoint mới, đã duyệt 2026-11-25), body đúng một trong hai:
 - `{ "currentPassword": "..." }`: kiểm bằng `PasswordEncoder.matches`, dùng chung bộ đếm
   `PasswordChangeAttempts` của đổi mật khẩu (sai nhiều lần thì khóa 15 phút, trả 429), tài khoản phải có mật khẩu.
 - `{ "googleIdToken": "..." }`: qua `GoogleIdTokenVerifier` với cùng luật `iat` (phase 5) và nonce (nếu bật); `sub` phải
-  **trùng** định danh Google đã liên kết của chính user, không thì 403.
+  **trùng** định danh Google đã liên kết của chính user, không thì 403 `REAUTH_ACCOUNT_MISMATCH`.
+
+Lỗi (tiếng Việt, bảng trong `plan.md`): thiếu/sai token → 403 `REAUTH_REQUIRED` "Vui lòng xác thực lại để thực hiện thao
+tác này."; Google khác tài khoản → "Tài khoản Google không khớp với tài khoản Google đã liên kết."; sai mật khẩu hoặc bị khóa
+tạm tái dùng mã và thông báo của đổi mật khẩu hiện có.
 
 Trả `{ "reauthToken": "<32 byte base64url>", "expiresInSeconds": 300, "method": "PASSWORD|GOOGLE" }`.
 Lưu Redis `auth:reauth:{SHA-256(token)}` = `userId|method|sid`, TTL 300 giây; token gắn với user và phiên hiện tại (`sid`,
@@ -33,7 +37,8 @@ Gateway: gán `/api/users/me/reauth` vào tier `auth` (rate limit chặt) trong 
 
 ### G3. Gỡ liên kết cần xác thực lại + email báo
 - `DELETE /api/users/me/oauth/{provider}` đọc header `X-Reauth-Token`. Khi
-  `app.auth.reauth-required-for-unlink=true` (mặc định `false` đến khi frontend sẵn sàng): thiếu hoặc sai token → `403
+  `app.auth.reauth-required-for-unlink=true` (mặc định `false` trong code; chủ dự án bật qua
+  `APP_AUTH_REAUTH_REQUIRED_FOR_UNLINK` **sau khi** frontend phase 10 đợt 4 đã triển khai): thiếu hoặc sai token → `403
   REAUTH_REQUIRED`. Quy tắc "không gỡ liên kết cuối cùng khi chưa có mật khẩu" giữ nguyên.
 - Gỡ thành công → `UserNoticeOutbox.enqueue` sự kiện mới `user.google-account-unlinked.v1` (payload như
   `user.google-account-linked.v1`: `eventId, eventType, occurredAt, userId, email, displayName`, không có thông tin xác thực).
@@ -45,10 +50,17 @@ Gateway: gán `/api/users/me/reauth` vào tier `auth` (rate limit chặt) trong 
 ### G5. Đặt mật khẩu lần đầu cho tài khoản chỉ có Google
 `POST /api/users/me/password/initial` (cần JWT), body `{ "newPassword": "..." }`, header `X-Reauth-Token` **bắt buộc** và
 phải có `method=GOOGLE`:
-- Chỉ áp khi `passwordHash` rỗng; đã có mật khẩu thì 409 (dùng đổi mật khẩu).
-- Phải xác minh email (như đổi mật khẩu); qua `PasswordPolicyService` (phase 4).
+- Chỉ áp khi `passwordHash` rỗng; đã có mật khẩu thì 409 `PASSWORD_ALREADY_SET` "Tài khoản đã có mật khẩu. Hãy dùng chức
+  năng đổi mật khẩu." (dùng đổi mật khẩu).
+- Phải xác minh email (như đổi mật khẩu, tái dùng thông báo "Vui lòng xác minh email trước khi thực hiện thao tác này");
+  qua `PasswordPolicyService` (phase 4, `WEAK_PASSWORD`).
 - Ghi hash, thu hồi mọi refresh token (lý do `PASSWORD_CHANGE`, phase 2) và access token (`revokeUser`, phase 3), phát
   `PasswordChangedV1` sẵn có. Giống đổi mật khẩu: client đăng nhập lại sau khi đặt.
+- **Xóa `password_cleared_at`** (đặt `NULL`): đã chốt 2026-11-25. Cột này do `main` thêm ở `V16__users_password_cleared_at.sql`
+  (đánh dấu mật khẩu đã bị xóa khi liên kết Google vào tài khoản chưa xác minh). Trước khi code, Codex đọc `User`,
+  `UserJpaEntity`, `ForgotPasswordUseCase` để xác nhận ngữ nghĩa và thêm thao tác xóa vào `User` (hoặc phương thức đặt
+  mật khẩu hiện có) để hai nơi không lệch nhau; test chứng minh sau khi đặt mật khẩu, `password_cleared_at` là `NULL` và
+  luồng quên mật khẩu hoạt động bình thường.
 - Không đổi hành vi `POST /api/users/me/password` hiện có (vẫn 409 cho tài khoản chưa có mật khẩu).
 
 ## Files
@@ -70,10 +82,12 @@ phải có `method=GOOGLE`:
 - `UnlinkOAuthIdentityUseCaseTest`: cờ tắt (hành vi cũ); cờ bật thiếu token → `REAUTH_REQUIRED`; có token → gỡ và phát
   sự kiện; liên kết cuối cùng chưa có mật khẩu vẫn bị chặn.
 - `SetInitialPasswordUseCaseTest`: cần token `GOOGLE`; token `PASSWORD` bị từ chối; đã có mật khẩu → 409; mật khẩu yếu →
-  `WEAK_PASSWORD`; thu hồi token và phát `PasswordChangedV1`.
+  `WEAK_PASSWORD`; thu hồi token và phát `PasswordChangedV1`; `password_cleared_at` được xóa.
 - Notification: listener nhận sự kiện, gửi thư, retry/DLQ như listener liên kết hiện có.
 - `@WebMvcTest` các endpoint mới (xác thực, mã lỗi); `AuthRouteConsistencyTest` xanh.
-- Chạy lại bộ test bảo mật trên stack local: gỡ liên kết bằng access token trần bị `403 REAUTH_REQUIRED` khi cờ bật.
+- Mọi lỗi mới có test kiểm thông báo tiếng Việt và `details.code`.
+- **Chủ dự án chạy tay** (không phải Codex): bộ test bảo mật trên stack local, gỡ liên kết bằng access token trần bị
+  `403 REAUTH_REQUIRED` khi cờ bật.
 
 ## Success Criteria
 - [ ] Gỡ liên kết cần xác thực lại khi cờ bật và chủ tài khoản nhận email báo.

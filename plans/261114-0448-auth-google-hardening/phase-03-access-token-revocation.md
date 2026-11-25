@@ -14,7 +14,7 @@ tài khoản, token cũ vẫn dùng được đến một giờ. Token hiện kh
 
 ## Thiết kế
 
-### Claim mới (cần duyệt, chỉ thêm)
+### Claim mới (đã duyệt 2026-11-25, chỉ thêm)
 `JwtTokenService.createAccessToken(user, sessionId)` thêm: `jti` (UUID mới mỗi token), `iat` (giữ lại thay vì xóa như
 hiện nay), `sid` (= `family_id` của phiên, phase 2). Không đổi claim cũ (`iss`, `sub`, `exp`, `roles`).
 `AuthTokenIssuer` tạo `family_id` trước, dùng cho cả access token (`sid`) và refresh token.
@@ -50,9 +50,15 @@ Token cũ không có `jti/sid/iat` (cấp trước khi triển khai) **bỏ qua*
 - `WebSocketProtocolAuthFilter` (`/ws/notifications`) dùng chung lớp `RevocationChecker` để không bỏ sót kênh WebSocket.
 - Không phải route công khai mới; không đổi tier rate limit.
 
+### Lỗi trả client
+- Token bị thu hồi: 401, `details.code=SESSION_REVOKED`, "Phiên đăng nhập đã hết hiệu lực. Vui lòng đăng nhập lại."
+- `fail-closed=true` và Redis lỗi: 503, `details.code=AUTH_UNAVAILABLE`, "Hệ thống tạm thời không xác minh được phiên
+  đăng nhập. Vui lòng thử lại sau." (cả hai theo định dạng lỗi của Gateway, tiếng Việt có dấu; xem `plan.md`).
+
 ### Thời hạn access token
-Sau khi frontend xác nhận tự refresh khi gặp 401, đặt `ACCESS_TOKEN_MAX_AGE_SECONDS=900` (chỉ là biến môi trường, quay lui
-không cần deploy). Phase này không đổi giá trị mặc định trong code.
+**Chủ dự án** (không phải Codex) đặt `ACCESS_TOKEN_MAX_AGE_SECONDS=900` sau khi tự xác nhận trên trình duyệt rằng frontend
+refresh khi gặp 401 (`httpClient.ts` đã có `refreshAccessToken`; phase 10 có test cho luồng này). Chỉ là biến môi trường,
+quay lui không cần deploy. Phase này không đổi giá trị mặc định trong code.
 
 ### API phiên
 Bật `exceptCurrent=true` và trường `current` của phase 2 bằng `currentSessionId()`.
@@ -72,12 +78,13 @@ Bật `exceptCurrent=true` và trường `current` của phase 2 bằng `current
   401, sau mốc → qua; token cũ không có claim → qua; Redis lỗi → qua và tăng metric; `fail-closed=true` → chặn.
 - user-service: `LogoutUseCase` ghi `revokeSession` đúng `family_id`; đổi mật khẩu ghi `revokeUser`; Redis lỗi không làm
   đổi mật khẩu thất bại.
-- Chạy lại trên stack local: đăng nhập → gọi API (200) → đăng xuất → dùng lại access token cũ (401 trong 1 giây);
-  đổi mật khẩu ở một thiết bị làm token của thiết bị khác mất hiệu lực.
+- Test Gateway kiểm thông báo 401/503 tiếng Việt và `details.code`.
+- **Chủ dự án chạy tay** trên stack local (không phải Codex): đăng nhập → gọi API (200) → đăng xuất → dùng lại access token
+  cũ (401 trong 1 giây); đổi mật khẩu ở một thiết bị làm token của thiết bị khác mất hiệu lực.
 
 ## Success Criteria
 - [ ] Sau đăng xuất, thu hồi phiên, đổi/đặt lại mật khẩu, khóa tài khoản: access token cũ bị 401 ở Gateway ngay lập tức.
 - [ ] Redis chết: hệ thống vẫn phục vụ (mở) và có metric/cảnh báo; có cờ chặn cho môi trường cần chặt.
 - [ ] Token cấp trước triển khai vẫn dùng được đến khi hết hạn, không đăng xuất hàng loạt.
-- [ ] `docs/contracts/auth-token-revocation-v1.md` và phê duyệt thêm claim có trước khi merge.
+- [ ] `docs/contracts/auth-token-revocation-v1.md` có trong cùng PR (claim `jti`, `iat`, `sid` đã được duyệt 2026-11-25).
 - [ ] `mvn -q -pl infra/api-gateway test`, `mvn -q -pl services/user-service -am test` xanh.

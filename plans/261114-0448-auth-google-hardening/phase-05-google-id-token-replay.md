@@ -23,7 +23,7 @@ dependencies: [1]
 - Client phải gửi token ngay sau khi nhận (One Tap, Credential Manager đều cấp token mới mỗi lần).
 
 ### 2. Nonce do server cấp, dùng một lần (triển khai theo cờ)
-- Route công khai mới `POST /auth/google/nonce` (**cần duyệt**): trả `{ "nonce": "<43 ký tự base64url>",
+- Route công khai mới `POST /auth/google/nonce` (đã duyệt 2026-11-25): trả `{ "nonce": "<43 ký tự base64url>",
   "expiresInSeconds": 300 }` kèm `Cache-Control: no-store`. Sinh bằng `SecureRandom` 32 byte.
 - Lưu Redis: khóa `auth:google:nonce:{SHA-256(nonce) dạng hex}` giá trị `1`, TTL 300 giây (chỉ lưu hash, không lưu nonce thô).
 - Client đưa nonce vào yêu cầu Google (Web: tham số `nonce` của Google Identity Services; Android: `setNonce` của
@@ -31,7 +31,11 @@ dependencies: [1]
 - `GoogleIdentity` thêm trường `nonce`. Trong `GoogleSignInUseCase`, **sau khi** chữ ký hợp lệ (không để người chưa có token
   Google đốt nonce): nếu token có `nonce` → phải `consume` thành công (`GETDEL` nguyên tử), không thì 401
   (`result=replay`); nếu token không có `nonce` → chỉ được phép khi `app.auth.google.require-nonce=false`.
-- Cờ `app.auth.google.require-nonce` (mặc định `false`); bật `true` sau khi cả web và mobile đã gửi nonce.
+  Mọi nhánh từ chối trả cùng một thông báo tiếng Việt: "Phiên đăng nhập Google không hợp lệ hoặc đã hết hạn. Vui lòng thử
+  lại." (không lộ lý do cho client); Redis lỗi khi bắt buộc nonce: 503 `GOOGLE_SIGNIN_UNAVAILABLE`, "Đăng nhập Google tạm
+  thời không khả dụng. Vui lòng thử lại sau."
+- Cờ `app.auth.google.require-nonce` (mặc định `false`); chủ dự án bật `true` sau khi **cả web (phase 10) và mobile** đã
+  gửi nonce. Mobile làm sau nên cờ này giữ `false` cho đến lúc đó; Codex không bật.
 - Cổng `application/port/GoogleNonceStore` (`issue()`, `consume(nonce)`), adapter Redis ở `infrastructure`. Redis lỗi khi
   `consume`: **đóng** (từ chối, 503 `GOOGLE_SIGNIN_UNAVAILABLE`) nếu `require-nonce=true`, **mở** (bỏ qua) nếu `false`.
 
@@ -42,7 +46,8 @@ trong `config-repo/api-gateway.yaml`; cập nhật `AuthRouteConsistencyTest` th
 ### Triển khai theo bước
 1. Phát hành kiểm `iat` (không đổi client).
 2. Phát hành endpoint nonce, `require-nonce=false`; client web và mobile bắt đầu gửi nonce.
-3. Khi số lần đăng nhập không nonce về 0 (metric), đặt `require-nonce=true`.
+3. Khi số lần đăng nhập không nonce về 0 (metric) và mobile đã gửi nonce, chủ dự án đặt `require-nonce=true`.
+   Web gửi nonce ở phase 10 (đợt 3).
 
 ## Files
 - user-service: `config/GoogleAuthProperties.java`, `infrastructure/adapter/NimbusGoogleIdTokenVerifier.java`,

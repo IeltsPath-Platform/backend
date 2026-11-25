@@ -1,14 +1,18 @@
 ---
 phase: 9
 title: "CAPTCHA có điều kiện (A7), tùy chọn, cần duyệt"
-status: pending
+status: dropped
 priority: P3
 dependencies: [8]
 ---
 
-# Phase 9: CAPTCHA sau nhiều lần đăng nhập sai (tùy chọn)
+# Phase 9: CAPTCHA sau nhiều lần đăng nhập sai — ĐÃ BỎ
 
-**Chỉ làm khi được duyệt** vì thêm một dịch vụ ngoài mới (Cloudflare Turnstile hoặc tương đương). Mặc định tắt; hệ thống
+> **Đã bỏ ngày 2026-11-25** theo quyết định của chủ dự án. Không triển khai, không để cờ hay port chờ sẵn. Giữ file chỉ làm
+> hồ sơ thiết kế nếu sau này cần lại (khi đó mở lại như một plan mới). Giới hạn tốc độ hiện có vẫn là lớp bảo vệ duy nhất
+> trước dò mật khẩu hàng loạt.
+
+**(Hồ sơ cũ) Chỉ làm khi được duyệt** vì thêm một dịch vụ ngoài mới (Cloudflare Turnstile hoặc tương đương). Mặc định tắt; hệ thống
 không phụ thuộc vào nó.
 
 ## Vấn đề

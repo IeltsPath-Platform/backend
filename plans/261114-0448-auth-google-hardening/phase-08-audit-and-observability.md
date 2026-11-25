@@ -15,7 +15,9 @@ nên không đặt được cảnh báo.
 
 ## Thiết kế
 
-### Bảng audit: `V17__auth_audit_events.sql`
+### Bảng audit: `V18__auth_audit_events.sql`
+
+(V16 đã dùng bởi `main`, V17 bởi phase 2; đối chiếu lại số trước khi tạo file.)
 ```sql
 CREATE TABLE auth_audit_events (
     id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -75,10 +77,11 @@ Thêm tệp luật cho Prometheus trong `infra/prometheus` (kiểm cấu trúc h
 - `RefreshTokenReuseDetected`: `increase(auth_refresh_total{result="reuse"}[5m]) > 0`.
 - `GoogleSignInErrors`: `invalid_token` hoặc `unavailable` tăng đột biến.
 - `RevocationStoreErrors`: lỗi ghi hoặc đọc kho thu hồi khác 0 kéo dài.
-Ngưỡng cụ thể chốt sau khi có số liệu thực; đây là stack tùy chọn nên không chặn triển khai.
+Ngưỡng cụ thể chốt sau khi có số liệu thực; đây là stack tùy chọn nên không chặn triển khai. Codex chỉ viết file luật và
+kiểm cú pháp bằng `promtool check rules` nếu có sẵn trên máy; việc nạp thật vào Prometheus là việc của chủ dự án.
 
 ## Files
-Mới: `V17__auth_audit_events.sql`, `domain/aggregate/AuthAuditEvent.java`, `application/port/AuthAuditRecorder.java`,
+Mới: `V18__auth_audit_events.sql`, `domain/aggregate/AuthAuditEvent.java`, `application/port/AuthAuditRecorder.java`,
 `infrastructure/persistence/{AuthAuditEventJpaEntity,AuthAuditEventJpaRepository}.java`, adapter, `api/controller/
 SecurityEventsController.java`, DTO, `PurgeAuthAuditUseCase`, `infra/prometheus/rules/auth.yml`,
 `docs/contracts/auth-audit-v1.md`. Sửa: các use case nêu trên, `docs/system-architecture.md`.
@@ -93,5 +96,7 @@ SecurityEventsController.java`, DTO, `PurgeAuthAuditUseCase`, `infra/prometheus/
 ## Success Criteria
 - [ ] Mọi sự kiện nhạy cảm trong danh sách để lại một dòng audit với correlation id; không có dữ liệu bí mật trong `detail`.
 - [ ] Người dùng xem được lịch sử bảo mật của mình; ADMIN xem được của người khác.
-- [ ] Prometheus hiển thị các metric `auth_*`; luật cảnh báo nạp được.
+- [ ] Các metric `auth_*` có trong `/actuator/prometheus` (test); file luật cảnh báo hợp lệ cú pháp. Chủ dự án kiểm nạp
+  thật trên Prometheus.
+- [ ] Không có tham chiếu tới CAPTCHA (đã bỏ); `auth.captcha` không tồn tại.
 - [ ] `ArchitectureTest` xanh; contract `auth-audit-v1.md` trong cùng PR.
