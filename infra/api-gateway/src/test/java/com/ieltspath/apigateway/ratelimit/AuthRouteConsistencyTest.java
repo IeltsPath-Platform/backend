@@ -94,6 +94,19 @@ class AuthRouteConsistencyTest {
         assertThat(castMap(filter).get("args").toString()).contains("ai");
     }
 
+    @Test
+    void apiDocumentationIsNotConfiguredAsPublicByDefault() throws IOException {
+        Map<String, Object> config = loadConfig();
+        Map<String, Object> gatewaySecurity = nested(config, "gateway", "security");
+        List<String> publicEndpoints = castList(gatewaySecurity.get("public-endpoints"));
+
+        assertThat(publicEndpoints).noneMatch(path -> path.startsWith("/swagger-ui")
+                || path.startsWith("/v3/api-docs") || path.startsWith("/api-docs") || path.startsWith("/webjars"));
+        Map<String, Object> springdoc = nested(config, "springdoc");
+        assertThat(nested(springdoc, "api-docs").get("enabled")).isEqualTo("${API_DOCS_ENABLED:false}");
+        assertThat(nested(springdoc, "swagger-ui").get("enabled")).isEqualTo("${API_DOCS_ENABLED:false}");
+    }
+
     private Map<String, Object> loadConfig() throws IOException {
         Path configPath = Path.of("..", "config-server", "config-repo", "api-gateway.yaml");
         try (InputStream input = Files.newInputStream(configPath)) {

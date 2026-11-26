@@ -1,5 +1,7 @@
 package com.ieltspath.game.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.game.api.dto.request.CreateRocketRoomRequest;
 import com.ieltspath.game.api.dto.request.SubmitRocketAnswerRequest;
@@ -19,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 /** Rocket rooms and rounds. Ready, start and the other room routes are shared under /api/games/rooms. */
 @RestController
 @RequestMapping("/api/games/rocket")
+@LearnerOnly
 public class RocketGameController {
     private final CurrentUserProvider currentUser;
     private final CreateWordlyRoomUseCase rooms;

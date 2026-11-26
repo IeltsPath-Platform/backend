@@ -1,5 +1,7 @@
 package com.ieltspath.assessment.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.assessment.api.dto.request.CreateVideoPracticeAttemptRequest;
 import com.ieltspath.assessment.api.dto.response.VideoPracticeAttemptResponse;
 import com.ieltspath.assessment.application.command.CreateVideoPracticeAttemptCommand;
@@ -13,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/assessments/video-practice")
 @RequiredArgsConstructor
+@LearnerOnly
 public class VideoPracticeController {
 
     private final CurrentUserProvider currentUser;

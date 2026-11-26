@@ -28,7 +28,7 @@ older than this feature are built once, in the background, at startup.
 
 Role `CUSTOMER`. Always the verified caller's own report; there is no user parameter.
 
-`GET /api/learning/admin/learners/{userId}/report` — role `EXAMINER`; the same body for any learner.
+The report is self-scoped; there is no staff route that accepts a learner ID.
 
 ```json
 {
@@ -66,8 +66,8 @@ Role `CUSTOMER`. Always the verified caller's own report; there is no user param
 
 ## Skill view, focus, estimated band and target
 
-The report body also carries four blocks added after `knowledgePoints`; the fields above are unchanged. They are on both
-`GET /api/learning/report` and the staff route.
+The report body also carries four blocks added after `knowledgePoints`; the fields above are unchanged. They are on
+`GET /api/learning/report`.
 
 ```json
 { "skills": [{ "skill": "READING", "mastery": 0.72, "tierCounts": { "PRIORITY": 0, "CONSOLIDATE": 3, "MAINTAIN": 2,
@@ -103,7 +103,7 @@ The report body also carries four blocks added after `knowledgePoints`; the fiel
   and the report is otherwise complete. `gap` is the target minus `estimatedBand.value` (`null` if either is unknown).
   `projection` is described in [progress-snapshots-v1](progress-snapshots-v1.md) and is `null` without a target band.
 - `placementBand`: the stored diagnostic placement band, or `null` when no placement is stored. This additive field is
-  separate from `estimatedBand` and does not change its rules. It is available on both the learner and staff reports.
+  separate from `estimatedBand` and does not change its rules.
 
 ## Mastery rules (Content Author)
 

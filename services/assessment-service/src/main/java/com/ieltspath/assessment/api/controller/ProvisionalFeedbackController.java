@@ -1,5 +1,7 @@
 package com.ieltspath.assessment.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.assessment.application.usecase.GetProvisionalFeedbackUseCase;
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import lombok.RequiredArgsConstructor;
@@ -9,6 +11,7 @@ import java.util.UUID;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/assessments/attempts")
+@LearnerOnly
 public class ProvisionalFeedbackController {
     private final CurrentUserProvider currentUser;
     private final GetProvisionalFeedbackUseCase feedback;

@@ -1,5 +1,7 @@
 package com.ieltspath.assessment.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.assessment.api.dto.request.CreateLearnerSubmissionRequest;
 import com.ieltspath.assessment.api.dto.response.LearnerSubmissionResponse;
 import com.ieltspath.assessment.application.command.CreateLearnerSubmissionCommand;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/assessments/submissions")
 @RequiredArgsConstructor
+@LearnerOnly
 public class LearnerSubmissionController {
 
     private final CurrentUserProvider currentUser;

@@ -9,7 +9,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import org.springframework.security.access.AccessDeniedException;
 
 @Service
 public class CreateWebSocketTicketUseCase {
@@ -22,10 +24,13 @@ public class CreateWebSocketTicketUseCase {
     }
 
     @Transactional(readOnly = true)
-    public GameTicketResult execute(UUID roomId, UUID userId) {
+    public GameTicketResult execute(UUID roomId, UUID userId, Set<String> roles) {
+        if (roles == null || !roles.contains("CUSTOMER")) {
+            throw new AccessDeniedException("CUSTOMER role is required for game WebSocket access");
+        }
         var room = roomRepository.findById(roomId).orElseThrow(() -> new GameRoomNotFoundException(roomId));
         if (!room.hasActiveMember(userId)) throw new GameRoomNotFoundException(roomId);
-        Ticket ticket = ticketStore.issue(roomId, userId);
+        Ticket ticket = ticketStore.issue(roomId, userId, roles);
         return new GameTicketResult(ticket.token(), ticket.expiresAt(),
                 List.of("game.v1", "ticket." + ticket.token()));
     }

@@ -1,5 +1,7 @@
 package com.ieltspath.library.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.library.api.dto.request.UpsertVideoProgressRequest;
 import com.ieltspath.library.api.dto.response.PageResponse;
@@ -20,6 +22,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/learning-support/video-progress")
 @RequiredArgsConstructor
+@LearnerOnly
 public class VideoProgressController {
     private final CurrentUserProvider currentUserProvider;
     private final UpsertVideoProgressUseCase upsertVideoProgressUseCase;

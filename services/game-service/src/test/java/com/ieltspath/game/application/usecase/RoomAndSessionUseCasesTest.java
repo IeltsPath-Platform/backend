@@ -380,15 +380,26 @@ class RoomAndSessionUseCasesTest {
         var tickets = mock(WebSocketTicketStore.class);
         var room = wordlyRoom();
         Instant expires = Instant.parse("2026-10-30T00:01:00Z");
-        when(tickets.issue(room.id(), host)).thenReturn(new WebSocketTicketStore.Ticket("t0k3n", room.id(), host, expires));
+        when(tickets.issue(room.id(), host, java.util.Set.of("CUSTOMER"))).thenReturn(
+                new WebSocketTicketStore.Ticket("t0k3n", room.id(), host, expires, java.util.Set.of("CUSTOMER")));
         var useCase = new CreateWebSocketTicketUseCase(rooms, tickets);
 
-        var ticket = useCase.execute(room.id(), host);
+        var ticket = useCase.execute(room.id(), host, java.util.Set.of("CUSTOMER"));
 
         assertEquals("t0k3n", ticket.ticket());
         assertEquals(expires, ticket.expiresAt());
         assertEquals(List.of("game.v1", "ticket.t0k3n"), ticket.subprotocols());
-        assertThrows(GameRoomNotFoundException.class, () -> useCase.execute(room.id(), guest));
-        verify(tickets, never()).issue(room.id(), guest);
+        assertThrows(GameRoomNotFoundException.class, () -> useCase.execute(room.id(), guest, java.util.Set.of("CUSTOMER")));
+        verify(tickets, never()).issue(room.id(), guest, java.util.Set.of("CUSTOMER"));
+    }
+
+    @Test
+    void aWebSocketTicketCannotBeIssuedWithoutLearnerRole() {
+        var tickets = mock(WebSocketTicketStore.class);
+        var useCase = new CreateWebSocketTicketUseCase(rooms, tickets);
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> useCase.execute(UUID.randomUUID(), host, java.util.Set.of("CONTENT_AUTHOR")));
+        verifyNoInteractions(rooms, tickets);
     }
 }

@@ -20,7 +20,6 @@ class LearningRouteConfigTest {
             "/api/learning/suggestions",
             "/api/learning/courses/00000000-0000-0000-0000-000000000000/score",
             "/api/learning/admin/score-config",
-            "/api/learning/admin/learners/00000000-0000-0000-0000-000000000000/report",
             "/api/learning/writing-submissions/00000000-0000-0000-0000-000000000000/revisions",
             "/api/learning/writing-submissions/00000000-0000-0000-0000-000000000000/history"
     );

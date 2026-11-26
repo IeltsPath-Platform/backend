@@ -1,5 +1,7 @@
 package com.ieltspath.library.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.commonstorage.UploadRejectedException;
 import com.ieltspath.library.api.dto.request.CreateFlashcardRequest;
@@ -30,6 +32,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/learning-support/flashcards")
 @RequiredArgsConstructor
+@LearnerOnly
 public class FlashcardController {
     private final CurrentUserProvider currentUserProvider;
     private final CreateFlashcardUseCase createFlashcardUseCase;

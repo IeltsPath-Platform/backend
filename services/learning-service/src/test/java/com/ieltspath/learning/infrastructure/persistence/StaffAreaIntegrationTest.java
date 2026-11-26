@@ -357,11 +357,4 @@ class StaffAreaIntegrationTest {
         assertEquals(1, job.runOnce(), "the skipped round is made up for by the next one");
     }
 
-    @Test
-    void theOverviewOfALearnerWithNothingYetIsEmptyNotAnError() {
-        var overview = insight.overview(UUID.randomUUID());
-        assertTrue(overview.courses().isEmpty());
-        assertTrue(overview.flags().isEmpty());
-        assertEquals(0, overview.knowledgePointsByTier().get("PRIORITY"));
-    }
 }

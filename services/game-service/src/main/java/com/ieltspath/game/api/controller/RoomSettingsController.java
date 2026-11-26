@@ -1,5 +1,7 @@
 package com.ieltspath.game.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.game.api.dto.request.UpdateRoomSettingsRequest;
 import com.ieltspath.game.api.dto.response.GameRoomResponse;
@@ -10,6 +12,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/games/rooms")
+@LearnerOnly
 public class RoomSettingsController {
     private final CurrentUserProvider user;
     private final UpdateRoomSettingsUseCase update;

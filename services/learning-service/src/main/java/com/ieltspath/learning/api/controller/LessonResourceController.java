@@ -1,5 +1,7 @@
 package com.ieltspath.learning.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.learning.api.dto.response.LessonResourcesResponse;
 import com.ieltspath.learning.application.usecase.GetLessonResourcesUseCase;
@@ -12,6 +14,7 @@ import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
+@LearnerOnly
 public class LessonResourceController {
     private final CurrentUserProvider currentUser;
     private final GetLessonResourcesUseCase getLessonResources;

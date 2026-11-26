@@ -1,5 +1,7 @@
 package com.ieltspath.access.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.access.api.dto.response.KeyProductResponse;
 import com.ieltspath.access.api.dto.response.PlanResponse;
 import com.ieltspath.access.application.usecase.ListKeyProductsUseCase;
@@ -14,6 +16,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/access")
 @RequiredArgsConstructor
+@LearnerOnly
 public class AccessCatalogController {
 
     private final ListPlansUseCase listPlansUseCase;

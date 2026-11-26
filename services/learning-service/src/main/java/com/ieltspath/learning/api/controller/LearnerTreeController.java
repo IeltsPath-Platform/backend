@@ -1,5 +1,7 @@
 package com.ieltspath.learning.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.learning.application.usecase.GetLearnerTreeUseCase;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +15,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/learning")
 @RequiredArgsConstructor
+@LearnerOnly
 public class LearnerTreeController {
     private final CurrentUserProvider currentUser;
     private final GetLearnerTreeUseCase tree;

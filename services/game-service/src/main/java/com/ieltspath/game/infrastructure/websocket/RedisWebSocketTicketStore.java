@@ -6,6 +6,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Optional;
+import java.util.Set;
+import java.util.Arrays;
+import java.util.stream.Collectors;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -31,13 +34,15 @@ public class RedisWebSocketTicketStore implements WebSocketTicketStore {
     }
 
     @Override
-    public Ticket issue(UUID roomId, UUID userId) {
+    public Ticket issue(UUID roomId, UUID userId, Set<String> roles) {
         byte[] tokenBytes = new byte[32];
         secureRandom.nextBytes(tokenBytes);
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(tokenBytes);
         Instant expiresAt = Instant.now().plus(ttl);
-        redis.opsForValue().set(KEY_PREFIX + token, roomId + String.valueOf(SEPARATOR) + userId, ttl);
-        return new Ticket(token, roomId, userId, expiresAt);
+        String stored = roomId + String.valueOf(SEPARATOR) + userId + SEPARATOR
+                + String.join(",", roles.stream().sorted().toList());
+        redis.opsForValue().set(KEY_PREFIX + token, stored, ttl);
+        return new Ticket(token, roomId, userId, expiresAt, roles);
     }
 
     @Override
@@ -45,9 +50,12 @@ public class RedisWebSocketTicketStore implements WebSocketTicketStore {
         if (token == null || token.isBlank()) return Optional.empty();
         String stored = redis.opsForValue().getAndDelete(KEY_PREFIX + token);
         if (stored == null) return Optional.empty();
-        int split = stored.indexOf(SEPARATOR);
-        UUID roomId = UUID.fromString(stored.substring(0, split));
-        UUID userId = UUID.fromString(stored.substring(split + 1));
-        return Optional.of(new Ticket(token, roomId, userId, Instant.now().plus(ttl)));
+        String[] parts = stored.split("\\|", -1);
+        if (parts.length != 3) return Optional.empty();
+        UUID roomId = UUID.fromString(parts[0]);
+        UUID userId = UUID.fromString(parts[1]);
+        Set<String> roles = parts[2].isBlank() ? Set.of() : Arrays.stream(parts[2].split(","))
+                .collect(Collectors.toUnmodifiableSet());
+        return Optional.of(new Ticket(token, roomId, userId, Instant.now().plus(ttl), roles));
     }
 }

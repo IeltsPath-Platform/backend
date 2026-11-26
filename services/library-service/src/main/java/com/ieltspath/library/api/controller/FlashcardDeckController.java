@@ -1,5 +1,7 @@
 package com.ieltspath.library.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.library.api.dto.request.AddDeckItemRequest;
 import com.ieltspath.library.api.dto.request.CreateDeckRequest;
@@ -20,6 +22,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/learning-support/decks")
 @RequiredArgsConstructor
+@LearnerOnly
 public class FlashcardDeckController {
     private final CurrentUserProvider currentUserProvider;
     private final CreateFlashcardDeckUseCase createFlashcardDeckUseCase;

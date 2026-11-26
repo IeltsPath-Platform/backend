@@ -78,6 +78,12 @@ class InternalPathSecurityTest {
     }
 
     @Test
+    void apiDocumentationRequiresAuthenticationWhenDisabled() {
+        client.get().uri("/swagger-ui.html").exchange().expectStatus().isUnauthorized();
+        client.get().uri("/v3/api-docs").exchange().expectStatus().isUnauthorized();
+    }
+
+    @Test
     void onlyVocabularyCatalogGetRoutesArePublic() {
         client.get().uri("/api/content/vocabulary")
                 .exchange().expectStatus().isOk();

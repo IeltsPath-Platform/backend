@@ -1,5 +1,7 @@
 package com.ieltspath.library.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.library.application.usecase.*;
 import com.ieltspath.library.application.result.StudyAttemptResult.*;
@@ -14,6 +16,7 @@ import java.util.*;
 
 @RestController @RequiredArgsConstructor @Validated
 @RequestMapping("/api/learning-support/vocabulary-study")
+@LearnerOnly
 public class VocabularyStudyController {
     private final CurrentUserProvider currentUser;
     private final StartStudyAttemptUseCase start;

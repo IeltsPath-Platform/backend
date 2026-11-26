@@ -29,9 +29,4 @@ public class CourseScoreController {
         return score.execute(currentUser.requireUserId(), courseId);
     }
 
-    @GetMapping("/admin/learners/{userId}/courses/{courseId}/score")
-    @PreAuthorize("hasRole('EXAMINER')")
-    public CourseScoreResult learner(@PathVariable("userId") UUID userId, @PathVariable("courseId") UUID courseId) {
-        return score.execute(userId, courseId);
-    }
 }

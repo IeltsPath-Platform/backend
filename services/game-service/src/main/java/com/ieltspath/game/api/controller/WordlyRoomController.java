@@ -1,5 +1,7 @@
 package com.ieltspath.game.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.game.api.dto.request.CreateWordlyRoomRequest;
 import com.ieltspath.game.api.dto.response.GameRoomResponse;
@@ -12,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/games/wordly/rooms")
+@LearnerOnly
 public class WordlyRoomController {
     private final CurrentUserProvider currentUser;
     private final CreateWordlyRoomUseCase createRoom;

@@ -1,5 +1,7 @@
 package com.ieltspath.learning.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.learning.application.service.HeartsService;
 import com.ieltspath.learning.application.usecase.HeartsUseCase;
@@ -17,6 +19,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/learning/me/hearts")
 @RequiredArgsConstructor
+@LearnerOnly
 public class HeartsController {
     private final CurrentUserProvider currentUser;
     private final HeartsUseCase hearts;
