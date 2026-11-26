@@ -113,15 +113,17 @@ public class Subscription {
     }
 
     public void extend(int additionalDays, int additionalCredits) {
+        if (status != SubscriptionStatus.ACTIVE) {
+            throw new IllegalStateException("Only an active subscription can be extended");
+        }
         Instant baseTime = (endsAt != null && endsAt.isAfter(Instant.now())) ? endsAt : Instant.now();
         this.endsAt = baseTime.plus(additionalDays, ChronoUnit.DAYS);
         this.humanGradingCreditsTotal += additionalCredits;
-        this.status = SubscriptionStatus.ACTIVE;
         this.updatedAt = Instant.now();
     }
 
     public void expire() {
-        if (status != SubscriptionStatus.ACTIVE) {
+        if (!status.canMoveTo(SubscriptionStatus.EXPIRED)) {
             throw new IllegalStateException("Only an active subscription can expire");
         }
         this.status = SubscriptionStatus.EXPIRED;
@@ -148,6 +150,10 @@ public class Subscription {
     }
 
     public void cancel() {
+        if (status == SubscriptionStatus.CANCELLED) return;
+        if (!status.canMoveTo(SubscriptionStatus.CANCELLED)) {
+            throw new IllegalStateException("Only an active subscription can be cancelled");
+        }
         this.status = SubscriptionStatus.CANCELLED;
         this.cancelledAt = Instant.now();
         this.updatedAt = Instant.now();

@@ -98,6 +98,18 @@ class SubscriptionTest {
     }
 
     @Test
+    @DisplayName("A final subscription cannot be extended or cancelled")
+    void shouldRejectMovesFromFinalSubscription() {
+        Subscription sub = new Subscription(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), SubscriptionStatus.EXPIRED,
+                Instant.now().minus(30, ChronoUnit.DAYS), Instant.now().minus(1, ChronoUnit.DAYS),
+                SubscriptionSourceType.ACTIVATION_KEY, UUID.randomUUID(), 0, 0, null, 0, null, null);
+
+        assertThatThrownBy(() -> sub.extend(30, 0)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(sub::cancel).isInstanceOf(IllegalStateException.class);
+        assertThat(sub.getStatus()).isEqualTo(SubscriptionStatus.EXPIRED);
+    }
+
+    @Test
     @DisplayName("A cancelled subscription cannot use a credit")
     void shouldRefuseCreditOnCancelledSubscription() {
         Subscription sub = Subscription.create(UUID.randomUUID(), UUID.randomUUID(), SubscriptionSourceType.ACTIVATION_KEY, UUID.randomUUID(), 30, 4);

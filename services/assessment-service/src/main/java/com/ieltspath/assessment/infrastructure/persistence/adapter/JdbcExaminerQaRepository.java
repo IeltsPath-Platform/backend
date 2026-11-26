@@ -61,9 +61,12 @@ public class JdbcExaminerQaRepository implements ExaminerQaRepository {
             if (!assigned) throw new AssessmentAccessDeniedException("Bài chấm kiểm tra chất lượng này không được phân công cho bạn.");
             throw new InvalidAssessmentStateException("Bài đánh giá chất lượng đã được gửi hoặc người đánh giá không độc lập.");
         }
-        jdbc.update("UPDATE grading_jobs SET status='COMPLETED',completed_at=CURRENT_TIMESTAMP WHERE id=?", jobId);
-        jdbc.update("UPDATE human_reviews SET status='COMPLETED',completed_at=CURRENT_TIMESTAMP WHERE grading_job_id=?",
-                jobId);
+        jdbc.update("UPDATE grading_jobs SET status='PROCESSING' WHERE id=? AND status='QUEUED' AND assigned_examiner_id=?",
+                jobId, reviewerId);
+        int completedJob = jdbc.update("UPDATE grading_jobs SET status='COMPLETED',completed_at=CURRENT_TIMESTAMP WHERE id=? AND status='PROCESSING'", jobId);
+        if (completedJob != 1) throw new InvalidAssessmentStateException("QA grading job is no longer processing");
+        jdbc.update("UPDATE human_reviews SET status='IN_REVIEW',started_at=COALESCE(started_at,CURRENT_TIMESTAMP) WHERE grading_job_id=? AND status='ASSIGNED'", jobId);
+        jdbc.update("UPDATE human_reviews SET status='COMPLETED',completed_at=CURRENT_TIMESTAMP WHERE grading_job_id=? AND status='IN_REVIEW'", jobId);
     }
 
     @Override

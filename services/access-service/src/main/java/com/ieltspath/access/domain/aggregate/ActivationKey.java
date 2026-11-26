@@ -118,20 +118,27 @@ public class ActivationKey {
             throw new KeyNotIssuedException();
         }
         if (isExpired()) {
-            this.status = KeyStatus.EXPIRED;
+            if (status.canMoveTo(KeyStatus.EXPIRED)) this.status = KeyStatus.EXPIRED;
             throw new KeyExpiredException("Mã kích hoạt đã hết hạn.");
         }
         if (status != KeyStatus.ACTIVE) {
             throw new InvalidKeyOperationException("Mã kích hoạt không còn dùng được.");
         }
 
+        if (!status.canMoveTo(KeyStatus.REDEEMED)) {
+            throw new InvalidKeyOperationException("Activation key is no longer usable");
+        }
         this.status = KeyStatus.REDEEMED;
         this.redeemedAt = Instant.now();
     }
 
     public void revoke() {
+        if (status == KeyStatus.REVOKED) return;
         if (status == KeyStatus.REDEEMED) {
             throw new InvalidKeyOperationException("Không thu hồi được mã đã kích hoạt.");
+        }
+        if (!status.canMoveTo(KeyStatus.REVOKED)) {
+            throw new InvalidKeyOperationException("Only an active key can be revoked");
         }
         this.status = KeyStatus.REVOKED;
     }

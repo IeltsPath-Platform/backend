@@ -3,5 +3,9 @@ package com.ieltspath.access.domain.vo;
 public enum SubscriptionStatus {
     ACTIVE,
     EXPIRED,
-    CANCELLED
+    CANCELLED;
+
+    public boolean canMoveTo(SubscriptionStatus next) {
+        return this == ACTIVE && (next == EXPIRED || next == CANCELLED);
+    }
 }

@@ -90,7 +90,8 @@ public class JdbcExaminerQueueStore implements ExaminerQueueStore {
                               ELSE (j.requested_examiner_id=:examiner
                                     AND (j.assigned_examiner_id IS NULL OR j.assigned_examiner_id=:examiner)) END)
                 )
-                UPDATE grading_jobs j SET assigned_examiner_id=:examiner,claimed_at=CURRENT_TIMESTAMP
+                UPDATE grading_jobs j SET assigned_examiner_id=:examiner,claimed_at=CURRENT_TIMESTAMP,
+                    status='PROCESSING'
                 FROM target t
                 WHERE (j.id=t.id OR (t.attempt_id IS NOT NULL AND EXISTS (
                     SELECT 1 FROM learner_submissions l JOIN attempt_items i ON i.id=l.attempt_item_id
@@ -106,6 +107,12 @@ public class JdbcExaminerQueueStore implements ExaminerQueueStore {
                     SELECT 1 FROM essay_grade_comparisons c WHERE c.submission_id=j.submission_id AND c.examiner_id=:examiner))
                 RETURNING j.id
                 """,args,(r,n)->r.getObject("id",UUID.class));
+        if (!changed.isEmpty()) jdbc.update("""
+                UPDATE human_reviews SET status='QUEUED',grader_user_id=NULL,assigned_at=NULL,started_at=NULL,
+                    completed_at=NULL,draft_payload=NULL,draft_saved_at=NULL
+                WHERE grading_job_id IN (:ids) AND grader_user_id IS DISTINCT FROM :examiner
+                  AND status IN ('ASSIGNED','IN_REVIEW')
+                """,Map.of("ids",changed,"examiner",examinerId));
         if (!changed.isEmpty()) jdbc.update("""
                 INSERT INTO human_reviews(id,grading_job_id,grader_user_id,status,assigned_at)
                 SELECT gen_random_uuid(),id,:examiner,'ASSIGNED',CURRENT_TIMESTAMP FROM grading_jobs WHERE id IN (:ids)
@@ -163,25 +170,41 @@ public class JdbcExaminerQueueStore implements ExaminerQueueStore {
                 WHERE h.grading_job_id=j.id AND j.submission_id=l.id AND l.attempt_item_id=i.id
                   AND i.attempt_section_id=s.id AND s.attempt_id=:attempt AND j.grading_mode='HUMAN'
                   AND COALESCE(j.reason,'')<>'QA_SAMPLE'
-                  AND j.status='QUEUED' AND j.assigned_examiner_id IS NULL
+                  AND j.status='QUEUED' AND j.assigned_examiner_id IS NULL AND h.status='COMPLETED'
                 """,args);
     }
     @Override @Transactional(propagation=Propagation.MANDATORY)
     public void completeAttempt(UUID attempt, UUID examiner) {
         var args=Map.of("attempt",attempt,"examiner",examiner);
         jdbc.update("""
+                UPDATE grading_jobs j SET status='PROCESSING'
+                FROM learner_submissions l,attempt_items i,attempt_sections s
+                WHERE j.submission_id=l.id AND l.attempt_item_id=i.id AND i.attempt_section_id=s.id
+                AND s.attempt_id=:attempt AND j.grading_mode='HUMAN' AND j.assigned_examiner_id=:examiner
+                AND COALESCE(j.reason,'')<>'QA_SAMPLE' AND j.status='QUEUED'
+                """,args);
+        jdbc.update("""
                 UPDATE grading_jobs j SET status='COMPLETED',completed_at=CURRENT_TIMESTAMP
                 FROM learner_submissions l,attempt_items i,attempt_sections s
                 WHERE j.submission_id=l.id AND l.attempt_item_id=i.id AND i.attempt_section_id=s.id
                 AND s.attempt_id=:attempt AND j.grading_mode='HUMAN' AND j.assigned_examiner_id=:examiner
-                AND COALESCE(j.reason,'')<>'QA_SAMPLE' AND j.status IN ('QUEUED','PROCESSING')
+                AND COALESCE(j.reason,'')<>'QA_SAMPLE' AND j.status='PROCESSING'
+                """,args);
+        jdbc.update("""
+                UPDATE human_reviews h SET status='IN_REVIEW',started_at=COALESCE(h.started_at,CURRENT_TIMESTAMP)
+                FROM grading_jobs j,learner_submissions l,attempt_items i,attempt_sections s
+                WHERE h.grading_job_id=j.id AND j.submission_id=l.id AND l.attempt_item_id=i.id
+                AND i.attempt_section_id=s.id AND s.attempt_id=:attempt AND j.assigned_examiner_id=:examiner
+                AND j.grading_mode='HUMAN' AND COALESCE(j.reason,'')<>'QA_SAMPLE'
+                AND j.status='COMPLETED' AND h.status='ASSIGNED'
                 """,args);
         jdbc.update("""
                 UPDATE human_reviews h SET status='COMPLETED',completed_at=CURRENT_TIMESTAMP
                 FROM grading_jobs j,learner_submissions l,attempt_items i,attempt_sections s
                 WHERE h.grading_job_id=j.id AND j.submission_id=l.id AND l.attempt_item_id=i.id
                 AND i.attempt_section_id=s.id AND s.attempt_id=:attempt AND j.assigned_examiner_id=:examiner
-                AND j.grading_mode='HUMAN' AND COALESCE(j.reason,'')<>'QA_SAMPLE' AND j.status='COMPLETED'
+                AND j.grading_mode='HUMAN' AND COALESCE(j.reason,'')<>'QA_SAMPLE'
+                AND j.status='COMPLETED' AND h.status='IN_REVIEW'
                 """,args);
     }
     private static QueueEntry entry(ResultSet r,int n) throws SQLException {
