@@ -363,14 +363,13 @@ cùng course mở theo trạng thái suy ra khi đọc. Course test không chặ
 
 ## Scheduler và nhiều instance
 
-Backend hiện có 30 phương thức `@Scheduled` trong 29 file. Cơ chế chống xử lý trùng theo mã đang chạy:
+Backend hiện có 40 phương thức `@Scheduled` trong 39 file. Cơ chế chống xử lý trùng theo mã đang chạy:
 
 | Service | Job / lịch | Cơ chế cạnh tranh | HTTP/LLM khi giữ khóa hoặc transaction |
 |---|---|---|---|
 | game | `RocketRoundScheduler` | Khóa hàng trận (`FOR UPDATE`) và kiểm trạng thái vòng khi settle; hai lịch trùng không đóng vòng hai lần | Không |
 | game | `SoloTimeoutScheduler` | Khóa trận và người chơi (`FOR UPDATE OF m,p`), kiểm deadline; hai lịch trùng chỉ trừ một mạng | Không |
 | game | `LobbySeatScheduler` | Khóa hàng phòng (`FOR UPDATE`) rồi kiểm lại hạn giữ chỗ trước khi cho rời phòng; hai lịch trùng chỉ cho rời một lần | Không |
-| game | `OutboxRetentionJob` | Xóa theo ngưỡng thời gian; chạy lặp an toàn | Không |
 | game | `RoomEventChannelSupervisor` | Mỗi instance tự đăng ký lại Redis pub/sub của nó | Không |
 | notification | `NoticePushChannelConfig` | Mỗi instance tự đăng ký lại Redis pub/sub của nó | Không |
 | notification | `PushDeliveryScheduler` | Claim batch bằng `FOR UPDATE SKIP LOCKED`; lease/fencing lưu trong Notification DB | Firebase call ngoài transaction; delivery bền trong PostgreSQL |
@@ -383,6 +382,11 @@ Backend hiện có 30 phương thức `@Scheduled` trong 29 file. Cơ chế ch�
 | notification | `LearningMailScheduler` | Mỗi giám khảo được nhận job bằng một lệnh `DELETE ... RETURNING`; hai instance không nhận cùng job, job đến sau nằm cho lần sau | SMTP ngoài claim; job bị giữ lại nếu gửi lỗi hoặc chạm giới hạn ngày |
 | notification | `NotificationRetentionScheduler` | Xóa theo cutoff và lô giới hạn; chạy lặp an toàn | Không |
 | community | `CommunityOutboxRelayScheduler` | `FOR UPDATE SKIP LOCKED`; publish broker trong transaction ngắn | Broker trong transaction ngắn |
+| user | `OutboxPurgeJob` | Xóa dòng `PUBLISHED` quá 30 ngày theo lô; mỗi lô khóa bằng `FOR UPDATE SKIP LOCKED` | Không |
+| access | `OutboxPurgeJob` | Chỉ xóa dòng `PUBLISHED` quá 30 ngày; `FAILED` và `NOT_RELAYED` được giữ lại; từng lô dùng `FOR UPDATE SKIP LOCKED` | Không |
+| assessment | `OutboxPurgeJob` | Chỉ xóa dòng có `published_at` quá 30 ngày theo lô với `FOR UPDATE SKIP LOCKED` | Không |
+| community | `OutboxPurgeJob` | Chỉ xóa dòng đã phát quá 30 ngày; dòng `failed_at` được giữ; từng lô dùng `FOR UPDATE SKIP LOCKED` | Không |
+| library | `OutboxPurgeJob` | Chỉ xóa dòng `PUBLISHED` quá 30 ngày theo lô; mỗi lô khóa bằng `FOR UPDATE SKIP LOCKED` | Không |
 | assessment | `GateEssayGradingScheduler` | Claim batch bằng `FOR UPDATE SKIP LOCKED` trong transaction; cập nhật job hoàn tất trong transaction riêng | LLM ngoài transaction claim và transaction ghi kết quả |
 | assessment | `GradingDeadlineScheduler` | Store chọn các job bằng `FOR UPDATE SKIP LOCKED`; ghi thông báo/outbox trong transaction | Không |
 | assessment | `SpeakingRecordingRetentionScheduler` | Xóa theo ngưỡng thời gian; chạy lặp an toàn | Không |
@@ -509,7 +513,7 @@ hoạt động upload.
 | Template service mới dùng `application/port`; user-service dùng `domain/repository` | Khác biệt template/hiện hữu |
 | `CONTENT_SERVICE_URL` của game trong config-repo mặc định `http://content-service:8082` | Sai khi game chạy trên host; đặt biến này thành `http://localhost:8082` |
 | Content V7 xóa vĩnh viễn năm bảng catalog | Chỉ chạy trên Testcontainers cho tới khi duyệt chạy trên `content_db` dùng chung |
-| Outbox của access/content/game không có relay | Event chưa được phát |
+| Vòng đời outbox đã phát | User, access, assessment, community và library xóa dòng đã phát sau 30 ngày theo lô; dòng chưa phát, `FAILED`, `NOT_RELAYED` và community `failed_at` được giữ. Access có `AccessOutboxRelay`; content và game đã bỏ bảng outbox |
 | Notification nhận Community event qua RabbitMQ và lưu idempotent theo event id | WebSocket chỉ push sau commit; REST là nguồn đồng bộ lại khi reconnect |
 | Secret có giá trị fallback trong config-repo được track | Thiếu biến env thì service dùng secret công khai trong repo |
 | `.sdd/global/system-architecture.md`, `.sdd/constraints/global.md` (baseline 2026-09-18) ghi không có broker/outbox/learning service | Lỗi thời; `.sdd/global/constitution.md` vẫn là invariant cao nhất. Dữ kiện: code, `AGENTS.md`, tài liệu này |

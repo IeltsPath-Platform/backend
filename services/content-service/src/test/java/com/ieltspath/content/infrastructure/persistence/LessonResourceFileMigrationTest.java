@@ -27,7 +27,7 @@ class LessonResourceFileMigrationTest {
     @BeforeAll
     static void migrate() {
         Flyway.configure().dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
-                .locations("classpath:db/migration").target("147").load().migrate();
+                .locations("classpath:db/migration").target("151").load().migrate();
     }
 
     @Test
@@ -63,15 +63,15 @@ class LessonResourceFileMigrationTest {
         UUID lessonId = UUID.randomUUID();
         try (var connection = connect(); var sql = connection.createStatement()) {
             UUID topicId = UUID.randomUUID();
-            sql.executeUpdate("INSERT INTO topics (id,code,name) VALUES ('" + topicId + "','RES_V148','Resources')");
+            sql.executeUpdate("INSERT INTO topics (id,code,name) VALUES ('" + topicId + "','RES_SLIDE','Resources')");
             sql.executeUpdate("INSERT INTO lessons (id,topic_id,code,title,sort_order) VALUES ('" + lessonId + "','"
-                    + topicId + "','RES_V148','Slides',1)");
+                    + topicId + "','RES_SLIDE','Slides',1)");
             sql.executeUpdate(row(lessonId, "SLIDE", "'Slide cũ'", "'https://docs.google.com/presentation/d/demo'", "NULL", 0));
             sql.executeUpdate(row(lessonId, "DOCUMENT", "'Tài liệu'", "'https://example.com/doc.pdf'", "NULL", 0));
         }
 
         Flyway.configure().dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
-                .locations("classpath:db/migration").target("148").load().migrate();
+                .locations("classpath:db/migration").target("152").load().migrate();
 
         try (var connection = connect(); var sql = connection.createStatement()) {
             try (var rows = sql.executeQuery("SELECT count(*) FROM lesson_resources WHERE lesson_id='" + lessonId

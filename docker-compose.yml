@@ -282,6 +282,8 @@ services:
       dockerfile: Dockerfile.spring-service
       args:
         MODULE_PATH: services/learning-service
+        # The Azure Speech SDK loads native libraries that do not run on Alpine.
+        RUNTIME_IMAGE: eclipse-temurin:21-jre
     environment:
       <<: *spring-env
       SERVER_PORT: 8086

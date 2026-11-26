@@ -1,4 +1,6 @@
 # syntax=docker/dockerfile:1
+# A service with native libraries built against glibc (Azure Speech in learning-service) needs a non-Alpine runtime.
+ARG RUNTIME_IMAGE=eclipse-temurin:21-jre-alpine
 FROM maven:3.9-eclipse-temurin-21 AS builder
 ARG MODULE_PATH
 ARG SKIP_GO_OFFLINE=false
@@ -9,8 +11,12 @@ RUN --mount=type=cache,target=/root/.m2 \
     mvn -B -ntp package -pl "$MODULE_PATH" -am -DskipTests && \
     cp "$MODULE_PATH"/target/*.jar /tmp/app.jar
 
-FROM eclipse-temurin:21-jre-alpine AS runtime
-RUN addgroup -S -g 10001 spring && adduser -S -u 10001 -G spring spring
+FROM ${RUNTIME_IMAGE} AS runtime
+RUN if command -v apk > /dev/null; then \
+        addgroup -S -g 10001 spring && adduser -S -u 10001 -G spring spring; \
+    else \
+        groupadd --system --gid 10001 spring && useradd --system --uid 10001 --gid spring --no-create-home spring; \
+    fi
 WORKDIR /app
 ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75 -Dsun.net.inetaddr.ttl=5"
 COPY --from=builder --chown=10001:10001 /tmp/app.jar ./app.jar

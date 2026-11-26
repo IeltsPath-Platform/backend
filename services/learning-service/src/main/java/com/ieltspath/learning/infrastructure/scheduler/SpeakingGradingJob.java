@@ -2,6 +2,7 @@ package com.ieltspath.learning.infrastructure.scheduler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.commonstorage.ObjectStorage;
+import com.ieltspath.commonstorage.StorageException;
 import com.ieltspath.learning.application.exception.LlmUnavailableException;
 import com.ieltspath.learning.application.exception.SpeechUnavailableException;
 import com.ieltspath.learning.application.port.LearningContentClient;
@@ -199,7 +200,7 @@ public class SpeakingGradingJob implements SpeakingGradingTrigger {
     /**
      * Stops the instance without leaving a submission stuck. Nothing new is claimed; the submissions being graded get
      * {@link #SHUTDOWN_WAIT_SECONDS} to finish. A submission that is still running after that is handed back: it becomes
-     * retryable at once and the claim does not count as an attempt, so a deploy does not use up the three attempts of a learner's
+     * retryable at once and the claim does not count as an attempt, so a deploy does not use up the attempts of a learner's
      * submission and does not leave it waiting for the stale limit.
      */
     @PreDestroy
@@ -318,9 +319,17 @@ public class SpeakingGradingJob implements SpeakingGradingTrigger {
         } catch (RuntimeException exception) {
             // The type and the place of the failure are enough to find the cause; the message could carry the learner's words.
             StackTraceElement origin = exception.getStackTrace().length == 0 ? null : exception.getStackTrace()[0];
-            log.warn("Speaking grading failed: submissionId={}, code={}, exception={}, at={}", submission.id(),
-                    "INTERNAL_FAILURE", exception.getClass().getName(),
-                    origin == null ? "-" : origin.getClassName() + "." + origin.getMethodName() + ":" + origin.getLineNumber());
+            String at = origin == null ? "-"
+                    : origin.getClassName() + "." + origin.getMethodName() + ":" + origin.getLineNumber();
+            if (exception instanceof StorageException storageException) {
+                // These fields are safe: StorageException omits the bucket, object key, URL, headers, and response body.
+                log.warn("Speaking grading failed: submissionId={}, code={}, category={}, operation={}, reason={}, status={}, ref={}, at={}",
+                        submission.id(), "INTERNAL_FAILURE", "STORAGE_FAILURE", storageException.operation(), storageException.reason(),
+                        storageException.status(), storageException.ref(), at);
+            } else {
+                log.warn("Speaking grading failed: submissionId={}, code={}, exception={}, at={}", submission.id(),
+                        "INTERNAL_FAILURE", exception.getClass().getName(), at);
+            }
             failRetryable(submission, "INTERNAL_FAILURE");
         } finally {
             heartbeat.cancel(false);
@@ -488,7 +497,13 @@ public class SpeakingGradingJob implements SpeakingGradingTrigger {
         }
     }
 
+    /** Queues another try; after the last one the submission ends at once, so the learner is told without waiting. */
     private void failRetryable(SpeakingSubmission submission, String code) {
+        if (submission.gradingAttempts() >= settings.maxAttempts()) {
+            log.warn("Speaking grading out of attempts: submissionId={}, lastCode={}", submission.id(), code);
+            needsExaminer(submission, "MAX_ATTEMPTS_REACHED");
+            return;
+        }
         submission.retryable(code, Instant.now(clock));
         submissions.save(submission);
         log.warn("Speaking grading deferred: submissionId={}, code={}", submission.id(), code);

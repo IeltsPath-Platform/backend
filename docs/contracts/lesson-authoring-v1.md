@@ -107,7 +107,7 @@ Errors: `400 EMPTY_FILE`, `400 UNSUPPORTED_DOCUMENT`, `413 DOCUMENT_TOO_LARGE` (
 `POST /api/content/admin/lessons/{lessonId}/resources` takes `{ type: "DOCUMENT" | "SLIDE", title, fileKey, sortOrder }` to attach the
 upload. Both types use `POST /api/content/admin/media/document` and the `lesson-document/` key prefix. The key must be one this author uploaded and must exist in storage; a key of another author, outside
 `lesson-document/`, with a path trick, or whose file is missing returns `400`. A slide with a `url`, or a body with both
-`url` and `fileKey`, returns `400`. V148 deleted all existing slide links and the database now rejects slide rows without a file key.
+`url` and `fileKey`, returns `400`. V152 deleted all existing slide links and the database now rejects slide rows without a file key.
 
 `PUT .../resources/{resourceId}` of a file resource takes `{ title, sortOrder }` and no `url`; to replace the file, delete the
 resource and add a new one. Deleting a file resource removes its file after the row is committed; a failed cleanup is logged

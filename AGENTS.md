@@ -1,7 +1,7 @@
 # AGENTS.md - Quy tắc bắt buộc cho AI Agent
 
 - Phiên bản: 2.3
-- Cập nhật lần cuối: 2026-11-26 (Learning topic catalog Redis cache); 2026-11-18 (luật thang bài ôn, chẩn đoán dò ngược, giỏ ôn và nguồn điểm `ReviewReevaluation`; placement chia ba kho đề và cho làm lại, bỏ luật "chỉ làm một lần" ở §3.8); 2026-11-14 (bài ôn tiêu chí Writing ôn KP của mã lỗi gặp nhiều nhất); 2026-11-13 (khối `judgments` khi chấm Writing chỉ dùng KP của đề, `kpj3`); 2026-11-12 (ngoại lệ `chartFacts`: học viên nhận phát biểu đúng cho câu số liệu viết sai); 2026-11-11 (ghi chú gamification học từ vựng mobile ở §3.8; thêm common-llm); 2026-11-02 (thêm §3.9 và nhóm điều cấm "Pattern hệ thống" ở §5: resilience, outbox, idempotency, scheduler, storage; bổ sung Redis, Resilience4j, Micrometer/OpenTelemetry, Supabase vào stack và hai module shared mới); 2026-10-30 (Content gọi Library một chiều, Library không gọi Content; Notification đã có DB, listener và API; mặc định DB của config-repo là `localhost:5440`); 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); dữ kiện khác giữ mốc kiểm 2026-10-07 sau course path, placement recommendation và course gate
+- Cập nhật lần cuối: 2026-11-26 (Learning topic catalog Redis cache; job dọn outbox chỉ xóa dòng đã phát quá `retention-days`, giữ pending và lỗi); 2026-11-18 (luật thang bài ôn, chẩn đoán dò ngược, giỏ ôn và nguồn điểm `ReviewReevaluation`; placement chia ba kho đề và cho làm lại, bỏ luật "chỉ làm một lần" ở §3.8); 2026-11-14 (bài ôn tiêu chí Writing ôn KP của mã lỗi gặp nhiều nhất); 2026-11-13 (khối `judgments` khi chấm Writing chỉ dùng KP của đề, `kpj3`); 2026-11-12 (ngoại lệ `chartFacts`: học viên nhận phát biểu đúng cho câu số liệu viết sai); 2026-11-11 (ghi chú gamification học từ vựng mobile ở §3.8; thêm common-llm); 2026-11-02 (thêm §3.9 và nhóm điều cấm "Pattern hệ thống" ở §5: resilience, outbox, idempotency, scheduler, storage; bổ sung Redis, Resilience4j, Micrometer/OpenTelemetry, Supabase vào stack và hai module shared mới); 2026-10-30 (Content gọi Library một chiều, Library không gọi Content; Notification đã có DB, listener và API; mặc định DB của config-repo là `localhost:5440`); 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); dữ kiện khác giữ mốc kiểm 2026-10-07 sau course path, placement recommendation và course gate
 - Dự án: `IELTSPath` (Maven coordinates: `com.ieltspath:code-base:1.0-SNAPSHOT`)
 - Kiến trúc chi tiết (sơ đồ, flow, data ownership, quyết định): [`docs/system-architecture.md`](docs/system-architecture.md)
 
@@ -50,7 +50,7 @@ phần hạ tầng hoặc architectural pattern mới nếu chưa được phê 
 | Bảo mật | Spring Security, OAuth2 Resource Server, Nimbus JWT, HMAC-SHA256 JWT, BCrypt. |
 | Messaging | RabbitMQ 3.13; Spring AMQP (`spring-boot-starter-amqp`): assessment phát, learning-service nhận. |
 | Realtime | Spring WebSocket (game-service). |
-| Redis | Redis 7: rate limiting, login limits, game WebSocket tickets, realtime pub/sub, and the Learning topic display cache. |
+| Redis | Redis 7: rate limit ở Gateway, giới hạn đăng nhập, ticket WebSocket của game, pub/sub đẩy realtime (kênh không bền). |
 | Resilience | Resilience4j 2.4.0, chỉ dùng qua `common-resilience` (`ResilientCall`). |
 | Quan sát | Micrometer, Micrometer Tracing + OpenTelemetry qua `common-observability`; Prometheus, Loki, Tempo, Alloy, Grafana là stack tùy chọn (`docker-compose.observability.yml`, profile `observability`). |
 | Lưu file | Supabase Storage qua `common-storage`. |
@@ -190,7 +190,7 @@ src/main/java/com/ieltspath/<service>
   xuất bản như mọi nội dung khác; không có đường nào từ bản nháp tới học viên. Nội dung nhập từ Excel đi qua cùng luật.
 - Chạy local bằng container: `docker compose up -d --build` khởi chạy PostgreSQL, RabbitMQ, Config Server, Eureka,
   Gateway và các service đã triển khai; Flyway của từng service tạo schema/seed trong database riêng. Để chạy Java từ
-  IDE, dùng `docker compose up -d postgres rabbitmq redis` rồi trỏ các `*_DB_URL` tới `localhost:${MVP_POSTGRES_PORT:-5440}/<service>_db`; thứ tự service trên host là Config Server → Eureka → Gateway → business service.
+  IDE, dùng `docker compose up -d postgres rabbitmq` rồi trỏ các `*_DB_URL` tới `localhost:${MVP_POSTGRES_PORT:-5440}/<service>_db`; thứ tự service trên host là Config Server → Eureka → Gateway → business service.
   Tài khoản/điểm demo của user/access chỉ được ghi khi `DEMO_DATA_ENABLED=true` (Compose local mặc định bật).
   Game chọn snapshot `VOCABULARY` từ library và `GRAMMAR` từ content; trong Compose các base URL trỏ theo tên service.
   Chi tiết: `docs/local-development.md`, `docs/system-architecture.md` §7.
@@ -347,7 +347,7 @@ Gặp code cũ lệch pattern: giữ nguyên hành vi, không sửa lây trong t
 | Khi bạn... | PHẢI | Chi tiết |
 | --- | --- | --- |
 | Gọi HTTP sang service khác hoặc LLM | LLM đi qua `common-llm` (vẫn dùng `ResilientCall`); HTTP khác bọc trong `ResilientCall.call(target, CallKind, ...)` của `common-resilience`: `target` là tên service đích (LLM là `llm`); `READ` và `IDEMPOTENT_WRITE` được retry một lần, `WRITE` không retry; bắt `DownstreamUnavailableException` rồi đổi về contract lỗi của service gọi; chạy ngoài transaction và ngoài khóa | `docs/system-architecture.md` §3 |
-| Phát event | Ghi bảng outbox cùng transaction với dữ liệu, relay publish có publisher confirm; bảng outbox có `correlation_id` và `trace_context`; tên exchange, routing key, payload nằm ở `common-events`, tên có version, contract ở `docs/contracts/`; đổi hình dạng event đã có cần duyệt (§5) | §3.5 |
+| Phát event | Ghi bảng outbox cùng transaction với dữ liệu, relay publish có publisher confirm; bảng outbox có `correlation_id` và `trace_context`; job dọn chỉ xóa dòng đã phát quá `retention-days`, giữ dòng chưa phát, `FAILED` và `NOT_RELAYED`; tên exchange, routing key, payload nằm ở `common-events`, tên có version, contract ở `docs/contracts/`; đổi hình dạng event đã có cần duyệt (§5) | §3.5 |
 | Thêm consumer | Idempotent theo khóa tự nhiên (`eventId` hoặc `(attempt, result_version)`); lỗi tạm đi retry queue có TTL, lỗi contract hoặc hết lượt vào DLQ; service consumer sở hữu queue, retry queue, DLQ; chỉ ack sau khi ghi xong; mẫu là consumer của learning-service | §3.5 |
 | Trừ hoặc cộng điểm, cấp quyền (Premium), mở khóa trả phí | Bắt buộc `Idempotency-Key` hoặc khóa ổn định tương đương (như submission ID); lưu khóa cùng thông tin để phát hiện dùng lại khác payload trong cùng transaction với tác động: cùng khóa và payload trả kết quả cũ, khác payload trả `409`. Cần gọi service khác sau khi ghi thì ghi intent `PENDING` trước rồi đối soát (reconcile) | `docs/saga-course-unlock-and-human-grading.md`, `docs/contracts/subscription-granted-v1.md` |
 | Thêm `@Scheduled` hoặc job nền | An toàn khi nhiều instance cùng chạy: claim hàng bằng `FOR UPDATE SKIP LOCKED`, hoặc advisory lock, hoặc thao tác lặp an toàn; HTTP và LLM chạy ngoài khóa và transaction; thêm một dòng vào bảng "Scheduler và nhiều instance" | `docs/system-architecture.md` |
@@ -505,6 +505,6 @@ Những điểm ảnh hưởng trực tiếp tới quy tắc:
   `infrastructure` và không đưa dependency dạng này vào `domain`.
 - `CONTENT_SERVICE_URL` của game mặc định `http://content-service:8082` trong config-repo; khi chạy game trên host,
   đặt `http://localhost:8082`. `LIBRARY_SERVICE_URL` đã mặc định `http://localhost:8081`.
-- Content và game không còn bảng outbox (đã xóa). Access, assessment, community, library (`outbox_events`, V43) và learning (`reward_grants`) có outbox và relay.
+- Content và game không còn bảng outbox (đã xóa). Access có `AccessOutboxRelay`; user, assessment, community, library (`outbox_events`, V43) và learning (`reward_grants`) cũng có relay. User, access, assessment, community và library dọn dòng đã phát sau 30 ngày; lỗi và dòng chưa phát được giữ.
 - Config-repo yêu cầu JWT, mật khẩu DB, RabbitMQ và Redis qua biến môi trường; không thêm giá trị dự phòng. Thiếu biến bắt buộc thì service không khởi động; `.env.example` chỉ chứa tên và giá trị rỗng.
 - Chưa xác định: nơi lưu bản sao lưu DB ngoài VPS, tên miền production, frontend contract, API versioning. CD đã có (workflow chạy tay); chưa chạy lần nào.

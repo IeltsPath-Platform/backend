@@ -79,6 +79,12 @@ library:
       max-attempts: 20
       poll-interval: PT2S
       confirm-timeout: PT5S
+    purge:
+      enabled: ${LIBRARY_OUTBOX_PURGE_ENABLED:true}
+      retention-days: ${LIBRARY_OUTBOX_PURGE_RETENTION_DAYS:30}
+      batch-size: 1000
+      max-batches-per-run: 20
+      cron: ${LIBRARY_OUTBOX_PURGE_CRON:0 53 3 * * *}
   access:
     base-url: ${ACCESS_SERVICE_URL:http://localhost:8084}
   vocabulary-study:
