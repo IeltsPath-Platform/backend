@@ -120,6 +120,14 @@ public class Subscription {
         this.updatedAt = Instant.now();
     }
 
+    public void expire() {
+        if (status != SubscriptionStatus.ACTIVE) {
+            throw new IllegalStateException("Only an active subscription can expire");
+        }
+        this.status = SubscriptionStatus.EXPIRED;
+        this.updatedAt = Instant.now();
+    }
+
     public void consumeHumanGradingCredit() {
         if (!isActive()) {
             throw new IllegalStateException("Cannot consume credit on inactive subscription");

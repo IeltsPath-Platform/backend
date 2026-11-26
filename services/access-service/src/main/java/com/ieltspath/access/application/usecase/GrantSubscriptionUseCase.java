@@ -86,6 +86,8 @@ public class GrantSubscriptionUseCase {
         Plan plan = planRepository.findById(command.planId())
                 .orElseThrow(() -> new PlanNotFoundException(command.planId()));
 
+        subscriptionRepository.lockUserSlot(command.userId());
+        subscriptionRepository.expireLapsed(command.userId(), Instant.now());
         Optional<Subscription> activeSub = subscriptionRepository.findActiveByUserId(command.userId());
         Subscription subscription;
         if (activeSub.isPresent()) {

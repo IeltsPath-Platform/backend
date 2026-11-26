@@ -140,6 +140,8 @@ public class ActivateKeyUseCase {
             int days = product.getPremiumDays() != null ? product.getPremiumDays() : 0;
             int credits = product.getHumanGradingCredits() != null ? product.getHumanGradingCredits() : 0;
 
+            subscriptionRepository.lockUserSlot(command.userId());
+            subscriptionRepository.expireLapsed(command.userId(), Instant.now());
             Optional<Subscription> activeSub = subscriptionRepository.findActiveByUserId(command.userId());
             Subscription subscription;
             if (activeSub.isPresent()) {

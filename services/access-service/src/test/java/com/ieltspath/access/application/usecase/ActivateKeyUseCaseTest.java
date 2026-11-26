@@ -132,6 +132,8 @@ class ActivateKeyUseCaseTest {
         assertThat(result.subscriptionEndsAt()).isNotNull();
 
         verify(subscriptionRepository).save(any(Subscription.class));
+        verify(subscriptionRepository).lockUserSlot(userId);
+        verify(subscriptionRepository).expireLapsed(eq(userId), any(Instant.class));
         verify(keyActivationRepository).save(any(KeyActivation.class));
         verify(activationKeyRepository).save(key);
     }
