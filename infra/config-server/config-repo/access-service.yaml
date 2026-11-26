@@ -32,6 +32,11 @@ spring:
 
 # Outbox relay: publishes SubscriptionGranted events to Notification. Other event types stay in the table only.
 access:
+  points:
+    reconciliation:
+      enabled: ${ACCESS_POINTS_RECONCILIATION_ENABLED:false}
+      interval: ${ACCESS_POINTS_RECONCILIATION_INTERVAL:PT24H}
+      max-rows: ${ACCESS_POINTS_RECONCILIATION_MAX_ROWS:100}
   outbox:
     relay:
       enabled: ${ACCESS_OUTBOX_RELAY_ENABLED:true}
@@ -69,7 +74,7 @@ app:
 springdoc:
   # OpenAPI for the Gateway Swagger UI; set API_DOCS_ENABLED=false outside local development.
   api-docs:
-    enabled: ${API_DOCS_ENABLED:true}
+    enabled: ${API_DOCS_ENABLED:false}
   paths-to-match:
     - /api/access/**
 

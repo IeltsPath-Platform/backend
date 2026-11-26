@@ -3,6 +3,7 @@ package com.ieltspath.access.infrastructure.persistence.repository;
 import com.ieltspath.access.infrastructure.persistence.entity.SubscriptionJpaEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
@@ -16,6 +17,16 @@ public interface SubscriptionJpaRepository extends JpaRepository<SubscriptionJpa
 
     @Query("SELECT s FROM SubscriptionJpaEntity s WHERE s.userId = :userId AND s.status = 'ACTIVE' AND (s.endsAt IS NULL OR s.endsAt > :now) ORDER BY s.endsAt DESC LIMIT 1")
     Optional<SubscriptionJpaEntity> findActiveByUserId(@Param("userId") UUID userId, @Param("now") Instant now);
+
+    @Modifying
+    @Query("UPDATE SubscriptionJpaEntity s SET s.status = 'EXPIRED', s.updatedAt = :now, s.rowVersion = s.rowVersion + 1 " +
+            "WHERE s.userId = :userId AND s.status = 'ACTIVE' AND s.endsAt IS NOT NULL AND s.endsAt <= :now")
+    int expireLapsedByUserId(@Param("userId") UUID userId, @Param("now") Instant now);
+
+    @Modifying
+    @Query("UPDATE SubscriptionJpaEntity s SET s.status = 'EXPIRED', s.updatedAt = :now, s.rowVersion = s.rowVersion + 1 " +
+            "WHERE s.status = 'ACTIVE' AND s.endsAt IS NOT NULL AND s.endsAt <= :now")
+    int expireAllLapsed(@Param("now") Instant now);
 
     List<SubscriptionJpaEntity> findByUserIdOrderByCreatedAtDesc(UUID userId);
 }

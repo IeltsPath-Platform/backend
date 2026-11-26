@@ -1,5 +1,7 @@
 package com.ieltspath.access.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.access.api.dto.request.ActivateKeyRequest;
 import com.ieltspath.access.api.dto.response.ActivationResponse;
 import com.ieltspath.access.api.dto.response.PointLedgerResponse;
@@ -22,6 +24,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/access/me")
 @RequiredArgsConstructor
+@LearnerOnly
 public class LearnerAccessController {
 
     private final CurrentUserProvider currentUserProvider;

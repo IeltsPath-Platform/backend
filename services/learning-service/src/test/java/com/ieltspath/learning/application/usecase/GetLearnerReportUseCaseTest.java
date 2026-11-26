@@ -62,7 +62,7 @@ class GetLearnerReportUseCaseTest {
                 profile(readingA, 0.9, MasteryTier.MAINTAIN, 10), profile(readingB, 0.85, MasteryTier.MAINTAIN, 10),
                 profile(writing, 0.2, MasteryTier.PRIORITY, 4), profile(listening, 0.3, MasteryTier.PRIORITY, 4),
                 profile(grammar, 0.5, MasteryTier.CONSOLIDATE, 6)));
-        when(directory.describe()).thenReturn(Map.of(
+        when(directory.describeForDisplay(true)).thenReturn(Map.of(
                 readingA, new KnowledgePointDirectory.Entry("R1", "Reading 1", "READING", B60),
                 readingB, new KnowledgePointDirectory.Entry("R2", "Reading 2", "READING", B60),
                 writing, new KnowledgePointDirectory.Entry("W1", "Writing 1", "WRITING", B60),

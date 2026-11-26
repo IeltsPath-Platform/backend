@@ -11,6 +11,7 @@ import com.ieltspath.content.application.exception.PremiumRequiredException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -31,6 +32,7 @@ import java.util.Map;
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    private static final String PUBLISHED_VERSION_LOCK_MESSAGE = "published_version_content_locked";
 
     @ExceptionHandler(PremiumRequiredException.class)
     public ResponseEntity<ErrorResponse> premiumRequired(PremiumRequiredException ex, HttpServletRequest request) {
@@ -92,6 +94,24 @@ public class GlobalExceptionHandler {
                                                                         HttpServletRequest request) {
         return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
                 Map.of("code", "QUESTION_ALREADY_IN_VERSION"));
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException ex,
+                                                                       HttpServletRequest request) {
+        if (hasCauseMessage(ex, PUBLISHED_VERSION_LOCK_MESSAGE)) {
+            return buildResponse(HttpStatus.CONFLICT,
+                    "Không thể chỉnh sửa nội dung của phiên bản đã xuất bản", request.getRequestURI(),
+                    Map.of("code", "PUBLISHED_VERSION_LOCKED"));
+        }
+        return handleGenericException(ex, request);
+    }
+
+    private static boolean hasCauseMessage(Throwable exception, String expectedMessage) {
+        for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
+            if (cause.getMessage() != null && cause.getMessage().contains(expectedMessage)) return true;
+        }
+        return false;
     }
 
     @ExceptionHandler(TopicSortOrderTakenException.class)

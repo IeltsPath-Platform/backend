@@ -6,6 +6,7 @@ import com.ieltspath.access.infrastructure.persistence.entity.SubscriptionJpaEnt
 import com.ieltspath.access.infrastructure.persistence.mapper.AccessPersistenceMapper;
 import com.ieltspath.access.infrastructure.persistence.repository.SubscriptionJpaRepository;
 import org.springframework.stereotype.Component;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.Instant;
 import java.util.List;
@@ -17,10 +18,13 @@ public class SubscriptionRepositoryAdapter implements SubscriptionRepository {
 
     private final SubscriptionJpaRepository subscriptionJpaRepository;
     private final AccessPersistenceMapper mapper;
+    private final JdbcTemplate jdbcTemplate;
 
-    public SubscriptionRepositoryAdapter(SubscriptionJpaRepository subscriptionJpaRepository, AccessPersistenceMapper mapper) {
+    public SubscriptionRepositoryAdapter(SubscriptionJpaRepository subscriptionJpaRepository, AccessPersistenceMapper mapper,
+                                         JdbcTemplate jdbcTemplate) {
         this.subscriptionJpaRepository = subscriptionJpaRepository;
         this.mapper = mapper;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     @Override
@@ -38,6 +42,22 @@ public class SubscriptionRepositoryAdapter implements SubscriptionRepository {
         return subscriptionJpaRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
                 .map(mapper::toDomain)
                 .toList();
+    }
+
+    @Override
+    public void lockUserSlot(UUID userId) {
+        jdbcTemplate.query("SELECT pg_advisory_xact_lock(hashtextextended(CAST(? AS text), 0))",
+                resultSet -> null, userId.toString());
+    }
+
+    @Override
+    public int expireLapsed(UUID userId, Instant now) {
+        return subscriptionJpaRepository.expireLapsedByUserId(userId, now);
+    }
+
+    @Override
+    public int expireAllLapsed(Instant now) {
+        return subscriptionJpaRepository.expireAllLapsed(now);
     }
 
     @Override

@@ -16,28 +16,44 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class PurgeLoginHistoryUseCaseTest {
+class LoginHistoryRetentionUseCaseTest {
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 10, 29, 3, 30);
 
     @Mock
     private LoginHistoryRepository repository;
     @InjectMocks
-    private PurgeLoginHistoryUseCase useCase;
+    private LoginHistoryRetentionUseCase useCase;
 
     @Test
-    void removesAttemptsOlderThanTheRetentionPeriodAndReportsTheCount() {
-        when(repository.deleteOlderThan(NOW.minusDays(90))).thenReturn(7);
+    void removesOldAttemptsInBatchesAndReportsTheTotal() {
+        when(repository.deleteOlderThan(NOW.minusDays(180), 3)).thenReturn(3, 3, 1);
 
-        assertThat(useCase.execute(90, NOW)).isEqualTo(7);
+        assertThat(useCase.execute(180, 3, false, NOW)).isEqualTo(7);
 
-        verify(repository).deleteOlderThan(LocalDateTime.of(2026, 7, 31, 3, 30));
+        verify(repository, org.mockito.Mockito.times(3)).deleteOlderThan(LocalDateTime.of(2026, 5, 2, 3, 30), 3);
     }
 
     @Test
-    void refusesARetentionPeriodThatWouldEraseEverything() {
-        assertThatThrownBy(() -> useCase.execute(0, NOW)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> useCase.execute(-5, NOW)).isInstanceOf(IllegalArgumentException.class);
+    void dryRunCountsEligibleRowsWithoutDeleting() {
+        when(repository.countOlderThan(NOW.minusDays(180))).thenReturn(23L);
+
+        assertThat(useCase.execute(180, 1000, true, NOW)).isEqualTo(23L);
+
+        verify(repository).countOlderThan(NOW.minusDays(180));
+        verifyNoInteractionsAfterCount();
+    }
+
+    @Test
+    void refusesInvalidRetentionAndBatchValues() {
+        assertThatThrownBy(() -> useCase.execute(0, 1, false, NOW)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> useCase.execute(-5, 1, false, NOW)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> useCase.execute(180, 0, false, NOW)).isInstanceOf(IllegalArgumentException.class);
 
         verifyNoInteractions(repository);
+    }
+
+    private void verifyNoInteractionsAfterCount() {
+        org.mockito.Mockito.verify(repository, org.mockito.Mockito.never())
+                .deleteOlderThan(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyInt());
     }
 }

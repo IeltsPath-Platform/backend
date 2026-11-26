@@ -1,5 +1,7 @@
 package com.ieltspath.learning.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.learning.api.dto.request.*;
 import com.ieltspath.learning.application.result.*;
@@ -14,6 +16,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/learning")
 @RequiredArgsConstructor
+@LearnerOnly
 public class StudySessionController {
     private final CurrentUserProvider currentUser;
     private final StartStudySessionUseCase start;

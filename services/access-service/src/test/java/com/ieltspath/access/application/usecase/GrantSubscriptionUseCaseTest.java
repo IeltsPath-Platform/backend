@@ -20,6 +20,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -45,6 +46,8 @@ class GrantSubscriptionUseCaseTest {
     void savesOnePendingSubscriptionGrantedEvent() {
         useCase.execute(new GrantSubscriptionCommand(learner, plan.getId(), 30, 0));
 
+        verify(subscriptions).lockUserSlot(learner);
+        verify(subscriptions).expireLapsed(eq(learner), any());
         ArgumentCaptor<OutboxEvent> saved = ArgumentCaptor.forClass(OutboxEvent.class);
         verify(outbox).save(saved.capture());
         assertEquals("SubscriptionGranted", saved.getValue().getEventType());

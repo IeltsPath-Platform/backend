@@ -94,7 +94,7 @@ class ListSubmissionHistoryUseCaseTest {
         UUID named = UUID.randomUUID();
         UUID unknown = UUID.randomUUID();
         when(history.findKnowledgePractice(user, 21, 0)).thenReturn(List.of(practised(named), practised(unknown)));
-        when(directory.describe()).thenReturn(Map.of(named, new KnowledgePointDirectory.Entry("TREND", "Từ vựng xu hướng", "WRITING", null)));
+        when(directory.describeForDisplay()).thenReturn(Map.of(named, new KnowledgePointDirectory.Entry("TREND", "Từ vựng xu hướng", "WRITING", null)));
 
         var page = useCase.execute(user, Scope.KNOWLEDGE, null, 0, 20);
 
@@ -107,7 +107,7 @@ class ListSubmissionHistoryUseCaseTest {
     @Test
     void stillListsThePractisedPointsWhenTheCatalogIsDown() {
         when(history.findKnowledgePractice(user, 21, 0)).thenReturn(List.of(practised(UUID.randomUUID())));
-        when(directory.describe()).thenThrow(new IllegalStateException("content is down"));
+        when(directory.describeForDisplay()).thenThrow(new IllegalStateException("content is down"));
 
         var page = useCase.execute(user, Scope.KNOWLEDGE, null, 0, 20);
 

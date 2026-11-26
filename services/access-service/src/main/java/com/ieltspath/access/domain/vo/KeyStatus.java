@@ -4,5 +4,9 @@ public enum KeyStatus {
     ACTIVE,
     REDEEMED,
     REVOKED,
-    EXPIRED
+    EXPIRED;
+
+    public boolean canMoveTo(KeyStatus next) {
+        return this == ACTIVE && (next == REDEEMED || next == REVOKED || next == EXPIRED);
+    }
 }

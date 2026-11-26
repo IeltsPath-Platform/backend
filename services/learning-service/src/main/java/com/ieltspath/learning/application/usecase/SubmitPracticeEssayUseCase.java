@@ -60,7 +60,6 @@ public class SubmitPracticeEssayUseCase {
 
     public WritingSubmissionResult execute(UUID userId, UUID attemptId, UUID questionVersionId, UUID requestId,
                                            String essayText) {
-        boolean premium = flow.premiumLearner();
         int words = flow.validate(essayText);
 
         Optional<WritingSubmission> existing = essays.findByRequestId(requestId);
@@ -73,6 +72,7 @@ public class SubmitPracticeEssayUseCase {
             if (submission.status() == WritingSubmissionStatus.GRADED) return view.assemble(submission);
             if (submission.status() == WritingSubmissionStatus.PAYMENT_PENDING) return charge(submission);
         }
+        boolean premium = flow.premiumLearner();
         flow.requireGraderAvailable();
 
         PracticeAttempt attempt = owned(userId, attemptId);

@@ -1,5 +1,7 @@
 package com.ieltspath.learning.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.learning.application.usecase.StreakUseCase;
 import com.ieltspath.learning.domain.vo.StreakView;
@@ -17,6 +19,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/learning/me/streak")
 @RequiredArgsConstructor
+@LearnerOnly
 public class StreakController {
     private final CurrentUserProvider currentUser;
     private final StreakUseCase streak;

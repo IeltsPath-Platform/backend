@@ -87,9 +87,22 @@ class GameCatalogControllerTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    void staffWithoutTheLearnerRoleAreRefused() throws Exception {
+        for (String role : List.of("CONTENT_AUTHOR", "SALES_STAFF")) {
+            mvc.perform(get("/api/games/catalog").header("Authorization", "Bearer " + token(
+                            "urn:code-base:api-gateway", Instant.now().plusSeconds(300), role)))
+                    .andExpect(status().isForbidden());
+        }
+    }
+
     private String token(String issuer, Instant expiresAt) {
+        return token(issuer, expiresAt, "CUSTOMER");
+    }
+
+    private String token(String issuer, Instant expiresAt, String role) {
         var claims = JwtClaimsSet.builder().issuer(issuer).subject(UUID.randomUUID().toString())
-                .expiresAt(expiresAt).claim("roles", List.of("CUSTOMER")).build();
+                .expiresAt(expiresAt).claim("roles", List.of(role)).build();
         var key = new OctetSequenceKey.Builder(KEY).build();
         JwtEncoder encoder = new NimbusJwtEncoder(new ImmutableJWKSet<SecurityContext>(new JWKSet(key)));
         return encoder.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims))

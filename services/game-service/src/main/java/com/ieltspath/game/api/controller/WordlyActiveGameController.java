@@ -1,5 +1,7 @@
 package com.ieltspath.game.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.game.application.result.ActiveWordlyGameResult;
 import com.ieltspath.game.application.usecase.ActiveWordlyGameUseCase;
@@ -9,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 /** One room per user across every room game; the Wordly path predates Rocket and stays as an alias. */
 @RequestMapping({"/api/games/me/active-game", "/api/games/wordly/me/active-game"})
+@LearnerOnly
 public class WordlyActiveGameController {
     private final CurrentUserProvider currentUser;
     private final ActiveWordlyGameUseCase activeGame;

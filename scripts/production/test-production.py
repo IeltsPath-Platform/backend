@@ -118,7 +118,8 @@ class ProductionEnvironmentTest(unittest.TestCase):
     def test_credential_scope_and_secure_cookie(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / 'env'
-            renderer.render(configuration(), root)
+            config = configuration()
+            renderer.render(config, root)
             def keys(name):
                 return dict(line.split('=', 1) for line in (root / (name + '.env')).read_text().splitlines())
             gateway, user, content = keys('api-gateway'), keys('user-service'), keys('content-service')
@@ -134,6 +135,16 @@ class ProductionEnvironmentTest(unittest.TestCase):
             self.assertEqual(user['USER_DB_USERNAME'], 'user_app')
             self.assertIn('RABBITMQ_PASSWORD', user)
             self.assertNotIn('RABBITMQ_PASSWORD', gateway)
+            learning = keys('learning-service')
+            self.assertEqual(learning['REDIS_HOST'], 'redis')
+            self.assertEqual(learning['REDIS_PASSWORD'], config['REDIS_PASSWORD'])
+            self.assertNotIn('REDIS_PASSWORD', keys('content-service'))
+            self.assertNotIn('REDIS_PASSWORD', keys('assessment-service'))
+            config['LEARNING_TOPIC_CACHE_ENABLED'] = 'false'
+            renderer.render(config, root / 'env-disabled')
+            disabled_learning = dict(line.split('=', 1) for line in
+                                     (root / 'env-disabled' / 'learning-service.env').read_text().splitlines())
+            self.assertEqual(disabled_learning['LEARNING_TOPIC_CACHE_ENABLED'], 'false')
             if os.name != 'nt':
                 self.assertEqual((root / 'user-service.env').stat().st_mode & 0o777, 0o600)
 

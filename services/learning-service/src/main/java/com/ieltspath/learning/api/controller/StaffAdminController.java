@@ -29,8 +29,8 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * The staff area of Learning: learner overview, anomaly flags, work queues, and statistics for content authors. An
- * Examiners work the examiner queue, and content authors work the content queue.
+ * The staff area of Learning: anomaly flags, work queues, and statistics for content authors. Examiners work the
+ * examiner queue, and content authors work the content queue.
  */
 @RestController
 @RequestMapping("/api/learning")
@@ -43,12 +43,6 @@ public class StaffAdminController {
         this.currentUser = currentUser;
         this.insight = insight;
         this.work = work;
-    }
-
-    @GetMapping("/admin/learners/{userId}/overview")
-    @PreAuthorize("hasRole('EXAMINER')")
-    public StaffInsightResults.Overview overview(@PathVariable("userId") UUID userId) {
-        return insight.overview(userId);
     }
 
     @GetMapping("/admin/work-items")

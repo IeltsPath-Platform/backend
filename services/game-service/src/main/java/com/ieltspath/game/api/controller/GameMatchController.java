@@ -1,5 +1,7 @@
 package com.ieltspath.game.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.game.api.dto.response.GameMatchResponse;
 import com.ieltspath.game.application.usecase.GetGameMatchStateUseCase;
@@ -12,6 +14,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/games/matches")
+@LearnerOnly
 public class GameMatchController {
     private final CurrentUserProvider currentUserProvider;
     private final GetGameMatchStateUseCase getMatchState;

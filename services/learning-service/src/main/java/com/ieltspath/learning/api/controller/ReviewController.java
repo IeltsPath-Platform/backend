@@ -1,5 +1,7 @@
 package com.ieltspath.learning.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.learning.api.dto.response.ReviewResponse;
 import com.ieltspath.learning.api.dto.response.ReviewSubmissionResponse;
@@ -32,6 +34,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/learning")
 @RequiredArgsConstructor
+@LearnerOnly
 public class ReviewController {
     private final CurrentUserProvider currentUser;
     private final GetReviewUseCase getReviewUseCase;

@@ -90,17 +90,6 @@ class ReportControllerTest {
                 .andExpect(jsonPath("$.knowledgePoints").isArray()).andExpect(jsonPath("$.skills").isArray());
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"EXAMINER"})
-    void staffReadAnyLearnersReport(String role) throws Exception {
-        when(report.execute(other)).thenReturn(sample(other));
-
-        mvc.perform(get("/api/learning/admin/learners/" + other + "/report").with(user("staff").roles(role)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.userId").value(other.toString()));
-        verify(report).execute(other);
-    }
-
     @Test
     void theWeeklyReportIsTheCallersOwnAndTakesAMondayDate() throws Exception {
         when(currentUser.requireUserId()).thenReturn(learner);
@@ -138,9 +127,13 @@ class ReportControllerTest {
     }
 
     @Test
-    void aCustomerCannotCallTheStaffReport() throws Exception {
+    void staffLearnerReportRouteHasBeenRemovedForEveryRole() throws Exception {
+        mvc.perform(get("/api/learning/admin/learners/" + other + "/report").with(user("staff").roles("EXAMINER")))
+                .andExpect(status().isNotFound());
         mvc.perform(get("/api/learning/admin/learners/" + other + "/report").with(user("customer").roles("CUSTOMER")))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/api/learning/admin/learners/" + other + "/report"))
+                .andExpect(status().isNotFound());
         verifyNoInteractions(report);
     }
 
@@ -155,13 +148,13 @@ class ReportControllerTest {
     void contentAuthorsCannotReadLearnerReports() throws Exception {
         mvc.perform(get("/api/learning/admin/learners/" + other + "/report")
                         .with(user("author").roles("CONTENT_AUTHOR")))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isNotFound());
         verifyNoInteractions(report);
     }
 
     @Test
     void unauthenticatedCallersAreRejected() throws Exception {
         mvc.perform(get("/api/learning/report")).andExpect(status().isUnauthorized());
-        mvc.perform(get("/api/learning/admin/learners/" + other + "/report")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/learning/admin/learners/" + other + "/report")).andExpect(status().isNotFound());
     }
 }

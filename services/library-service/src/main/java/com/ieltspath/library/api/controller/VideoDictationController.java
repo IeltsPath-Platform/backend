@@ -1,5 +1,7 @@
 package com.ieltspath.library.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.library.api.dto.request.RecordVideoDictationAttemptRequest;
 import com.ieltspath.library.api.dto.response.DictationVideoDetailResponse;
@@ -38,6 +40,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/learning-support/video-dictation")
 @RequiredArgsConstructor
+@LearnerOnly
 public class VideoDictationController {
     private final CurrentUserProvider currentUserProvider;
     private final ListDictationVideosUseCase listVideosUseCase;

@@ -12,6 +12,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -102,6 +103,12 @@ public class GlobalExceptionHandler {
                         fieldError ->
                                 details.put(fieldError.getField(), fieldError.getDefaultMessage()));
         return error(HttpStatus.BAD_REQUEST, "Dữ liệu gửi lên không hợp lệ", request, details);
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> accessDenied(
+            AccessDeniedException exception, HttpServletRequest request) {
+        return error(HttpStatus.FORBIDDEN, "Bạn không có quyền truy cập tài nguyên này.", request, null);
     }
 
     @ExceptionHandler(Exception.class)

@@ -1,5 +1,6 @@
 package com.ieltspath.game.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.game.api.dto.request.CreateGameRoomRequest;
 import com.ieltspath.game.api.dto.request.ReadyStatusRequest;
@@ -12,11 +13,13 @@ import com.ieltspath.game.application.usecase.CreateWebSocketTicketUseCase;
 import com.ieltspath.game.application.usecase.GetGameRoomUseCase;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
 
 @RestController
+@LearnerOnly
 @RequestMapping("/api/games/rooms")
 public class GameRoomController {
     private final com.ieltspath.game.application.usecase.StartGameMatchUseCase startMatch;
@@ -91,7 +94,12 @@ public class GameRoomController {
     }
 
     @PostMapping("/{roomId}/websocket-ticket")
-    public GameTicketResponse websocketTicket(@PathVariable("roomId") UUID roomId) {
-        return GameTicketResponse.from(createTicket.execute(roomId, currentUserProvider.requireUserId()));
+    public GameTicketResponse websocketTicket(@PathVariable("roomId") UUID roomId, Authentication authentication) {
+        var roles = authentication.getAuthorities().stream()
+                .map(authority -> authority.getAuthority())
+                .filter(authority -> authority.startsWith("ROLE_"))
+                .map(authority -> authority.substring("ROLE_".length()))
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        return GameTicketResponse.from(createTicket.execute(roomId, currentUserProvider.requireUserId(), roles));
     }
 }

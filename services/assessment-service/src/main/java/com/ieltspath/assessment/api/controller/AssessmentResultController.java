@@ -1,5 +1,7 @@
 package com.ieltspath.assessment.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.assessment.api.dto.response.LearnerAssessmentResultResponse;
 import com.ieltspath.assessment.application.usecase.GetAssessmentResultUseCase;
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
@@ -14,6 +16,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/assessments/attempts/{attemptId}/result")
 @RequiredArgsConstructor
+@LearnerOnly
 public class AssessmentResultController {
 
     private final CurrentUserProvider currentUser;

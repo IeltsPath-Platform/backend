@@ -2,6 +2,7 @@ package com.ieltspath.learning.application.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.learning.application.port.LearningContentClient;
+import com.ieltspath.learning.application.port.TopicCatalog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -19,12 +20,14 @@ public class SpeakingGradingContextCapture {
     private static final String ERROR_CODE_PREFIX = "SPK_";
 
     private final LearningContentClient content;
+    private final TopicCatalog topicCatalog;
     private final SpeakingHistorySummarizer history;
     private final ObjectMapper json;
 
-    public SpeakingGradingContextCapture(LearningContentClient content, SpeakingHistorySummarizer history,
-                                         ObjectMapper json) {
+    public SpeakingGradingContextCapture(LearningContentClient content, TopicCatalog topicCatalog,
+                                         SpeakingHistorySummarizer history, ObjectMapper json) {
         this.content = content;
+        this.topicCatalog = topicCatalog;
         this.history = history;
         this.json = json;
     }
@@ -41,7 +44,7 @@ public class SpeakingGradingContextCapture {
         }
         List<LearningContentClient.KnowledgePoint> points = List.of();
         try {
-            points = history.relevantPoints(content.getTopicSequence());
+            points = history.relevantPoints(topicCatalog.topics(false));
         } catch (RuntimeException unavailable) {
             log.warn("Speaking knowledge points unavailable: {}", unavailable.getClass().getSimpleName());
         }

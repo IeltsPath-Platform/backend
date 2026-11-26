@@ -4,6 +4,7 @@ import com.ieltspath.access.application.command.ConsumeHumanGradingCreditCommand
 import com.ieltspath.access.application.command.RefundHumanGradingCreditCommand;
 import com.ieltspath.access.application.usecase.ConsumeHumanGradingCreditUseCase;
 import com.ieltspath.access.domain.exception.DuplicateIdempotencyException;
+import com.ieltspath.access.domain.exception.InsufficientCreditsException;
 import com.ieltspath.access.infrastructure.persistence.adapter.JdbcHumanGradingCreditConsumptionRepository;
 import com.ieltspath.access.infrastructure.persistence.adapter.PlanRepositoryAdapter;
 import com.ieltspath.access.infrastructure.persistence.adapter.OutboxEventRepositoryAdapter;
@@ -105,21 +106,31 @@ class HumanGradingCreditConsumptionIntegrationTest {
     }
 
     @Test
-    void unlimitedConsumptionIsPersistedAndRefundDoesNotMintCredit() {
+    void premiumConsumptionSpendsCreditAndRefundRestoresIt() {
         UUID user = UUID.randomUUID();
         UUID subscription = activePremiumSubscription(user, 2);
         UUID submission = UUID.randomUUID();
 
         var first = credits.consume(new ConsumeHumanGradingCreditCommand(user, submission));
-        assertFalse(first.charged());
+        assertTrue(first.charged());
         assertFalse(credits.consume(new ConsumeHumanGradingCreditCommand(user, submission)).charged());
         entityManager.flush();
-        assertEquals(0, usedCredits(subscription));
+        assertEquals(1, usedCredits(subscription));
         assertEquals(2, credits.refund(new RefundHumanGradingCreditCommand(user, submission)));
-        assertEquals(0, usedCredits(subscription));
         entityManager.flush();
+        assertEquals(0, usedCredits(subscription));
         assertEquals(1, count("SELECT count(*) FROM outbox_events WHERE event_type='HumanGradingCreditConsumed'"));
         assertEquals(1, count("SELECT count(*) FROM outbox_events WHERE event_type='HumanGradingCreditRefunded'"));
+    }
+
+    @Test
+    void premiumCannotConsumeMoreThanItsGrantedCredits() {
+        UUID user = UUID.randomUUID();
+        activePremiumSubscription(user, 1);
+
+        assertTrue(credits.consume(new ConsumeHumanGradingCreditCommand(user, UUID.randomUUID())).charged());
+        assertThrows(InsufficientCreditsException.class,
+                () -> credits.consume(new ConsumeHumanGradingCreditCommand(user, UUID.randomUUID())));
     }
 
     private UUID activeSubscription(UUID user, int total) {

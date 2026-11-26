@@ -1,5 +1,7 @@
 package com.ieltspath.game.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.game.application.result.WordlyRankingResult;
 import com.ieltspath.game.application.usecase.GetWordlyRankingUseCase;
@@ -11,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/games/matches")
+@LearnerOnly
 public class WordlyRankingController {
     private final CurrentUserProvider user;
     private final GetWordlyRankingUseCase rankings;

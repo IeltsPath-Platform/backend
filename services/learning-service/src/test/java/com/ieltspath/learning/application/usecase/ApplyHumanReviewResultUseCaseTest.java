@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.learning.application.command.HumanReviewResult;
 import com.ieltspath.learning.application.port.LearnerLock;
 import com.ieltspath.learning.application.port.LearningContentClient;
+import com.ieltspath.learning.application.port.TopicCatalog;
 import com.ieltspath.learning.application.service.ErrorTrapCatalog;
 import com.ieltspath.learning.application.service.ErrorTrapReviews;
 import com.ieltspath.learning.application.service.LessonAccess;
@@ -92,7 +93,7 @@ class ApplyHumanReviewResultUseCaseTest {
         reviews = mock(ReviewItemRepository.class);
         outcomes = mock(HumanReviewOutcomeRepository.class);
         json = new ObjectMapper();
-        useCase = new ApplyHumanReviewResultUseCase(lock, essays, requests, attempts, content, traps, access, evidence,
+        useCase = new ApplyHumanReviewResultUseCase(lock, essays, requests, attempts, content, TopicCatalog.direct(content), traps, access, evidence,
                 profiles, errorTrapReviews, criterionReviews, reviews, outcomes, json, mock(PlatformTransactionManager.class), 2);
 
         WritingSubmission essay = WritingSubmission.start(ESSAY, LEARNER, LESSON, BLOCK, UUID.randomUUID(),

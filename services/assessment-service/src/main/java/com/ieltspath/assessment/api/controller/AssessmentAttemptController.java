@@ -1,5 +1,7 @@
 package com.ieltspath.assessment.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.assessment.api.dto.request.SaveAttemptResponseRequest;
 import com.ieltspath.assessment.api.dto.request.StartAssessmentAttemptRequest;
@@ -41,6 +43,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/assessments/attempts")
 @RequiredArgsConstructor
+@LearnerOnly
 public class AssessmentAttemptController {
 
     private final CurrentUserProvider currentUser;

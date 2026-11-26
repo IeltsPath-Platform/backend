@@ -31,6 +31,7 @@ services:
       - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/api-gateway.env
         format: raw
     environment: !override
+      API_DOCS_ENABLED: "false"
       GATEWAY_BEHIND_PROXY: "true"
       GATEWAY_RATE_LIMIT_TRUSTED_PROXIES: 172.28.0.2/32
     ports: !reset []
@@ -40,7 +41,8 @@ services:
     image: ghcr.io/${IMAGE_OWNER:?Set IMAGE_OWNER}/ieltspath-user-service:${IMAGE_TAG:?Set IMAGE_TAG}
     build: !reset null
     volumes: !reset []
-    environment: !reset {}
+    environment: !override
+      API_DOCS_ENABLED: "false"
     env_file: !override
       - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/user-service.env
         format: raw
@@ -51,7 +53,8 @@ services:
     image: ghcr.io/${IMAGE_OWNER:?Set IMAGE_OWNER}/ieltspath-content-service:${IMAGE_TAG:?Set IMAGE_TAG}
     build: !reset null
     volumes: !reset []
-    environment: !reset {}
+    environment: !override
+      API_DOCS_ENABLED: "false"
     env_file: !override
       - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/content-service.env
         format: raw
@@ -62,7 +65,8 @@ services:
     image: ghcr.io/${IMAGE_OWNER:?Set IMAGE_OWNER}/ieltspath-library-service:${IMAGE_TAG:?Set IMAGE_TAG}
     build: !reset null
     volumes: !reset []
-    environment: !reset {}
+    environment: !override
+      API_DOCS_ENABLED: "false"
     env_file: !override
       - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/library-service.env
         format: raw
@@ -73,7 +77,8 @@ services:
     image: ghcr.io/${IMAGE_OWNER:?Set IMAGE_OWNER}/ieltspath-assessment-service:${IMAGE_TAG:?Set IMAGE_TAG}
     build: !reset null
     volumes: !reset []
-    environment: !reset {}
+    environment: !override
+      API_DOCS_ENABLED: "false"
     env_file: !override
       - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/assessment-service.env
         format: raw
@@ -84,7 +89,8 @@ services:
     image: ghcr.io/${IMAGE_OWNER:?Set IMAGE_OWNER}/ieltspath-access-service:${IMAGE_TAG:?Set IMAGE_TAG}
     build: !reset null
     volumes: !reset []
-    environment: !reset {}
+    environment: !override
+      API_DOCS_ENABLED: "false"
     env_file: !override
       - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/access-service.env
         format: raw
@@ -95,7 +101,8 @@ services:
     image: ghcr.io/${IMAGE_OWNER:?Set IMAGE_OWNER}/ieltspath-learning-service:${IMAGE_TAG:?Set IMAGE_TAG}
     build: !reset null
     volumes: !reset []
-    environment: !reset {}
+    environment: !override
+      API_DOCS_ENABLED: "false"
     env_file: !override
       - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/learning-service.env
         format: raw
@@ -106,7 +113,8 @@ services:
     image: ghcr.io/${IMAGE_OWNER:?Set IMAGE_OWNER}/ieltspath-game-service:${IMAGE_TAG:?Set IMAGE_TAG}
     build: !reset null
     volumes: !reset []
-    environment: !reset {}
+    environment: !override
+      API_DOCS_ENABLED: "false"
     env_file: !override
       - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/game-service.env
         format: raw
@@ -117,7 +125,8 @@ services:
     image: ghcr.io/${IMAGE_OWNER:?Set IMAGE_OWNER}/ieltspath-notification-service:${IMAGE_TAG:?Set IMAGE_TAG}
     build: !reset null
     volumes: !reset []
-    environment: !reset {}
+    environment: !override
+      API_DOCS_ENABLED: "false"
     env_file: !override
       - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/notification-service.env
         format: raw
@@ -128,7 +137,8 @@ services:
     image: ghcr.io/${IMAGE_OWNER:?Set IMAGE_OWNER}/ieltspath-community-service:${IMAGE_TAG:?Set IMAGE_TAG}
     build: !reset null
     volumes: !reset []
-    environment: !reset {}
+    environment: !override
+      API_DOCS_ENABLED: "false"
     env_file: !override
       - path: ${PRODUCTION_ENV_ROOT:-/opt/ieltspath/env}/community-service.env
         format: raw

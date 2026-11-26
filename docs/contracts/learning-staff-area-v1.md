@@ -1,37 +1,14 @@
 # Learning staff area v1
 
-The Learning side of the admin area: learner overview, anomaly flags, work queues and statistics for content authors. The
+The Learning side of the staff area: anomaly flags, work queues and statistics for content authors. The
 Assessment and Access side (examiner quality review, paid human grading) is in [admin-area-v1.md](admin-area-v1.md).
 Learning keeps ids only; names of courses, knowledge points and users come from Content, User and Access, and the
 frontend joins them.
 
 Roles: `EXAMINER` works the `EXAMINER` queue, `CONTENT_AUTHOR` (R&D) the `CONTENT_AUTHOR` queue.
 
-## `GET /api/learning/admin/learners/{userId}/overview`
-
-Role `EXAMINER`. Read-only; it never refreshes the learner's data.
-
-```json
-{
-  "userId": "…",
-  "courses": [{ "courseId": "…", "topics": 8, "topicsDone": 5, "passedAt": null, "status": "REMEDIATION",
-                "total": 0.62, "passThreshold": 0.7 }],
-  "knowledgePointsByTier": { "PRIORITY": 3, "CONSOLIDATE": 5, "MAINTAIN": 12 },
-  "pendingReviews": [{ "reviewId": "…", "knowledgePointId": "…", "blocking": true, "triggerKind": null }],
-  "diagnoses": [{ "sessionId": "…", "rootKnowledgePointId": "…", "status": "PROBING", "probes": 2 }],
-  "remediation": [{ "courseId": "…", "topicId": null, "kind": "POST_COURSE", "open": true, "createdAt": "…" }],
-  "flags": [{ "id": "…", "kind": "BURST_SUBMISSIONS", "status": "OPEN", "evidence": "{…}" }],
-  "openWork": [],
-  "weekly": { "skills": [], "tierCounts": {}, "answered": 84, "correct": 61, "accuracy": 0.726, "activeMinutes": 190,
-              "estimatedBand": 6.0, "focusKnowledgePointIds": [] }
-}
-```
-
-`weekly` is the learner's snapshot of the week before the current one (the body of the snapshot in
-[progress-snapshots-v1](progress-snapshots-v1.md)), or `null` when they have none.
-
-`status` and `total` are the course score of [course-score-v1.md](course-score-v1.md). The full per-knowledge-point report
-is `/api/learning/admin/learners/{userId}/report`.
+There is no staff endpoint for reading a learner's data by a user ID. Learners use the self-scoped report and score
+endpoints documented in [learner-report-v1](learner-report-v1.md) and [course-score-v1](course-score-v1.md).
 
 ## Anomaly flags
 

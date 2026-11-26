@@ -11,6 +11,7 @@ import org.springframework.web.socket.WebSocketHandler;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -31,7 +32,7 @@ class GameWebSocketHandshakeInterceptorTest {
         var user = UUID.randomUUID();
         var room = new GameRoom(UUID.randomUUID(), "AB7K2Q", user, 4, Instant.EPOCH);
         when(tickets.consume("opaque")).thenReturn(Optional.of(new WebSocketTicketStore.Ticket(
-                "opaque", room.id(), user, Instant.now().plusSeconds(30))), Optional.empty());
+                "opaque", room.id(), user, Instant.now().plusSeconds(30), Set.of("CUSTOMER"))), Optional.empty());
         when(rooms.findById(room.id())).thenReturn(Optional.of(room));
         var attributes = new HashMap<String, Object>();
         assertTrue(interceptor.beforeHandshake(request, response, handler, attributes));
@@ -52,7 +53,7 @@ class GameWebSocketHandshakeInterceptorTest {
         room.join(guest, Instant.EPOCH);
         room.kick(host, guest, Instant.EPOCH);
         when(tickets.consume("opaque")).thenReturn(Optional.of(new WebSocketTicketStore.Ticket(
-                "opaque", room.id(), guest, Instant.now().plusSeconds(30))));
+                "opaque", room.id(), guest, Instant.now().plusSeconds(30), Set.of("CUSTOMER"))));
         when(rooms.findById(room.id())).thenReturn(Optional.of(room));
         var attributes = new HashMap<String, Object>();
         assertFalse(interceptor.beforeHandshake(request, response, handler, attributes));
@@ -68,7 +69,7 @@ class GameWebSocketHandshakeInterceptorTest {
         var room = new GameRoom(UUID.randomUUID(), "AB7K2Q", host, 4, Instant.EPOCH);
         room.close(host, Instant.EPOCH);
         when(tickets.consume("opaque")).thenReturn(Optional.of(new WebSocketTicketStore.Ticket(
-                "opaque", room.id(), host, Instant.now().plusSeconds(30))));
+                "opaque", room.id(), host, Instant.now().plusSeconds(30), Set.of("CUSTOMER"))));
         when(rooms.findById(room.id())).thenReturn(Optional.of(room));
         assertFalse(interceptor.beforeHandshake(request, response, handler, new HashMap<>()));
     }
@@ -82,5 +83,17 @@ class GameWebSocketHandshakeInterceptorTest {
         headers.set("Sec-WebSocket-Protocol", "ticket.opaque");
         assertFalse(interceptor.beforeHandshake(request, response, handler, new HashMap<>()));
         verifyNoInteractions(tickets, rooms);
+    }
+
+    @Test
+    void rejectsTicketWithoutLearnerRoleBeforeLookingUpRoom() {
+        var headers = new HttpHeaders();
+        headers.add("Sec-WebSocket-Protocol", "game.v1, ticket.opaque");
+        when(request.getHeaders()).thenReturn(headers);
+        when(tickets.consume("opaque")).thenReturn(Optional.of(new WebSocketTicketStore.Ticket(
+                "opaque", UUID.randomUUID(), UUID.randomUUID(), Instant.now().plusSeconds(30), Set.of("CONTENT_AUTHOR"))));
+
+        assertFalse(interceptor.beforeHandshake(request, response, handler, new HashMap<>()));
+        verifyNoInteractions(rooms);
     }
 }

@@ -335,3 +335,8 @@ not call Content. After grading, learner-facing results may include the active e
 lookup succeeds. Review selection uses the weakest eligible child to choose parent-KP sets and may create one optional
 `ERROR_PATTERN` review for that parent. Learner reports and trees nest only trap children with evidence under parents;
 child KPs are excluded from parent rollups and practice availability.
+
+
+## Topic display cache
+
+`TopicCatalog` caches Content topic-sequence responses used for display with Redis keys `cache:learning:topic-sequence:v1:base` and `cache:learning:topic-sequence:v1:error-traps` (60-second TTL). Cache misses, malformed entries, and Redis failures read through to Content. Set `LEARNING_TOPIC_CACHE_ENABLED=false` to disable it; `learning.topic-cache.enabled` defaults to false in application code and true in config-repo, and `learning.topic-cache.ttl-seconds` defaults to 60. State-changing and access-decision reads continue to call Content directly.

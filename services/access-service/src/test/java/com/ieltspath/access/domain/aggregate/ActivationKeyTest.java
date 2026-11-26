@@ -109,4 +109,15 @@ class ActivationKeyTest {
 
         assertThat(key.getStatus()).isEqualTo(KeyStatus.REVOKED);
     }
+
+    @Test
+    @DisplayName("A key whose status is expired cannot be revoked")
+    void shouldRejectRevokingFinalExpiredKey() {
+        ActivationKey key = ActivationKey.create(UUID.randomUUID(), "hash123", "9999",
+                Instant.now().minus(1, ChronoUnit.DAYS), null);
+        assertThatThrownBy(key::redeem).isInstanceOf(KeyExpiredException.class);
+
+        assertThatThrownBy(key::revoke).isInstanceOf(InvalidKeyOperationException.class);
+        assertThat(key.getStatus()).isEqualTo(KeyStatus.EXPIRED);
+    }
 }

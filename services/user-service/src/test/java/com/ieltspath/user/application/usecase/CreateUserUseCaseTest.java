@@ -50,6 +50,18 @@ class CreateUserUseCaseTest {
         assertThat(created.getStatus().name()).isEqualTo("ACTIVE");
     }
 
+    @Test
+    void rejectsAnEmailThatDiffersOnlyByCase() {
+        when(userRepository.existsByEmail("a@x.com")).thenReturn(true);
+
+        assertThatThrownBy(() -> useCase().execute(
+                new CreateUserCommand("A@x.com", "secret123", "John Doe", null, null)))
+                .isInstanceOf(EmailAlreadyExistsException.class)
+                .hasMessage("Email đã tồn tại: a@x.com");
+        verify(userRepository).existsByEmail("a@x.com");
+        verify(userRepository, never()).save(any(User.class));
+    }
+
     private CreateUserUseCase useCase() {
         return new CreateUserUseCase(userRepository, roleRepository, new BCryptPasswordEncoder(), policy());
     }

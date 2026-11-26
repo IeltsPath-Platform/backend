@@ -1,5 +1,7 @@
 package com.ieltspath.learning.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.learning.application.service.GamificationRecorder;
 import com.ieltspath.learning.application.service.LearnerTimezones;
@@ -18,6 +20,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/learning/me")
 @RequiredArgsConstructor
+@LearnerOnly
 public class GamificationController {
     private final CurrentUserProvider currentUser;
     private final GamificationRecorder gamification;

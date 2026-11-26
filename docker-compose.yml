@@ -282,12 +282,17 @@ services:
       dockerfile: Dockerfile.spring-service
       args:
         MODULE_PATH: services/learning-service
+        # The Azure Speech SDK loads native libraries that do not run on Alpine.
+        RUNTIME_IMAGE: eclipse-temurin:21-jre
     environment:
       <<: *spring-env
       SERVER_PORT: 8086
       DEMO_DATA_ENABLED: "${DEMO_DATA_ENABLED:-true}"
       LEARNING_DB_URL: jdbc:postgresql://postgres:5432/learning_db
       LEARNING_DB_PASSWORD: "${POSTGRES_PASSWORD}"
+      REDIS_HOST: redis
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"
+      LEARNING_TOPIC_CACHE_ENABLED: "${LEARNING_TOPIC_CACHE_ENABLED:-true}"
       ASSESSMENT_SERVICE_URL: http://assessment-service:8083
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_USERNAME: "${RABBITMQ_USERNAME}"

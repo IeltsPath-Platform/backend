@@ -1,4 +1,11 @@
 spring:
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
+      connect-timeout: 200ms
+      timeout: 200ms
   servlet:
     multipart:
       # One Speaking recording per request: 10 MB file (the bucket's limit, about 5 minutes of WAV), a little headroom for
@@ -51,6 +58,9 @@ app:
           - /v3/api-docs/**
 
 learning:
+  topic-cache:
+    enabled: ${LEARNING_TOPIC_CACHE_ENABLED:true}
+    ttl-seconds: 60
   speaking-grading:
     poll-ms: ${LEARNING_PLACEMENT_SPEAKING_GRADING_POLL_MS:5000}
     batch-size: ${LEARNING_PLACEMENT_SPEAKING_GRADING_BATCH_SIZE:5}
@@ -168,10 +178,11 @@ learning:
     wake-on-submit: true
     # A grading that failed for a reason that may pass (model or speech service unreachable) waits this long before it is
     # tried again. Kept short: the wait is what the learner sees, and the speech analysis is stored, so a retry is cheap.
-    # Each model call already retries a 5xx or a dropped connection three times, 2 s apart, so this wait is for an outage that
+    # Each model call already tries a 5xx or a dropped connection twice, 2 s apart, so this wait is for an outage that
     # lasts longer than that. The job polls every 5 s, so a retry starts up to 5 s after this delay. Minimum 5.
     retry-delay-seconds: ${LEARNING_SPEAKING_RETRY_DELAY_SECONDS:10}
-    max-attempts: 3
+    # Tries of one submission. When the last one fails the learner is told at once and is not charged.
+    max-attempts: 2
     pass-band: 6.0
     max-input-chars: 60000
     history-min-evidence: 3
@@ -281,7 +292,7 @@ learning:
 springdoc:
   # OpenAPI for the Gateway Swagger UI; set API_DOCS_ENABLED=false outside local development.
   api-docs:
-    enabled: ${API_DOCS_ENABLED:true}
+    enabled: ${API_DOCS_ENABLED:false}
   paths-to-match:
     - /api/learning/**
 

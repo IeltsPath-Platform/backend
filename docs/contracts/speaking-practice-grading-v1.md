@@ -26,12 +26,13 @@ a third of `stale-after-seconds`, so a slow step is not taken over. No status or
 Stopping an instance. A stopping instance claims nothing new and gives the submissions it is grading 25 seconds to finish
 (under the 30 s of Spring's shutdown phase and the container's 40 s grace). One that is still running after that is handed
 back: it becomes `FAILED_RETRYABLE` with failure code `INSTANCE_STOPPED` and the claim does not count as an attempt, so a
-deploy neither leaves a submission waiting for `stale-after-seconds` nor uses up its three attempts. If the hand-back cannot be
+deploy neither leaves a submission waiting for `stale-after-seconds` nor uses up its attempts. If the hand-back cannot be
 saved, another instance takes the row over once it is stale, as before.
 
 Retry wait. A grading that failed for a reason that may pass (`FAILED_RETRYABLE`) waits `learning.speaking.retry-delay-seconds`
-(10 by default, `LEARNING_SPEAKING_RETRY_DELAY_SECONDS`) and is tried again, up to `max-attempts` (3); the poll adds up to
-`job-delay-ms` (5 s) to the wait. After the last attempt the submission is `NEEDS_EXAMINER` with `MAX_ATTEMPTS_REACHED`.
+(10 by default, `LEARNING_SPEAKING_RETRY_DELAY_SECONDS`) and is tried again, up to `max-attempts` (2); the poll adds up to
+`job-delay-ms` (5 s) to the wait. When the last attempt fails the submission becomes `NEEDS_EXAMINER` with
+`MAX_ATTEMPTS_REACHED` at once, without another retry wait.
 
 Release order. The learner's result page in the frontend repository can ship before or after this change:
 it lays a weakness out by the labels `Sửa:` / `Quy tắc:` / `Luyện:` of prompt `spk7` and shows an older one, or one without
@@ -103,7 +104,7 @@ Up to 15 entries per criterion and 45 in all; a weakness may be up to 850 charac
 excerpt that is not valid are dropped as before. A code without a trap point only explains the result and adds no evidence.
 
 Busy provider. A grade is five model calls (FC, LR, GRA, overview, synthesis) and one failed call spoils it, so each call is
-asked again, up to three tries two seconds apart, when the provider answers 5xx (Google's "high demand" 503) or the
+asked again, up to two tries two seconds apart, when the provider answers 5xx (Google's "high demand" 503) or the
 connection fails. A 429 is never asked again because it means the quota is gone. Writing and every other LLM call keep their
 single request. When the tries run out the submission is `FAILED_RETRYABLE` with `LLM_UNAVAILABLE` and the job tries the
 whole grade again as before.

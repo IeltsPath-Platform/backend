@@ -4,11 +4,11 @@ import com.ieltspath.learning.application.exception.AccessUnavailableException;
 import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.port.AccessClient;
 import com.ieltspath.learning.application.port.LearningContentClient;
+import com.ieltspath.learning.application.port.TopicCatalog;
 import com.ieltspath.learning.application.port.LearningContentClient.LessonCandidate;
 import com.ieltspath.learning.application.port.LearningContentClient.PackageCandidate;
 import com.ieltspath.learning.application.port.LearningContentClient.SuggestionCandidates;
 import com.ieltspath.learning.application.usecase.GetSuggestionsUseCase;
-import com.ieltspath.learning.application.usecase.StaffInsightUseCase;
 import com.ieltspath.learning.domain.vo.LearningSkill;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -61,8 +61,8 @@ class SuggestionsAndOverviewIntegrationTest {
 
     @Autowired JdbcTemplate jdbc;
     @Autowired GetSuggestionsUseCase suggestions;
-    @Autowired StaffInsightUseCase insight;
     @MockitoBean LearningContentClient content;
+    @MockitoBean TopicCatalog topicCatalog;
     @MockitoBean AccessClient access;
 
     private final UUID user = UUID.randomUUID();
@@ -85,9 +85,11 @@ class SuggestionsAndOverviewIntegrationTest {
                 + "review_items, review_sets, lesson_progress, practice_test_assignments, learner_flags, work_items, "
                 + "diagnostic_probes, diagnostic_sessions, remediation_flags, course_outcomes CASCADE");
         var courseView = new LearningContentClient.Course(course, "IELTS_5_5", "IELTS 5.5", new BigDecimal("5.5"), true);
-        when(content.getTopicSequence()).thenReturn(List.of(new LearningContentClient.Topic(topic, "T", "Topic", 1, null,
+        List<LearningContentClient.Topic> topicSequence = List.of(new LearningContentClient.Topic(topic, "T", "Topic", 1, null,
                 List.of(kp(consolidate, "KC"), kp(due, "KD"), kp(firm, "KF"), kp(next, "KN")), LearningSkill.READING,
-                true, courseView)));
+                true, courseView));
+        when(content.getTopicSequence()).thenReturn(topicSequence);
+        when(topicCatalog.topics(false)).thenReturn(topicSequence);
         when(content.getPracticeTestMilestones(course)).thenReturn(List.of());
         when(content.prerequisites(anyList())).thenAnswer(invocation -> {
             List<UUID> asked = invocation.getArgument(0);
@@ -172,14 +174,14 @@ class SuggestionsAndOverviewIntegrationTest {
     }
 
     @Test
-    void premiumSuggestsLessonsBeyondTheFreePreview() {
+    void premiumDoesNotSuggestUnownedLessonsBeyondTheFreePreview() {
         when(access.premium()).thenReturn(true);
         UUID closed = UUID.randomUUID();
         offerLessons(lesson(closed, due, paidCourse, 5));
 
         var items = suggestions.execute(user).suggestions();
 
-        assertTrue(items.stream().anyMatch(item -> closed.equals(item.id())));
+        assertFalse(items.stream().anyMatch(item -> closed.equals(item.id())));
     }
 
     @Test
@@ -327,32 +329,4 @@ class SuggestionsAndOverviewIntegrationTest {
         assertEquals(0, new BigDecimal("6.0").compareTo(captor.getValue()));
     }
 
-    @Test
-    void theOverviewGathersCoursesTiersReviewsFlagsAndOpenWork() {
-        UUID review = UUID.randomUUID();
-        jdbc.update("INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status, skill, blocking) "
-                + "VALUES (?, ?, ?, ?, 'PENDING', 'READING', TRUE)", review, user, consolidate, UUID.randomUUID());
-        UUID flag = UUID.randomUUID();
-        jdbc.update("INSERT INTO learner_flags (id, user_id, kind, evidence) VALUES (?, ?, 'BURST_SUBMISSIONS', "
-                + "'{}'::jsonb)", flag, user);
-        jdbc.update("INSERT INTO work_items (id, queue, kind, subject_user_id, subject_ref) VALUES (?, 'EXAMINER', "
-                + "'LEARNER_FLAG', ?, ?)", UUID.randomUUID(), user, flag);
-
-        var overview = insight.overview(user);
-
-        assertEquals(1, overview.courses().size());
-        var courseView = overview.courses().getFirst();
-        assertEquals(course, courseView.courseId());
-        assertEquals(1, courseView.topics());
-        assertEquals(0, courseView.topicsDone());
-        assertEquals("IN_PROGRESS", courseView.status());
-        assertEquals(Map.of("PRIORITY", 0, "CONSOLIDATE", 1, "MAINTAIN", 2, "INSUFFICIENT", 0),
-                overview.knowledgePointsByTier());
-        assertEquals(List.of(review), overview.pendingReviews().stream().map(r -> r.reviewId()).toList());
-        assertEquals(1, overview.flags().size());
-        assertEquals(1, overview.openWork().size());
-
-        jdbc.update("UPDATE topic_progress SET tested_at = now(), first_test_percent = 40 WHERE user_id = ?", user);
-        assertEquals(1, insight.overview(user).courses().getFirst().topicsDone(), "a tested topic counts as done");
-    }
 }

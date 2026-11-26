@@ -1,5 +1,7 @@
 package com.ieltspath.learning.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.learning.api.dto.request.SubmitEssayRequest;
 import com.ieltspath.learning.api.dto.response.WritingSubmissionResponse;
@@ -26,6 +28,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/learning")
 @RequiredArgsConstructor
+@LearnerOnly
 public class WritingController {
     private final CurrentUserProvider currentUser;
     private final GetWritingSubmissionUseCase getWritingSubmissionUseCase;

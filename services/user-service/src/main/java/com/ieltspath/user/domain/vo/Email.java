@@ -1,6 +1,7 @@
 package com.ieltspath.user.domain.vo;
 
 import java.util.regex.Pattern;
+import java.util.Locale;
 
 public record Email(String value) {
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$");
@@ -9,6 +10,6 @@ public record Email(String value) {
         if (value == null || value.isBlank() || !EMAIL_PATTERN.matcher(value.trim()).matches()) {
             throw new IllegalArgumentException("Email không hợp lệ");
         }
-        value = value.trim().toLowerCase();
+        value = value.trim().toLowerCase(Locale.ROOT);
     }
 }

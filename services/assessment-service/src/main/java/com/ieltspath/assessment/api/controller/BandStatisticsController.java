@@ -1,5 +1,7 @@
 package com.ieltspath.assessment.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.assessment.application.usecase.GetBandHistoryUseCase;
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import jakarta.validation.constraints.Max;
@@ -15,6 +17,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/assessments/me/statistics")
+@LearnerOnly
 public class BandStatisticsController {
     private final CurrentUserProvider currentUser;
     private final GetBandHistoryUseCase history;

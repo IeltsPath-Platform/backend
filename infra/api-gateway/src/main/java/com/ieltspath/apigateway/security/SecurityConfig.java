@@ -11,6 +11,7 @@ import com.nimbusds.jose.jwk.OctetSequenceKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.proc.SecurityContext;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
@@ -66,7 +67,8 @@ public class SecurityConfig {
             ServerHttpSecurity http,
             ObjectMapper objectMapper,
             AuthProperties authProperties,
-            PublicEndpointProperties publicEndpointProperties
+            PublicEndpointProperties publicEndpointProperties,
+            @Value("${springdoc.api-docs.enabled:false}") boolean apiDocsEnabled
     ) {
         // Mot entry point cho moi 401: thieu token, token sai, token het han. Neu de oauth2ResourceServer dung entry
         // point mac dinh thi 401 do token het han khong co header CORS, browser giau response va web khong tu refresh token.
@@ -127,6 +129,12 @@ public class SecurityConfig {
                     // Cho phep cac endpoint public lay tu config, vi du login/register.
                     publicEndpointProperties.publicEndpoints().forEach(path ->
                             exchange.pathMatchers(path).permitAll());
+
+                    // OpenAPI endpoints are public only when local/developer documentation is enabled.
+                    if (apiDocsEnabled) {
+                        exchange.pathMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**",
+                                "/api-docs/**", "/webjars/**").permitAll();
+                    }
 
                     // Cac route con lai bat buoc co JWT hop le.
                     exchange.anyExchange().authenticated();

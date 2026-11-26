@@ -90,7 +90,7 @@ public class GetReviewBasketUseCase {
                         || optionalByPoint.containsKey(profile.knowledgePointId())).toList();
         if (blocking.isEmpty() && candidates.isEmpty()) return new ReviewBasketResult(List.of(), List.of(), List.of());
 
-        Map<UUID, KnowledgePointDirectory.Entry> described = directory.describe();
+        Map<UUID, KnowledgePointDirectory.Entry> described = directory.describeForDisplay();
         Map<UUID, Integer> availability = availability(userId, candidates);
         // One read of the completed lessons for every weak point that has no review yet, not one per point.
         Set<UUID> taught = lessonLocator.taughtAmong(userId, candidates.stream()

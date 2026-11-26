@@ -98,11 +98,18 @@ class StaffAdminControllerTest {
 
     @ParameterizedTest
     @CsvSource({"CUSTOMER,/api/learning/admin/work-items", "SALES_STAFF,/api/learning/admin/work-items",
-            "CONTENT_AUTHOR,/api/learning/admin/learners/00000000-0000-0000-0000-000000000001/overview",
             "EXAMINER,/api/learning/admin/question-stats", "EXAMINER,/api/learning/admin/tree-quality",
             "CUSTOMER,/api/learning/admin/question-stats"})
     void otherRolesAreRefused(String role, String path) throws Exception {
         mvc.perform(get(path).with(user("other").roles(role))).andExpect(status().isForbidden());
+        verifyNoInteractions(work, insight);
+    }
+
+    @Test
+    void examinerLearnerOverviewRouteHasBeenRemoved() throws Exception {
+        mvc.perform(get("/api/learning/admin/learners/" + id + "/overview")
+                        .with(user("examiner").roles("EXAMINER")))
+                .andExpect(status().isNotFound());
         verifyNoInteractions(work, insight);
     }
 

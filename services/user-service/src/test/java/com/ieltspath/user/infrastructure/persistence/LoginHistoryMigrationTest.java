@@ -31,7 +31,8 @@ class LoginHistoryMigrationTest {
     @Test
     void createsTableAndNewestFirstIndex() throws Exception {
         try (Connection connection = connection(); var statement = connection.createStatement()) {
-            for (String name : new String[]{"login_history", "idx_login_history_user_created"}) {
+            for (String name : new String[]{"login_history", "idx_login_history_user_created",
+                    "idx_login_history_retention_created_id"}) {
                 try (var rows = statement.executeQuery("SELECT to_regclass('public." + name + "')")) {
                     assertTrue(rows.next());
                     assertNotNull(rows.getString(1), name);

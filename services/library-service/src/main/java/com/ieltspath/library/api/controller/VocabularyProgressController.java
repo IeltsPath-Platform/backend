@@ -1,5 +1,7 @@
 package com.ieltspath.library.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.library.api.dto.request.WeeklyGoalRequest;
 import com.ieltspath.library.api.dto.response.VocabularyAchievementsResponse;
@@ -21,6 +23,7 @@ import java.util.UUID;
 @Validated
 @RequestMapping("/api/learning-support/flashcards/notebook")
 @RequiredArgsConstructor
+@LearnerOnly
 public class VocabularyProgressController {
     private final CurrentUserProvider currentUser;
     private final VocabularyProgressUseCase progress;
