@@ -50,6 +50,23 @@ import static org.assertj.core.api.Assertions.assertThat;
         com.ieltspath.content.infrastructure.persistence.adapter.JdbcCodeSettingsStore.class,
         QuestionPersistenceMapper.class, ContentPackageRepositoryAdapter.class, ContentPackagePersistenceMapper.class,
         JdbcErrorTypeRepository.class, JdbcSectionMediaWriter.class, JdbcLearningContentReader.class,
+        com.ieltspath.content.application.usecase.CodeSettingsUseCases.class,
+        com.ieltspath.content.application.usecase.CodeContextResolver.class,
+        com.ieltspath.content.application.usecase.CodeExistence.class,
+        com.ieltspath.content.application.usecase.CreateCourseUseCase.class,
+        com.ieltspath.content.application.usecase.CreateTopicUseCase.class,
+        com.ieltspath.content.application.usecase.LessonAuthoringUseCase.class,
+        com.ieltspath.content.application.usecase.CreateKnowledgePointUseCase.class,
+        com.ieltspath.content.application.usecase.CreateErrorTypeUseCase.class,
+        com.ieltspath.content.infrastructure.persistence.adapter.CourseRepositoryAdapter.class,
+        com.ieltspath.content.infrastructure.persistence.mapper.CoursePersistenceMapperImpl.class,
+        com.ieltspath.content.infrastructure.persistence.adapter.TopicRepositoryAdapter.class,
+        com.ieltspath.content.infrastructure.persistence.mapper.TopicPersistenceMapper.class,
+        com.ieltspath.content.infrastructure.persistence.adapter.LessonAuthoringRepositoryAdapter.class,
+        com.ieltspath.content.application.usecase.PublishQuestionVersionUseCase.class,
+        com.ieltspath.content.infrastructure.persistence.adapter.KnowledgePointRepositoryAdapter.class,
+        com.ieltspath.content.infrastructure.persistence.mapper.KnowledgePointPersistenceMapper.class,
+        com.ieltspath.content.application.service.TrapKnowledgePointSync.class,
         PracticeSetMaterializerIntegrationTest.Beans.class})
 @Testcontainers(disabledWithoutDocker = true)
 class PracticeSetMaterializerIntegrationTest {
@@ -58,6 +75,9 @@ class PracticeSetMaterializerIntegrationTest {
     static class Beans {
         @Bean MediaReferencePolicy mediaReferencePolicy() { return new MediaReferencePolicy("https://media.example.test/ieltspath"); }
         @Bean com.fasterxml.jackson.databind.ObjectMapper objectMapper() { return new com.fasterxml.jackson.databind.ObjectMapper(); }
+        @Bean com.ieltspath.content.application.port.VocabularySenseLookup vocabularySenses() {
+            return org.mockito.Mockito.mock(com.ieltspath.content.application.port.VocabularySenseLookup.class);
+        }
         @Bean com.ieltspath.content.application.port.QuestionImageWriter questionImageWriter() {
             return org.mockito.Mockito.mock(com.ieltspath.content.application.port.QuestionImageWriter.class);
         }
@@ -98,8 +118,11 @@ class PracticeSetMaterializerIntegrationTest {
         entityManager.flush();
 
         assertThat(jdbc.queryForMap("SELECT code, package_type, status, lesson_id FROM content_packages WHERE id=?", created))
-                .containsEntry("code", "PS-" + tag + "_L-1").containsEntry("package_type", "PRACTICE_SET")
+                .containsEntry("package_type", "PRACTICE_SET")
                 .containsEntry("status", "DRAFT").containsEntry("lesson_id", lesson);
+        // The code comes from the configured pattern, not from the fallback built out of the lesson code.
+        assertThat(jdbc.queryForObject("SELECT code FROM content_packages WHERE id=?", String.class, created))
+                .matches("PKG_PS\\d{3,}");
         assertThat(jdbc.queryForObject("SELECT status FROM content_package_versions WHERE package_id=?", String.class, created))
                 .isEqualTo("DRAFT");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM content_sections s JOIN content_package_versions v ON v.id=s.package_version_id "
