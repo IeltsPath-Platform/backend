@@ -141,6 +141,21 @@ class SpeakingGradingJobTest {
     }
 
     @Test
+    void theLastFailedAttemptEndsTheSubmissionAtOnce() {
+        SpeakingSubmission submission = claimed();
+        submission.startAnalysis(NOW);
+        when(speech.analyze(any(), any())).thenReturn(heard());
+        when(quota.tryConsume(any(), any(), anyString(), anyInt())).thenReturn(true);
+        gradingFailsWith(new LlmUnavailableException(null));
+
+        job.runOne();
+
+        assertEquals(SpeakingSubmissionStatus.NEEDS_EXAMINER, submission.status());
+        assertEquals("MAX_ATTEMPTS_REACHED", submission.failureCode());
+        verify(quota).release(eq(USER), any(LocalDate.class), eq("speaking_grading"));
+    }
+
+    @Test
     void theDailyLimitDefersTheSubmissionWithoutUsingAnAttempt() {
         SpeakingSubmission submission = claimed();
         when(speech.analyze(any(), any())).thenReturn(heard());

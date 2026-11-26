@@ -20,11 +20,11 @@ if the response is lost.
 `ADMIN` token and deliberately does not require the token subject to equal `{userId}`: Learning and Assessment background
 workers use service-subject tokens. The response contains only the boolean. Public clients cannot reach `/internal/**`.
 
-`POST /internal/access/human-grading/consume` and `/refund` are idempotent by `submissionId`. For a subscription whose
-active plan enables `HUMAN_GRADING_UNLIMITED`, consume still records the consumption and outbox event but does not spend
-a credit; the response is `{ "submissionId", "remainingCredits", "charged": false }`. A repeat also returns
-`charged: false`. Refunding an unlimited consumption marks it refunded without increasing `human_grading_credits_used`
-in reverse or minting a credit. Without an active subscription, consume remains `402 HUMAN_GRADING_CREDIT_REQUIRED`.
+`POST /internal/access/human-grading/consume` and `/refund` are idempotent by `submissionId`. A consume spends one credit
+from the active subscription and records the consumption and outbox event; the response is
+`{ "submissionId", "remainingCredits", "charged": true }`. A repeat returns `charged: false` without spending again.
+Refunding a charged consumption restores one credit. Without an active subscription or a remaining credit, consume returns
+`402 HUMAN_GRADING_CREDIT_REQUIRED`.
 
 ## Earning points
 

@@ -5,7 +5,6 @@ import com.ieltspath.access.application.command.RefundHumanGradingCreditCommand;
 import com.ieltspath.access.domain.aggregate.Subscription;
 import com.ieltspath.access.domain.entity.HumanGradingCreditConsumption;
 import com.ieltspath.access.domain.entity.OutboxEvent;
-import com.ieltspath.access.domain.repository.PlanRepository;
 import com.ieltspath.access.domain.exception.DuplicateIdempotencyException;
 import com.ieltspath.access.domain.exception.InsufficientCreditsException;
 import com.ieltspath.access.domain.repository.HumanGradingCreditConsumptionRepository;
@@ -21,18 +20,15 @@ public class ConsumeHumanGradingCreditUseCase {
     private final SubscriptionRepository subscriptionRepository;
     private final OutboxEventRepository outboxEventRepository;
     private final HumanGradingCreditConsumptionRepository consumptionRepository;
-    private final PlanRepository planRepository;
 
     public ConsumeHumanGradingCreditUseCase(
             SubscriptionRepository subscriptionRepository,
             OutboxEventRepository outboxEventRepository,
-            HumanGradingCreditConsumptionRepository consumptionRepository,
-            PlanRepository planRepository
+            HumanGradingCreditConsumptionRepository consumptionRepository
     ) {
         this.subscriptionRepository = subscriptionRepository;
         this.outboxEventRepository = outboxEventRepository;
         this.consumptionRepository = consumptionRepository;
-        this.planRepository = planRepository;
     }
 
     public int execute(ConsumeHumanGradingCreditCommand command) {
@@ -78,14 +74,9 @@ public class ConsumeHumanGradingCreditUseCase {
     private Debit debit(java.util.UUID userId) {
         Subscription subscription = subscriptionRepository.findActiveByUserId(userId)
                 .orElseThrow(() -> new InsufficientCreditsException(null, 0));
-        boolean unlimited = planRepository.findById(subscription.getPlanId())
-                .map(plan -> plan.hasFeature("HUMAN_GRADING_UNLIMITED"))
-                .orElse(false);
-        if (!unlimited) {
-            subscription.consumeHumanGradingCredit();
-            subscriptionRepository.save(subscription);
-        }
-        return new Debit(subscription, !unlimited);
+        subscription.consumeHumanGradingCredit();
+        subscriptionRepository.save(subscription);
+        return new Debit(subscription, true);
     }
 
     private record Debit(Subscription subscription, boolean creditSpent) {}

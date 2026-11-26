@@ -34,7 +34,7 @@ public record SpeakingPracticeSettings(
         @DefaultValue("120") @Min(30) int staleAfterSeconds,
         /** A grading that failed for a reason that may pass waits this long before it is tried again. */
         @DefaultValue("30") @Min(5) int retryDelaySeconds,
-        @DefaultValue("3") @Min(1) int maxAttempts,
+        @DefaultValue("2") @Min(1) int maxAttempts,
         @DefaultValue("6.0") double passBand,
         @DefaultValue("60000") @Min(1000) int maxInputChars,
         @DefaultValue("3") @Min(1) int historyMinEvidence,

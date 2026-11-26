@@ -152,6 +152,10 @@ public class AzureSpeechClient implements SpeechAnalysisClient {
             // The message of an SDK error can carry detail of the request; only its type is logged.
             log.warn("Speech analysis failed: {}", exception.getClass().getSimpleName());
             throw new SpeechUnavailableException("SPEECH_FAILED", true);
+        } catch (LinkageError error) {
+            // The native libraries of the SDK did not load (an image they do not run on, a missing system library).
+            log.error("Speech SDK could not be loaded: {}", error.getClass().getSimpleName());
+            throw new SpeechUnavailableException("SPEECH_SDK_UNAVAILABLE", true);
         }
         if (failure.get() != null) throw failure.get();
         return results;
