@@ -102,9 +102,10 @@ class AuthRouteConsistencyTest {
 
         assertThat(publicEndpoints).noneMatch(path -> path.startsWith("/swagger-ui")
                 || path.startsWith("/v3/api-docs") || path.startsWith("/api-docs") || path.startsWith("/webjars"));
-        Map<String, Object> springdoc = nested(config, "springdoc");
-        assertThat(nested(springdoc, "api-docs").get("enabled")).isEqualTo("${API_DOCS_ENABLED:false}");
-        assertThat(nested(springdoc, "swagger-ui").get("enabled")).isEqualTo("${API_DOCS_ENABLED:false}");
+        String apiDocs = nested(config, "springdoc", "api-docs", "enabled");
+        String swaggerUi = nested(config, "springdoc", "swagger-ui", "enabled");
+        assertThat(apiDocs).isEqualTo("${API_DOCS_ENABLED:false}");
+        assertThat(swaggerUi).isEqualTo("${API_DOCS_ENABLED:false}");
     }
 
     private Map<String, Object> loadConfig() throws IOException {
