@@ -20,9 +20,11 @@ public class NotificationRepositoryAdapter implements NotificationRepository {
     public boolean insertIfAbsent(UUID sourceEventId, Notification n) {
         return jdbc.update("""
                 INSERT INTO notifications(id,source_event_id,recipient_id,actor_id,event_type,post_id,comment_id,grading_job_id,created_at)
-                VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING
+                SELECT ?,?,?,?,?,?,?,?,?
+                WHERE NOT EXISTS (SELECT 1 FROM deleted_users WHERE user_id = ?)
+                ON CONFLICT DO NOTHING
                 """, n.id(), sourceEventId, n.recipientId(), n.actorId(), n.eventType(), n.postId(), n.commentId(),
-                n.gradingJobId(), Timestamp.from(n.createdAt())) > 0;
+                n.gradingJobId(), Timestamp.from(n.createdAt()), n.recipientId()) > 0;
     }
 
     @Override
