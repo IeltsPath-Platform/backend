@@ -1,4 +1,4 @@
-﻿spring:
+spring:
   servlet:
     multipart:
       max-file-size: 5MB
