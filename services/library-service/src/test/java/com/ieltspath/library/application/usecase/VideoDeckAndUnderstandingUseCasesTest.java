@@ -227,4 +227,15 @@ class VideoDeckAndUnderstandingUseCasesTest {
         verify(progressRepo, times(1)).delete(any());
         verify(segmentRepo, times(1)).delete(any());
     }
+
+    @Test
+    void aVideoWithoutSegmentsCanBePublished() {
+        var video = draftVideo();
+        assertEquals(0, video.getSegments().size());
+
+        var result = new PublishLearningVideoUseCase(videos).execute(new PublishLearningVideoCommand(video.getId()));
+
+        assertEquals(PublicationStatus.PUBLISHED, result.status());
+        verify(videos).save(video);
+    }
 }

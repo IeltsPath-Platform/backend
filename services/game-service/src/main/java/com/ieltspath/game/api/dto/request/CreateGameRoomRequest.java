@@ -13,6 +13,6 @@ public record CreateGameRoomRequest(
         @NotBlank @Size(max = 50) String gameType,
         @NotBlank @Size(max = 30) String learningDomain,
         @NotBlank @Size(max = 30) String mode,
-        @Min(2) @Max(32) int maxPlayers,
+        @Min(2) @Max(4) int maxPlayers,
         @NotEmpty @Size(max = 20) List<UUID> contentIds
 ) {}
