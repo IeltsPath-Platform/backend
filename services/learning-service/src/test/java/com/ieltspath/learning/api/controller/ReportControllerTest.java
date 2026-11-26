@@ -133,7 +133,7 @@ class ReportControllerTest {
         mvc.perform(get("/api/learning/admin/learners/" + other + "/report").with(user("customer").roles("CUSTOMER")))
                 .andExpect(status().isNotFound());
         mvc.perform(get("/api/learning/admin/learners/" + other + "/report"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isUnauthorized());
         verifyNoInteractions(report);
     }
 
@@ -155,6 +155,6 @@ class ReportControllerTest {
     @Test
     void unauthenticatedCallersAreRejected() throws Exception {
         mvc.perform(get("/api/learning/report")).andExpect(status().isUnauthorized());
-        mvc.perform(get("/api/learning/admin/learners/" + other + "/report")).andExpect(status().isNotFound());
+        mvc.perform(get("/api/learning/admin/learners/" + other + "/report")).andExpect(status().isUnauthorized());
     }
 }

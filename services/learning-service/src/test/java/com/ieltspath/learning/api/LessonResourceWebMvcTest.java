@@ -66,7 +66,7 @@ class LessonResourceWebMvcTest {
                 List.of(new ResourceLink(UUID.randomUUID(), "Slide", "https://storage.example/signed-slide.pdf", 0)),
                 List.of(new ResourceLink(UUID.randomUUID(), "Giáo trình", "https://drive.google.com/x", 0))));
 
-        mvc.perform(get("/api/learning/lessons/{id}/resources", LESSON).with(jwt()))
+        mvc.perform(get("/api/learning/lessons/{id}/resources", LESSON).with(learner()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.lessonId").value(LESSON.toString()))
                 .andExpect(jsonPath("$.summaryMarkdown").value("## Outcomes"))
@@ -79,7 +79,7 @@ class LessonResourceWebMvcTest {
     void aMissingSummaryIsSerializedAsNull() throws Exception {
         when(getLessonResources.execute(USER, LESSON)).thenReturn(new LessonResources(LESSON, null, null, null));
 
-        mvc.perform(get("/api/learning/lessons/{id}/resources", LESSON).with(jwt()))
+        mvc.perform(get("/api/learning/lessons/{id}/resources", LESSON).with(learner()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.summaryMarkdown").value(nullValue()))
                 .andExpect(jsonPath("$.slides").isEmpty())
@@ -90,7 +90,7 @@ class LessonResourceWebMvcTest {
     void aLockedLessonIsForbiddenWithItsGateCode() throws Exception {
         when(getLessonResources.execute(USER, LESSON)).thenThrow(new LearningGateException("LESSON_LOCKED", List.of()));
 
-        mvc.perform(get("/api/learning/lessons/{id}/resources", LESSON).with(jwt()))
+        mvc.perform(get("/api/learning/lessons/{id}/resources", LESSON).with(learner()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("LESSON_LOCKED"));
     }
@@ -100,8 +100,12 @@ class LessonResourceWebMvcTest {
         when(getLessonResources.execute(USER, LESSON))
                 .thenThrow(new LearningRequestException(404, "NOT_FOUND", "Lesson was not found"));
 
-        mvc.perform(get("/api/learning/lessons/{id}/resources", LESSON).with(jwt())).andExpect(status().isNotFound());
+        mvc.perform(get("/api/learning/lessons/{id}/resources", LESSON).with(learner())).andExpect(status().isNotFound());
         mvc.perform(get("/api/learning/lessons/{id}/resources", LESSON)).andExpect(status().isUnauthorized());
+    }
+
+    private static org.springframework.test.web.servlet.request.RequestPostProcessor learner() {
+        return jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_CUSTOMER"));
     }
 
     private static org.hamcrest.Matcher<Object> nullValue() {
