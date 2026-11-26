@@ -50,6 +50,12 @@ community:
       poll-interval: PT2S
       batch-size: 50
       confirm-timeout: PT5S
+    purge:
+      enabled: ${COMMUNITY_OUTBOX_PURGE_ENABLED:true}
+      retention-days: ${COMMUNITY_OUTBOX_PURGE_RETENTION_DAYS:30}
+      batch-size: 1000
+      max-batches-per-run: 20
+      cron: ${COMMUNITY_OUTBOX_PURGE_CRON:0 51 3 * * *}
 app:
   storage:
     enabled: true

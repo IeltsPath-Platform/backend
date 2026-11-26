@@ -84,6 +84,12 @@ assessment:
       batch-size: 50
       max-attempts: 20
       confirm-timeout: PT5S
+    purge:
+      enabled: ${ASSESSMENT_OUTBOX_PURGE_ENABLED:true}
+      retention-days: ${ASSESSMENT_OUTBOX_PURGE_RETENTION_DAYS:30}
+      batch-size: 1000
+      max-batches-per-run: 20
+      cron: ${ASSESSMENT_OUTBOX_PURGE_CRON:0 49 3 * * *}
 
 app:
   storage:

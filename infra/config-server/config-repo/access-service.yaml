@@ -39,6 +39,12 @@ access:
       max-attempts: 20
       poll-interval: PT2S
       confirm-timeout: PT5S
+    purge:
+      enabled: ${ACCESS_OUTBOX_PURGE_ENABLED:true}
+      retention-days: ${ACCESS_OUTBOX_PURGE_RETENTION_DAYS:30}
+      batch-size: 1000
+      max-batches-per-run: 20
+      cron: ${ACCESS_OUTBOX_PURGE_CRON:0 47 3 * * *}
   # The user service lists the sales accounts that keys are handed to (GET /internal/users/sales-staff).
   user:
     base-url: ${USER_SERVICE_URL:http://localhost:8085}
