@@ -1,5 +1,6 @@
 package com.ieltspath.assessment.api.controller;
 
+import com.ieltspath.assessment.api.dto.request.CreateGradingJobRequest;
 import com.ieltspath.commonsecurity.authorization.LearnerOnly;
 import org.junit.jupiter.api.Test;
 
