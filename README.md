@@ -45,6 +45,7 @@ Chỉ liệt kê pattern đã có trong code. Cột "Xem" trỏ tới nơi đọ
 | **Centralized Configuration** | Config Server dạng native đọc `config-repo/*.yaml`; giá trị đổi theo môi trường dùng `${VAR:default}` | `infra/config-server` |
 | **Token exchange tại biên** | User Service ký external JWT; Gateway kiểm rồi ký **internal JWT** ngắn hạn (~60 giây) cho downstream. Downstream chỉ tin internal JWT, không tin header `X-User-*` | `shared/common-security`, mục 4 của system-architecture |
 | **Rate limiting (token bucket qua Redis)** | Tier `auth`, `upload`, `ai`, `default` theo subject JWT hoặc IP. Redis lỗi: request thường đi tiếp, login trả 503 (fail-closed) | `config-repo/api-gateway.yaml` |
+| **Learning topic display cache** | Redis caches Content topic sequences for display reads for 60 seconds; Redis failures fall back to Content. Learning decisions continue to read Content directly | `services/learning-service`, `docs/system-architecture.md` §9 |
 
 ### Cấu trúc trong service và dữ liệu
 

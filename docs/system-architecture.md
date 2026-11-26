@@ -481,6 +481,7 @@ Bảng tổng hợp đầy đủ theo nhóm (resilience, idempotency, claim `SKI
 | Global exception handler → `ErrorResponse` | Service Java |
 | WebSocket với ticket ngắn hạn | game |
 | Rate limit dùng chung qua Redis | API Gateway, user-service, community-service |
+| Learning topic catalog cache | `TopicCatalog` caches Content topic sequences for display-only reads under `cache:learning:topic-sequence:v1:base` and `cache:learning:topic-sequence:v1:error-traps` (60-second TTL). Redis timeouts/errors and malformed values fall back to Content. Used by reports, review basket/history, quests, diagnostics, suggestions, essay/speaking feedback, and human-review details. `learning.topic.cache` records hit/miss/error. State/access decisions bypass the cache. |
 
 Rate limit được cấu hình trong `infra/config-server/config-repo/api-gateway.yaml` theo các tier `auth`,
 `upload`, `ai` và `default`; mỗi tier có `replenishRate` (token/giây) và `burstCapacity`. Gateway ưu tiên

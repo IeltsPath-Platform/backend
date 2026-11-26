@@ -63,7 +63,7 @@ Nguồn: `application.yml` từng module (`SERVER_PORT`), `infra/config-server/c
   (mặc định 20; thiếu cấu hình thì gate essay chuyển EXAMINER) và access-service đang chạy
   (`ACCESS_SERVICE_URL`, mặc định `http://localhost:8084`); content cần `CONTENT_MEDIA_BASE_URL` (https của bucket mp3) cho bài Listening.
 - `docker compose up -d --build` chạy toàn stack. Khi chạy service Java từ IDE, khởi động database và broker bằng
-  `docker compose up -d postgres rabbitmq`, rồi đặt các `*_DB_URL` thành `jdbc:postgresql://localhost:5440/<service>_db`
+  `docker compose up -d postgres rabbitmq redis`, rồi đặt các `*_DB_URL` thành `jdbc:postgresql://localhost:5440/<service>_db`
   và password thành `POSTGRES_PASSWORD`.
 - Service Java chạy trên host (IDE hoặc `java -jar`) theo thứ tự: config-server → eureka → api-gateway → user → content →
   library → assessment → các service còn lại (kể cả game-service, xem §5).

@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.ieltspath.learning.application.command.HumanReviewResult;
 import com.ieltspath.learning.application.port.LearnerLock;
 import com.ieltspath.learning.application.port.LearningContentClient;
+import com.ieltspath.learning.application.port.TopicCatalog;
 import com.ieltspath.learning.application.service.ErrorTrapCatalog;
 import com.ieltspath.learning.application.service.ErrorTrapReviews;
 import com.ieltspath.learning.application.service.LessonAccess;
@@ -67,6 +68,7 @@ public class ApplyHumanReviewResultUseCase {
     private final HumanReviewRequestRepository requests;
     private final PracticeAttemptRepository attempts;
     private final LearningContentClient content;
+    private final TopicCatalog topicCatalog;
     private final ErrorTrapCatalog traps;
     private final LessonAccess access;
     private final KnowledgeEvidenceRepository evidence;
@@ -82,7 +84,8 @@ public class ApplyHumanReviewResultUseCase {
 
     public ApplyHumanReviewResultUseCase(LearnerLock lock, WritingSubmissionRepository essays,
                                          HumanReviewRequestRepository requests, PracticeAttemptRepository attempts,
-                                         LearningContentClient content, ErrorTrapCatalog traps, LessonAccess access,
+                                         LearningContentClient content, TopicCatalog topicCatalog,
+                                         ErrorTrapCatalog traps, LessonAccess access,
                                          KnowledgeEvidenceRepository evidence, MasteryProfileUpdater profiles,
                                          ErrorTrapReviews errorTrapReviews, WritingCriterionReviews criterionReviews,
                                          ReviewItemRepository reviews, HumanReviewOutcomeRepository outcomes,
@@ -94,6 +97,7 @@ public class ApplyHumanReviewResultUseCase {
         this.requests = requests;
         this.attempts = attempts;
         this.content = content;
+        this.topicCatalog = topicCatalog;
         this.traps = traps;
         this.access = access;
         this.evidence = evidence;
@@ -294,7 +298,7 @@ public class ApplyHumanReviewResultUseCase {
     private Map<UUID, LearningContentClient.KnowledgePoint> knowledgePointDetails() {
         try {
             Map<UUID, LearningContentClient.KnowledgePoint> found = new HashMap<>();
-            for (LearningContentClient.Topic topic : content.getTopicSequence()) {
+            for (LearningContentClient.Topic topic : topicCatalog.topics(false)) {
                 if (topic.knowledgePoints() == null) continue;
                 for (LearningContentClient.KnowledgePoint point : topic.knowledgePoints()) {
                     if (point != null && point.id() != null) found.putIfAbsent(point.id(), point);

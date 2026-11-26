@@ -1,4 +1,11 @@
 spring:
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
+      connect-timeout: 200ms
+      timeout: 200ms
   servlet:
     multipart:
       # One Speaking recording per request: 10 MB file (the bucket's limit, about 5 minutes of WAV), a little headroom for
@@ -51,6 +58,9 @@ app:
           - /v3/api-docs/**
 
 learning:
+  topic-cache:
+    enabled: ${LEARNING_TOPIC_CACHE_ENABLED:true}
+    ttl-seconds: 60
   speaking-grading:
     poll-ms: ${LEARNING_PLACEMENT_SPEAKING_GRADING_POLL_MS:5000}
     batch-size: ${LEARNING_PLACEMENT_SPEAKING_GRADING_BATCH_SIZE:5}

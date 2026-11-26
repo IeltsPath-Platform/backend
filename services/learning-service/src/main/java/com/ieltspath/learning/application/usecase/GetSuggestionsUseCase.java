@@ -2,6 +2,7 @@ package com.ieltspath.learning.application.usecase;
 
 import com.ieltspath.learning.application.exception.AccessUnavailableException;
 import com.ieltspath.learning.application.port.LearningContentClient;
+import com.ieltspath.learning.application.port.TopicCatalog;
 import com.ieltspath.learning.application.result.SuggestionResult;
 import com.ieltspath.learning.application.service.KnowledgePointDirectory;
 import com.ieltspath.learning.application.service.PaywallGate;
@@ -56,6 +57,7 @@ public class GetSuggestionsUseCase {
     private final ReviewItemRepository reviews;
     private final PracticeTestAssignmentRepository practiceTests;
     private final LearningContentClient content;
+    private final TopicCatalog topicCatalog;
     private final KnowledgePointDirectory directory;
     private final PaywallGate paywall;
     private final SuggestionRules rules = new SuggestionRules();
@@ -65,7 +67,7 @@ public class GetSuggestionsUseCase {
                                  LearnerPlacementRepository placements, LessonProgressRepository lessons,
                                  PracticeAttemptRepository attempts, ReviewItemRepository reviews,
                                  PracticeTestAssignmentRepository practiceTests, LearningContentClient content,
-                                 KnowledgePointDirectory directory, PaywallGate paywall) {
+                                 TopicCatalog topicCatalog, KnowledgePointDirectory directory, PaywallGate paywall) {
         this.profiles = profiles;
         this.curricula = curricula;
         this.placements = placements;
@@ -74,13 +76,14 @@ public class GetSuggestionsUseCase {
         this.reviews = reviews;
         this.practiceTests = practiceTests;
         this.content = content;
+        this.topicCatalog = topicCatalog;
         this.directory = directory;
         this.paywall = paywall;
     }
 
     @Transactional(readOnly = true)
     public SuggestionResult execute(UUID userId) {
-        Map<UUID, KnowledgePointDirectory.Entry> described = directory.describe();
+        Map<UUID, KnowledgePointDirectory.Entry> described = directory.describeForDisplay();
         Optional<BigDecimal> maxBand = currentBand(userId, described);
         if (maxBand.isEmpty()) return new SuggestionResult(List.of());
 
@@ -117,7 +120,7 @@ public class GetSuggestionsUseCase {
         Set<UUID> activeTopics = curriculum.topics().stream()
                 .filter(topic -> statuses.get(topic.topicId()) == TopicStatus.IN_PROGRESS)
                 .map(topic -> topic.courseId()).filter(java.util.Objects::nonNull).collect(Collectors.toSet());
-        Optional<BigDecimal> fromCourses = content.getTopicSequence().stream()
+        Optional<BigDecimal> fromCourses = topicCatalog.topics(false).stream()
                 .filter(topic -> topic.course() != null && activeTopics.contains(topic.course().courseId()))
                 .map(topic -> topic.course().bandLevel()).max(Comparator.naturalOrder());
         return fromCourses.or(() -> placements.find(userId).map(placement -> placement.band().value()));

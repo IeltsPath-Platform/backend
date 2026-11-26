@@ -1,6 +1,7 @@
 package com.ieltspath.learning.application.service;
 
 import com.ieltspath.learning.application.port.LearningContentClient;
+import com.ieltspath.learning.application.port.TopicCatalog;
 import com.ieltspath.learning.domain.aggregate.MasteryProfile;
 import com.ieltspath.learning.domain.repository.MasteryProfileRepository;
 import com.ieltspath.learning.domain.repository.QuestRepository;
@@ -46,7 +47,7 @@ public class QuestService {
     private final QuestRepository quests;
     private final MasteryProfileRepository profiles;
     private final ReviewItemRepository reviews;
-    private final LearningContentClient content;
+    private final TopicCatalog topicCatalog;
     private final GamificationRecorder gamification;
     private final RewardGrantRepository rewards;
     private final LearnerTimezones timezones;
@@ -55,7 +56,7 @@ public class QuestService {
     private final Clock clock = Clock.systemUTC();
 
     public QuestService(QuestRepository quests, MasteryProfileRepository profiles, ReviewItemRepository reviews,
-                        LearningContentClient content, GamificationRecorder gamification,
+                        TopicCatalog topicCatalog, GamificationRecorder gamification,
                         RewardGrantRepository rewards, LearnerTimezones timezones, BadgeService badges,
                         @Value("${learning.gamification.quests.practice-required:5}") int practiceRequired,
                         @Value("${learning.gamification.quests.practice-xp:20}") int practiceXp,
@@ -68,7 +69,7 @@ public class QuestService {
         this.quests = quests;
         this.profiles = profiles;
         this.reviews = reviews;
-        this.content = content;
+        this.topicCatalog = topicCatalog;
         this.gamification = gamification;
         this.rewards = rewards;
         this.timezones = timezones;
@@ -148,7 +149,7 @@ public class QuestService {
                 if (review.blocking()) blocking.add(review.knowledgePointId());
             }
             Set<UUID> withPractice = new HashSet<>();
-            for (LearningContentClient.Topic topic : content.getTopicSequence()) {
+            for (LearningContentClient.Topic topic : topicCatalog.topics(false)) {
                 for (LearningContentClient.KnowledgePoint point : topic.knowledgePoints()) {
                     if (point.hasPracticeSet()) withPractice.add(point.id());
                 }

@@ -4,6 +4,7 @@ import com.ieltspath.learning.application.exception.AccessUnavailableException;
 import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.port.AccessClient;
 import com.ieltspath.learning.application.port.LearningContentClient;
+import com.ieltspath.learning.application.port.TopicCatalog;
 import com.ieltspath.learning.application.port.LearningContentClient.LessonCandidate;
 import com.ieltspath.learning.application.port.LearningContentClient.PackageCandidate;
 import com.ieltspath.learning.application.port.LearningContentClient.SuggestionCandidates;
@@ -63,6 +64,7 @@ class SuggestionsAndOverviewIntegrationTest {
     @Autowired GetSuggestionsUseCase suggestions;
     @Autowired StaffInsightUseCase insight;
     @MockitoBean LearningContentClient content;
+    @MockitoBean TopicCatalog topicCatalog;
     @MockitoBean AccessClient access;
 
     private final UUID user = UUID.randomUUID();
@@ -85,9 +87,11 @@ class SuggestionsAndOverviewIntegrationTest {
                 + "review_items, review_sets, lesson_progress, practice_test_assignments, learner_flags, work_items, "
                 + "diagnostic_probes, diagnostic_sessions, remediation_flags, course_outcomes CASCADE");
         var courseView = new LearningContentClient.Course(course, "IELTS_5_5", "IELTS 5.5", new BigDecimal("5.5"), true);
-        when(content.getTopicSequence()).thenReturn(List.of(new LearningContentClient.Topic(topic, "T", "Topic", 1, null,
+        List<LearningContentClient.Topic> topicSequence = List.of(new LearningContentClient.Topic(topic, "T", "Topic", 1, null,
                 List.of(kp(consolidate, "KC"), kp(due, "KD"), kp(firm, "KF"), kp(next, "KN")), LearningSkill.READING,
-                true, courseView)));
+                true, courseView));
+        when(content.getTopicSequence()).thenReturn(topicSequence);
+        when(topicCatalog.topics(false)).thenReturn(topicSequence);
         when(content.getPracticeTestMilestones(course)).thenReturn(List.of());
         when(content.prerequisites(anyList())).thenAnswer(invocation -> {
             List<UUID> asked = invocation.getArgument(0);
@@ -172,14 +176,14 @@ class SuggestionsAndOverviewIntegrationTest {
     }
 
     @Test
-    void premiumSuggestsLessonsBeyondTheFreePreview() {
+    void premiumDoesNotSuggestUnownedLessonsBeyondTheFreePreview() {
         when(access.premium()).thenReturn(true);
         UUID closed = UUID.randomUUID();
         offerLessons(lesson(closed, due, paidCourse, 5));
 
         var items = suggestions.execute(user).suggestions();
 
-        assertTrue(items.stream().anyMatch(item -> closed.equals(item.id())));
+        assertFalse(items.stream().anyMatch(item -> closed.equals(item.id())));
     }
 
     @Test
