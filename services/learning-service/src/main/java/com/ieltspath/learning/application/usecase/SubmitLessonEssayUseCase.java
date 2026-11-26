@@ -91,7 +91,6 @@ public class SubmitLessonEssayUseCase {
      */
     public WritingSubmissionResult execute(UUID userId, UUID lessonId, UUID blockId, UUID requestId, String essayText,
                                            WritingSubmission revising) {
-        boolean premium = flow.premiumLearner();
         int words = flow.validate(essayText);
 
         Optional<WritingSubmission> existing = essays.findByRequestId(requestId);
@@ -102,6 +101,7 @@ public class SubmitLessonEssayUseCase {
             if (submission.status() == WritingSubmissionStatus.GRADED) return view.assemble(submission);
             if (submission.status() == WritingSubmissionStatus.PAYMENT_PENDING) return charge(submission);
         }
+        boolean premium = flow.premiumLearner();
         flow.requireGraderAvailable();
 
         Lesson lesson = content.getLesson(lessonId);

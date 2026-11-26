@@ -101,8 +101,8 @@ public class GetLearnerReportUseCase {
             pendingReviews.putIfAbsent(review.knowledgePointId(), review.reviewId());
         }
         Set<UUID> diagnosing = diagnostics.probingRootKnowledgePoints(userId);
-        Map<UUID, KnowledgePointDirectory.Entry> described = directory.describe(true);
-        if (described == null || described.isEmpty()) described = directory.describe();
+        Map<UUID, KnowledgePointDirectory.Entry> described = directory.describeForDisplay(true);
+        if (described == null || described.isEmpty()) described = directory.describeForDisplay();
         final Map<UUID, KnowledgePointDirectory.Entry> pointDirectory = described;
         List<MasteryProfile> trapProfiles = profiles.findErrorTrapProfiles(userId);
         var trapCatalogEntries = trapCatalog == null ? null : trapCatalog.load();

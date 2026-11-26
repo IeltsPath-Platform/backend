@@ -8,6 +8,7 @@ import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.exception.LlmUnavailableException;
 import com.ieltspath.learning.application.exception.WritingGradingException;
 import com.ieltspath.learning.application.port.LearningContentClient;
+import com.ieltspath.learning.application.port.TopicCatalog;
 import com.ieltspath.learning.application.port.EssayPromptActivationProvider;
 import com.ieltspath.learning.application.port.LearningContentClient.ErrorType;
 import com.ieltspath.learning.application.port.LearningContentClient.Rubric;
@@ -60,6 +61,7 @@ public class EssayGrader {
     private final LlmClient llm;
     private final ObjectMapper json;
     private final LearningContentClient content;
+    private final TopicCatalog topicCatalog;
     private final EssayPromptActivationProvider activations;
     private final EssayKnowledgeJudge knowledgeJudge;
     private final String model;
@@ -68,11 +70,13 @@ public class EssayGrader {
 
     @Autowired
     public EssayGrader(LlmClient llm, ObjectMapper json, LearningContentClient content,
-                       EssayPromptActivationProvider activations, EssayKnowledgeJudge knowledgeJudge,
+                       TopicCatalog topicCatalog, EssayPromptActivationProvider activations,
+                       EssayKnowledgeJudge knowledgeJudge,
                        @Value("${learning.llm.model:}") String model, WritingSettings settings) {
         this.llm = llm;
         this.json = json;
         this.content = content;
+        this.topicCatalog = topicCatalog;
         this.activations = activations;
         this.knowledgeJudge = knowledgeJudge;
         this.model = model;
@@ -81,7 +85,14 @@ public class EssayGrader {
 
     public EssayGrader(LlmClient llm, ObjectMapper json, LearningContentClient content,
                        EssayPromptActivationProvider activations, EssayKnowledgeJudge knowledgeJudge) {
-        this(llm, json, content, activations, knowledgeJudge, "", WritingSettings.defaults());
+        this(llm, json, content, TopicCatalog.direct(content), activations, knowledgeJudge, "", WritingSettings.defaults());
+    }
+
+    /** Keeps the existing full constructor available to unit tests while Spring injects the display catalog. */
+    public EssayGrader(LlmClient llm, ObjectMapper json, LearningContentClient content,
+                       EssayPromptActivationProvider activations, EssayKnowledgeJudge knowledgeJudge,
+                       String model, WritingSettings settings) {
+        this(llm, json, content, TopicCatalog.direct(content), activations, knowledgeJudge, model, settings);
     }
 
     /** Kept for unit tests that construct the original grader directly. */
@@ -506,7 +517,7 @@ public class EssayGrader {
     private Map<UUID, LearningContentClient.KnowledgePoint> knowledgePointCatalog() {
         try {
             Map<UUID, LearningContentClient.KnowledgePoint> found = new HashMap<>();
-            for (LearningContentClient.Topic topic : content.getTopicSequence()) {
+            for (LearningContentClient.Topic topic : topicCatalog.topics(false)) {
                 if (topic.knowledgePoints() == null) continue;
                 for (LearningContentClient.KnowledgePoint point : topic.knowledgePoints()) {
                     if (point != null && point.id() != null) found.putIfAbsent(point.id(), point);

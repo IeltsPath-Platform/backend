@@ -39,7 +39,7 @@ public class GetQuestsUseCase {
         List<Quest> todays = quests.ensureToday(userId, today);
         boolean hasTarget = todays.stream().anyMatch(quest -> quest.targetKnowledgePointId() != null);
         // The directory is one call to Content, asked only when a quest names a point.
-        Map<UUID, KnowledgePointDirectory.Entry> described = hasTarget ? directory.describe() : Map.of();
+        Map<UUID, KnowledgePointDirectory.Entry> described = hasTarget ? directory.describeForDisplay() : Map.of();
         List<Item> items = todays.stream().map(quest -> new Item(quest.type(), quest.required(), quest.progress(),
                 quest.completed(), quest.xpReward(), quest.pointsReward(), target(quest, described))).toList();
         return new QuestsView(today, (int) items.stream().filter(Item::completed).count(), items);

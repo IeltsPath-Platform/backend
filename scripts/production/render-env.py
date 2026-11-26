@@ -8,7 +8,7 @@ import sys
 
 BUSINESS = {'user': 8085, 'content': 8082, 'library': 8081, 'assessment': 8083,
             'access': 8084, 'learning': 8086, 'game': 8087, 'notification': 8088, 'community': 8089}
-REDIS = {'api-gateway', 'user-service', 'game-service', 'notification-service', 'community-service'}
+REDIS = {'api-gateway', 'user-service', 'game-service', 'notification-service', 'community-service', 'learning-service'}
 BROKER = {'user', 'assessment', 'access', 'learning', 'notification', 'community'}
 STORAGE = {'user', 'content', 'library', 'assessment', 'learning', 'community'}
 LINKS = {'content': ['library'], 'library': ['access'], 'assessment': ['content', 'user'],
@@ -22,7 +22,8 @@ OPTIONAL = {
     'learning': ['LEARNING_SPEECH_KEY', 'LEARNING_SPEECH_REGION', 'LEARNING_SPEECH_LOCALE',
                  'LEARNING_SPEAKING_ENABLED', 'LEARNING_SPEAKING_DAILY_LIMIT', 'LEARNING_SPEAKING_POINT_COST',
                  'LEARNING_SPEAKING_BUCKET', 'LEARNING_SPEAKING_RETENTION_DAYS',
-                 'LEARNING_LLM_REASONING_EFFORT', 'LEARNING_WRITING_POINT_COST', 'LEARNING_WRITING_DAILY_GRADING_LIMIT'],
+                 'LEARNING_LLM_REASONING_EFFORT', 'LEARNING_WRITING_POINT_COST', 'LEARNING_WRITING_DAILY_GRADING_LIMIT',
+                 'LEARNING_TOPIC_CACHE_ENABLED'],
     'community': ['COMMUNITY_MEDIA_BUCKET', 'COMMUNITY_IMAGE_HOSTS', 'COMMUNITY_VIDEO_HOSTS'],
 }
 

@@ -220,7 +220,7 @@ class PracticeGatedLessonUnlockIntegrationTest {
     }
 
     @Test
-    void premiumExpiryLocksNewPremiumProgressButGrandfatheredProgressStaysReadableDuringAccessOutage() {
+    void premiumDoesNotUnlockPaidLessonsButGrandfatheredProgressStaysReadableDuringAccessOutage() {
         UUID courseId = UUID.randomUUID();
         var course = new Course(courseId, "C65", "Band 6.5", new BigDecimal("6.5"), false);
         when(content.getTopicSequence()).thenReturn(List.of(new Topic(topic, "READ", "Reading", 1, null,
@@ -234,15 +234,17 @@ class PracticeGatedLessonUnlockIntegrationTest {
         UUID user = UUID.randomUUID();
         topics.execute(user);
         when(access.premium()).thenReturn(true);
+        jdbc.update("INSERT INTO learner_course_unlocks (user_id, course_id, skill, point_cost, request_id, status) "
+                        + "VALUES (?, ?, 'READING', 50, ?, 'ACTIVE')",
+                user, courseId, UUID.randomUUID());
         complete.execute(user, lesson1);
         assertFalse(jdbc.queryForObject("SELECT grandfathered FROM lesson_progress WHERE user_id = ? AND lesson_id = ?",
                 Boolean.class, user, lesson1));
-
-        when(access.premium()).thenReturn(false);
+        jdbc.update("DELETE FROM learner_course_unlocks WHERE user_id = ? AND course_id = ?", user, courseId);
         assertEquals("PAYWALL", assertThrows(LearningGateException.class,
                 () -> getLesson.execute(user, lesson1)).getCode());
 
-        jdbc.update("UPDATE lesson_progress SET grandfathered = true WHERE user_id = ? AND lesson_id = ?",
+        jdbc.update("UPDATE lesson_progress SET completed_at = now(), grandfathered = true WHERE user_id = ? AND lesson_id = ?",
                 user, lesson1);
         when(access.premium()).thenThrow(new AccessUnavailableException(503));
         assertDoesNotThrow(() -> getLesson.execute(user, lesson1));
@@ -446,13 +448,14 @@ class PracticeGatedLessonUnlockIntegrationTest {
     }
 
     @Test
-    void premiumLearnerCanListPracticeSetsForAnUnownedPaywalledLesson() {
+    void premiumLearnerCannotListPracticeSetsForAnUnownedPaywalledLesson() {
         var target = practiceListingLesson(4, false, false, false);
         when(access.premium()).thenReturn(true);
 
-        var result = practiceSets.execute(target.userId(), target.lessonId());
+        LearningGateException error = assertThrows(LearningGateException.class,
+                () -> practiceSets.execute(target.userId(), target.lessonId()));
 
-        assertEquals(1, result.items().size());
+        assertEquals("PAYWALL", error.getCode());
     }
 
     @Test
@@ -472,10 +475,10 @@ class PracticeGatedLessonUnlockIntegrationTest {
         assertTrue(completedResult.lessonCompleted());
 
         var paywalled = practiceListingLesson(4, false, false, false);
-        AccessUnavailableException error = assertThrows(AccessUnavailableException.class,
+        LearningGateException error = assertThrows(LearningGateException.class,
                 () -> practiceSets.execute(paywalled.userId(), paywalled.lessonId()));
-        assertTrue(error.getMessage().contains("status 503"));
-        verify(access, times(1)).premium();
+        assertEquals("PAYWALL", error.getCode());
+        verify(access, never()).premium();
     }
 
     private PracticeListingTarget practiceListingLesson(int skillPosition, boolean completed, boolean grandfathered,

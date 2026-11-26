@@ -35,6 +35,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 /** Free practice on one knowledge point, end to end against a real database and a stubbed Content. */
@@ -372,7 +373,7 @@ class FreePracticeIntegrationTest {
 
         assertTrue(node.locked());
         assertFalse(node.practiceAvailable());
-        verify(access).premium();
+        verify(access, never()).premium();
     }
 
     @Test

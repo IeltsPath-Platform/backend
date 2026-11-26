@@ -1,6 +1,6 @@
 # Cache cây topic bằng Redis ở learning-service
 
-Trạng thái: **plan chi tiết, đã chốt quyết định 2026-11-25; chưa có code**. Người làm chạy các phase theo thứ tự.
+Status: **implementation complete locally; 88 targeted tests and 2 Content migration tests pass; Learning suite: 2,024 tests, 0 failures, 1 ArchUnit frozen-store error, 2 skipped; post-change benchmark and PR remain; no commit created**.
 
 | Repo | Nhánh | Tách từ |
 | --- | --- | --- |

@@ -54,7 +54,7 @@ public class ListSubmissionHistoryUseCase {
         if (rows.isEmpty()) return rows;
         Map<UUID, KnowledgePointDirectory.Entry> catalog;
         try {
-            catalog = directory.describe();
+            catalog = directory.describeForDisplay();
         } catch (RuntimeException unavailable) {
             // The list is still worth showing without names; the client falls back to a plain label.
             return rows;

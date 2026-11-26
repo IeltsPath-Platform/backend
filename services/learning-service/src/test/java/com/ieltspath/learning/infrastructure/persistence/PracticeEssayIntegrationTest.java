@@ -100,6 +100,7 @@ class PracticeEssayIntegrationTest {
             + "and fresh air helps them focus. ").repeat(4);
 
     @Autowired JdbcTemplate jdbc;
+    @Autowired com.ieltspath.learning.application.service.WritingSettings writingSettings;
     @Autowired RefreshLearningTopicsUseCase topics;
     @Autowired SubmitLessonExerciseUseCase submitExercise;
     @Autowired GetLessonPracticeSetsUseCase practiceSets;
@@ -214,8 +215,8 @@ class PracticeEssayIntegrationTest {
                 () -> submitEssay.execute(USER, attempt, ESSAY, UUID.randomUUID(), TEXT)).getCode());
 
         when(access.balance()).thenReturn(30L);
-        jdbc.update("INSERT INTO llm_daily_usage (user_id, usage_date, kind, count) VALUES (?, ?, 'writing_grading', 10)",
-                USER, LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")));
+        jdbc.update("INSERT INTO llm_daily_usage (user_id, usage_date, kind, count) VALUES (?, ?, 'writing_grading', ?)",
+                USER, LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")), writingSettings.dailyGradingLimit());
         assertEquals("DAILY_LIMIT_REACHED", assertThrows(LearningRequestException.class,
                 () -> submitEssay.execute(USER, attempt, ESSAY, UUID.randomUUID(), TEXT)).getCode());
         verify(llm, never()).completeJson(any(), any());

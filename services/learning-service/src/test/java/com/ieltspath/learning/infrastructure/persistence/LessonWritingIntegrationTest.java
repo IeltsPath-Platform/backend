@@ -90,6 +90,7 @@ class LessonWritingIntegrationTest {
             + "and make people calmer. ").repeat(4);
 
     @Autowired JdbcTemplate jdbc;
+    @Autowired com.ieltspath.learning.application.service.WritingSettings writingSettings;
     @Autowired GetWritingSubmissionUseCase getWritingSubmissionUseCase;
     @Autowired SubmitLessonEssayUseCase submitLessonEssayUseCase;
     @Autowired com.ieltspath.learning.application.usecase.SubmitEssayRevisionUseCase submitEssayRevisionUseCase;
@@ -283,8 +284,8 @@ class LessonWritingIntegrationTest {
 
     @Test
     void dailyLimitStopsGradingBeforeTheLlm() {
-        jdbc.update("INSERT INTO llm_daily_usage (user_id, usage_date, kind, count) VALUES (?, ?, 'writing_grading', 10)",
-                USER, LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")));
+        jdbc.update("INSERT INTO llm_daily_usage (user_id, usage_date, kind, count) VALUES (?, ?, 'writing_grading', ?)",
+                USER, LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")), writingSettings.dailyGradingLimit());
 
         assertCode(429, "DAILY_LIMIT_REACHED", () -> submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), ESSAY));
         verify(llm, never()).completeJson(any(), any());

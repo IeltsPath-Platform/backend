@@ -76,7 +76,7 @@ Chạy trên host: mỗi service đọc `.env` gốc (đánh đổi của môi t
 | Biến                                                                        | Dùng cho                                                                                                                                                                                                                                                                                                              |
 | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `POSTGRES_PASSWORD`                                                         | Mật khẩu PostgreSQL dùng bởi các database riêng của từng service; host port mặc định `5440`                                                                                                                                                                                                                           |
-| `REDIS_PASSWORD`                                                            | Mật khẩu Redis dùng cho rate limit ở Gateway và giới hạn đăng nhập ở User Service; compose yêu cầu biến này                                                                                                                                                                                                           |
+| `REDIS_PASSWORD` | Redis used by rate limits and the Learning topic cache; Compose requires this variable |
 | `GAME_WEBSOCKET_ALLOWED_ORIGINS`                                            | Trang web được mở WebSocket game, phân tách bằng dấu phẩy, `*` thay cho phần bất kỳ (mặc định `http://localhost:5173`). Production đặt origin của web, ví dụ `https://app.example.com`; Expo bản web cũng cần origin của nó ở đây. App native không cần: nó gửi Origin trùng địa chỉ API nên được nhận như cùng nguồn |
 | `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD`                                    | Broker trong compose; assessment và Learning Service trên host phải dùng đúng cặp này (mặc định `guest` sẽ fail)                                                                                                                                                                                                      |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_AUTH`, `SMTP_STARTTLS`, `MAIL_FROM` | SMTP cho email đặt lại mật khẩu; lưu trong `.env`, không commit mật khẩu. Local Mailpit dùng host `mailpit`, cổng `1025`, không bật auth/STARTTLS. |
@@ -102,7 +102,7 @@ Nếu mật khẩu có ký tự đặc biệt, hãy percent-encode hoặc chọn
 
 1. Chạy toàn stack trong container: `docker compose up -d --build`. Init script tạo database riêng cho từng service;
    Flyway áp schema/seed. User và Access ghi tài khoản/điểm demo khi `DEMO_DATA_ENABLED=true` (mặc định local bật).
-2. Hoặc chạy Java từ IDE: `docker compose up -d postgres rabbitmq`, đặt từng `*_DB_URL` về
+2. Hoặc chạy Java từ IDE: `docker compose up -d postgres rabbitmq redis`, đặt từng `*_DB_URL` về
    `jdbc:postgresql://localhost:5440/<service>_db` và password bằng `POSTGRES_PASSWORD`; sau đó chạy Config Server →
    Eureka → Gateway → các business service. Các Spring module tự nạp `.env` ở root repository.
 3. Mở Swagger tại Gateway `http://localhost:8080/swagger-ui.html`.

@@ -12,15 +12,43 @@ import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import com.ieltspath.learning.application.port.TopicCatalog;
+import org.junit.jupiter.api.Test;
+
+import java.util.Set;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.library.freeze.FreezingArchRule.freeze;
 
 @AnalyzeClasses(packagesOf = ArchitectureTest.class, importOptions = ImportOption.DoNotIncludeTests.class)
 class ArchitectureTest {
+    private static final Set<String> FRESH_CONTENT_READERS = Set.of(
+            "com.ieltspath.learning.application.usecase.RefreshLearningTopicsUseCase",
+            "com.ieltspath.learning.application.usecase.StartFreePracticeUseCase",
+            "com.ieltspath.learning.application.usecase.StartBasketReviewUseCase",
+            "com.ieltspath.learning.application.service.DiagnosticPreparation",
+            "com.ieltspath.learning.application.usecase.GetLearnerTreeUseCase",
+            "com.ieltspath.learning.application.usecase.StaffInsightUseCase");
+
     @ArchTest
     static void respectArchitecture(JavaClasses importedClasses) {
         rulesFor("com.ieltspath.learning").forEach(rule -> freeze(rule).check(importedClasses));
+    }
+
+    @Test
+    void readsThatAffectStateOrAccessDoNotUseTheDisplayCatalog() {
+        JavaClasses importedClasses = new com.tngtech.archunit.core.importer.ClassFileImporter()
+                .importPackages("com.ieltspath.learning");
+
+        for (String readerName : FRESH_CONTENT_READERS) {
+            var reader = importedClasses.get(readerName);
+            assertThat(reader.getDirectDependenciesFromSelf())
+                    .noneMatch(dependency -> dependency.getTargetClass().isAssignableTo(TopicCatalog.class));
+            assertThat(reader.getMethodCallsFromSelf())
+                    .noneMatch(call -> call.getTarget().getName().equals("describeForDisplay"));
+        }
     }
 
     // Bytecode cannot prove HTTP calls run outside transactions/locks, nor identify a generic HTTP client's URL.
