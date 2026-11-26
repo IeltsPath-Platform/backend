@@ -1,0 +1,4679 @@
+[
+ {
+  "file": "authentication-sign-in",
+  "feature": "Authentication",
+  "name": "Sign In",
+  "width": 760,
+  "height": 414,
+  "ucs": "Sign In with Password, Sign In with Google",
+  "note": "On the mobile app the first field is E-mail only and the screen has no navigation bar.",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Sign In / Sign Up",
+    "Switch between signing in and registering. The active tab is highlighted."
+   ],
+   [
+    2,
+    "Sign in to start your journey!",
+    "Heading of the form."
+   ],
+   [
+    3,
+    "E-mail or phone number",
+    "Required, at most 255 characters. The server accepts the e-mail address only. A message in red appears under the field when it is empty."
+   ],
+   [
+    4,
+    "Password",
+    "Required. The text is hidden and can be shown with a button."
+   ],
+   [
+    5,
+    "Forgot password?",
+    "Opens Forgot Password."
+   ],
+   [
+    6,
+    "Sign In",
+    "Checks the form, then signs in (UC Sign In with Password). A wrong e-mail or password, an inactive account and a wait after many failures each show a message and the form shakes."
+   ],
+   [
+    7,
+    "Continue with Google",
+    "Signs in with a Google account (UC Sign In with Google). A failure shows \"Cannot sign in with Google. Please try again.\""
+   ]
+  ],
+  "source": "wf_data_auth"
+ },
+ {
+  "file": "authentication-register",
+  "feature": "Authentication",
+  "name": "Register",
+  "width": 760,
+  "height": 506,
+  "ucs": "Sign Up",
+  "note": "The mobile screen also has an optional phone number field and shows a hint of at least 6 characters, while the server needs at least 8.",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Sign In / Sign Up",
+    "Switch between signing in and registering."
+   ],
+   [
+    2,
+    "Create an account to start your journey",
+    "Heading of the form."
+   ],
+   [
+    3,
+    "Full name",
+    "Required, at most 150 characters."
+   ],
+   [
+    4,
+    "E-mail",
+    "Required, must be a valid e-mail address."
+   ],
+   [
+    5,
+    "Password",
+    "Required, 8 to 72 characters. The server also refuses common passwords, passwords that repeat the name or e-mail, and passwords that are too simple, and shows the reason under the field."
+   ],
+   [
+    6,
+    "Confirm password",
+    "Required, must be the same as the password."
+   ],
+   [
+    7,
+    "Create account",
+    "Creates the Learner account and sends the verification e-mail (UC Sign Up)."
+   ],
+   [
+    8,
+    "Continue with Google",
+    "Registers or signs in with Google (UC Sign In with Google)."
+   ]
+  ],
+  "source": "wf_data_auth"
+ },
+ {
+  "file": "authentication-verify-e-mail",
+  "feature": "Authentication",
+  "name": "Verify E-mail",
+  "width": 760,
+  "height": 264,
+  "ucs": "Verify E-mail Address",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Verify e-mail",
+    "Heading."
+   ],
+   [
+    2,
+    "Verifying\u2026",
+    "Shown while the link in the e-mail is being checked."
+   ],
+   [
+    3,
+    "Result message",
+    "Success: the address is confirmed. Failure: \"The verification link is not valid or has expired\", or \"The verification link is incomplete. Open the correct link in the e-mail.\""
+   ],
+   [
+    4,
+    "Sign In",
+    "Goes to the Sign In screen after a result."
+   ],
+   [
+    5,
+    "You can send the link again from the profile page after you sign in.",
+    "Hint under a failed result. The page itself has no field to ask for a new link."
+   ]
+  ],
+  "source": "wf_data_auth"
+ },
+ {
+  "file": "authentication-forgot-password",
+  "feature": "Authentication",
+  "name": "Forgot Password",
+  "width": 760,
+  "height": 318,
+  "ucs": "Reset Forgotten Password",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Forgot password > Verify e-mail > Reset password",
+    "Shows which step of the recovery the user is on."
+   ],
+   [
+    2,
+    "Forgot your password? Recover it fast!",
+    "Heading."
+   ],
+   [
+    3,
+    "E-mail",
+    "Required, a valid e-mail address."
+   ],
+   [
+    4,
+    "Send request",
+    "Sends the request. The message \"Request sent\" is the same whether or not the address exists (UC Reset Forgotten Password). If sending fails: \"Could not send the request. Try again.\""
+   ],
+   [
+    5,
+    "Back to sign in",
+    "Returns to Sign In."
+   ]
+  ],
+  "source": "wf_data_auth"
+ },
+ {
+  "file": "authentication-reset-password",
+  "feature": "Authentication",
+  "name": "Reset Password",
+  "width": 760,
+  "height": 390,
+  "ucs": "Reset Forgotten Password",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Reset your password securely!",
+    "Heading. The text under it asks for the code and the new password."
+   ],
+   [
+    2,
+    "Reset code",
+    "Required. Filled in from the link in the e-mail, or pasted by the user."
+   ],
+   [
+    3,
+    "New password",
+    "Required, 8 to 72 characters; the same rules as when registering."
+   ],
+   [
+    4,
+    "Confirm password",
+    "Required, must be the same as the new password."
+   ],
+   [
+    5,
+    "Reset password",
+    "Saves the new password and closes the other sessions. A code that is wrong, used or older than 15 minutes shows a message."
+   ],
+   [
+    6,
+    "Request a new code",
+    "Goes back to Forgot Password."
+   ]
+  ],
+  "source": "wf_data_auth"
+ },
+ {
+  "file": "authentication-welcome",
+  "feature": "Authentication",
+  "name": "Welcome",
+  "width": 330,
+  "height": 420,
+  "ucs": "Sign Up, Sign In with Password",
+  "note": "",
+  "shell": "mobile",
+  "elements": [
+   [
+    1,
+    "IELTSPath logo and mascot",
+    "Branding picture."
+   ],
+   [
+    2,
+    "Learn step by step. Keep the rhythm every day.",
+    "Tagline of the app."
+   ],
+   [
+    3,
+    "Get started",
+    "Opens Onboarding for a new user."
+   ],
+   [
+    4,
+    "I already have an account",
+    "Opens Sign In."
+   ]
+  ],
+  "source": "wf_data_auth"
+ },
+ {
+  "file": "authentication-onboarding",
+  "feature": "Authentication",
+  "name": "Onboarding",
+  "width": 330,
+  "height": 420,
+  "ucs": "Set Learning Goal, Sign Up",
+  "note": "",
+  "shell": "mobile",
+  "elements": [
+   [
+    1,
+    "1 > 2 > 3 > 4 > 5 > 6",
+    "Progress bar and step counter, for example 2/6. The back arrow returns to the earlier question."
+   ],
+   [
+    2,
+    "Target band?",
+    "One question at a time: target band (5.5 to 7.5+), the first skill to improve, daily minutes (5 to 20), why the user studies IELTS, earlier exams, and when to remind."
+   ],
+   [
+    3,
+    "5.5, 6.0, 6.5, 7.0, 7.5+",
+    "Answer options; exactly one can be chosen."
+   ],
+   [
+    4,
+    "Next",
+    "Disabled until an option is chosen. After the last question the answers are saved on the phone and the app opens Register."
+   ]
+  ],
+  "source": "wf_data_auth"
+ },
+ {
+  "file": "games-game-catalog",
+  "feature": "Games",
+  "name": "Game Catalog",
+  "width": 760,
+  "height": 408,
+  "ucs": "View Game Catalog, Join Game Room",
+  "note": "On mobile the catalogue also holds the game setup (words, time limit, lives) and asks a Guest to sign in to play.",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Every new word, a new challenge",
+    "Heading \"LEARN THROUGH GAMES\" with the words Learn, Play, Grow."
+   ],
+   [
+    2,
+    "Game",
+    "Wordly and Rocket. Each card offers solo play and, with the server, a room for up to 4 players. When no game exists: \"No games yet. Please come back later.\" When the server cannot be reached: \"Could not load the games.\""
+   ],
+   [
+    3,
+    "Join a friend's room",
+    "Enter the room code to review and compete together."
+   ],
+   [
+    4,
+    "Room code",
+    "6 characters."
+   ],
+   [
+    5,
+    "Rejoin room",
+    "Shown when the Learner is already in a room: \"You are in a game room\" with \"Rejoin room\"."
+   ]
+  ],
+  "source": "wf_data_games"
+ },
+ {
+  "file": "games-wordly-setup",
+  "feature": "Games",
+  "name": "Wordly Setup",
+  "width": 760,
+  "height": 402,
+  "ucs": "Set Up Game",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Set up your game",
+    "Heading. A box \"How to play\": one meaning, three planets; a wrong answer or time out costs a life."
+   ],
+   [
+    2,
+    "Number of words",
+    "Limited (at least 5) or unlimited: play until the lives are used up or the Learner stops."
+   ],
+   [
+    3,
+    "Time for each word",
+    "180 seconds or no limit."
+   ],
+   [
+    4,
+    "Lives for each player",
+    "From 3 to 6 lives. A wrong answer or a time out costs one life."
+   ],
+   [
+    5,
+    "Easier, Harder",
+    "Level of the words; no choice means all levels. The topics list loads from the server."
+   ],
+   [
+    6,
+    "Start",
+    "Starts a solo game or creates a room. A Learner already in a room sees \"You are in a game room\" and \"Rejoin room\"."
+   ]
+  ],
+  "source": "wf_data_games"
+ },
+ {
+  "file": "games-rocket-setup",
+  "feature": "Games",
+  "name": "Rocket Setup",
+  "width": 760,
+  "height": 390,
+  "ucs": "Set Up Game",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Vocabulary rocket",
+    "Read the Vietnamese meaning and steer the rocket into the planet that carries the right English word."
+   ],
+   [
+    2,
+    "Number of words in the game",
+    "At least 5."
+   ],
+   [
+    3,
+    "Time for each question",
+    "Seconds for each question."
+   ],
+   [
+    4,
+    "Lives for each player",
+    "Lives for each player."
+   ],
+   [
+    5,
+    "Sample data in use (10 sample words, not connected to the server).",
+    "Notice shown when the app runs without the server."
+   ],
+   [
+    6,
+    "Start",
+    "Starts solo or creates a room."
+   ]
+  ],
+  "source": "wf_data_games"
+ },
+ {
+  "file": "games-game-room",
+  "feature": "Games",
+  "name": "Game Room",
+  "width": 760,
+  "height": 386,
+  "ucs": "Join Game Room",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "ROOM CODE",
+    "The code with the button \"Copy room code\" (\"Room code copied.\")."
+   ],
+   [
+    2,
+    "Players in the room",
+    "Up to 4 seats. Invite friends by the code and get ready together."
+   ],
+   [
+    3,
+    "Player, Role, Ready",
+    "Each seat shows the player, \"(You)\", \"Room owner\", \"Ready\", or \"Free seat / Waiting for players\". The owner can invite a player to leave, after confirming."
+   ],
+   [
+    4,
+    "Edit settings",
+    "Owner only. Saving shows \"Settings saved. Everyone must get ready again.\" \"Settings unavailable\" and \"Reload room\" appear on errors."
+   ],
+   [
+    5,
+    "Ready / Start",
+    "A player marks ready; the owner starts when everyone is ready."
+   ],
+   [
+    6,
+    "Leave room",
+    "Leaves the room; \"Back to games\"."
+   ]
+  ],
+  "source": "wf_data_games"
+ },
+ {
+  "file": "games-wordly-play",
+  "feature": "Games",
+  "name": "Wordly Play",
+  "width": 760,
+  "height": 454,
+  "ucs": "Play Wordly",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "GUESS THE MEANING WORD",
+    "Heading with the meaning of the word to guess."
+   ],
+   [
+    2,
+    "Guess board",
+    "Rows of letters. Colours: right place, wrong place, not in the word. A hint reveals one letter and is shown \"Used 1/1 hint for this word\"."
+   ],
+   [
+    3,
+    "Letter keyboard",
+    "On-screen keyboard that follows the colours; keys: letters, Submit, Delete."
+   ],
+   [
+    4,
+    "Score, Correct words, Lives",
+    "Score, words guessed and lives left. In a room a match ranking is shown."
+   ],
+   [
+    5,
+    "Hint for this word",
+    "Reveals one letter after at least one guess (once for each word)."
+   ],
+   [
+    6,
+    "Exit game",
+    "Asks \"Exit the game?\" with \"Keep playing\". A pending guess can be retried: \"The guess is waiting for confirmation. Retry will send the same request.\""
+   ]
+  ],
+  "source": "wf_data_games"
+ },
+ {
+  "file": "games-rocket-play",
+  "feature": "Games",
+  "name": "Rocket Play",
+  "width": 760,
+  "height": 426,
+  "ucs": "Play Rocket",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Question, time left, correct and wrong counts",
+    "Header of the match."
+   ],
+   [
+    2,
+    "Sky",
+    "The Vietnamese meaning is shown; planets carry English words and the rocket flies into the right one (\"Fly into the word that means \u2026\")."
+   ],
+   [
+    3,
+    "Correct, Time, Score",
+    "End of a round: correct answers, time, points earned and words practised."
+   ],
+   [
+    4,
+    "Play again",
+    "Starts a new round; \"Play on\" continues. A knocked-out player watches: \"You are out - watching\"."
+   ],
+   [
+    5,
+    "Exit game",
+    "Leaves with confirmation."
+   ]
+  ],
+  "source": "wf_data_games"
+ },
+ {
+  "file": "games-game-result",
+  "feature": "Games",
+  "name": "Game Result",
+  "width": 760,
+  "height": 362,
+  "ucs": "View Game Result",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Official result: GAMES / WORDLY",
+    "Heading."
+   ],
+   [
+    2,
+    "Total score, Correct words, Best streak, Time",
+    "The figures of the match."
+   ],
+   [
+    3,
+    "Rank, Player, Score, Lives",
+    "Ranking of the players with the time to the right answer."
+   ],
+   [
+    4,
+    "Choose a game",
+    "Opens the game catalogue. \"Back to home\" goes home. \"Back to the match\" returns while the result can still be loaded."
+   ]
+  ],
+  "source": "wf_data_games"
+ },
+ {
+  "file": "community-community-feed",
+  "feature": "Community",
+  "name": "Community Feed",
+  "width": 760,
+  "height": 426,
+  "ucs": "View Community Feed, React to Post or Comment, Comment on Post",
+  "note": "The mobile Community tab has the filters All, Explore and Following, a search box and the button \"Write a post\".",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Practise and improve together with the IELTSPath community",
+    "Heading \"IELTSPATH COMMUNITY\"."
+   ],
+   [
+    2,
+    "Search posts",
+    "Search in the community."
+   ],
+   [
+    3,
+    "Feed / Saved / Following / Report queue",
+    "Feed, saved posts, posts of people followed, and (for staff) the queue of reports. Posts, Followers and Following lists belong to the profile."
+   ],
+   [
+    4,
+    "Filter by topic",
+    "All topics or one topic."
+   ],
+   [
+    5,
+    "New post",
+    "Opens the Write Post window."
+   ],
+   [
+    6,
+    "Post",
+    "Each post shows the author, text, pictures or video, reactions, comments and a menu to report. \"Load more\" loads more. Empty states: \"No post found. Try other keywords\", \"You have no posts from people you follow\", \"The feed is waiting for the first story\"."
+   ]
+  ],
+  "source": "wf_data_games"
+ },
+ {
+  "file": "community-post-detail",
+  "feature": "Community",
+  "name": "Post Detail",
+  "width": 760,
+  "height": 338,
+  "ucs": "Comment on Post, React to Post or Comment, Report Content",
+  "note": "On mobile the post opens in its own screen with a menu to edit, delete or report a comment.",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Post",
+    "Author, topic, text, pictures or video, and the reactions."
+   ],
+   [
+    2,
+    "Write a comment",
+    "Reply to the post or to another comment (\"Replying to\u2026\"). Mentions notify the person."
+   ],
+   [
+    3,
+    "Comment",
+    "Comments in order; the author can edit or delete their own; others can report it. With none: \"No comments yet. Be the first to share your thoughts.\""
+   ],
+   [
+    4,
+    "Report",
+    "Opens the report window (reason, one report each per person)."
+   ]
+  ],
+  "source": "wf_data_games"
+ },
+ {
+  "file": "community-learner-profile",
+  "feature": "Community",
+  "name": "Learner Profile",
+  "width": 760,
+  "height": 362,
+  "ucs": "View Learner Profile",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Avatar and display name",
+    "The public profile of a Learner. \"Follow\" or \"Edit profile\" (for the owner)."
+   ],
+   [
+    2,
+    "Posts, Followers, Following",
+    "Counts; the lists open under the tabs."
+   ],
+   [
+    3,
+    "Posts / Followers / Following",
+    "Posts written by the Learner, and the lists. With none: \"You have not posted anything. Share what you are learning.\" or \"Could not load the list.\""
+   ],
+   [
+    4,
+    "Write the first post",
+    "Shown to the owner when there is no post."
+   ]
+  ],
+  "source": "wf_data_games"
+ },
+ {
+  "file": "community-write-post-window",
+  "feature": "Community",
+  "name": "Write Post window",
+  "width": 760,
+  "height": 516,
+  "ucs": "Write Post",
+  "note": "",
+  "shell": "modal",
+  "elements": [
+   [
+    1,
+    "Choose a topic",
+    "Required topic of the post."
+   ],
+   [
+    2,
+    "Post title (optional)",
+    "Title of the post."
+   ],
+   [
+    3,
+    "Post content",
+    "Required, what the Learner wants to share. Background colours can be chosen for text-only posts."
+   ],
+   [
+    4,
+    "Attach pictures or videos",
+    "Opens the attachment panel: from the computer (JPG, PNG, WebP, GIF, up to 5 MB each, up to 4 pictures) or by link; a video link from an allowed site such as YouTube. \"Uploading\u2026\" then \"Upload done\"."
+   ],
+   [
+    5,
+    "Emoji",
+    "Inserts an emoji."
+   ],
+   [
+    6,
+    "Post",
+    "Publishes the post (UC Write Post). Cancel asks \"Cancel the post you are writing? Unposted content will be lost.\""
+   ]
+  ],
+  "source": "wf_data_games"
+ },
+ {
+  "file": "community-post-composer",
+  "feature": "Community",
+  "name": "Post Composer",
+  "width": 330,
+  "height": 610,
+  "ucs": "Write Post",
+  "note": "",
+  "shell": "mobile",
+  "elements": [
+   [
+    1,
+    "Write what you want to share\u2026",
+    "Main text: \"What are you studying today? Ask, share or find a study partner\u2026\"."
+   ],
+   [
+    2,
+    "Choose a topic",
+    "Required."
+   ],
+   [
+    3,
+    "Title",
+    "Optional, for example \"How I raised my Writing by 0.5 band\"."
+   ],
+   [
+    4,
+    "Target band",
+    "Optional."
+   ],
+   [
+    5,
+    "Video link",
+    "Optional link such as https://youtu.be/\u2026"
+   ],
+   [
+    6,
+    "Add a picture from a link",
+    "Optional."
+   ],
+   [
+    7,
+    "Purple, Night, Sunset, Ocean, Forest, Pink, Aurora",
+    "Background colour for text-only posts."
+   ],
+   [
+    8,
+    "Post",
+    "Publishes. If it fails: \"Could not post. Check the connection and try again.\" Leaving asks \"Keep writing\" or \"Discard post\"."
+   ]
+  ],
+  "source": "wf_data_games"
+ },
+ {
+  "file": "community-bookmarked-posts",
+  "feature": "Community",
+  "name": "Bookmarked Posts",
+  "width": 330,
+  "height": 420,
+  "ucs": "Bookmark Post",
+  "note": "",
+  "shell": "mobile",
+  "elements": [
+   [
+    1,
+    "Saved",
+    "Posts the Learner bookmarked."
+   ],
+   [
+    2,
+    "Post",
+    "Saved posts. With none: \"No saved posts. Tap the bookmark icon under a post to keep it to read later.\" An error shows \"Could not load saved posts\" and Retry."
+   ],
+   [
+    3,
+    "Back to feed",
+    "Returns to the community feed."
+   ]
+  ],
+  "source": "wf_data_games"
+ },
+ {
+  "file": "community-community-reports",
+  "feature": "Community",
+  "name": "Community Reports",
+  "width": 760,
+  "height": 378,
+  "ucs": "Moderate Community Reports",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Report queue",
+    "Heading \"COMMUNITY MODERATION\". A user without the right sees \"You are not allowed to see this queue\"."
+   ],
+   [
+    2,
+    "Content, Reason, Reported by",
+    "Open reports. While loading: \"Loading reports\u2026\". With none: \"No reports waiting.\""
+   ],
+   [
+    3,
+    "Open content",
+    "Opens the post or comment that was reported."
+   ],
+   [
+    4,
+    "Dismiss",
+    "Closes the report and keeps the content."
+   ],
+   [
+    5,
+    "Hide content",
+    "Hides the post or comment from learners; it is kept, not erased (DR-37)."
+   ]
+  ],
+  "source": "wf_data_games"
+ },
+ {
+  "file": "home-and-public-pages-home",
+  "feature": "Home and public pages",
+  "name": "Home",
+  "width": 760,
+  "height": 628,
+  "ucs": "View Plans and Pricing, Browse Examiners",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Hero: mascot and \"One step a day. Closer to your target band.\"",
+    "Welcome banner of the public site."
+   ],
+   [
+    2,
+    "Explore practice",
+    "Opens the practice test catalogue."
+   ],
+   [
+    3,
+    "4 skills, Clear path, Own pace",
+    "Highlights of the product."
+   ],
+   [
+    4,
+    "Learning benefits: four skills towards the IELTS goal",
+    "Section that introduces the four skills Listening, Reading, Writing and Speaking."
+   ],
+   [
+    5,
+    "Plans and keys",
+    "Shows the plans (Premium) and the point cards, and how to enter an activation key. A message appears when the current plan cannot be loaded. The button opens the Activate Key window."
+   ],
+   [
+    6,
+    "Request a consultation",
+    "A form with full name and phone number, button \"Send request\". It checks the fields and shows \"Consultation request sent! An adviser will contact you within 24 hours.\", but the request is not sent anywhere yet (screen only)."
+   ]
+  ],
+  "source": "wf_data_home"
+ },
+ {
+  "file": "home-and-public-pages-activate-key-window",
+  "feature": "Home and public pages",
+  "name": "Activate Key window",
+  "width": 760,
+  "height": 362,
+  "ucs": "Activate Key",
+  "note": "The window opens over the Home page, the plan page and the overview.",
+  "shell": "modal",
+  "elements": [
+   [
+    1,
+    "Enter the full code you were given, with the prefix IP- if there is one. You do not pay here.",
+    "Explanation under the title \"Activate plan / Top up key\"."
+   ],
+   [
+    2,
+    "Activation key code",
+    "Required. Example: IP-XXXX-XXXX-XXXX. A Guest sees \"Sign in to activate a plan or top up points\" and a Sign In button instead of the field."
+   ],
+   [
+    3,
+    "Activate",
+    "Sends the code (UC Activate Key). Messages: key unknown, used, revoked or expired; e-mail not verified; \"The result could not be confirmed. Keep the code and try again when the connection is stable.\""
+   ],
+   [
+    4,
+    "Close",
+    "Closes the window. After success the window shows \"Activation successful\" with the points or days granted, and a Done button."
+   ]
+  ],
+  "source": "wf_data_home"
+ },
+ {
+  "file": "home-and-public-pages-examiner-directory",
+  "feature": "Home and public pages",
+  "name": "Examiner Directory",
+  "width": 760,
+  "height": 528,
+  "ucs": "Browse Examiners",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Learn with the most dedicated IELTS experts",
+    "Heading of the page."
+   ],
+   [
+    2,
+    "Experts, Highest band, Certificates, Taking work",
+    "Figures about the examiner team."
+   ],
+   [
+    3,
+    "Search experts by name",
+    "Free text."
+   ],
+   [
+    4,
+    "All, Listening, Reading, Writing, Speaking",
+    "Filter by skill. A switch limits the list to Examiners who are taking work now."
+   ],
+   [
+    5,
+    "Sort",
+    "Highest band, Most experienced, Name A-Z."
+   ],
+   [
+    6,
+    "Examiner",
+    "One card for each Examiner: name, expertise, graded essays, response time and a Taking work badge. \"View profile\" opens Examiner Detail. With no match: \"No suitable expert found\" and a Clear filter button."
+   ],
+   [
+    7,
+    "Four steps to work with an expert",
+    "Explains the process: take the free placement test, choose an expert, send the Writing essay, read the review."
+   ]
+  ],
+  "source": "wf_data_home"
+ },
+ {
+  "file": "home-and-public-pages-examiner-detail",
+  "feature": "Home and public pages",
+  "name": "Examiner Detail",
+  "width": 760,
+  "height": 406,
+  "ucs": "Browse Examiners, Request Examiner Review of Essay",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Home > Expert team > Examiner name",
+    "Breadcrumb path."
+   ],
+   [
+    2,
+    "Verified IELTS examiner",
+    "Name, photo and short introduction of the Examiner."
+   ],
+   [
+    3,
+    "Certified band, Essays graded, 5-star ratings",
+    "Figures of the Examiner."
+   ],
+   [
+    4,
+    "Profile and qualifications",
+    "Degrees and certificates, areas of teaching, and the \"verified\" mark."
+   ],
+   [
+    5,
+    "What you get",
+    "Four-criterion diagnosis (TR, CC, LR, GRA), inline error tags, band-up rewrites, and automatic update of the knowledge tree and the review basket. A sample feedback sheet is shown."
+   ],
+   [
+    6,
+    "Send Writing to this Examiner",
+    "Starts the request for a review by this Examiner (UC Request Examiner Review of Essay). A Guest is sent to Sign In."
+   ]
+  ],
+  "source": "wf_data_home"
+ },
+ {
+  "file": "home-and-public-pages-home-tab",
+  "feature": "Home and public pages",
+  "name": "Home tab",
+  "width": 330,
+  "height": 420,
+  "ucs": "Browse Vocabulary",
+  "note": "",
+  "shell": "mobile",
+  "elements": [
+   [
+    1,
+    "Today",
+    "Heading of the tab."
+   ],
+   [
+    2,
+    "Vocabulary topic",
+    "The published vocabulary topics. While loading: \"Loading topics\u2026\". With none: \"No vocabulary topics yet. Topics appear after they are published.\" On error: \"Could not load vocabulary topics. Check the connection to the server and try again.\" and a Retry button."
+   ]
+  ],
+  "source": "wf_data_home"
+ },
+ {
+  "file": "account-and-overview-overview",
+  "feature": "Account and overview",
+  "name": "Overview",
+  "width": 760,
+  "height": 460,
+  "ucs": "View Overview and Achievements",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Overview / Detailed data / My achievements / My profile",
+    "Switches between the pages of the overview. Detailed data and achievements have their own rows below."
+   ],
+   [
+    2,
+    "Hello, <name>",
+    "Greeting with the button \"Continue learning\"."
+   ],
+   [
+    3,
+    "Choose course",
+    "Shows the progress of the chosen course and the start, current and target band."
+   ],
+   [
+    4,
+    "Course progress, Streak, Study time",
+    "Course progress, the study streak with the record, and the time learned this week."
+   ],
+   [
+    5,
+    "Skill, Band, Priority",
+    "Skills of the course: the band of each skill and which one to improve first. With none graded: \"No skill has been graded in this course yet.\""
+   ],
+   [
+    6,
+    "Retake placement test",
+    "Visible while a retake is left. Shows the retakes available."
+   ]
+  ],
+  "source": "wf_data_home"
+ },
+ {
+  "file": "account-and-overview-detailed-statistics",
+  "feature": "Account and overview",
+  "name": "Detailed Statistics",
+  "width": 760,
+  "height": 490,
+  "ucs": "View Overview and Achievements",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Let us look at your detailed data again!",
+    "Heading: every learning step is recorded."
+   ],
+   [
+    2,
+    "Period",
+    "Period of the statistics."
+   ],
+   [
+    3,
+    "Listening, Reading, Writing, Speaking",
+    "Legend and filter of the band chart."
+   ],
+   [
+    4,
+    "Band of each attempt",
+    "Chart and table of the band of each eligible attempt: date, source and version, with the change from the earlier one. A grade that is being regraded is marked."
+   ],
+   [
+    5,
+    "Your vocabulary map",
+    "Progress by level over the words of IELTSPath."
+   ]
+  ],
+  "source": "wf_data_home"
+ },
+ {
+  "file": "account-and-overview-achievements",
+  "feature": "Account and overview",
+  "name": "Achievements",
+  "width": 760,
+  "height": 544,
+  "ucs": "View Overview and Achievements",
+  "note": "The mobile screen is called Learning progress and shows the same blocks in one column.",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Every step forward counts",
+    "Heading. Text: collect experience, keep the rhythm, unlock new milestones."
+   ],
+   [
+    2,
+    "Level and XP, Hearts, Streak",
+    "Level and experience points, hearts left, and the study streak."
+   ],
+   [
+    3,
+    "Badge",
+    "Badges earned and still to earn."
+   ],
+   [
+    4,
+    "Rank, Learner, XP",
+    "Weekly league ranking."
+   ],
+   [
+    5,
+    "Quest, Progress, Reward",
+    "Today's quests."
+   ],
+   [
+    6,
+    "Continue learning",
+    "Goes back to the learning path."
+   ]
+  ],
+  "source": "wf_data_home"
+ },
+ {
+  "file": "account-and-overview-profile-and-security",
+  "feature": "Account and overview",
+  "name": "Profile and Security",
+  "width": 760,
+  "height": 926,
+  "ucs": "Edit Profile, Change Password, Set Learning Goal",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Avatar - click or drop to change",
+    "Change or remove the picture. A failed upload shows \"Upload failed\"."
+   ],
+   [
+    2,
+    "Personal information",
+    "Edit mode saves with \"Saved successfully!\". An invalid phone number shows \"The phone number is not in the Vietnam format (for example 0912345678 or +84912345678).\""
+   ],
+   [
+    3,
+    "Display name (nickname)",
+    "Name shown to others."
+   ],
+   [
+    4,
+    "Full name",
+    "Required."
+   ],
+   [
+    5,
+    "Phone number",
+    "Optional, Vietnam format."
+   ],
+   [
+    6,
+    "Time zone",
+    "Used to count the study day and the streak."
+   ],
+   [
+    7,
+    "Bio",
+    "Short text about the learner."
+   ],
+   [
+    8,
+    "E-mail verification",
+    "Shows \"E-mail not verified yet\" and a button to send the verification e-mail again; a failure shows \"Could not send the verification e-mail. Try again in a few minutes.\""
+   ],
+   [
+    9,
+    "Make profile public",
+    "Decides who can see the profile and the learning activity."
+   ],
+   [
+    10,
+    "Account security",
+    "Change password and linked accounts."
+   ],
+   [
+    11,
+    "Current password",
+    "Required."
+   ],
+   [
+    12,
+    "New password",
+    "A strength meter shows Very weak, Weak, Medium or Strong."
+   ],
+   [
+    13,
+    "Confirm new password",
+    "Must match."
+   ],
+   [
+    14,
+    "Change password",
+    "Saves it and shows \"Password changed successfully!\"."
+   ],
+   [
+    15,
+    "Unlink Google",
+    "Removes the Google sign-in when the account has a password; a Google-only account must first create a password after confirming with Google."
+   ]
+  ],
+  "source": "wf_data_home"
+ },
+ {
+  "file": "account-and-overview-notification-preferences",
+  "feature": "Account and overview",
+  "name": "Notification Preferences",
+  "width": 760,
+  "height": 260,
+  "ucs": "Manage Notification Preferences",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Back to community",
+    "Returns to the community."
+   ],
+   [
+    2,
+    "Notification preferences",
+    "You can turn each kind of notice on or off. All are on by default."
+   ],
+   [
+    3,
+    "Post comments / Replies / Mentions / Reactions / New followers",
+    "Community notices for the learner."
+   ],
+   [
+    4,
+    "Premium activated / Premium ending / Result ready / Words due for review",
+    "Account and learning notices for the learner."
+   ],
+   [
+    5,
+    "Essay to grade / Due soon / Overdue / Grade ready",
+    "Notices that go to Examiners, in their own group."
+   ]
+  ],
+  "source": "wf_data_home"
+ },
+ {
+  "file": "account-and-overview-account-profile-tab",
+  "feature": "Account and overview",
+  "name": "Account / Profile tab",
+  "width": 330,
+  "height": 490,
+  "ucs": "Edit Profile, Sign Out",
+  "note": "",
+  "shell": "mobile",
+  "elements": [
+   [
+    1,
+    "Account",
+    "Shows the user name and e-mail. A Guest sees \"Sign in to sync the profile\" with a Sign In button."
+   ],
+   [
+    2,
+    "Change password",
+    "Opens Change Password."
+   ],
+   [
+    3,
+    "Learning progress",
+    "Opens the progress screen."
+   ],
+   [
+    4,
+    "Notification settings",
+    "Opens the notification preferences."
+   ],
+   [
+    5,
+    "Daily goal (XP)",
+    "Choose the XP goal for each day."
+   ],
+   [
+    6,
+    "Study reminder / Streak reminder / Background music",
+    "Switches on the device."
+   ],
+   [
+    7,
+    "Font size / Appearance",
+    "Display options."
+   ],
+   [
+    8,
+    "Help / Clear temporary data",
+    "Help and clearing the cache; clearing asks for confirmation."
+   ],
+   [
+    9,
+    "Sign Out",
+    "Closes the session on the phone (UC Sign Out)."
+   ]
+  ],
+  "source": "wf_data_home"
+ },
+ {
+  "file": "account-and-overview-edit-profile",
+  "feature": "Account and overview",
+  "name": "Edit Profile",
+  "width": 330,
+  "height": 756,
+  "ucs": "Edit Profile",
+  "note": "",
+  "shell": "mobile",
+  "elements": [
+   [
+    1,
+    "Avatar (JPEG, PNG or WebP, up to 2 MB)",
+    "Square, clear pictures are best. \"Remove current picture\" removes it."
+   ],
+   [
+    2,
+    "Full name",
+    "Required."
+   ],
+   [
+    3,
+    "E-mail",
+    "Shown but cannot be changed here."
+   ],
+   [
+    4,
+    "Phone number",
+    "Optional."
+   ],
+   [
+    5,
+    "Display name",
+    "The name others see."
+   ],
+   [
+    6,
+    "About you",
+    "Short bio."
+   ],
+   [
+    7,
+    "Self-assessed band",
+    "Band the learner believes they have."
+   ],
+   [
+    8,
+    "Time zone",
+    "Default Asia/Ho_Chi_Minh; counts the study day and the streak."
+   ],
+   [
+    9,
+    "Public profile",
+    "Lets other learners see the community profile."
+   ],
+   [
+    10,
+    "Save changes",
+    "Saves the profile."
+   ]
+  ],
+  "source": "wf_data_home"
+ },
+ {
+  "file": "account-and-overview-change-password",
+  "feature": "Account and overview",
+  "name": "Change Password",
+  "width": 330,
+  "height": 420,
+  "ucs": "Change Password",
+  "note": "The hint says at least 6 characters, but the server requires at least 8 and refuses weak passwords.",
+  "shell": "mobile",
+  "elements": [
+   [
+    1,
+    "Current password",
+    "Required: confirms who is changing it."
+   ],
+   [
+    2,
+    "New password",
+    "Hint \"At least 6 characters\"."
+   ],
+   [
+    3,
+    "Confirm new password",
+    "Must match the new password."
+   ],
+   [
+    4,
+    "Update password",
+    "Saves the new password."
+   ],
+   [
+    5,
+    "Back to profile",
+    "Returns without saving."
+   ]
+  ],
+  "source": "wf_data_home"
+ },
+ {
+  "file": "account-and-overview-notifications",
+  "feature": "Account and overview",
+  "name": "Notifications",
+  "width": 330,
+  "height": 420,
+  "ucs": "View Notifications",
+  "note": "",
+  "shell": "mobile",
+  "elements": [
+   [
+    1,
+    "Notifications",
+    "Heading with the button \"Read all\"."
+   ],
+   [
+    2,
+    "Today / Last 7 days / Earlier",
+    "Notices are grouped by time. With none: \"No notifications yet. When someone likes, comments or follows you, you will see it here.\""
+   ],
+   [
+    3,
+    "Notice",
+    "Tapping a notice opens the post or the screen it is about. An error shows \"Could not load notifications\" and a Retry button."
+   ]
+  ],
+  "source": "wf_data_home"
+ },
+ {
+  "file": "learning-path-course-list",
+  "feature": "Learning path",
+  "name": "Course List",
+  "width": 760,
+  "height": 406,
+  "ucs": "View Courses",
+  "note": "The mobile Courses tab shows the same cards in one column and has no placement button.",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "IELTS path by target band",
+    "Heading of the page."
+   ],
+   [
+    2,
+    "Not sure where to start?",
+    "Offers the free placement test to find the current band. The button \"Take placement test\" opens Placement Test. When a retake is left it shows \"Retake placement test\" and the number of retakes."
+   ],
+   [
+    3,
+    "All, Suggested for you, Studying, Completed, Ready for final",
+    "Filters the courses. With none: \"No course in this group.\""
+   ],
+   [
+    4,
+    "Course",
+    "One card for each band course: band, free or paid, progress and \"Last visit\" time."
+   ],
+   [
+    5,
+    "Today's suggestions",
+    "Small, optional tasks such as the review basket. \"It is only a suggestion. Skipping it does not affect your path.\""
+   ]
+  ],
+  "source": "wf_data_learning"
+ },
+ {
+  "file": "learning-path-placement-test",
+  "feature": "Learning path",
+  "name": "Placement Test",
+  "width": 760,
+  "height": 516,
+  "ucs": "Start Placement Test, Take Placement Test, Record Placement Speaking",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Home > Placement test",
+    "Breadcrumb path."
+   ],
+   [
+    2,
+    "Choose a test level",
+    "Before the test: the levels and how many tries are left. A Learner with a test in progress sees \"You have a test in progress. Saved answers are kept when you continue.\" and the buttons Continue and Check again."
+   ],
+   [
+    3,
+    "Listening > Reading > Writing > Speaking",
+    "Parts of the test. Quick jump to a part and question, Previous and Next question."
+   ],
+   [
+    4,
+    "Question area",
+    "The passage or audio on the left and the questions on the right. Answers are saved while the Learner works; the study time recorder runs while the tab is active."
+   ],
+   [
+    5,
+    "Submit this part",
+    "Saves the part. After the last part the system grades the test (\"Grading your test\") and opens the result."
+   ],
+   [
+    6,
+    "Skip Speaking",
+    "Available when the Learner cannot record."
+   ]
+  ],
+  "source": "wf_data_learning"
+ },
+ {
+  "file": "learning-path-topic-list",
+  "feature": "Learning path",
+  "name": "Topic List",
+  "width": 760,
+  "height": 410,
+  "ucs": "View Topics of a Course",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Home > Courses > Course name",
+    "Breadcrumb path."
+   ],
+   [
+    2,
+    "Path by skill",
+    "Study the skills in parallel or one by one, as you like."
+   ],
+   [
+    3,
+    "Listening, Reading, Writing, Speaking",
+    "Chooses the skill. Each skill shows the number of lessons."
+   ],
+   [
+    4,
+    "Topic",
+    "The topics of the course in order, with progress. Opens Topic."
+   ],
+   [
+    5,
+    "Knowledge tree and free practice",
+    "Opens the Knowledge Tree."
+   ],
+   [
+    6,
+    "Course final test",
+    "Opens when every topic is done. Messages: \"The final test is not open. Finish every topic in the earlier course.\" or \"There is no final test for this course yet.\" A passed test shows \"Passed\"."
+   ]
+  ],
+  "source": "wf_data_learning"
+ },
+ {
+  "file": "learning-path-knowledge-tree",
+  "feature": "Learning path",
+  "name": "Knowledge Tree",
+  "width": 760,
+  "height": 426,
+  "ucs": "View Knowledge Tree",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Knowledge tree",
+    "Study order and the level of mastery of each knowledge point."
+   ],
+   [
+    2,
+    "All, Listening, Reading, Writing, Speaking",
+    "Filter by skill."
+   ],
+   [
+    3,
+    "Tree diagram",
+    "Nodes are knowledge points, coloured by mastery. A node with a blocking review is marked. A node taught in free lessons is marked \"Free\"."
+   ],
+   [
+    4,
+    "Knowledge point detail",
+    "Opens on a click: what it builds on, what it opens, where it is taught, and a button to take the blocking review."
+   ],
+   [
+    5,
+    "Common mistakes",
+    "List of common errors of the course."
+   ]
+  ],
+  "source": "wf_data_learning"
+ },
+ {
+  "file": "learning-path-topic",
+  "feature": "Learning path",
+  "name": "Topic",
+  "width": 760,
+  "height": 358,
+  "ucs": "Study a Lesson, Unlock Course Skill with Points",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Stage N \u00b7 Topic name",
+    "Heading with the number of lessons and the estimated minutes."
+   ],
+   [
+    2,
+    "Lesson, Status, Action",
+    "Lessons in order. A status says Completed, In progress, \"Review needed\", \"Optional review\", \"Reach the Practice part\", or \"Free trial\". A locked lesson shows \"Unlock\"."
+   ],
+   [
+    3,
+    "Unlock the skill to take the topic test.",
+    "Shown when the skill is not unlocked."
+   ],
+   [
+    4,
+    "Topic test",
+    "States: \"Passed\"; \"No test for this stage yet\"; \"Practise more before the test: <knowledge points>\"; \"The test is not open. Finish the lessons, more practice and the review if any.\""
+   ]
+  ],
+  "source": "wf_data_learning"
+ },
+ {
+  "file": "learning-path-lesson",
+  "feature": "Learning path",
+  "name": "Lesson",
+  "width": 760,
+  "height": 430,
+  "ucs": "Study a Lesson, Answer Lesson Exercises, Write Essay in a Lesson",
+  "note": "On the mobile app the lesson is studied in the Lesson Session screen.",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Home > Course > Topic > Lesson",
+    "Breadcrumb path."
+   ],
+   [
+    2,
+    "Content / Vocabulary / Exercises",
+    "The content of the lesson, its words and its exercises."
+   ],
+   [
+    3,
+    "Lesson content",
+    "Reading passages and exercises in blocks, lesson slides, \"Lesson Summary\" and documents."
+   ],
+   [
+    4,
+    "Required review",
+    "Shown when a review is waiting: \"You need to strengthen <knowledge point> before going on. The review has a short theory summary and a few questions.\" Button \"Take review\"."
+   ],
+   [
+    5,
+    "Do exercises",
+    "Starts the exercises. A lesson without exercises shows \"Press Complete lesson to record your progress\"."
+   ],
+   [
+    6,
+    "Practise this lesson",
+    "Opens the practice of the lesson once it is available."
+   ],
+   [
+    7,
+    "Study time recorder",
+    "Shows that study time is being recorded, or \"Could not record study time. You can still go on.\""
+   ]
+  ],
+  "source": "wf_data_learning"
+ },
+ {
+  "file": "learning-path-lesson-session",
+  "feature": "Learning path",
+  "name": "Lesson Session",
+  "width": 330,
+  "height": 420,
+  "ucs": "Study a Lesson, Answer Lesson Exercises",
+  "note": "",
+  "shell": "mobile",
+  "elements": [
+   [
+    1,
+    "1 > 2 > 3 > 4",
+    "Progress through the blocks of the lesson."
+   ],
+   [
+    2,
+    "Block",
+    "Text, video, slide or an exercise question. One block at a time."
+   ],
+   [
+    3,
+    "A, B, C, D",
+    "Answer choices of an exercise question."
+   ],
+   [
+    4,
+    "Check",
+    "Grades the answer. A wrong answer costs one heart and shows the hint."
+   ],
+   [
+    5,
+    "Next",
+    "Goes to the next block; the last one finishes the lesson."
+   ]
+  ],
+  "source": "wf_data_learning"
+ },
+ {
+  "file": "learning-path-no-hearts-window",
+  "feature": "Learning path",
+  "name": "No Hearts window",
+  "width": 760,
+  "height": 312,
+  "ucs": "Refill Hearts with Points",
+  "note": "",
+  "shell": "modal",
+  "elements": [
+   [
+    1,
+    "You have run out of hearts.",
+    "Title of the window. Explains that one heart comes back every 5 hours."
+   ],
+   [
+    2,
+    "Time until the next heart; price of a full refill (5 points)",
+    "Shows when the next heart comes back and what a refill costs."
+   ],
+   [
+    3,
+    "Refill hearts",
+    "Pays 5 points and fills the hearts (UC Refill Hearts with Points). Not enough points shows a message."
+   ],
+   [
+    4,
+    "Later",
+    "Closes the window."
+   ]
+  ],
+  "source": "wf_data_learning"
+ },
+ {
+  "file": "learning-path-practice-set",
+  "feature": "Learning path",
+  "name": "Practice Set",
+  "width": 760,
+  "height": 494,
+  "ucs": "Practise a Lesson",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Home > Course > Lesson > Practice",
+    "Breadcrumb path."
+   ],
+   [
+    2,
+    "Practice set",
+    "The set that goes with the lesson; \"Audio\" and \"Transcript\" when the set has listening."
+   ],
+   [
+    3,
+    "Exercises",
+    "Passage and questions. An essay question follows the Writing grading flow."
+   ],
+   [
+    4,
+    "Submit",
+    "Grades the set. A set cleared at 70% shows \"Passed\"."
+   ],
+   [
+    5,
+    "After submitting",
+    "Shows the score, the answers and explanations under each question, \"Level up! Hearts refilled\", \"+XP\", hearts lost, and \"Daily XP cap reached: the excess is not counted, tomorrow it counts again\". A set whose answers were shown before does not count."
+   ],
+   [
+    6,
+    "Start over",
+    "Starts the set again."
+   ]
+  ],
+  "source": "wf_data_learning"
+ },
+ {
+  "file": "learning-path-topic-test",
+  "feature": "Learning path",
+  "name": "Topic Test",
+  "width": 760,
+  "height": 410,
+  "ucs": "Take Topic Test, Take Course Final Test",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Topic test",
+    "Do the parts one by one; answers are saved at once. No time limit."
+   ],
+   [
+    2,
+    "Part 1 > Part 2 > Part 3",
+    "Parts of the test with the number of answered questions."
+   ],
+   [
+    3,
+    "Question area",
+    "Passage or audio with transcript, and the questions. A message shows \"Saving\u2026\", \"Saved\" or \"Could not save; will try again when you submit\"."
+   ],
+   [
+    4,
+    "Previous part / Next part",
+    "Moves between parts."
+   ],
+   [
+    5,
+    "Submit test",
+    "Sends the test (UC Take Topic Test) and opens the result."
+   ]
+  ],
+  "source": "wf_data_learning"
+ },
+ {
+  "file": "learning-path-topic-test-result",
+  "feature": "Learning path",
+  "name": "Topic Test Result",
+  "width": 760,
+  "height": 394,
+  "ucs": "View Topic Test Result",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Grading your test\u2026",
+    "Shown while the test is graded."
+   ],
+   [
+    2,
+    "Score, Passed or Completed, Time",
+    "Result of the test. The first attempt counts for the course process score."
+   ],
+   [
+    3,
+    "Question, Your answer, Result",
+    "Each question with the answer and the explanation."
+   ],
+   [
+    4,
+    "Next stage",
+    "Opens the next topic."
+   ],
+   [
+    5,
+    "Back to course",
+    "Returns to the course. \"View course list\" goes to the list."
+   ]
+  ],
+  "source": "wf_data_learning"
+ },
+ {
+  "file": "learning-path-review",
+  "feature": "Learning path",
+  "name": "Review",
+  "width": 760,
+  "height": 484,
+  "ucs": "Review a Weak Skill",
+  "note": "The mobile app has the same steps in a single column.",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Review \u00b7 Knowledge point",
+    "Heading of the review."
+   ],
+   [
+    2,
+    "Theory to remember",
+    "Short theory summary."
+   ],
+   [
+    3,
+    "Review questions",
+    "Opens after the theory is confirmed: \"Confirm that you read the theory to go to practice\". Audio and transcript for listening questions."
+   ],
+   [
+    4,
+    "Submit",
+    "Grades the review. Result: \"Passed\"; errors to fix; XP; hearts lost; \"Keep studying\" or \"Open review basket\"."
+   ],
+   [
+    5,
+    "Check earlier knowledge",
+    "After the second failed try: a short check of the knowledge this skill builds on. \"Do at least one to be able to skip.\""
+   ]
+  ],
+  "source": "wf_data_learning"
+ },
+ {
+  "file": "learning-path-prerequisite-check",
+  "feature": "Learning path",
+  "name": "Prerequisite Check",
+  "width": 760,
+  "height": 366,
+  "ucs": "Review a Weak Skill",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Check earlier knowledge",
+    "A short test of the knowledge point this skill builds on."
+   ],
+   [
+    2,
+    "Questions",
+    "Questions with audio and transcript for listening."
+   ],
+   [
+    3,
+    "Submit",
+    "Grades the check and shows the answers and explanations."
+   ],
+   [
+    4,
+    "Back to review",
+    "Returns to the review. If the check is closed: \"This check is no longer open. You can go back to the review to see the next step.\""
+   ]
+  ],
+  "source": "wf_data_learning"
+ },
+ {
+  "file": "learning-path-review-basket",
+  "feature": "Learning path",
+  "name": "Review Basket",
+  "width": 760,
+  "height": 330,
+  "ucs": "Use Review Basket",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Review basket",
+    "All skills that need review, in groups."
+   ],
+   [
+    2,
+    "Required, Needs priority, Should strengthen, Due for review",
+    "Groups. Empty messages: \"No required review. You are on track.\", \"Nothing else needs strengthening.\", \"Nothing is due.\""
+   ],
+   [
+    3,
+    "Knowledge point",
+    "Each card shows the knowledge point, why it is in the basket and a button \"Take review\"."
+   ],
+   [
+    4,
+    "Continue review",
+    "Opens the next review. \"No new question set yet\" appears when none is ready."
+   ],
+   [
+    5,
+    "Back to path",
+    "Returns to the learning path. An empty basket shows \"The review basket is empty\"."
+   ]
+  ],
+  "source": "wf_data_learning"
+ },
+ {
+  "file": "practice-tests-and-grading-practice-test-catalog",
+  "feature": "Practice tests and grading",
+  "name": "Practice Test Catalog",
+  "width": 760,
+  "height": 492,
+  "ucs": "Browse Practice Tests",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Listening / Reading / Writing / Speaking",
+    "Chooses the skill of the tests."
+   ],
+   [
+    2,
+    "Find a test by name",
+    "Free text."
+   ],
+   [
+    3,
+    "Not done, Done",
+    "Filter by status of the learner. A select limits the list to a question type."
+   ],
+   [
+    4,
+    "Practice test",
+    "One card for each test with its name and a Premium badge (\"Premium needed\") on tests that need a plan."
+   ],
+   [
+    5,
+    "Are you ready?",
+    "Opens when a test is chosen: information about the part and the choice of the look: \"Practice look\" with highlight and notes, or \"Real exam look\" like the IELTS computer test. A test already done offers \"View result\" or \"Redo\"."
+   ],
+   [
+    6,
+    "Previous / Next page",
+    "Moves between pages of tests."
+   ]
+  ],
+  "source": "wf_data_practice"
+ },
+ {
+  "file": "practice-tests-and-grading-reading-practice",
+  "feature": "Practice tests and grading",
+  "name": "Reading Practice",
+  "width": 760,
+  "height": 364,
+  "ucs": "Take Reading Practice",
+  "note": "",
+  "shell": "bare",
+  "elements": [
+   [
+    1,
+    "Timer, test name and the button Exit",
+    "Header of the test; \"Exit\" leaves the attempt."
+   ],
+   [
+    2,
+    "Reading passage",
+    "The text of the passage. The divider can be dragged to change the width of the two sides. Tools on a selected text: Highlight, Note, Look up word."
+   ],
+   [
+    3,
+    "Questions",
+    "The questions of the part, grouped; a bookmark marks a question to return to."
+   ],
+   [
+    4,
+    "1 > 2 > 3 > 4 > 5",
+    "Question navigation with answered and bookmarked questions."
+   ],
+   [
+    5,
+    "Next question",
+    "Moves to the next question."
+   ],
+   [
+    6,
+    "Submit",
+    "Asks \"Submit?\" with Continue and Submit. A timed test submits by itself at the end."
+   ]
+  ],
+  "source": "wf_data_practice"
+ },
+ {
+  "file": "practice-tests-and-grading-listening-practice",
+  "feature": "Practice tests and grading",
+  "name": "Listening Practice",
+  "width": 760,
+  "height": 382,
+  "ucs": "Take Listening Practice",
+  "note": "",
+  "shell": "bare",
+  "elements": [
+   [
+    1,
+    "Timer, test name and the button Exit",
+    "Header of the test."
+   ],
+   [
+    2,
+    "Audio",
+    "Audio player of the section. \"This section has no recording\" appears when none exists."
+   ],
+   [
+    3,
+    "Questions",
+    "Questions of the section."
+   ],
+   [
+    4,
+    "Previous / Next question",
+    "Moves between questions."
+   ],
+   [
+    5,
+    "Submit",
+    "Asks \"Submit?\" with Continue and Submit."
+   ]
+  ],
+  "source": "wf_data_practice"
+ },
+ {
+  "file": "practice-tests-and-grading-reading-listening-result",
+  "feature": "Practice tests and grading",
+  "name": "Reading / Listening Result",
+  "width": 760,
+  "height": 352,
+  "ucs": "Review Practice Attempt",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Home > Practice > Result",
+    "Breadcrumb path."
+   ],
+   [
+    2,
+    "Correct, Band, Time",
+    "Score of the attempt in practice or full-test mode."
+   ],
+   [
+    3,
+    "Question, Your answer, Correct answer",
+    "Each question with the result."
+   ],
+   [
+    4,
+    "Review answers",
+    "Opens Answer Review."
+   ]
+  ],
+  "source": "wf_data_practice"
+ },
+ {
+  "file": "practice-tests-and-grading-answer-review",
+  "feature": "Practice tests and grading",
+  "name": "Answer Review",
+  "width": 760,
+  "height": 260,
+  "ucs": "Review Practice Attempt",
+  "note": "",
+  "shell": "bare",
+  "elements": [
+   [
+    1,
+    "The attempt, rebuilt as it was taken",
+    "If it cannot be rebuilt: \"Could not rebuild the attempt.\""
+   ],
+   [
+    2,
+    "Passage or audio",
+    "Passage or transcript."
+   ],
+   [
+    3,
+    "Questions with the result",
+    "Each question shows the answer given, the correct answer and the explanation."
+   ]
+  ],
+  "source": "wf_data_practice"
+ },
+ {
+  "file": "practice-tests-and-grading-reading-history",
+  "feature": "Practice tests and grading",
+  "name": "Reading History",
+  "width": 760,
+  "height": 260,
+  "ucs": "View Reading History",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Reading history",
+    "The Reading tests the learner has submitted."
+   ],
+   [
+    2,
+    "Test, Date, Band",
+    "Submitted attempts. \"View result\" opens the result; \"Show more\" loads more. With none: \"You have not submitted a Reading test yet\" and the button \"Choose a Reading test\"."
+   ]
+  ],
+  "source": "wf_data_practice"
+ },
+ {
+  "file": "practice-tests-and-grading-writing-workspace",
+  "feature": "Practice tests and grading",
+  "name": "Writing Workspace",
+  "width": 760,
+  "height": 356,
+  "ucs": "Write Essay for Grading, Write Essay in a Lesson",
+  "note": "",
+  "shell": "bare",
+  "elements": [
+   [
+    1,
+    "Time left (real exam look) or time written (practice look) and Exit",
+    "Header. When time is up: \"Time is up. The essay is locked.\""
+   ],
+   [
+    2,
+    "Task",
+    "The question and any chart or picture. The divider can be dragged."
+   ],
+   [
+    3,
+    "Your essay",
+    "The writing box with a word count. The button \"Sample essay\" shows a model answer in practice mode."
+   ],
+   [
+    4,
+    "Previous part / Next part",
+    "Moves between Task 1 and Task 2."
+   ],
+   [
+    5,
+    "Finish",
+    "Submits the essay for AI grading (UC Write Essay for Grading). Messages: not enough points, daily limit, grading unavailable."
+   ]
+  ],
+  "source": "wf_data_practice"
+ },
+ {
+  "file": "practice-tests-and-grading-writing-result",
+  "feature": "Practice tests and grading",
+  "name": "Writing Result",
+  "width": 760,
+  "height": 556,
+  "ucs": "View Writing Result, Rewrite Essay",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Band, TR / TA, CC, LR, GRA",
+    "The band and the four criteria, graded by AI on a 0-9 scale by the IELTS band descriptors."
+   ],
+   [
+    2,
+    "Details by criterion",
+    "For each criterion: what was done well, what to improve, the evidence quoted from the essay and the description of the band."
+   ],
+   [
+    3,
+    "Your essay, marked",
+    "Errors are marked in the text; a click shows the explanation. \"View corrected essay\" shows the correction."
+   ],
+   [
+    4,
+    "Numbers measured automatically",
+    "Time, number of paragraphs, words per sentence, linking words used, most repeated words."
+   ],
+   [
+    5,
+    "Rewrite essay",
+    "Starts a revision (UC Rewrite Essay). Available for lesson essays, up to three times."
+   ],
+   [
+    6,
+    "View sample essay",
+    "Shows a model essay."
+   ],
+   [
+    7,
+    "Back to Writing catalog",
+    "Returns to the catalogue."
+   ]
+  ],
+  "source": "wf_data_practice"
+ },
+ {
+  "file": "practice-tests-and-grading-grading-job",
+  "feature": "Practice tests and grading",
+  "name": "Grading Job",
+  "width": 760,
+  "height": 260,
+  "ucs": "Track Grading Job",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Grading status",
+    "Shows where a review by an Examiner stands: waiting, claimed, graded, late."
+   ],
+   [
+    2,
+    "This grading job was not found in your list.",
+    "Shown for a job that does not belong to the Learner."
+   ],
+   [
+    3,
+    "View grading result",
+    "Opens the result once the Examiner has graded."
+   ],
+   [
+    4,
+    "Back to the list of essays graded by teachers",
+    "Opens Examiner Reviews."
+   ]
+  ],
+  "source": "wf_data_practice"
+ },
+ {
+  "file": "practice-tests-and-grading-examiner-reviews",
+  "feature": "Practice tests and grading",
+  "name": "Examiner Reviews",
+  "width": 760,
+  "height": 330,
+  "ucs": "Request Examiner Review of Essay, Track Grading Job",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Submission history",
+    "Page also used for the history of submissions, with the tab \"Essays graded by teachers\"."
+   ],
+   [
+    2,
+    "Listening, Reading, Writing, Speaking",
+    "Chooses the skill."
+   ],
+   [
+    3,
+    "In courses / 4-skill practice / By knowledge point / Graded by teachers",
+    "Kind of submission."
+   ],
+   [
+    4,
+    "Essay, Examiner, Status",
+    "Reviews the Learner asked for. With none: \"You have not submitted any <skill> yet\"."
+   ]
+  ],
+  "source": "wf_data_practice"
+ },
+ {
+  "file": "practice-tests-and-grading-speaking-workspace",
+  "feature": "Practice tests and grading",
+  "name": "Speaking Workspace",
+  "width": 760,
+  "height": 324,
+  "ucs": "Record Speaking Answers",
+  "note": "",
+  "shell": "bare",
+  "elements": [
+   [
+    1,
+    "Speaking, part and question number, and Exit",
+    "Header. When the time of a part ends: \"The time of this part is up. Your recording is kept, go to the next step.\""
+   ],
+   [
+    2,
+    "Question",
+    "The question of the part, shown or played."
+   ],
+   [
+    3,
+    "Recorder",
+    "Button to start and stop recording, a timer and a level meter. The recording can be played back before moving on."
+   ],
+   [
+    4,
+    "Next",
+    "Goes to the next question; \"This part has no question\" appears for an empty part."
+   ]
+  ],
+  "source": "wf_data_practice"
+ },
+ {
+  "file": "practice-tests-and-grading-speaking-review",
+  "feature": "Practice tests and grading",
+  "name": "Speaking Review",
+  "width": 760,
+  "height": 364,
+  "ucs": "Submit Speaking for Grading",
+  "note": "",
+  "shell": "bare",
+  "elements": [
+   [
+    1,
+    "Review your Speaking",
+    "Listen to each answer again. Record again any answer you are not happy with before submitting."
+   ],
+   [
+    2,
+    "Question, Recording, Action",
+    "One row for each question with a play button and a \"Record again\" button. \"Answered\" marks a done question."
+   ],
+   [
+    3,
+    "I agree to send my voice recording to the speech recognition service and the AI model for grading",
+    "Consent in the confirm window that opens before grading; the grade button stays closed until it is ticked (DR-29)."
+   ],
+   [
+    4,
+    "Submit for grading",
+    "Uploads and submits (UC Submit Speaking for Grading). Refusals: grading off, no consent, daily limit, not enough points, another submission waiting."
+   ],
+   [
+    5,
+    "Back",
+    "Returns to the questions."
+   ]
+  ],
+  "source": "wf_data_practice"
+ },
+ {
+  "file": "practice-tests-and-grading-speaking-result",
+  "feature": "Practice tests and grading",
+  "name": "Speaking Result",
+  "width": 760,
+  "height": 416,
+  "ucs": "View Speaking Result",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Band, Fluency, Vocabulary, Grammar, Pronunciation",
+    "The band and the four criteria on a 0-9 scale. \"Band capped\" shows when a rule lowered the band."
+   ],
+   [
+    2,
+    "What keeps you at this band",
+    "The weakest criterion, what to do next, the focus of improvement and a practice plan."
+   ],
+   [
+    3,
+    "Comments by part",
+    "Good points and points to improve for each part, with quotes from the answer; words to practise pronunciation."
+   ],
+   [
+    4,
+    "Transcript and measures from the voice",
+    "The transcript and measures taken from the voice; errors to fix with the rule and an exercise."
+   ],
+   [
+    5,
+    "The AI score is for reference only.",
+    "Footer note. States when a result is missing: \"Result not received\", \"The grading system has an error\", \"Submission stopped\"."
+   ],
+   [
+    6,
+    "Back to Speaking catalog",
+    "Returns to the catalogue."
+   ]
+  ],
+  "source": "wf_data_practice"
+ },
+ {
+  "file": "practice-tests-and-grading-submission-history",
+  "feature": "Practice tests and grading",
+  "name": "Submission History",
+  "width": 760,
+  "height": 330,
+  "ucs": "View Submission History",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Submission history",
+    "All the work the Learner has submitted."
+   ],
+   [
+    2,
+    "Listening, Reading, Writing, Speaking",
+    "Chooses the skill."
+   ],
+   [
+    3,
+    "In courses / 4-skill practice / By knowledge point / Graded by teachers",
+    "Kind of submission."
+   ],
+   [
+    4,
+    "Item, Date, Result",
+    "Rows open the result. With none: \"You have not submitted any <skill> yet. Tests you take in 4-skill practice will appear here.\""
+   ]
+  ],
+  "source": "wf_data_practice"
+ },
+ {
+  "file": "content-authoring-content-author-home",
+  "feature": "Content authoring",
+  "name": "Content Author Home",
+  "width": 760,
+  "height": 394,
+  "ucs": "Follow Work Items, Manage Courses",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Overview",
+    "Content that exists and the work for R&D."
+   ],
+   [
+    2,
+    "Content coverage",
+    "Coverage by skill and by CEFR level; depth of questions. Message when empty: \"Nothing to handle yet\"."
+   ],
+   [
+    3,
+    "To do for R&D",
+    "Questions with a wrong difficulty, knowledge points with only one question, and points with no skill or no question. \"View all\" opens the full list."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "content-authoring-courses",
+  "feature": "Content authoring",
+  "name": "Courses",
+  "width": 760,
+  "height": 506,
+  "ucs": "Manage Courses, Import Course",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Courses and topics",
+    "Manage courses by band, organise topics and open the lessons of each topic."
+   ],
+   [
+    2,
+    "Create course",
+    "Opens the form to create a course."
+   ],
+   [
+    3,
+    "Course, Band, Status",
+    "Courses with a \"Free\" badge, and the topics of each. \"Add topic\" creates a topic; Edit course opens the form. With none: \"No course yet\"."
+   ],
+   [
+    4,
+    "Course form",
+    "Code, name, band, cover picture, banner, description, status (in use), \"Free course for everyone\" (no unlock price), skill unlock price in points."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "content-authoring-question-bank",
+  "feature": "Content authoring",
+  "name": "Question Bank",
+  "width": 760,
+  "height": 330,
+  "ucs": "Manage Questions",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Question bank",
+    "Questions shared by lessons, practice and tests."
+   ],
+   [
+    2,
+    "New question",
+    "Creates a question."
+   ],
+   [
+    3,
+    "Type, Skill, Purpose, FREE / PREMIUM, Status",
+    "Filters, with search by code."
+   ],
+   [
+    4,
+    "No., Code, Type, Updated, Actions",
+    "Questions. \"View detail\" opens Question Detail. Deleting asks \"Delete the question?\"; it is archived, not erased."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "content-authoring-question-detail",
+  "feature": "Content authoring",
+  "name": "Question Detail",
+  "width": 760,
+  "height": 506,
+  "ucs": "Manage Questions",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Question bank",
+    "Returns to the list."
+   ],
+   [
+    2,
+    "Question code",
+    "Versions of the question. \"Add version\" saves a new draft; \"Version N saved as draft\"."
+   ],
+   [
+    3,
+    "Version, Status, Actions",
+    "Versions with Publish and Archive. A published version is not edited (DR-13)."
+   ],
+   [
+    4,
+    "Version form",
+    "Question text, options, answer, explanation and hint; a picture can be chosen, replaced or removed (the original stays in storage)."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "content-authoring-test-packages",
+  "feature": "Content authoring",
+  "name": "Test Packages",
+  "width": 760,
+  "height": 330,
+  "ucs": "Manage Test Packages",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Tests and question packages",
+    "Create packages, write their versions and publish when ready."
+   ],
+   [
+    2,
+    "New package",
+    "Creates a package."
+   ],
+   [
+    3,
+    "Type, Status, Course, Topic, Lesson",
+    "Filters; search by code or title. Practice tests live in the Practice library, placement tests in the placement test store."
+   ],
+   [
+    4,
+    "No., Code and title, Type, Access, Status",
+    "Packages. With none: \"No package matches. Change the filter or create a package.\""
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "content-authoring-package-editor",
+  "feature": "Content authoring",
+  "name": "Package Editor",
+  "width": 760,
+  "height": 394,
+  "ucs": "Manage Test Packages",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Edit the package",
+    "A package without a version asks to create a draft. A published version is read-only: \"Choose or create a draft to edit\"."
+   ],
+   [
+    2,
+    "Package version",
+    "Chooses the version to view or edit."
+   ],
+   [
+    3,
+    "Section, Skill, Time (min)",
+    "Sections of the version. \"Add section\" opens the form: section title, part number (unique), time in minutes (more than 0), skill, instructions."
+   ],
+   [
+    4,
+    "Preview package",
+    "Shows the package as a Learner sees it."
+   ],
+   [
+    5,
+    "Publish",
+    "Runs the checks and publishes the version, or schedules it (UC Manage Test Packages)."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "content-authoring-placement-tests",
+  "feature": "Content authoring",
+  "name": "Placement Tests",
+  "width": 760,
+  "height": 330,
+  "ucs": "Manage Placement Tests",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Placement test store",
+    "The packages used for the placement test, by level."
+   ],
+   [
+    2,
+    "Level 3.0, Level 5.0, Level 9.0",
+    "Level of the test; every placement package must have a level before it is published."
+   ],
+   [
+    3,
+    "Code and title, Level, Status",
+    "Placement packages. Created and published like other packages."
+   ],
+   [
+    4,
+    "New placement test",
+    "Creates a placement package."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "content-authoring-practice-library",
+  "feature": "Content authoring",
+  "name": "Practice Library",
+  "width": 760,
+  "height": 370,
+  "ucs": "Manage Practice Library",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Practice library",
+    "Four-skill practice tests. Premium tests can only be taken by Learners with Premium."
+   ],
+   [
+    2,
+    "Listening / Reading / Writing / Speaking",
+    "Skill of the tests."
+   ],
+   [
+    3,
+    "All, Free, Premium",
+    "Access filter; search by code or title."
+   ],
+   [
+    4,
+    "Code, Title, Access, Status",
+    "Practice tests. \"Hide from the library?\" asks to confirm. \"Edit info\" changes the test."
+   ],
+   [
+    5,
+    "Create practice test",
+    "Opens the form with package title and code, and the course, topic and lesson it belongs to."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "content-authoring-vocabulary-content",
+  "feature": "Content authoring",
+  "name": "Vocabulary Content",
+  "width": 760,
+  "height": 350,
+  "ucs": "Manage Vocabulary Content",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Manage academic vocabulary",
+    "Words, topics and sets."
+   ],
+   [
+    2,
+    "Words and senses / Topics / Vocabulary sets",
+    "Three lists."
+   ],
+   [
+    3,
+    "Find a word",
+    "Example: abandon, policy."
+   ],
+   [
+    4,
+    "Word, Part of speech, Actions",
+    "Words with their senses. Topics have a name, a cover picture and edit and delete; sets can be ordered and edited."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "content-authoring-grading-rubrics",
+  "feature": "Content authoring",
+  "name": "Grading Rubrics",
+  "width": 760,
+  "height": 480,
+  "ucs": "Manage Grading Rubrics",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Grading rubrics",
+    "The criteria the AI uses to grade Writing and Speaking."
+   ],
+   [
+    2,
+    "Task",
+    "Chooses the skill and task."
+   ],
+   [
+    3,
+    "In use",
+    "The active rubric of the task; \"Create a draft from the one in use\" copies it. When none: \"No rubric in use for this task yet.\""
+   ],
+   [
+    4,
+    "Drafts",
+    "Drafts with \"Edit draft\". The editor has the source, the system prompt (up to 4,000 characters), the criteria and the band descriptions. \"Rubric activated.\" confirms an activation."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "content-authoring-error-types",
+  "feature": "Content authoring",
+  "name": "Error Types",
+  "width": 760,
+  "height": 330,
+  "ucs": "Manage Error Types",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Error codes",
+    "Common mistakes, related knowledge and fix suggestions used to grade and diagnose."
+   ],
+   [
+    2,
+    "Create error code",
+    "Opens the form."
+   ],
+   [
+    3,
+    "All groups, Not approved, Approved",
+    "Filters; search by code or name."
+   ],
+   [
+    4,
+    "Code, Group, Severity, Approval",
+    "The catalogue. Each row has Edit, Details and Approve. The form holds the group, severity, related knowledge points (optional), a fix suggestion and the status."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "content-authoring-knowledge-graph",
+  "feature": "Content authoring",
+  "name": "Knowledge Graph",
+  "width": 760,
+  "height": 288,
+  "ucs": "Manage Knowledge Graph",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Knowledge tree",
+    "Each cell is a knowledge point. A point below must be learned before the point right above it."
+   ],
+   [
+    2,
+    "Skill, Course, Show inactive, Only with warnings",
+    "Filters. \"Reload\" refreshes."
+   ],
+   [
+    3,
+    "Graph check",
+    "Lists points that are not connected. \"The graph is fine: no isolated point, missing data or reverse link.\" when clean."
+   ],
+   [
+    4,
+    "Create knowledge point",
+    "Opens the form. \"Stop using the point?\" hides it from Learners and from lesson writing; it can be switched on again."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "content-authoring-code-settings",
+  "feature": "Content authoring",
+  "name": "Code Settings",
+  "width": 760,
+  "height": 314,
+  "ucs": "Manage Code Settings",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "General settings",
+    "The structure of the generated codes."
+   ],
+   [
+    2,
+    "Code structure",
+    "Settings tab."
+   ],
+   [
+    3,
+    "Starting number",
+    "Minimum number of digits."
+   ],
+   [
+    4,
+    "Auto-generated code set / Allow editing the code",
+    "Switches for the code set."
+   ],
+   [
+    5,
+    "Save",
+    "Saves; \"Code settings saved.\""
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "content-authoring-course-import",
+  "feature": "Content authoring",
+  "name": "Course Import",
+  "width": 760,
+  "height": 494,
+  "ucs": "Import Course",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Import a course from Excel",
+    "File .xlsx up to 5 MB. Data starts on row 3."
+   ],
+   [
+    2,
+    "Excel file",
+    "Required."
+   ],
+   [
+    3,
+    "Check",
+    "Saves the file as a draft and shows the errors in the draft. \"The file could not be read, so no draft was saved.\" when invalid."
+   ],
+   [
+    4,
+    "Look-up",
+    "Active knowledge point codes and approved error codes of the catalogue."
+   ],
+   [
+    5,
+    "File, Course, Status",
+    "Your drafts, with Update and Delete (\"Delete the draft?\"). With none: \"No draft yet. Choose a file and press Check.\""
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "content-authoring-import-draft",
+  "feature": "Content authoring",
+  "name": "Import Draft",
+  "width": 760,
+  "height": 384,
+  "ucs": "Import Course",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "\u2190 Back to the list of drafts",
+    "Returns."
+   ],
+   [
+    2,
+    "Course import draft",
+    "See the course that will be created from the file, fix mistakes, then save. Import only when no error is left."
+   ],
+   [
+    3,
+    "Topics, Lessons, Questions, Lesson packages",
+    "What will be created."
+   ],
+   [
+    4,
+    "Errors and warnings",
+    "Each problem with its place in the file."
+   ],
+   [
+    5,
+    "Import",
+    "Creates the course, not yet active. A list says what is left: activate the course and topics, publish lessons, questions and packages after review, add vocabulary, pictures, audio and documents, add description, cover, banner and unlock points, choose test sources."
+   ],
+   [
+    6,
+    "Save draft / Delete draft",
+    "Saves the edits or deletes the draft."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "content-authoring-ai-drafts",
+  "feature": "Content authoring",
+  "name": "AI Drafts",
+  "width": 760,
+  "height": 352,
+  "ucs": "Generate AI Draft, Review AI Draft",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Review AI questions",
+    "The drafts that the AI model made for the Content Author."
+   ],
+   [
+    2,
+    "Draft status",
+    "Waiting for review, all statuses and more."
+   ],
+   [
+    3,
+    "Draft, Kind, Status",
+    "Drafts. The list reloads every 5 seconds while a request waits or is being generated. With none: \"No suitable draft.\""
+   ],
+   [
+    4,
+    "Load more",
+    "Loads more drafts."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "content-authoring-ai-draft-detail",
+  "feature": "Content authoring",
+  "name": "AI Draft Detail",
+  "width": 760,
+  "height": 318,
+  "ucs": "Review AI Draft",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "List of drafts",
+    "Returns."
+   ],
+   [
+    2,
+    "Question draft",
+    "Status, question type and number of questions asked. The page reloads every 5 seconds while the request is being processed."
+   ],
+   [
+    3,
+    "Generated questions",
+    "Each question can be put into a new exercise block, and shows where it is used. \"No usable question\" appears when none exists; \"Dropped questions\" lists the ones the system refused."
+   ],
+   [
+    4,
+    "Open the lesson / Open the question bank",
+    "Goes to the places that use the draft."
+   ],
+   [
+    5,
+    "Reject draft",
+    "Rejects with an optional note (up to the allowed length)."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "content-authoring-ai-evaluation",
+  "feature": "Content authoring",
+  "name": "AI Evaluation",
+  "width": 760,
+  "height": 414,
+  "ucs": "Evaluate AI Grading",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Evaluate AI Writing grading",
+    "Compare with essays graded by Examiners before a grading version is switched on for Learners."
+   ],
+   [
+    2,
+    "Version in use",
+    "Which grading version is live."
+   ],
+   [
+    3,
+    "Task to evaluate",
+    "Task 1 or Task 2; the list can be filtered by task."
+   ],
+   [
+    4,
+    "Run evaluation",
+    "Compares the AI with the reference set."
+   ],
+   [
+    5,
+    "Task, Examiner band, Source, Added",
+    "The reference set (\"Add a reference essay\", \"Import from essays graded by both AI and Examiner\") and the runs (status, number of essays, share within 0.5 band)."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "content-authoring-evaluation-run",
+  "feature": "Content authoring",
+  "name": "Evaluation Run",
+  "width": 760,
+  "height": 422,
+  "ucs": "Evaluate AI Grading",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "List of evaluations",
+    "Returns."
+   ],
+   [
+    2,
+    "Evaluation run detail",
+    "Result against the thresholds."
+   ],
+   [
+    3,
+    "Criterion, Essays, Within 0.5 band, Mean gap, QWK",
+    "Gap by criterion. \"No criterion data yet\" when empty."
+   ],
+   [
+    4,
+    "Reference essay, Examiner band, AI band, Difference",
+    "Essay-by-essay comparison."
+   ],
+   [
+    5,
+    "Activate this version",
+    "Asks \"Confirm activation\"; \"Grading version activated.\" The button \"Deactivate\" reverses it. If the gap is large, look at the criteria and edit the band descriptions in the rubric, then run again."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "content-authoring-work-queue",
+  "feature": "Content authoring",
+  "name": "Work Queue",
+  "width": 760,
+  "height": 312,
+  "ucs": "Follow Work Items",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Finish the work",
+    "Work the system finds by itself in the Learners' data."
+   ],
+   [
+    2,
+    "Kind, Status: open and in progress / done / all",
+    "Filters."
+   ],
+   [
+    3,
+    "No., Work, Subject, Figures, Created, Action",
+    "The work items. \"Mark done\" opens a form with what was done, the result and a note."
+   ],
+   [
+    4,
+    "No suitable work item.",
+    "Empty message."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "content-authoring-examiner-grade-check",
+  "feature": "Content authoring",
+  "name": "Examiner Grade Check",
+  "width": 760,
+  "height": 414,
+  "ucs": "Check Examiner Grades",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Examiner check",
+    "Blind regrading of some Writing essays already graded by an Examiner, to see who deviates."
+   ],
+   [
+    2,
+    "Choose list",
+    "Essays to regrade, or the summary by Examiner."
+   ],
+   [
+    3,
+    "No., Task, Source, Waiting, Over 48 h",
+    "Essays waiting. \"Take\" claims one; \"Continue grading\" resumes."
+   ],
+   [
+    4,
+    "Examiner, Essays regraded, Mean gap (band), More than 1 band",
+    "Summary by Examiner."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "content-authoring-review-essay",
+  "feature": "Content authoring",
+  "name": "Review Essay",
+  "width": 760,
+  "height": 404,
+  "ucs": "Check Examiner Grades",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Back to the list",
+    "Returns."
+   ],
+   [
+    2,
+    "Regrade a Writing essay",
+    "Blind: the grade of the Examiner is not shown."
+   ],
+   [
+    3,
+    "Task and essay",
+    "The question and the essay of the Learner."
+   ],
+   [
+    4,
+    "Rubric and grade",
+    "Reference rubric, the total band and a note (up to 4,000 characters)."
+   ],
+   [
+    5,
+    "Save grade",
+    "Saves the regrade."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "grading-by-examiners-examiner-dashboard",
+  "feature": "Grading by examiners",
+  "name": "Examiner Dashboard",
+  "width": 760,
+  "height": 396,
+  "ucs": "View Grading Queue",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Grading overview",
+    "Work to do now and figures."
+   ],
+   [
+    2,
+    "Do now",
+    "The nearest jobs. \"No essay waits for you to grade\" when empty: when a Learner chooses you, the essay appears here. \"Nothing urgent. The next essay you can grade:\" shows the next one."
+   ],
+   [
+    3,
+    "Waiting, Grading, Due in 36 h, Late 48 h",
+    "Figures by status, plus \"Taken today\" and \"Graded\"."
+   ],
+   [
+    4,
+    "You have taken all the essays you can today. Learners can choose you again from tomorrow.",
+    "Shown when the daily limit is reached."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "grading-by-examiners-writing-queue",
+  "feature": "Grading by examiners",
+  "name": "Writing Queue",
+  "width": 760,
+  "height": 386,
+  "ucs": "View Grading Queue, Grade Writing Submission",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Grading queue",
+    "Queue numbers at the top; a message \"Could not load the figures\" on error."
+   ],
+   [
+    2,
+    "Waiting / Graded",
+    "Choose the list. A finished essay moves to \"Graded\" and can be seen again at any time."
+   ],
+   [
+    3,
+    "Search by essay code",
+    "Free text."
+   ],
+   [
+    4,
+    "Source: all, Due: nearest, Due: furthest",
+    "Filters and sort."
+   ],
+   [
+    5,
+    "Essay, Band graded, Graded at, Status, Action",
+    "Jobs with pages. A job that cannot be graded here is shown as not supported."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "grading-by-examiners-writing-grading",
+  "feature": "Grading by examiners",
+  "name": "Writing Grading",
+  "width": 760,
+  "height": 480,
+  "ucs": "Grade Writing Submission",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "List of essays",
+    "Returns."
+   ],
+   [
+    2,
+    "Grade a Writing essay",
+    "The Learner's essay is read-only. Select the part with an error and fill in the form below."
+   ],
+   [
+    3,
+    "Learner's essay and task",
+    "The essay with the marked errors; \"No error recorded yet.\" Delete removes a mark."
+   ],
+   [
+    4,
+    "Grade",
+    "For each of the four criteria: a band and a comment (good points, points to fix, examples). Then the general comment: strengths, what to fix first, how to practise."
+   ],
+   [
+    5,
+    "Total band: calculated as the mean of the four criteria, rounded to 0.5. It cannot be typed.",
+    "Rule for the total."
+   ],
+   [
+    6,
+    "Complete grading",
+    "Opens the check: all four criteria graded, each with a comment, a general comment. After completing, the Learner gets the result and the Examiner cannot edit it."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "grading-by-examiners-graded-review",
+  "feature": "Grading by examiners",
+  "name": "Graded Review",
+  "width": 760,
+  "height": 312,
+  "ucs": "Review Graded Essay",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Back to the graded list",
+    "Returns."
+   ],
+   [
+    2,
+    "Graded essay",
+    "What the Examiner graded."
+   ],
+   [
+    3,
+    "Essay of the Learner",
+    "The essay and the task, with a button to enlarge a chart."
+   ],
+   [
+    4,
+    "Your grade",
+    "Total band, general comment and the errors recorded."
+   ],
+   [
+    5,
+    "Two columns, Wider essay, Balanced, Wider grading",
+    "Layout of the page; the divider can be dragged."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "grading-by-examiners-speaking-grading",
+  "feature": "Grading by examiners",
+  "name": "Speaking Grading",
+  "width": 760,
+  "height": 384,
+  "ucs": "Grade Speaking Submission",
+  "note": "The page shows \"Speaking grading is not open yet\" when the feature is not on.",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Grade Speaking",
+    "Listen to the answers of the Learner and grade by four criteria."
+   ],
+   [
+    2,
+    "Recordings",
+    "A player for each answer, with the transcript and scores where they exist."
+   ],
+   [
+    3,
+    "Grade",
+    "A band and a comment for each of the four criteria."
+   ],
+   [
+    4,
+    "Complete grading",
+    "Submits the grade (UC Grade Speaking Submission)."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "grading-by-examiners-examiner-profile",
+  "feature": "Grading by examiners",
+  "name": "Examiner Profile",
+  "width": 760,
+  "height": 402,
+  "ucs": "Manage Examiner Profile",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Back to overview",
+    "Returns."
+   ],
+   [
+    2,
+    "Examiner profile",
+    "Learners read this profile when they choose who grades their essay: name, IELTS band and certificates."
+   ],
+   [
+    3,
+    "IELTS band",
+    "Shows \"Not updated\" until set."
+   ],
+   [
+    4,
+    "Taking new essays",
+    "When off, Learners cannot choose this Examiner."
+   ],
+   [
+    5,
+    "Certificate, Issued by, Score, Year",
+    "Certificates; \"Add certificate\" adds a row. With none: \"No certificate yet.\""
+   ],
+   [
+    6,
+    "Save",
+    "\"Profile saved. Learners see the new information when they choose a grader.\""
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "administration-administrator-home",
+  "feature": "Administration",
+  "name": "Administrator Home",
+  "width": 760,
+  "height": 260,
+  "ucs": "View System Overview",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "System overview",
+    "State of the services, accounts and activity."
+   ],
+   [
+    2,
+    "Services, Users, Last activity",
+    "Number of services running (\"No service is failing\") with the link \"View services\"; accounts and how many are locked with \"Manage users\"; DAU, WAU and MAU with \"View activity\"."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "administration-users",
+  "feature": "Administration",
+  "name": "Users",
+  "width": 760,
+  "height": 330,
+  "ucs": "Manage Users, Reset User Password",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Users",
+    "Create staff accounts and manage roles and status."
+   ],
+   [
+    2,
+    "New staff account",
+    "Opens the form: e-mail, full name, phone (optional), temporary password (6-72 characters in the form; the server needs at least 8) and roles."
+   ],
+   [
+    3,
+    "All roles, All statuses",
+    "Filters; search by name or e-mail. With none: \"No user found. Try another keyword or filter.\""
+   ],
+   [
+    4,
+    "User, Roles, Status, Actions",
+    "Users. A menu per row opens the User actions window."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "administration-user-actions-window",
+  "feature": "Administration",
+  "name": "User actions window",
+  "width": 760,
+  "height": 454,
+  "ucs": "Manage Users, Reset User Password",
+  "note": "",
+  "shell": "modal",
+  "elements": [
+   [
+    1,
+    "Full name / Phone number",
+    "Edit and \"Save information\"."
+   ],
+   [
+    2,
+    "Roles",
+    "Assign roles; \"Save roles\". An Administrator account cannot also be Content Author or Examiner."
+   ],
+   [
+    3,
+    "Status",
+    "Active, Inactive or Locked; \"Save status\"."
+   ],
+   [
+    4,
+    "New password",
+    "Sets a new password for the user (UC Reset User Password)."
+   ],
+   [
+    5,
+    "Delete account",
+    "Deactivates the account after confirmation. Rules protect the last Administrator."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "administration-login-history-window",
+  "feature": "Administration",
+  "name": "Login History window",
+  "width": 760,
+  "height": 360,
+  "ucs": "View Login History",
+  "note": "",
+  "shell": "modal",
+  "elements": [
+   [
+    1,
+    "Login history of the user",
+    "The latest sign-in attempts."
+   ],
+   [
+    2,
+    "Time, Result, Reason, Device",
+    "Each attempt, success or failure, with the reason and the device and address."
+   ],
+   [
+    3,
+    "Close",
+    "Closes the window."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "administration-system-overview",
+  "feature": "Administration",
+  "name": "System Overview",
+  "width": 760,
+  "height": 260,
+  "ucs": "View System Overview",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "System overview",
+    "Health of the services, accounts and activity of the platform."
+   ],
+   [
+    2,
+    "Services running, Accounts, DAU, WAU, MAU",
+    "Figures with links to the detail pages."
+   ],
+   [
+    3,
+    "No activity data yet.",
+    "Empty message."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "administration-service-status",
+  "feature": "Administration",
+  "name": "Service Status",
+  "width": 760,
+  "height": 294,
+  "ucs": "View Service Status",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Services",
+    "Checking the services\u2026"
+   ],
+   [
+    2,
+    "Check again",
+    "Reloads the status."
+   ],
+   [
+    3,
+    "No., Service, Status, Instance, Fastest reply, Instance address",
+    "Status of every service and its instances. \"No instance\" and \"Could not load the status of the services.\" appear on problems."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "administration-activity-log",
+  "feature": "Administration",
+  "name": "Activity Log",
+  "width": 760,
+  "height": 446,
+  "ucs": "View Activity Log",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Activity",
+    "Days are counted in UTC; activity means answering a question, not signing in."
+   ],
+   [
+    2,
+    "From date",
+    "Start of the range."
+   ],
+   [
+    3,
+    "DAU chart",
+    "Bar chart of active learners by day."
+   ],
+   [
+    4,
+    "Week start, Cohort size, Week 1, Week 2, Week 4, Week 8",
+    "Retention by weekly cohort."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "key-sales-key-overview",
+  "feature": "Key sales",
+  "name": "Key Overview",
+  "width": 760,
+  "height": 488,
+  "ucs": "View Key Overview",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Key stock overview",
+    "Keys created, handed out and activated."
+   ],
+   [
+    2,
+    "+ New key batch",
+    "Opens Create Batch. \"View all batches \u2192\" opens Key Batches."
+   ],
+   [
+    3,
+    "Period",
+    "Time range of the chart. \"Legend\" and \"View as table\" switch the display."
+   ],
+   [
+    4,
+    "Keys by batch / by Sales Staff",
+    "Bar chart with a tab for each view. With none in the range: \"No batch in this period.\""
+   ],
+   [
+    5,
+    "Batch code, Product, Keys, Progress, Expires, Action",
+    "\"View batch\" opens Batch Detail."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "key-sales-key-batches",
+  "feature": "Key sales",
+  "name": "Key Batches",
+  "width": 760,
+  "height": 352,
+  "ucs": "View Key Batches",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Key batches",
+    "A batch holds keys of one product with one expiry, made in one go."
+   ],
+   [
+    2,
+    "+ New key batch",
+    "Opens Create Batch."
+   ],
+   [
+    3,
+    "Product",
+    "Filter by product. With no product: \"No key product yet.\""
+   ],
+   [
+    4,
+    "Batch code, Keys, Progress, Expires, Action",
+    "Batches with a legend of the states and paging (\"Previous\", \"Next\")."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "key-sales-create-batch",
+  "feature": "Key sales",
+  "name": "Create Batch",
+  "width": 760,
+  "height": 452,
+  "ucs": "Create Key Batch",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Create a new key batch",
+    "Breadcrumb \"Key batches > Create new batch\"."
+   ],
+   [
+    2,
+    "Choose key product",
+    "Required; shows what each key gives."
+   ],
+   [
+    3,
+    "Number of keys",
+    "From 1 to 1,000."
+   ],
+   [
+    4,
+    "Expiry date of the keys",
+    "Not in the past. A switch \"No expiry limit\" leaves it empty."
+   ],
+   [
+    5,
+    "Batch summary",
+    "Product, what each key gives, number, expiry, allocation (not allocated), batch code (given by the system when created)."
+   ],
+   [
+    6,
+    "I checked the product, the number and the expiry",
+    "Must be ticked."
+   ],
+   [
+    7,
+    "Create batch",
+    "Creates the batch (UC Create Key Batch). \"Could not create the batch. Please try again.\" on failure. \"Back to edit\" returns."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "key-sales-batch-created",
+  "feature": "Key sales",
+  "name": "Batch Created",
+  "width": 760,
+  "height": 318,
+  "ucs": "Create Key Batch",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Result of creating the batch",
+    "The keys are in stock. Allocate them to Sales Staff so they can hand them out."
+   ],
+   [
+    2,
+    "Key, Product, Status, Expires",
+    "The first keys of the batch."
+   ],
+   [
+    3,
+    "Keys not yet allocated stay in the manager's shared stock.",
+    "Shows how many are not allocated."
+   ],
+   [
+    4,
+    "Allocate to Sales Staff",
+    "Opens the batch to allocate (UC Allocate Keys to Sales Staff)."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "key-sales-batch-detail",
+  "feature": "Key sales",
+  "name": "Batch Detail",
+  "width": 760,
+  "height": 378,
+  "ucs": "Allocate Keys to Sales Staff, View Key Batches",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Batch status",
+    "Number of keys by state; filter by state."
+   ],
+   [
+    2,
+    "Allocate to Sales Staff",
+    "Gives keys to Sales Staff (UC Allocate Keys to Sales Staff)."
+   ],
+   [
+    3,
+    "Export CSV",
+    "Downloads the list; \"Could not export the file. Please try again.\""
+   ],
+   [
+    4,
+    "Revoke unused keys\u2026",
+    "Revokes the keys not yet used, with a note."
+   ],
+   [
+    5,
+    "Key, Status, Sales Staff, Issued at, Activated at, Action",
+    "Keys with a tick box. Per key: View, Reassign, Take back to stock, Revoke\u2026. With none: \"No key matches the filter.\""
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "key-sales-issue-key-directly",
+  "feature": "Key sales",
+  "name": "Issue Key Directly",
+  "width": 760,
+  "height": 260,
+  "ucs": "Issue Key Directly",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Issue a key directly",
+    "The Sales Manager hands out a key without going through Sales Staff."
+   ],
+   [
+    2,
+    "Product",
+    "Choose the key product."
+   ],
+   [
+    3,
+    "Issue a key",
+    "Takes the next key and shows the code. \"Key issued\" then \"Done\". \"Could not issue the key. Please try again.\" on failure."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "key-sales-issue-key",
+  "feature": "Key sales",
+  "name": "Issue Key",
+  "width": 760,
+  "height": 362,
+  "ucs": "Issue Key to Learner, View Own Key Stock",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Issue a key",
+    "Only the keys the manager allocated to you are shown. Choose a plan to take one key, then copy it and send it to the Learner."
+   ],
+   [
+    2,
+    "My keys by batch",
+    "A chart and a table \"View as table\" of the keys held, with the number not yet issued. With none: \"No batch in this period.\""
+   ],
+   [
+    3,
+    "Product",
+    "Each product shows how many keys are left; the button takes the next key. \"Key issued\" shows the code with a Copy button and \"Done\". \"Could not issue the key. Please try again.\" on failure."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "key-sales-issued-keys",
+  "feature": "Key sales",
+  "name": "Issued Keys",
+  "width": 760,
+  "height": 310,
+  "ucs": "View Issued Keys",
+  "note": "",
+  "shell": "staff",
+  "elements": [
+   [
+    1,
+    "Issued keys",
+    "The keys you handed out, by plan. See which are activated and which still wait."
+   ],
+   [
+    2,
+    "Product",
+    "Plan to show."
+   ],
+   [
+    3,
+    "Key, Status, Product, Issued on, Action",
+    "\"View details\" opens the key detail with the full code; each time the full code is seen it is written to the log. \"No key issued for this plan yet.\" when empty; paging with Previous and Next."
+   ]
+  ],
+  "source": "wf_data_staff"
+ },
+ {
+  "file": "vocabulary-and-flashcards-vocabulary",
+  "feature": "Vocabulary and flashcards",
+  "name": "Vocabulary",
+  "width": 760,
+  "height": 518,
+  "ucs": "Browse Vocabulary, Save Word to Notebook",
+  "note": "On mobile the Home tab lists vocabulary topics, and a topic opens a learning path of lessons (screen Vocabulary topic).",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "IELTSPath dictionary: vocabulary by topic",
+    "Heading. Link \"My notebook\" (or \"Sign in to save words\" for a Guest)."
+   ],
+   [
+    2,
+    "Look up a word",
+    "English to Vietnamese or Vietnamese to English; a switch changes the direction. Typing with Vietnamese accents searches by Vietnamese meaning."
+   ],
+   [
+    3,
+    "English \u2192 Vietnamese, Vietnamese \u2192 English, Recent, Try: environment",
+    "Direction, recent searches and example searches."
+   ],
+   [
+    4,
+    "Result",
+    "Words that match, each with a button to save it to the notebook. Message after saving: \"Word saved to the notebook!\". Errors: \"Cannot load results. Please try again.\""
+   ],
+   [
+    5,
+    "Vocabulary sets",
+    "Sets of words by topic and band, for example \"Environment - Band 6.5\". A word tray shows the words that will be added to flashcards."
+   ],
+   [
+    6,
+    "Sign in to unlock personal progress",
+    "Shown to a Guest: CEFR level, weekly goal and the six-level vocabulary map. Button \"Sign in now\"."
+   ]
+  ],
+  "source": "wf_data_vocab"
+ },
+ {
+  "file": "vocabulary-and-flashcards-word-detail",
+  "feature": "Vocabulary and flashcards",
+  "name": "Word Detail",
+  "width": 760,
+  "height": 572,
+  "ucs": "View Word Detail, Save Word to Notebook",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Home > Dictionary > Word",
+    "Breadcrumb. A word that does not exist shows \"The word may have been deleted or the link is wrong\" and a button \"Back to dictionary\"."
+   ],
+   [
+    2,
+    "Word, part of speech, pronunciation",
+    "Buttons play the British and the American pronunciation."
+   ],
+   [
+    3,
+    "Definitions and meanings",
+    "Definitions; collocations; synonyms and antonyms; common mistakes and how to avoid them; example sentences. Each block shows an empty message when there is no data."
+   ],
+   [
+    4,
+    "Quick facts",
+    "Frequency (COCA), CEFR level, Academic Word List, topic."
+   ],
+   [
+    5,
+    "Level of understanding",
+    "How well the Learner knows the word."
+   ],
+   [
+    6,
+    "My notes",
+    "Memory tip or personal example."
+   ],
+   [
+    7,
+    "Save and learn this word",
+    "Saves it in the notebook (UC Save Word to Notebook). A Guest sees \"Sign in to learn\". \"Open the vocabulary notebook\" appears after saving."
+   ]
+  ],
+  "source": "wf_data_vocab"
+ },
+ {
+  "file": "vocabulary-and-flashcards-vocabulary-set",
+  "feature": "Vocabulary and flashcards",
+  "name": "Vocabulary Set",
+  "width": 760,
+  "height": 440,
+  "ucs": "Study Vocabulary Set",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "\u2190 Back to the dictionary",
+    "Returns to the dictionary."
+   ],
+   [
+    2,
+    "Set name",
+    "With the button \"Continue the learning path\" or \"Start learning now\"."
+   ],
+   [
+    3,
+    "Mastered, Learning, Needs review",
+    "Progress in the set. A Guest sees \"Sign in now\"."
+   ],
+   [
+    4,
+    "Overview / Topics / Progress",
+    "Sections of the set."
+   ],
+   [
+    5,
+    "Topic",
+    "Main topics of the set, featured words, \"View words \u2192\" and \"Save all\"."
+   ],
+   [
+    6,
+    "Suggested way to learn",
+    "Read meanings and listen to UK and US pronunciation; practise with spaced 3D flashcards; test by typing and dictation; write sentences for Writing and Speaking."
+   ]
+  ],
+  "source": "wf_data_vocab"
+ },
+ {
+  "file": "vocabulary-and-flashcards-set-study",
+  "feature": "Vocabulary and flashcards",
+  "name": "Set Study",
+  "width": 760,
+  "height": 526,
+  "ucs": "Study Vocabulary Set",
+  "note": "",
+  "shell": "bare",
+  "elements": [
+   [
+    1,
+    "Study a set - Exit the session",
+    "Header with the progress bar and the question counter."
+   ],
+   [
+    2,
+    "Flashcard step",
+    "Front side with the word; click or press Space to flip and see meaning and context. Buttons \"Forgot [1]\" and \"Remembered [2]\"."
+   ],
+   [
+    3,
+    "Guess the meaning",
+    "Choose the correct Vietnamese meaning; keys 1 to 4 choose an answer. \"Correct!\" or the correct answer is shown."
+   ],
+   [
+    4,
+    "Fill in the word",
+    "Type the missing word of an example sentence, with the meaning as a hint; \"Excellent!\" on success."
+   ],
+   [
+    5,
+    "Write a sentence with the word",
+    "Practice sentence."
+   ],
+   [
+    6,
+    "Back to the set",
+    "Leaves the session."
+   ]
+  ],
+  "source": "wf_data_vocab"
+ },
+ {
+  "file": "vocabulary-and-flashcards-vocabulary-map",
+  "feature": "Vocabulary and flashcards",
+  "name": "Vocabulary Map",
+  "width": 760,
+  "height": 314,
+  "ucs": "View Vocabulary Map",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Vocabulary map of 6 levels (CEFR A1 - C2)",
+    "Heading \"VOCABULARY MATRIX\"."
+   ],
+   [
+    2,
+    "Mastered, Learning, Needs review, Not studied",
+    "Legend of the colours."
+   ],
+   [
+    3,
+    "Map",
+    "Six levels, each with the share of mastered, learning, to-review and not-studied words."
+   ],
+   [
+    4,
+    "Current level and next goal",
+    "Shows the current CEFR level and the next target. States: \"Analysing the map\u2026\", an error with Retry."
+   ]
+  ],
+  "source": "wf_data_vocab"
+ },
+ {
+  "file": "vocabulary-and-flashcards-notebook",
+  "feature": "Vocabulary and flashcards",
+  "name": "Notebook",
+  "width": 760,
+  "height": 402,
+  "ucs": "Review Notebook, Manage Flashcard Decks",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Your vocabulary notebook",
+    "Heading \"NOTEBOOK & FLASHCARDS\". A Guest sees \"Sign in now\" and \"View dictionary\"."
+   ],
+   [
+    2,
+    "Words / Decks / All cards",
+    "Words saved, flashcard decks (sets), and all cards, each with a count."
+   ],
+   [
+    3,
+    "Added this week, Total words, Remembered, Learning, Review now",
+    "Statistics of the notebook."
+   ],
+   [
+    4,
+    "Review due cards (R)",
+    "Opens Notebook Review for the words due today."
+   ],
+   [
+    5,
+    "Word, Level, Understanding",
+    "Words with a filter by level of understanding. Messages: \"No words found\" and \"Clear all filters\", or \"Your notebook is empty\" and \"Explore the dictionary\"."
+   ]
+  ],
+  "source": "wf_data_vocab"
+ },
+ {
+  "file": "vocabulary-and-flashcards-notebook-review",
+  "feature": "Vocabulary and flashcards",
+  "name": "Notebook Review",
+  "width": 760,
+  "height": 260,
+  "ucs": "Review Notebook",
+  "note": "",
+  "shell": "bare",
+  "elements": [
+   [
+    1,
+    "Review words - Exit the session",
+    "Header with the progress bar. While loading: \"Preparing your review\u2026\". An error shows \"Could not start the review\" and Retry."
+   ],
+   [
+    2,
+    "Card",
+    "Flashcard, multiple choice or fill-in questions picked by progress. Buttons \"Forgot [1]\" and \"Remembered [2]\", Space flips the card."
+   ],
+   [
+    3,
+    "Great! You have finished the words due.",
+    "End message with the buttons \"Back to the notebook\" and \"Explore the dictionary\"."
+   ]
+  ],
+  "source": "wf_data_vocab"
+ },
+ {
+  "file": "vocabulary-and-flashcards-add-to-notebook",
+  "feature": "Vocabulary and flashcards",
+  "name": "Add to Notebook",
+  "width": 330,
+  "height": 420,
+  "ucs": "Save Word to Notebook",
+  "note": "",
+  "shell": "mobile",
+  "elements": [
+   [
+    1,
+    "Add a word",
+    "English word. Results appear as the Learner types."
+   ],
+   [
+    2,
+    "Sense",
+    "Choose the exact meaning to learn. A word that is already saved is not created again. With no match: \"No suitable word found.\""
+   ],
+   [
+    3,
+    "Add",
+    "Saves the chosen sense to the notebook."
+   ]
+  ],
+  "source": "wf_data_vocab"
+ },
+ {
+  "file": "vocabulary-and-flashcards-deck-detail",
+  "feature": "Vocabulary and flashcards",
+  "name": "Deck Detail",
+  "width": 760,
+  "height": 356,
+  "ucs": "Manage Flashcard Decks, Study Flashcards",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "All decks",
+    "Returns to the list of decks."
+   ],
+   [
+    2,
+    "Deck name",
+    "Buttons: Edit, Add words from the dictionary, Delete deck. Deleting asks to confirm; only the deck is deleted and the cards stay in \"All cards\"."
+   ],
+   [
+    3,
+    "Study mode",
+    "Flashcards (flip, hear pronunciation), Learn (multiple choice then type until known), Test (graded test), Spaced review (\"N cards due today\")."
+   ],
+   [
+    4,
+    "Term, Definition, Actions",
+    "Cards of the deck. An empty deck shows \"The deck has no cards\"."
+   ]
+  ],
+  "source": "wf_data_vocab"
+ },
+ {
+  "file": "vocabulary-and-flashcards-deck-editor",
+  "feature": "Vocabulary and flashcards",
+  "name": "Deck Editor",
+  "width": 760,
+  "height": 554,
+  "ucs": "Manage Flashcard Decks",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Title",
+    "Required. Suggestions of IELTS topics appear."
+   ],
+   [
+    2,
+    "Description",
+    "Optional."
+   ],
+   [
+    3,
+    "Cover picture",
+    "Optional picture of the deck."
+   ],
+   [
+    4,
+    "Term, Definition, Row",
+    "Cards. \"Swap terms and definitions\" swaps the columns; \"Add card\" adds a row."
+   ],
+   [
+    5,
+    "Import",
+    "Pastes many cards at once, one per line, separated by a dash, tab or colon."
+   ],
+   [
+    6,
+    "Save",
+    "Creates or updates the deck. Cancel leaves without saving."
+   ]
+  ],
+  "source": "wf_data_vocab"
+ },
+ {
+  "file": "vocabulary-and-flashcards-add-cards-to-deck",
+  "feature": "Vocabulary and flashcards",
+  "name": "Add Cards to Deck",
+  "width": 330,
+  "height": 420,
+  "ucs": "Manage Flashcard Decks",
+  "note": "",
+  "shell": "mobile",
+  "elements": [
+   [
+    1,
+    "Choose cards from your library.",
+    "Explanation under the title \"Add cards to the deck\"."
+   ],
+   [
+    2,
+    "Card",
+    "Cards that can be added, each with a tick. With none: \"No suitable card in the loaded page.\""
+   ],
+   [
+    3,
+    "Load more cards",
+    "Loads the next page."
+   ],
+   [
+    4,
+    "Add",
+    "Adds the ticked cards to the deck."
+   ]
+  ],
+  "source": "wf_data_vocab"
+ },
+ {
+  "file": "vocabulary-and-flashcards-edit-card",
+  "feature": "Vocabulary and flashcards",
+  "name": "Edit Card",
+  "width": 330,
+  "height": 562,
+  "ucs": "Manage Flashcard Decks",
+  "note": "",
+  "shell": "mobile",
+  "elements": [
+   [
+    1,
+    "Find an English word",
+    "Search the library to fill the card faster. \"Could not find the word. You can still type the card by hand.\""
+   ],
+   [
+    2,
+    "Front side: word or question",
+    "Required."
+   ],
+   [
+    3,
+    "Back side: meaning or answer",
+    "Required."
+   ],
+   [
+    4,
+    "Example sentence",
+    "Optional."
+   ],
+   [
+    5,
+    "Picture",
+    "Optional picture."
+   ],
+   [
+    6,
+    "Save",
+    "Saves the card."
+   ],
+   [
+    7,
+    "Delete card",
+    "Deletes the card after confirmation."
+   ]
+  ],
+  "source": "wf_data_vocab"
+ },
+ {
+  "file": "vocabulary-and-flashcards-deck-learn-mode",
+  "feature": "Vocabulary and flashcards",
+  "name": "Deck Learn Mode",
+  "width": 760,
+  "height": 396,
+  "ucs": "Study Flashcards",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Learn mode",
+    "Choose the right meaning first, then type the word to know it for good. Needs at least 2 cards."
+   ],
+   [
+    2,
+    "Not learned, Learning, Known",
+    "Learning progress of the deck."
+   ],
+   [
+    3,
+    "Question",
+    "A definition with choices, then a box to type the term. \"Don't know?\" skips. Result: \"Correct!\" or \"Not right. The answer:\"."
+   ],
+   [
+    4,
+    "Answer",
+    "Checks the answer; \"I answered correctly\" overrides a wrong spelling; \"Continue\" moves on."
+   ],
+   [
+    5,
+    "Learn again / Take a test",
+    "At the end, offers to start again or take the test."
+   ]
+  ],
+  "source": "wf_data_vocab"
+ },
+ {
+  "file": "vocabulary-and-flashcards-deck-test-mode",
+  "feature": "Vocabulary and flashcards",
+  "name": "Deck Test Mode",
+  "width": 760,
+  "height": 484,
+  "ucs": "Study Flashcards",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Test",
+    "Multiple choice, true or false and written questions in one go. Needs at least 2 cards."
+   ],
+   [
+    2,
+    "Test setup",
+    "Choose the number of questions, answer with Definition or Term, and the types of questions."
+   ],
+   [
+    3,
+    "Start test",
+    "Starts the test. \"New test\" and \"Change setup\" are available afterwards."
+   ],
+   [
+    4,
+    "Questions",
+    "Each question with an answer box or choices; after submitting, correct answers are shown (\"Correct answer: ...\")."
+   ],
+   [
+    5,
+    "Submit",
+    "Submits the test and shows the score."
+   ]
+  ],
+  "source": "wf_data_vocab"
+ },
+ {
+  "file": "vocabulary-and-flashcards-flashcard-study",
+  "feature": "Vocabulary and flashcards",
+  "name": "Flashcard Study",
+  "width": 760,
+  "height": 286,
+  "ucs": "Study Flashcards",
+  "note": "",
+  "shell": "bare",
+  "elements": [
+   [
+    1,
+    "Spaced review - Exit the review",
+    "Header with \"Review progress\". While loading: \"Loading due cards\u2026\"."
+   ],
+   [
+    2,
+    "Card",
+    "The front of a due card; \"Flip card\" shows the back."
+   ],
+   [
+    3,
+    "Not remembered (1) / Remembered (2)",
+    "Grades the card and sets when it is due again."
+   ],
+   [
+    4,
+    "No more due cards",
+    "End message with \"Review more\" and \"Back\"."
+   ]
+  ],
+  "source": "wf_data_vocab"
+ },
+ {
+  "file": "vocabulary-and-flashcards-flashcard-progress",
+  "feature": "Vocabulary and flashcards",
+  "name": "Flashcard Progress",
+  "width": 330,
+  "height": 434,
+  "ucs": "Study Flashcards",
+  "note": "",
+  "shell": "mobile",
+  "elements": [
+   [
+    1,
+    "Vocabulary progress",
+    "Heading with the link \"Add a set\"."
+   ],
+   [
+    2,
+    "Saved, Mastered, Needs review",
+    "Counts of the Learner's words."
+   ],
+   [
+    3,
+    "Weekly goal",
+    "From 10 to 1,000 words a week, with the button \"Save goal\"."
+   ],
+   [
+    4,
+    "Vocabulary level map",
+    "Level map and review achievements: last reviews and progress by topic (\"No review recorded yet\", \"No topic data yet\")."
+   ],
+   [
+    5,
+    "View saved words \u2192",
+    "Opens the notebook."
+   ]
+  ],
+  "source": "wf_data_vocab"
+ },
+ {
+  "file": "video-dictation-dictation-library",
+  "feature": "Video dictation",
+  "name": "Dictation Library",
+  "width": 760,
+  "height": 344,
+  "ucs": "Browse Dictation Videos",
+  "note": "",
+  "shell": "site",
+  "elements": [
+   [
+    1,
+    "Video dictation: listen sentence by sentence and type exactly",
+    "The video pauses itself after each sentence for you to type. Choose a video by your level."
+   ],
+   [
+    2,
+    "Find a video by name",
+    "Free text."
+   ],
+   [
+    3,
+    "Filter by level",
+    "Level of the video."
+   ],
+   [
+    4,
+    "Video",
+    "One card for each video with the status \"Not done\" or \"Continue\". \"Continue watching\" resumes. With none: \"No dictation video yet. Come back later.\" or \"No video matches the filter\" and \"Clear filters\"."
+   ]
+  ],
+  "source": "wf_data_vocab"
+ },
+ {
+  "file": "video-dictation-dictation-player",
+  "feature": "Video dictation",
+  "name": "Dictation Player",
+  "width": 760,
+  "height": 356,
+  "ucs": "Practise Video Dictation",
+  "note": "",
+  "shell": "bare",
+  "elements": [
+   [
+    1,
+    "Video title and the button Exit",
+    "Header. A video that does not exist shows \"Video not found\" and \"Back to the video library\"."
+   ],
+   [
+    2,
+    "Video player",
+    "Plays one sentence and pauses."
+   ],
+   [
+    3,
+    "Dictation",
+    "The Learner types what was heard; the system compares it word by word with the correct sentence. The divider can be dragged and double-clicked to reset."
+   ],
+   [
+    4,
+    "Check",
+    "Checks the typed sentence and moves on."
+   ],
+   [
+    5,
+    "Replay / Next sentence",
+    "Plays the sentence again or goes to the next one. A video with no sentence shows \"This video has no sentence to practise\"."
+   ]
+  ],
+  "source": "wf_data_vocab"
+ }
+]
