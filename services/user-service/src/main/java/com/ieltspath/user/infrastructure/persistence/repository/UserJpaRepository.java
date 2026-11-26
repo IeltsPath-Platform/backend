@@ -19,7 +19,8 @@ public interface UserJpaRepository extends JpaRepository<UserJpaEntity, UUID> {
     Optional<UserJpaEntity> findWithRolesById(UUID id);
 
     @EntityGraph(attributePaths = "roles")
-    Optional<UserJpaEntity> findByEmail(String email);
+    @Query("select user from UserJpaEntity user where lower(user.email) = lower(:email)")
+    Optional<UserJpaEntity> findByEmail(@Param("email") String email);
 
     @EntityGraph(attributePaths = "roles")
     List<UserJpaEntity> findAll();
@@ -52,7 +53,8 @@ public interface UserJpaRepository extends JpaRepository<UserJpaEntity, UUID> {
     // No entity graph: fetching the roles collection together with a page limit would page in memory.
     List<UserJpaEntity> findByIdGreaterThanOrderByIdAsc(UUID id, org.springframework.data.domain.Pageable pageable);
 
-    boolean existsByEmail(String email);
+    @Query("select count(user) > 0 from UserJpaEntity user where lower(user.email) = lower(:email)")
+    boolean existsByEmail(@Param("email") String email);
     boolean existsByPhoneNumber(String phoneNumber);
     boolean existsByPhoneNumberAndIdNot(String phoneNumber, UUID id);
 

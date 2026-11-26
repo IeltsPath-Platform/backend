@@ -91,6 +91,20 @@ class LinkGoogleAccountUseCaseTest {
     }
 
     @Test
+    void findsAnExistingAccountWhenGoogleReturnsMixedCaseEmail() {
+        when(users.findByEmail("learner@gmail.com")).thenReturn(Optional.of(customerWithPassword));
+        when(identities.findByProviderAndProviderSubject(OAuthProvider.GOOGLE, "google-sub"))
+                .thenReturn(Optional.empty());
+        when(identities.findByUserIdAndProvider(userId, OAuthProvider.GOOGLE)).thenReturn(Optional.empty());
+
+        var result = useCase.execute(new GoogleIdentity("google-sub", "Learner@Gmail.com", "Learner", null));
+
+        assertThat(result.userId()).isEqualTo(userId);
+        verify(users).findByEmail("learner@gmail.com");
+        verify(users, never()).save(any(User.class));
+    }
+
+    @Test
     void verifiesAnUnverifiedAccountAndRemovesThePasswordNobodyProved() {
         User unverified = User.builder().id(userId).email(new Email("learner@gmail.com")).passwordHash("hash")
                 .fullName("Learner").status(UserStatus.ACTIVE)
