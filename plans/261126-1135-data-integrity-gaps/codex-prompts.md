@@ -1,4 +1,4 @@
-﻿# Codex prompts for the data integrity phases
+# Codex prompts for the data integrity phases
 
 Paste one prompt per Codex session. Each phase has its own worktree and branch, already created from `main` (830023b4).
 
@@ -9,6 +9,7 @@ Paste one prompt per Codex session. Each phase has its own worktree and branch, 
 | 3 | `C:\Users\Admin\wt\backend-wallet-reconciliation` | `feat/wallet-ledger-reconciliation` | wave 1 |
 | 4 | `C:\Users\Admin\wt\backend-lock-published` | `fix/lock-published-versions` | wave 1 |
 | 6 | `C:\Users\Admin\wt\backend-retention` | `feat/retention-purge` | wave 1 |
+| 7 | `C:\Users\Admin\wt\backend-access-control` | `fix/access-control` | wave 1 |
 | 5 | `C:\Users\Admin\wt\backend-status-transitions` | `refactor/status-transitions` | wave 2, after phase 1 is merged: run `git merge origin/main` in its worktree first |
 
 Wave 1 phases touch different services and files, so they can run at the same time. Phase 5 changes the enums that phase 1
@@ -127,3 +128,17 @@ Tests: a table-driven test per enum covering every pair of statuses; one test pe
 Common working rules: see the block above (no push, no PR, local commit).
 ```
 
+## Phase 7 - access control (learning, assessment, library, game, community, access, gateway)
+
+```
+Worktree: C:\Users\Admin\wt\backend-access-control   Branch: fix/access-control
+Plan: C:\Users\Admin\wt\backend-plans\plans\261126-1135-data-integrity-gaps\phase-07-access-control.md
+
+Task, three parts. Do 7a and 7c first, then 7b.
+7a (learning-service): the three endpoints GET /api/learning/admin/learners/{userId}/overview, /report and /courses/{courseId}/score let any Examiner read any learner's data. Nothing calls them. Remove the endpoints and the use case code only they use. If something does call them, stop, report it and change the role to ADMIN instead.
+7c (gateway, config, compose): close the API documentation in production. Set API_DOCS_ENABLED=false in docker-compose.prod.yml for the gateway and every business service, default it to false in the config repo (keep true in docker-compose.yml for local development), and stop listing /swagger-ui/**, /v3/api-docs/**, /api-docs/** and /webjars/** as public when the flag is false. Update docs/deployment.md and .env.example.
+7b (many services): add one meta-annotation in common-security (for example @LearnerOnly = @PreAuthorize("hasRole('CUSTOMER')")) and put it on the Learner-only controllers listed in the plan (learning, assessment, library, game, access). Community: allow CUSTOMER and ADMIN on the shared controller and keep the existing administrator check in the moderation use cases. Games: reject the WebSocket handshake when the token has no CUSTOMER role. Leave notification, user profile, sessions, OAuth identity, the public vocabulary catalogue and every controller that already has a role as they are. Before editing, grep each service for controllers without @PreAuthorize and compare with the list in the plan; tell me about any controller that is not in the list.
+Do not run the SQL pre-check on a real database; put it in the report for the owner.
+Tests: per service, a security test that a CONTENT_AUTHOR token and a SALES_STAFF token get 403 on one endpoint of each annotated controller and a CUSTOMER token passes; for 7a the paths are gone (404) or 403; for 7c an unauthenticated GET /swagger-ui.html and /v3/api-docs return 401 or 404 with the flag false and work with true. Run the module tests of every service you touched.
+Common working rules: see the block above (no push, no PR, local commit; one commit per part).
+```

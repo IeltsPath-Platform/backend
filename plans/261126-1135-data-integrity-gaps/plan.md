@@ -1,13 +1,13 @@
-﻿# Data integrity gaps found while writing SRS section 3.3
+# Data integrity and access control gaps found while writing the SRS
 
-Status: proposed. Nothing is implemented. Six phases, each its own small PR. Order: 1, 2, 5, 3, 4, 6.
+Status: proposed. Nothing is implemented. Seven phases, each its own small PR. Order: 1, 2, 7, 5, 3, 4, 6.
 
 ## Why
 
-Writing SRS section 3.3 (Data Business Rules), each rule was checked against the migrations and the code. Six rules hold
-today only because the application behaves, not because the database or the domain enforces them. A race, a new code
-path or a manual fix can break them silently. The SRS lists them as "Planned" rules DR-39 to DR-48 and each phase
-below turns one or more of them into an enforced rule.
+Writing SRS sections 3.3 (Data Business Rules) and 4.4 (Permission Matrix), each rule was checked against the migrations and
+the code. Some rules hold today only because the application behaves, not because the database or the domain enforces
+them, and some access rules are looser than the business intends. The SRS lists them as "Planned" rules DR-39 to DR-51 and
+each phase below turns one or more of them into an enforced rule.
 
 ## Phases
 
@@ -19,6 +19,7 @@ below turns one or more of them into an enforced rule.
 | 4 | Published content locked by the database | DR-42 | content | M | [phase-04](phase-04-published-content-lock.md) |
 | 5 | Status changes follow the lifecycle | DR-43 | access, assessment | M | [phase-05](phase-05-status-transitions.md) |
 | 6 | Retention and account deletion | DR-44 to DR-47 | user, assessment, design | S + design | [phase-06](phase-06-retention-and-deletion.md) |
+| 7 | Access control: Examiner reach, Learner-only features, API documentation | DR-49, DR-50, DR-51 | learning, assessment, library, game, community, access, gateway | M | [phase-07](phase-07-access-control.md) |
 
 ## What the code check found (corrects earlier assumptions)
 
@@ -28,6 +29,11 @@ below turns one or more of them into an enforced rule.
   owner's decision "admin grant adds days" is already the behaviour. The gap is a race plus a real problem: **nothing
   ever sets a lapsed subscription to EXPIRED**. `findActiveByUserId` hides it with `ends_at > now`, but the row stays
   `ACTIVE`. A plain unique index would block the next purchase after a lapse, so phase 1 has to expire lapsed rows too.
+- Access control: ownership checks are in place (a user cannot read another user's grading job, attempt, deck or note), so
+  there is no data leak between learners. Three weaker points remain: an Examiner can read the report, overview and course
+  score of any learner; Learner-only endpoints need only a signed-in user, not the Learner role; Swagger and the API
+  documentation are open without sign-in and enabled by default in production. None of the three Examiner endpoints is
+  used by the web app, the mobile app or another service.
 - Recordings: placement Speaking recordings are stored in `learner_submissions` with `skill = 'SPEAKING'`, and the existing
   purge selects exactly that, so they are already purged after 90 days. Phase 6 only adds a test.
 
@@ -44,6 +50,8 @@ below turns one or more of them into an enforced rule.
 - Phase 5 first adds `canMoveTo`; phase 1 uses it for Subscription, so land phase 5's Subscription part before or with phase 1.
 - Phase 3 is independent. Phase 4 needs its audit step done before the trigger.
 - Phase 6 design (account anonymisation) is a separate follow-up plan after phases 1 and 2 ship.
+- Phase 7 touches many controllers but only their annotations; it can run in parallel with phases 1 to 4. Its Learner-only
+  part needs the owner to confirm which test and staff accounts also hold the Learner role (see the phase).
 
 ## Rules for every phase
 
@@ -63,4 +71,6 @@ below turns one or more of them into an enforced rule.
 
 1. Should account anonymisation (phase 6 design) become its own plan right after phases 1 and 2? Recommended: yes.
 2. Does `auth_audit_events` count as "sign-in history" for the 180-day rule, or only `login_history`?
+3. Phase 7: do staff accounts (Content Author, Examiner, Sales) also hold the Learner role on purpose, for example to try the app as a learner? The pre-check query in phase 7 lists them.
+4. Phase 7: is `API_DOCS_ENABLED` already `false` on the production server? The repository default is `true`.
 
