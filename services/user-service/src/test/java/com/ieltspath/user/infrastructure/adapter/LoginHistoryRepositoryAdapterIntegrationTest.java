@@ -79,7 +79,7 @@ class LoginHistoryRepositoryAdapterIntegrationTest {
     }
 
     @Test
-    void deletesOnlyAttemptsOlderThanTheCutoff() {
+    void deletesOnlyAttemptsOlderThanTheCutoffInBoundedBatches() {
         UUID userId = newUser();
         LocalDateTime cutoff = LocalDateTime.of(2026, 7, 31, 3, 30);
         record(userId, cutoff.minusDays(10), true);
@@ -87,9 +87,13 @@ class LoginHistoryRepositoryAdapterIntegrationTest {
         record(userId, cutoff, true);
         record(userId, cutoff.plusDays(5), true);
 
-        int removed = repository.deleteOlderThan(cutoff);
+        assertThat(repository.countOlderThan(cutoff)).isEqualTo(2);
+        int firstBatch = repository.deleteOlderThan(cutoff, 1);
 
-        assertThat(removed).isEqualTo(2);
+        assertThat(firstBatch).isEqualTo(1);
+        assertThat(repository.countOlderThan(cutoff)).isEqualTo(1);
+        assertThat(repository.deleteOlderThan(cutoff, 1)).isEqualTo(1);
+        assertThat(repository.countOlderThan(cutoff)).isZero();
         assertThat(repository.findByUserId(userId, 0, 10).items()).extracting(LoginAttempt::getCreatedAt)
                 .containsExactly(cutoff.plusDays(5), cutoff);
     }

@@ -12,6 +12,9 @@ public interface LoginHistoryRepository {
     /** Attempts of one user, newest first. */
     OwnedPage<LoginAttempt> findByUserId(UUID userId, int page, int size);
 
-    /** Removes every attempt recorded before the cutoff and returns how many were removed. */
-    int deleteOlderThan(LocalDateTime cutoff);
+    /** Removes at most {@code limit} attempts recorded before the cutoff. */
+    int deleteOlderThan(LocalDateTime cutoff, int limit);
+
+    /** Counts attempts recorded before the cutoff without returning identifying data. */
+    long countOlderThan(LocalDateTime cutoff);
 }

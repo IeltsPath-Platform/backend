@@ -15,6 +15,18 @@ public interface LoginHistoryJpaRepository extends JpaRepository<LoginHistoryJpa
     Page<LoginHistoryJpaEntity> findByUserId(UUID userId, Pageable pageable);
 
     @Modifying
-    @Query("delete from LoginHistoryJpaEntity history where history.createdAt < :cutoff")
-    int deleteOlderThan(@Param("cutoff") LocalDateTime cutoff);
+    @Query(value = """
+            DELETE FROM login_history
+            WHERE id IN (
+                SELECT id FROM login_history
+                WHERE created_at < :cutoff
+                ORDER BY created_at, id
+                LIMIT :limit
+                FOR UPDATE SKIP LOCKED
+            )
+            """, nativeQuery = true)
+    int deleteOlderThan(@Param("cutoff") LocalDateTime cutoff, @Param("limit") int limit);
+
+    @Query("select count(history) from LoginHistoryJpaEntity history where history.createdAt < :cutoff")
+    long countOlderThan(@Param("cutoff") LocalDateTime cutoff);
 }
