@@ -2,6 +2,7 @@ package com.ieltspath.user.api.controller;
 
 import com.ieltspath.commonsecurity.config.CommonSecurityAutoConfiguration;
 import com.ieltspath.user.application.command.UpdateUserCommand;
+import com.ieltspath.user.application.usecase.DeleteMyAccountUseCase;
 import com.ieltspath.user.application.usecase.GetMyProfileUseCase;
 import com.ieltspath.user.application.usecase.RegisterUseCase;
 import com.ieltspath.user.application.command.RegisterCommand;
@@ -74,6 +75,8 @@ class UserControllerSecurityTest {
     private GetMyProfileUseCase getMyProfileUseCase;
     @MockBean
     private UpdateUserUseCase updateUserUseCase;
+    @MockBean
+    private DeleteMyAccountUseCase deleteMyAccountUseCase;
 
     @DynamicPropertySource
     static void hmacProperties(DynamicPropertyRegistry registry) {
