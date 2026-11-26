@@ -2,6 +2,7 @@ package com.ieltspath.apigateway.filter;
 
 import com.ieltspath.apigateway.security.AuthProperties;
 import com.ieltspath.apigateway.service.InternalJwtService;
+import com.ieltspath.apigateway.ratelimit.ClientKeyResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
@@ -21,10 +22,14 @@ import java.util.Optional;
 public class InternalJwtGatewayFilter implements GlobalFilter, Ordered {
     private final InternalJwtService internalJwtService;
     private final AuthProperties authProperties;
+    private final ClientKeyResolver clientKeyResolver;
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        ServerHttpRequest sanitizedRequest = withoutClientIdentity(exchange.getRequest());
+        ServerHttpRequest sanitizedRequest = withoutClientIdentity(exchange.getRequest())
+                .mutate()
+                .header("X-Gateway-Client-IP", clientKeyResolver.clientIp(exchange))
+                .build();
         ServerWebExchange sanitizedExchange = exchange.mutate()
                 .request(sanitizedRequest)
                 .build();
@@ -62,6 +67,7 @@ public class InternalJwtGatewayFilter implements GlobalFilter, Ordered {
     private ServerHttpRequest withoutClientIdentity(ServerHttpRequest request) {
         return request.mutate()
                 .headers(headers -> headers.remove(HttpHeaders.AUTHORIZATION))
+                .headers(headers -> headers.remove("X-Gateway-Client-IP"))
                 .build();
     }
 }

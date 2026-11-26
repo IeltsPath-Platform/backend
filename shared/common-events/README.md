@@ -1,7 +1,8 @@
 # common-events
 
 Message contracts and broker topology shared by the services. Each contract is a record whose name carries its version
-(`GradingCompletedV1`, `AssessmentCompletedV2`); the contract document lives in `docs/contracts/`.
+(`GradingCompletedV1`, `AssessmentCompletedV2`, `SpeakingGradingRequestedV1`, `SpeakingGradingCompletedV1`);
+the contract document lives in `docs/contracts/`.
 
 ## Changing a contract
 

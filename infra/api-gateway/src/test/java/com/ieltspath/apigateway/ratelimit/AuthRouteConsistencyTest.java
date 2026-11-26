@@ -18,7 +18,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AuthRouteConsistencyTest {
     private static final Set<String> AUTH_ENDPOINTS = Set.of(
             "/auth/login",
-            "/auth/refresh",
             "/auth/forgot-password",
             "/auth/reset-password",
             "/auth/google",
@@ -50,6 +49,7 @@ class AuthRouteConsistencyTest {
                 .filter(path -> !path.endsWith("/**"))
                 .collect(Collectors.toSet());
         expected.add("/api/users/register");
+        expected.remove("/auth/refresh");
         List<Map<String, Object>> routes = nested(config, "spring", "cloud", "gateway", "server", "webflux", "routes");
         Map<String, Object> authRoute = routes.stream()
                 .filter(route -> "user-auth-limited".equals(route.get("id")))
@@ -68,6 +68,16 @@ class AuthRouteConsistencyTest {
                 .findFirst().orElseThrow();
         assertThat(routePaths(route)).containsExactly("/api/users/me/reauth");
         assertThat(route.toString()).contains("tier=auth");
+    }
+
+    @Test
+    void refreshUsesTheSeparateLargerBurstTier() throws IOException {
+        Map<String, Object> config = loadConfig();
+        List<Map<String, Object>> routes = nested(config, "spring", "cloud", "gateway", "server", "webflux", "routes");
+        Map<String, Object> route = routes.stream().filter(item -> "user-refresh-limited".equals(item.get("id")))
+                .findFirst().orElseThrow();
+        assertThat(routePaths(route)).containsExactly("/auth/refresh");
+        assertThat(route.toString()).contains("auth-refresh");
     }
 
     @Test

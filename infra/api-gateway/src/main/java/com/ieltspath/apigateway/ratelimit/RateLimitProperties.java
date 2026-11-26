@@ -6,9 +6,12 @@ import java.util.List;
 import java.util.Map;
 
 @ConfigurationProperties("gateway.rate-limit")
-public record RateLimitProperties(List<String> trustedProxies, Map<String, Tier> tiers) {
+public record RateLimitProperties(boolean behindProxy, List<String> trustedProxies, Map<String, Tier> tiers) {
     public RateLimitProperties {
-        trustedProxies = trustedProxies == null ? List.of() : List.copyOf(trustedProxies);
+        trustedProxies = trustedProxies == null ? List.of() : trustedProxies.stream()
+                .filter(proxy -> proxy != null && !proxy.isBlank())
+                .map(String::trim)
+                .toList();
         tiers = tiers == null ? Map.of() : Map.copyOf(tiers);
     }
 

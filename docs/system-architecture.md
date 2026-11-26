@@ -39,7 +39,7 @@ content --HTTP--> library                 learning --HTTP--> content (/internal/
 | `infra/eureka-server` | Service registry | — | — |
 | `infra/api-gateway` | Ingress WebFlux: xác thực external JWT, ký internal JWT, routing, CORS, correlation id | — | — |
 | `shared/common-security` | Thư viện: security servlet cho downstream, internal JWT, `CanonicalRoles`, `CurrentUserProvider` | — | — |
-| `user-service` | Tài khoản, role, đăng nhập/refresh/logout, hồ sơ học viên (gồm avatar Supabase và múi giờ), đổi mật khẩu | `user_db` (Compose PostgreSQL host 5440; `learning_goals`, `learning_activities`, `study_*` và `streaks` còn lại sau khi dữ liệu chuyển sang learning, không còn được ghi hay đọc) | `/auth/**`, `/api/users/**` (trừ goal và study-time) |
+| `user-service` | Tài khoản, role, đăng nhập/refresh/logout, hồ sơ học viên (gồm avatar Supabase và múi giờ), đổi mật khẩu | `user_db` (Compose PostgreSQL host 5440; các bảng mục tiêu học, activity, thời gian học và streak đã chuyển sang learning và bị xóa ở V19) | `/auth/**`, `/api/users/**` (trừ goal và study-time) |
 | `content-service` | Course theo band, topic, knowledge point, câu hỏi (có version), gói nội dung/bài đọc, asset; snapshot grammar cho game | `content_db` (Compose PostgreSQL host 5440; V7 xóa năm bảng catalog) | `/api/content/**` trừ nhóm từ vựng/video |
 | `library-service` | Catalog từ vựng/video (V1, năm bảng; V19 mở rộng CEFR/chủ đề/bộ từ), flashcard/deck, note, tiến độ video và đoạn đã lưu (V2, sáu bảng) | `library_db` (Compose PostgreSQL host 5440) | `/api/content/{videos,vocabulary}/**`, `/api/content/admin/vocabulary/**`, `/api/learning-support/{flashcards,decks,notes,video-progress,saved-segments}/**` |
 | `assessment-service` | Lượt làm bài, chấm tự động và LLM cho thi topic/course, chấm EXAMINER, kết quả (có version), bài nộp, video practice; phát `AssessmentCompleted.v2` | `assessment_db` (Compose PostgreSQL host 5440) | `/api/assessments/**` |
@@ -144,6 +144,15 @@ assessment: SubmitAssessmentAttemptUseCase -> AutoGradeAttemptService (mọi câ
   -> AssessmentResultCompleter -> AssessmentCompletedEventFactory -> outbox_events (cùng transaction)
   -> OutboxRelayScheduler / OutboxRelay -> RabbitOutboxEventPublisher (publisher confirm)
   -> exchange assessment.events, routing key assessment.completed.v2
+assessment: khi bật `assessment.placement.speaking-grading.enabled`, ghi `SpeakingGradingRequested.v1` vào outbox cùng transaction;
+            consumer kết quả chấm lưu trạng thái idempotent rồi chỉ hoàn tất placement khi Writing và Speaking đã xong
+            hoặc Speaking quá hạn 10 phút (lỗi ghi nhận `partial`, không chuyển người chấm)
+learning: PlacementSpeakingRequestedListener (ack thủ công, chống trùng theo event/attempt)
+  -> queue learning.placement-speaking-grading.requested.v1 (retry có TTL, vi phạm contract/hết lượt -> DLQ)
+  -> placement_speaking_jobs -> job claim `FOR UPDATE SKIP LOCKED`
+  -> tải WAV từ common-storage, gọi Azure Speech và SpeakingGrader ngoài transaction
+  -> placement_speaking_outbox / relay -> SpeakingGradingCompleted.v1 -> Assessment
+  (luồng placement không trừ point, không dùng quota luyện tập, không ghi mastery)
 learning: AssessmentCompletedListener (ack thủ công)
   -> queue learning.assessment-completed.v2 (retry qua ...v2.retry có TTL, vi phạm contract/hết lượt -> ...v2.dlq)
   -> AssessmentCompletedParser -> ApplyAssessmentResultUseCase (một transaction, khóa theo user):
@@ -160,6 +169,7 @@ Luồng `SubscriptionGranted` của Access thông báo cho người dùng khi ad
 | --- | --- | --- | --- |
 | Access `GrantSubscriptionUseCase` ghi `SubscriptionGranted` vào `outbox_events` cùng transaction; `AccessOutboxRelay` publish với confirm tới exchange `access.events`, routing key `access.subscription-granted.v1` | Notification `SubscriptionGrantedListener` gọi `RecordSubscriptionGrantedUseCase`; `eventId` chống ghi thông báo trùng | `notification.subscription-granted.v1`; retry `notification.subscription-granted.v1.retry`; DLQ `notification.subscription-granted.v1.dlq` | [`subscription-granted-v1.md`](contracts/subscription-granted-v1.md) |
 | Library `QueueVocabularyReviewDueUseCase` (lịch hằng ngày 08:00 giờ Việt Nam) ghi `VocabularyReviewDue` vào `outbox_events`, mỗi học viên một dòng mỗi ngày; `LibraryOutboxRelay` publish có confirm tới exchange `library.events`, routing key `library.vocabulary-review-due.v1` | Notification `VocabularyReviewDueListener` gọi `RecordVocabularyReviewDueUseCase`; `eventId` chống ghi thông báo trùng | `notification.vocabulary-review-due.v1`; retry `notification.vocabulary-review-due.v1.retry`; DLQ `notification.vocabulary-review-due.v1.dlq` | [`vocabulary-review-due-v1.md`](contracts/vocabulary-review-due-v1.md) |
+| Assessment ghi `SpeakingGradingRequested.v1` vào `outbox_events` cùng giao dịch submit khi cờ bật; Learning lưu job theo event/attempt, chấm qua storage/Azure/LLM rồi ghi `SpeakingGradingCompleted.v1` vào `placement_speaking_outbox`; Assessment áp kết quả idempotent | Learning `learning.placement-speaking-grading.requested.v1` (retry/DLQ); Assessment `assessment.placement-speaking-grading.completed.v1` (retry/DLQ) | Hai consumer ACK sau commit; timeout Speaking 10 phút hoàn tất placement dạng partial | [`speaking-grading-requested-v1.md`](contracts/speaking-grading-requested-v1.md), [`speaking-grading-completed-v1.md`](contracts/speaking-grading-completed-v1.md) |
 | User `ForgotPasswordUseCase` ghi token hash và `PasswordResetRequestedV1` trong cùng transaction; `UserOutboxRelay` publish có confirm, sau đó xóa payload | Notification `PasswordResetRequestedListener` gửi SMTP và deduplicates bằng `eventId` | `notification.password-reset-requested.v1` (+ retry, DLQ) | [`password-reset-requested-v1.md`](contracts/password-reset-requested-v1.md) |
 
 Lỗi xử lý tạm thời được chuyển qua retry queue; lỗi payload hoặc vi phạm contract được dead-letter. Retry queue trả message về đúng exchange nguồn với routing key ban đầu, nên consumer nhận lại đúng contract (`RetryTopologyTest`). Khi Community park message vào DLQ, consumer ghi routing key gốc vào header `x-original-routing-key`, vì routing key của dead-letter là tên DLQ; replay đọc header này để gửi lại đúng đường. Content và Game không có outbox: bảng đã bị xóa vì không có service nào đọc event của hai bên.
@@ -168,7 +178,7 @@ Lỗi xử lý tạm thời được chuyển qua retry queue; lỗi payload ho�
 
 `common-observability` đặt `correlationId` trong MDC cho mỗi request và chuyển tiếp header `X-Correlation-Id` qua HTTP
 client. Với event đi qua outbox, adapter ghi giá trị MDC vào cột nullable `correlation_id` ngay lúc lưu: `outbox_events`
-ở Assessment, Community, Access, User và `reward_grants` ở Learning. Relay có thể chạy ở thread khác; publisher đọc id đã lưu
+ở Assessment, Community, Access, User, `reward_grants` ở Learning và `placement_speaking_outbox` ở Learning. Relay có thể chạy ở thread khác; publisher đọc id đã lưu
 và gửi header RabbitMQ `x-correlation-id`, không đưa id vào payload. Event cũ hoặc do scheduler tạo không có id thì bỏ
 header; listener tạo context mới và xóa MDC sau khi xử lý.
 
@@ -330,7 +340,7 @@ Client -> Gateway -> game: tạo phòng/phiên chơi -> chọn snapshot theo lea
                               VOCABULARY -> library; GRAMMAR -> content
 ```
 
-Năm bảng catalog và sáu bảng thư viện cá nhân thuộc `library_db`; mục tiêu học, `learning_activities` và dữ liệu thời gian học thuộc `learning_db` (các bảng cũ trong `user_db` còn đó, không dùng); streak do `learner_streaks` của learning giữ.
+Năm bảng catalog và sáu bảng thư viện cá nhân thuộc `library_db`; mục tiêu học, `learning_activities` và dữ liệu thời gian học thuộc `learning_db` (các bảng cũ trong `user_db` đã bị xóa ở migration V19, nên dữ liệu phải được chép sang learning trước); streak do `learner_streaks` của learning giữ.
 Game lưu snapshot để chơi; hai service cung cấp cùng request/response nội bộ.
 
 ### Kết quả thi → mastery
@@ -376,6 +386,7 @@ Backend hiện có 30 phương thức `@Scheduled` trong 29 file. Cơ chế ch�
 | assessment | `GateEssayGradingScheduler` | Claim batch bằng `FOR UPDATE SKIP LOCKED` trong transaction; cập nhật job hoàn tất trong transaction riêng | LLM ngoài transaction claim và transaction ghi kết quả |
 | assessment | `GradingDeadlineScheduler` | Store chọn các job bằng `FOR UPDATE SKIP LOCKED`; ghi thông báo/outbox trong transaction | Không |
 | assessment | `SpeakingRecordingRetentionScheduler` | Xóa theo ngưỡng thời gian; chạy lặp an toàn | Không |
+| assessment | `PlacementSpeakingTimeoutScheduler` | Quét hạn bằng `FOR UPDATE SKIP LOCKED`; kết quả quá 10 phút thành `FAILED` một lần | Không |
 | content | `ScheduledPublishJob` | Advisory lock tránh hai instance publish cùng đợt | Không |
 | content | `AiDraftScheduler` | Claim từng bản nháp bằng `FOR UPDATE SKIP LOCKED`, tăng `attempt_count` và gán `claim_token`; cập nhật kết quả có điều kiện theo token. Bản treo được đưa lại hàng chờ tối đa ba lần, sau đó thất bại và hoàn lượt trong cùng transaction | Generator/LLM ngoài transaction claim; claim cũ không thể ghi đè lượt mới |
 | learning | `LeagueCloseJob` | Advisory transaction lock quanh cập nhật tuần | Không |
@@ -383,6 +394,11 @@ Backend hiện có 30 phương thức `@Scheduled` trong 29 file. Cơ chế ch�
 | learning | `SnapshotJob` (weekly) | Advisory transaction lock theo kỳ snapshot | Không |
 | learning | `SnapshotJob` (monthly) | Advisory transaction lock theo kỳ snapshot | Không |
 | learning | `RewardGrantRelayJob` | Advisory transaction lock và `SKIP LOCKED` cho batch | Broker trong transaction ngắn |
+| learning | `PlacementSpeakingGradingJob` | Claim batch bằng `FOR UPDATE SKIP LOCKED`; lease cho phép nhận lại job treo | Storage, Azure Speech và LLM ngoài transaction claim và transaction ghi |
+| learning | `PlacementSpeakingOutboxRelay` | `FOR UPDATE SKIP LOCKED`; xác nhận broker rồi đánh dấu đã phát | Broker trong transaction ngắn |
+| assessment | `PlacementSpeakingTimeoutScheduler` | Quét hạn bằng `FOR UPDATE SKIP LOCKED`; kết quả quá 10 phút thành `FAILED` một lần | Không |
+| learning | `PlacementSpeakingGradingJob` | Claim batch bằng `FOR UPDATE SKIP LOCKED`; lease cho phép nhận lại job treo | Storage, Azure Speech và LLM ngoài transaction claim và transaction ghi |
+| learning | `PlacementSpeakingOutboxRelay` | `FOR UPDATE SKIP LOCKED`; xác nhận broker rồi đánh dấu đã phát | Broker trong transaction ngắn |
 | learning | `MasteryDecayJob` | Session advisory lock; các batch ghi theo transaction riêng | Không |
 | learning | `WorkItemSyncJob` | Đọc nguồn và lấy metadata Content trước; transaction ngắn lấy advisory lock rồi ghi snapshot; unique key loại mục trùng | Content HTTP ngoài transaction/khóa |
 | user | `LoginHistoryPurgeScheduler` | Xóa theo cutoff thời gian; chạy lặp an toàn | Không |

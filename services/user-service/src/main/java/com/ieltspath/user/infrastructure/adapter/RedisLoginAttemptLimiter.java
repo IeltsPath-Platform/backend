@@ -20,19 +20,24 @@ import java.util.Locale;
 @Component
 public class RedisLoginAttemptLimiter implements LoginAttemptLimiter {
     private static final Duration WINDOW = Duration.ofMinutes(15);
+    private static final Duration IP_WINDOW = Duration.ofMinutes(1);
     private static final long PAIR_THRESHOLD = 5;
     private static final long EMAIL_WAIT_THRESHOLD = 20;
+    private static final long IP_THRESHOLD = 20;
     private static final DefaultRedisScript<Long> RECORD_FAILURE = new DefaultRedisScript<>("""
             local pair = redis.call('INCR', KEYS[1])
             if pair == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end
             local email = redis.call('INCR', KEYS[2])
             if email == 1 then redis.call('EXPIRE', KEYS[2], ARGV[1]) end
+            local ip = redis.call('INCR', KEYS[4])
+            if ip == 1 then redis.call('EXPIRE', KEYS[4], ARGV[3]) end
             if email > tonumber(ARGV[2]) then
               local exponent = math.min(3, email - tonumber(ARGV[2]) - 1)
               local delay = math.min(8, 2 ^ exponent)
               redis.call('SET', KEYS[3], '1', 'EX', delay)
               return delay
             end
+            if ip > tonumber(ARGV[4]) then return 1 end
             return 0
             """, Long.class);
 
@@ -54,6 +59,11 @@ public class RedisLoginAttemptLimiter implements LoginAttemptLimiter {
             if (count != null && Long.parseLong(count) >= PAIR_THRESHOLD) {
                 throw new LoginRateLimitedException(Duration.ofSeconds(ttlSeconds(pairKey)));
             }
+            String ipKey = ipKey(clientIp);
+            String ipCount = redis.opsForValue().get(ipKey);
+            if (ipCount != null && Long.parseLong(ipCount) >= IP_THRESHOLD) {
+                throw new LoginRateLimitedException(Duration.ofSeconds(ttlSeconds(ipKey)));
+            }
         } catch (LoginRateLimitedException exception) {
             throw exception;
         } catch (RuntimeException exception) {
@@ -66,8 +76,9 @@ public class RedisLoginAttemptLimiter implements LoginAttemptLimiter {
         String hash = hash(normalize(normalizedEmail));
         try {
             redis.execute(RECORD_FAILURE,
-                    List.of(pairKey(hash, clientIp), "login:email:" + hash, "login:wait:" + hash),
-                    Long.toString(WINDOW.toSeconds()), Long.toString(EMAIL_WAIT_THRESHOLD));
+                    List.of(pairKey(hash, clientIp), "login:email:" + hash, "login:wait:" + hash, ipKey(clientIp)),
+                    Long.toString(WINDOW.toSeconds()), Long.toString(EMAIL_WAIT_THRESHOLD),
+                    Long.toString(IP_WINDOW.toSeconds()), Long.toString(IP_THRESHOLD));
         } catch (RuntimeException exception) {
             throw unavailable(exception);
         }
@@ -90,6 +101,10 @@ public class RedisLoginAttemptLimiter implements LoginAttemptLimiter {
 
     private String pairKey(String emailHash, String clientIp) {
         return "login:pair:" + emailHash + ":" + (clientIp == null || clientIp.isBlank() ? "unknown" : clientIp.trim());
+    }
+
+    private String ipKey(String clientIp) {
+        return "login:ip:" + hash(clientIp == null || clientIp.isBlank() ? "unknown" : clientIp.trim());
     }
 
     private String normalize(String email) {

@@ -36,7 +36,7 @@ class CommunityReactionMigrationTest {
                     + "('" + post + "','" + learner + "','LIKE','2026-10-16T10:00:00Z'),"
                     + "('" + post + "','" + learner + "','LOVE','2026-10-16T10:01:00Z')");
         }
-        Flyway.configure().dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword()).load().migrate();
+        Flyway.configure().dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword()).target("11").load().migrate();
         try (var connection = DriverManager.getConnection(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
              var statement = connection.createStatement()) {
             try (var current = statement.executeQuery("SELECT reaction_type FROM post_reactions")) {
