@@ -39,7 +39,7 @@ content --HTTP--> library                 learning --HTTP--> content (/internal/
 | `infra/eureka-server` | Service registry | — | — |
 | `infra/api-gateway` | Ingress WebFlux: xác thực external JWT, ký internal JWT, routing, CORS, correlation id | — | — |
 | `shared/common-security` | Thư viện: security servlet cho downstream, internal JWT, `CanonicalRoles`, `CurrentUserProvider` | — | — |
-| `user-service` | Tài khoản, role, đăng nhập/refresh/logout, hồ sơ học viên (gồm avatar Supabase và múi giờ), đổi mật khẩu | `user_db` (Compose PostgreSQL host 5440; `learning_goals`, `learning_activities`, `study_*` và `streaks` còn lại sau khi dữ liệu chuyển sang learning, không còn được ghi hay đọc) | `/auth/**`, `/api/users/**` (trừ goal và study-time) |
+| `user-service` | Tài khoản, role, đăng nhập/refresh/logout, hồ sơ học viên (gồm avatar Supabase và múi giờ), đổi mật khẩu | `user_db` (Compose PostgreSQL host 5440; các bảng mục tiêu học, activity, thời gian học và streak đã chuyển sang learning và bị xóa ở V19) | `/auth/**`, `/api/users/**` (trừ goal và study-time) |
 | `content-service` | Course theo band, topic, knowledge point, câu hỏi (có version), gói nội dung/bài đọc, asset; snapshot grammar cho game | `content_db` (Compose PostgreSQL host 5440; V7 xóa năm bảng catalog) | `/api/content/**` trừ nhóm từ vựng/video |
 | `library-service` | Catalog từ vựng/video (V1, năm bảng; V19 mở rộng CEFR/chủ đề/bộ từ), flashcard/deck, note, tiến độ video và đoạn đã lưu (V2, sáu bảng) | `library_db` (Compose PostgreSQL host 5440) | `/api/content/{videos,vocabulary}/**`, `/api/content/admin/vocabulary/**`, `/api/learning-support/{flashcards,decks,notes,video-progress,saved-segments}/**` |
 | `assessment-service` | Lượt làm bài, chấm tự động và LLM cho thi topic/course, chấm EXAMINER, kết quả (có version), bài nộp, video practice; phát `AssessmentCompleted.v2` | `assessment_db` (Compose PostgreSQL host 5440) | `/api/assessments/**` |
@@ -340,7 +340,7 @@ Client -> Gateway -> game: tạo phòng/phiên chơi -> chọn snapshot theo lea
                               VOCABULARY -> library; GRAMMAR -> content
 ```
 
-Năm bảng catalog và sáu bảng thư viện cá nhân thuộc `library_db`; mục tiêu học, `learning_activities` và dữ liệu thời gian học thuộc `learning_db` (các bảng cũ trong `user_db` còn đó, không dùng); streak do `learner_streaks` của learning giữ.
+Năm bảng catalog và sáu bảng thư viện cá nhân thuộc `library_db`; mục tiêu học, `learning_activities` và dữ liệu thời gian học thuộc `learning_db` (các bảng cũ trong `user_db` đã bị xóa ở migration V19, nên dữ liệu phải được chép sang learning trước); streak do `learner_streaks` của learning giữ.
 Game lưu snapshot để chơi; hai service cung cấp cùng request/response nội bộ.
 
 ### Kết quả thi → mastery
