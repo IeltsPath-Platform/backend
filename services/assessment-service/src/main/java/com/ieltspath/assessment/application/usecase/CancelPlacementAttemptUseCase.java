@@ -18,7 +18,7 @@ public class CancelPlacementAttemptUseCase {
     @Transactional
     public AssessmentAttemptResult execute(UUID userId, UUID attemptId) {
         var attempt = attempts.findByIdAndUserId(attemptId, userId)
-                .orElseThrow(() -> new AssessmentNotFoundException("Assessment attempt not found"));
+                .orElseThrow(() -> new AssessmentNotFoundException("Không tìm thấy lượt làm bài thi. Vui lòng kiểm tra lại."));
         attempt.cancel(Instant.now());
         return AssessmentAttemptResult.from(attempts.save(attempt));
     }

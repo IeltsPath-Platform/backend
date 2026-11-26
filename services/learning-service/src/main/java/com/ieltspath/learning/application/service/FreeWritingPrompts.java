@@ -28,13 +28,13 @@ public class FreeWritingPrompts {
         var version = content.getPackageVersion(packageVersionId);
         if (!PRACTICE_TEST.equals(version.packageType())) {
             throw new LearningRequestException(422, "NOT_A_PRACTICE_TEST",
-                    "Free writing is only available for the prompts of a practice test");
+                    "Luyện viết tự do chỉ áp dụng cho đề bài thuộc bài luyện tập.");
         }
         Item item = ItemGrading.orderedItems(version).stream()
                 .filter(candidate -> candidate.questionVersionId().equals(questionVersionId))
                 .filter(ItemGrading::isEssay).findFirst()
                 .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND",
-                        "This writing prompt was not found in the test"));
+                        "Không tìm thấy đề bài viết này trong bài luyện tập."));
         return new ResolvedPrompt(item, version.requiredFeatureKey());
     }
 

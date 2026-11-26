@@ -8,9 +8,9 @@ public class ExaminerChangeNotAllowedException extends RuntimeException {
 
     public ExaminerChangeNotAllowedException(Reason reason) {
         super(switch (reason) {
-            case NOT_OVERDUE -> "The examiner can still be waited for: the deadline has not passed";
-            case LIMIT_REACHED -> "The examiner of this submission was already changed the most times allowed";
-            case SAME_EXAMINER -> "Choose an examiner other than the current one";
+            case NOT_OVERDUE -> "Chưa quá hạn chấm bài nên chưa thể đổi giám khảo.";
+            case LIMIT_REACHED -> "Bạn đã đổi giám khảo cho bài nộp này đạt số lần tối đa cho phép.";
+            case SAME_EXAMINER -> "Vui lòng chọn giám khảo khác với giám khảo hiện tại.";
         });
         this.reason = reason;
     }

@@ -94,7 +94,7 @@ public class StartFreePracticeUseCase {
         if (unseen <= reserve) throw exhausted();
 
         LearningSkill skill = skillOf(topic, knowledgePointId).orElseThrow(() -> new LearningRequestException(409,
-                "FREE_PRACTICE_UNAVAILABLE", "This knowledge point has no skill to practise"));
+                "FREE_PRACTICE_UNAVAILABLE", "Điểm kiến thức này chưa có kỹ năng để luyện tập."));
         List<PracticeSet> candidates = content.searchPracticeSets(knowledgePointId, excludedList,
                 GetReviewBasketUseCase.MIN_SET_QUESTIONS, CANDIDATES);
         // One question to Access for the whole list, and only when some set needs a plan.
@@ -138,26 +138,26 @@ public class StartFreePracticeUseCase {
         return content.getTopicSequence().stream()
                 .filter(topic -> topic.knowledgePoints().stream().anyMatch(kp -> kp.id().equals(knowledgePointId)))
                 .findFirst()
-                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Knowledge point was not found"));
+                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Không tìm thấy điểm kiến thức."));
     }
 
     /** The learner must be taking the course of the point, and the course must be open. */
     private void requireOpenCourse(UUID userId, Topic topic) {
         if (topic.course() == null) return;
         if (!topic.course().active()) {
-            throw new LearningRequestException(403, "COURSE_NOT_OPEN", "The course of this knowledge point is closed");
+            throw new LearningRequestException(403, "COURSE_NOT_OPEN", "Khóa học chứa điểm kiến thức này hiện đang đóng.");
         }
         boolean taking = curricula.find(userId).topics().stream()
                 .anyMatch(progress -> progress.topicId().equals(topic.topicId()));
         if (!taking) {
-            throw new LearningRequestException(403, "COURSE_NOT_JOINED", "The learner is not taking this course");
+            throw new LearningRequestException(403, "COURSE_NOT_JOINED", "Bạn chưa tham gia khóa học này.");
         }
     }
 
     private static com.ieltspath.learning.application.port.LearningContentClient.KnowledgePoint point(
             Topic topic, UUID knowledgePointId) {
         return topic.knowledgePoints().stream().filter(item -> item.id().equals(knowledgePointId)).findFirst()
-                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Knowledge point was not found"));
+                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Không tìm thấy điểm kiến thức."));
     }
 
     /** The point's skill as Content names it; a point whose skill is missing or unknown cannot be practised freely. */
@@ -171,6 +171,6 @@ public class StartFreePracticeUseCase {
 
     private static LearningRequestException exhausted() {
         return new LearningRequestException(409, "FREE_PRACTICE_EXHAUSTED",
-                "No practice set is left for this knowledge point; the rest is kept for reviews");
+                "Hiện không còn bộ bài tập luyện tập tự do nào cho điểm kiến thức này; phần còn lại được dành cho bài ôn tập.");
     }
 }

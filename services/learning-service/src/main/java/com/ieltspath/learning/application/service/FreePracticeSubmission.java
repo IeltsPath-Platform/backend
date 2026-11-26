@@ -65,7 +65,7 @@ public class FreePracticeSubmission {
         var version = content.getPackageVersion(attempt.packageVersionId());
         if (ItemGrading.orderedItems(version).stream().anyMatch(ItemGrading::isEssay)) {
             throw new LearningRequestException(409, "FREE_PRACTICE_ESSAY_UNSUPPORTED",
-                    "Free practice does not take essays");
+                    "Luyện tập tự do không hỗ trợ bài viết luận.");
         }
         var graded = grading.grade(version, command.answers(), "Practice set");
         // Only the first answer to a set counts, as in lessons; a repeat is logged but adds no evidence.

@@ -58,13 +58,13 @@ public class EssaySubmissionFlow {
     /** The word count of a valid essay. */
     public int validate(String essayText) {
         if (essayText == null || essayText.isBlank()) {
-            throw new LearningRequestException(422, "ESSAY_EMPTY", "The essay is empty");
+            throw new LearningRequestException(422, "ESSAY_EMPTY", "Bài viết không được để trống.");
         }
         if (essayText.length() > settings.maxChars()) throw essayTooLong();
         int words = WritingScore.countWords(essayText);
         if (words < settings.minWords()) {
             throw new LearningRequestException(422, "ESSAY_TOO_SHORT",
-                    "The essay needs at least " + settings.minWords() + " words");
+                    "Bài viết cần tối thiểu " + settings.minWords() + " từ.");
         }
         if (words > settings.maxWords()) throw essayTooLong();
         return words;
@@ -92,11 +92,11 @@ public class EssaySubmissionFlow {
         try {
             balance = points.balance();
         } catch (AccessUnavailableException exception) {
-            throw new LearningRequestException(503, "PAYMENT_UNAVAILABLE", "Payment is unavailable");
+            throw new LearningRequestException(503, "PAYMENT_UNAVAILABLE", "Dịch vụ thanh toán tạm thời không khả dụng.");
         }
         if (balance < settings.pointCost()) {
             throw new LearningRequestException(402, "INSUFFICIENT_POINTS",
-                    "Grading costs " + settings.pointCost() + " points");
+                    "Chấm bài cần " + settings.pointCost() + " điểm.");
         }
     }
 
@@ -108,7 +108,7 @@ public class EssaySubmissionFlow {
             grading.fail("DAILY_LIMIT_REACHED");
             essays.save(grading);
             recordOutcome("DAILY_LIMIT_REACHED", grading);
-            throw new LearningRequestException(429, "DAILY_LIMIT_REACHED", "Daily grading limit reached");
+            throw new LearningRequestException(429, "DAILY_LIMIT_REACHED", "Bạn đã đạt giới hạn số lần chấm bài trong hôm nay.");
         }
         EssayGrader.GradedEssay graded;
         try {
@@ -151,12 +151,12 @@ public class EssaySubmissionFlow {
         } catch (InsufficientPointsException exception) {
             submission.recordPaymentFailure("INSUFFICIENT_POINTS");
             essays.save(submission);
-            throw new LearningRequestException(402, "INSUFFICIENT_POINTS", "Not enough points to release the grade",
+            throw new LearningRequestException(402, "INSUFFICIENT_POINTS", "Bạn không đủ điểm để nhận kết quả chấm bài.",
                     submission.id());
         } catch (AccessUnavailableException exception) {
             submission.recordPaymentFailure("PAYMENT_UNAVAILABLE");
             essays.save(submission);
-            throw new LearningRequestException(503, "PAYMENT_UNAVAILABLE", "Payment is unavailable; resend later",
+            throw new LearningRequestException(503, "PAYMENT_UNAVAILABLE", "Dịch vụ thanh toán tạm thời không khả dụng. Vui lòng thử lại sau.",
                     submission.id());
         }
         return finish.apply(submission, ledgerEntryId);
@@ -185,19 +185,19 @@ public class EssaySubmissionFlow {
     }
 
     private static LearningRequestException essayTooLong() {
-        return new LearningRequestException(422, "ESSAY_TOO_LONG", "The essay is too long");
+        return new LearningRequestException(422, "ESSAY_TOO_LONG", "Bài viết vượt quá độ dài cho phép.");
     }
 
     public static LearningRequestException gradingUnavailable(UUID submissionId) {
-        return new LearningRequestException(503, "GRADING_UNAVAILABLE", "Grading is unavailable; nothing was charged",
+        return new LearningRequestException(503, "GRADING_UNAVAILABLE", "Dịch vụ chấm bài tạm thời không khả dụng; bạn chưa bị trừ điểm.",
                 submissionId);
     }
 
     public static LearningRequestException gradingInProgress() {
-        return new LearningRequestException(409, "GRADING_IN_PROGRESS", "This essay block is already being graded");
+        return new LearningRequestException(409, "GRADING_IN_PROGRESS", "Bài viết này đang được chấm. Vui lòng chờ kết quả.");
     }
 
     public static LearningRequestException requestConflict() {
-        return new LearningRequestException(409, "REQUEST_CONFLICT", "requestId belongs to another submission");
+        return new LearningRequestException(409, "REQUEST_CONFLICT", "Mã yêu cầu này đã được sử dụng cho một bài nộp khác.");
     }
 }

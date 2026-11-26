@@ -43,24 +43,24 @@ public class SaveAttemptResponseUseCase {
     @Transactional
     public AttemptResponseResult execute(SaveAttemptResponseCommand command) {
         var attempt = attempts.findByIdAndUserId(command.attemptId(), command.userId())
-                .orElseThrow(() -> new AssessmentNotFoundException("Assessment attempt not found"));
+                .orElseThrow(() -> new AssessmentNotFoundException("Không tìm thấy lượt làm bài thi. Vui lòng kiểm tra lại."));
         if (attempt.getStatus() != AttemptStatus.IN_PROGRESS) {
-            throw new InvalidAssessmentStateException("Only in-progress attempts accept responses");
+            throw new InvalidAssessmentStateException("Chỉ có thể lưu câu trả lời khi lượt làm bài đang diễn ra.");
         }
         if (attempt.isPastDeadline(Instant.now())) {
             throw new AttemptExpiredException();
         }
 
         var item = items.findByIdAndAttemptId(command.itemId(), command.attemptId())
-                .orElseThrow(() -> new AssessmentNotFoundException("Attempt item not found"));
+                .orElseThrow(() -> new AssessmentNotFoundException("Không tìm thấy câu hỏi trong lượt làm bài."));
         if (sections.findById(item.attemptSectionId()).filter(AttemptSection::completed).isPresent()) {
-            throw new InvalidAssessmentStateException("The section of this item is already completed");
+            throw new InvalidAssessmentStateException("Phần thi của câu hỏi này đã được hoàn thành.");
         }
 
         var oldResponse = responses.findByAttemptItemId(command.itemId());
         long currentRevision = oldResponse.map(AttemptResponse::revision).orElse(0L);
         if (currentRevision != command.expectedRevision()) {
-            throw new RevisionConflictException("Response revision conflict");
+            throw new RevisionConflictException("Dữ liệu câu trả lời đã thay đổi. Vui lòng tải lại.");
         }
 
         var response = new AttemptResponse(

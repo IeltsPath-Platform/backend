@@ -54,12 +54,12 @@ public class JdbcExaminerQaRepository implements ExaminerQaRepository {
         if (inserted == 0) {
             boolean exists = Boolean.TRUE.equals(jdbc.queryForObject(
                     "SELECT EXISTS(SELECT 1 FROM grading_jobs WHERE id=? AND reason='QA_SAMPLE')", Boolean.class, jobId));
-            if (!exists) throw new AssessmentNotFoundException("QA grading job not found");
+            if (!exists) throw new AssessmentNotFoundException("Không tìm thấy bài chấm kiểm tra chất lượng.");
             boolean assigned = Boolean.TRUE.equals(jdbc.queryForObject(
                     "SELECT EXISTS(SELECT 1 FROM grading_jobs WHERE id=? AND assigned_examiner_id=?)", Boolean.class,
                     jobId, reviewerId));
-            if (!assigned) throw new AssessmentAccessDeniedException("QA job is not assigned to this reviewer");
-            throw new InvalidAssessmentStateException("QA review was already submitted or the reviewer is not independent");
+            if (!assigned) throw new AssessmentAccessDeniedException("Bài chấm kiểm tra chất lượng này không được phân công cho bạn.");
+            throw new InvalidAssessmentStateException("Bài đánh giá chất lượng đã được gửi hoặc người đánh giá không độc lập.");
         }
         jdbc.update("UPDATE grading_jobs SET status='COMPLETED',completed_at=CURRENT_TIMESTAMP WHERE id=?", jobId);
         jdbc.update("UPDATE human_reviews SET status='COMPLETED',completed_at=CURRENT_TIMESTAMP WHERE grading_job_id=?",

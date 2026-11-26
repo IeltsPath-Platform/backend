@@ -92,9 +92,9 @@ public class SubmitDiagnosticProbeUseCase {
                                                    SubmitExerciseCommand command) {
         for (int retry = 0; retry < 2; retry++) {
             diagnostics.findSession(userId, sessionId).orElseThrow(
-                    () -> new LearningRequestException(404, "NOT_FOUND", "Diagnosis was not found"));
+                    () -> new LearningRequestException(404, "NOT_FOUND", "Không tìm thấy phiên chẩn đoán."));
             DiagnosticProbe owned = diagnostics.findProbe(sessionId, probeId).orElseThrow(
-                    () -> new LearningRequestException(404, "NOT_FOUND", "Diagnostic probe was not found"));
+                    () -> new LearningRequestException(404, "NOT_FOUND", "Không tìm thấy câu hỏi kiểm tra chẩn đoán."));
             boolean replay = owned.status() == DiagnosticProbe.Status.ANSWERED
                     && command.requestId().equals(owned.requestId());
             if (replay) {
@@ -102,17 +102,17 @@ public class SubmitDiagnosticProbeUseCase {
                 if (stored.isPresent()) return readResponse(stored.get());
             }
             if (owned.status() != DiagnosticProbe.Status.OPEN && !replay) {
-                throw new LearningRequestException(409, "PROBE_CLOSED", "Diagnostic probe is closed");
+                throw new LearningRequestException(409, "PROBE_CLOSED", "Câu hỏi kiểm tra chẩn đoán đã đóng.");
             }
             if (!replay && attempts.revealedPackageIds(userId).contains(owned.packageId())) {
-                throw new LearningRequestException(409, "PROBE_CLOSED", "Diagnostic probe is closed");
+                throw new LearningRequestException(409, "PROBE_CLOSED", "Câu hỏi kiểm tra chẩn đoán đã đóng.");
             }
             PackageVersion version;
             try {
                 version = content.getPackageVersion(owned.packageVersionId());
             } catch (LearningRequestException error) {
                 if (error.getStatus() != 404 || !"NOT_FOUND".equals(error.getCode()) || replay) throw error;
-                throw new LearningRequestException(409, "PROBE_CLOSED", "Diagnostic probe is no longer available");
+                throw new LearningRequestException(409, "PROBE_CLOSED", "Câu hỏi kiểm tra chẩn đoán không còn khả dụng.");
             }
             var graded = grading.grade(version, command.answers(), "Diagnostic probe");
             ErrorTrapCatalog.ErrorTraps trapCatalog = errorTrapEvidence.loadIfNeeded(
@@ -125,7 +125,7 @@ public class SubmitDiagnosticProbeUseCase {
                     command, owned, version, graded, trapCatalog, errorTexts, diagnosticData));
             if (!read.retry()) return read.result();
         }
-        throw new LearningRequestException(409, "PROBE_CLOSED", "Probe changed while it was being submitted");
+        throw new LearningRequestException(409, "PROBE_CLOSED", "Câu hỏi kiểm tra chẩn đoán đã thay đổi trong lúc nộp.");
     }
 
     private ProbeSubmissionRead submitUnderLock(UUID userId, UUID sessionId, UUID probeId,
@@ -136,9 +136,9 @@ public class SubmitDiagnosticProbeUseCase {
                                                DiagnosticFlow.Prepared diagnosticData) {
         lock.lock(userId);
         diagnostics.findSession(userId, sessionId).orElseThrow(
-                () -> new LearningRequestException(404, "NOT_FOUND", "Diagnosis was not found"));
+                () -> new LearningRequestException(404, "NOT_FOUND", "Không tìm thấy phiên chẩn đoán."));
         DiagnosticProbe probe = diagnostics.findProbe(sessionId, probeId).orElseThrow(
-                () -> new LearningRequestException(404, "NOT_FOUND", "Diagnostic probe was not found"));
+                () -> new LearningRequestException(404, "NOT_FOUND", "Không tìm thấy câu hỏi kiểm tra chẩn đoán."));
         boolean replay = probe.status() == DiagnosticProbe.Status.ANSWERED
                 && command.requestId().equals(probe.requestId());
         if (replay) {
@@ -153,7 +153,7 @@ public class SubmitDiagnosticProbeUseCase {
             return ProbeSubmissionRead.retryRead();
         }
         if (!replay && attempts.revealedPackageIds(userId).contains(probe.packageId())) {
-            throw new LearningRequestException(409, "PROBE_CLOSED", "Diagnostic probe is closed");
+            throw new LearningRequestException(409, "PROBE_CLOSED", "Câu hỏi kiểm tra chẩn đoán đã đóng.");
         }
         if (!replay && candidatesBecameStale(userId, diagnosticData)) return ProbeSubmissionRead.retryRead();
         if (!replay) record(userId, probe, command, graded, trapCatalog, diagnosticData);

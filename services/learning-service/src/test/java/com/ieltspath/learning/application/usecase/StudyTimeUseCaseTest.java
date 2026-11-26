@@ -120,15 +120,15 @@ class StudyTimeUseCaseTest {
         var today=LocalDate.parse("2026-10-15");
         var error=assertThrows(IllegalArgumentException.class,()->new GetStudyTimeStatisticsUseCase(sessions,timezones,clock)
                 .execute(user,today,today,"YEAR",null));
-        assertEquals("grain must be DAY, WEEK or MONTH",error.getMessage());
+        assertEquals("Đơn vị thống kê phải là DAY, WEEK hoặc MONTH.",error.getMessage());
         verify(sessions,never()).daily(any(),any(),any(),any());
     }
     @Test void aHeartbeatNeedsAnEpochAndASequenceOfAtLeastOne() {
         var heartbeat=new RecordStudyHeartbeatUseCase(sessions,clock);
         UUID session=UUID.randomUUID();
-        assertEquals("Invalid heartbeat",assertThrows(IllegalArgumentException.class,
+        assertEquals("Nhịp học không hợp lệ.",assertThrows(IllegalArgumentException.class,
                 ()->heartbeat.execute(user,session,0,1,List.of(),false)).getMessage());
-        assertEquals("Invalid heartbeat",assertThrows(IllegalArgumentException.class,
+        assertEquals("Nhịp học không hợp lệ.",assertThrows(IllegalArgumentException.class,
                 ()->heartbeat.execute(user,session,1,0,List.of(),false)).getMessage());
         verifyNoInteractions(sessions);
     }
@@ -136,7 +136,7 @@ class StudyTimeUseCaseTest {
         var today=LocalDate.parse("2026-10-15");
         var error=assertThrows(IllegalArgumentException.class,()->new GetStudyTimeStatisticsUseCase(sessions,timezones,clock)
                 .execute(user,today,today.minusDays(1),"DAY",null));
-        assertEquals("Study-time range must contain 1 to 366 days",error.getMessage());
+        assertEquals("Khoảng thời gian thống kê phải từ 1 đến 366 ngày.",error.getMessage());
         verifyNoInteractions(sessions);
     }
     @Test void aWeekThatCrossesTwoMonthsIsOneWeekButTwoMonths() {

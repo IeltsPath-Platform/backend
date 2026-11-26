@@ -76,7 +76,7 @@ public class StartBasketReviewUseCase {
         ErrorTrapCatalog.ErrorTraps traps = errorTraps == null ? null : errorTraps.load();
         if (traps != null && traps.parentByTrapKp().containsKey(knowledgePointId)) {
             throw new LearningRequestException(409, "NOT_IN_REVIEW_BASKET",
-                    "This knowledge point is not in the review basket");
+                    "Điểm kiến thức này không nằm trong giỏ ôn tập.");
         }
         Optional<PendingReview> existing = reviews.findPending(userId).stream()
                 .filter(review -> review.knowledgePointId().equals(knowledgePointId)).findFirst();
@@ -88,7 +88,7 @@ public class StartBasketReviewUseCase {
             MasteryProfile profile = eligibleProfile(userId, knowledgePointId);
             UUID lessonId = lessonLocator.teaching(userId, knowledgePointId).orElseThrow(() ->
                     new LearningRequestException(409, "NO_LESSON_FOR_KNOWLEDGE_POINT",
-                            "No completed lesson teaches this knowledge point"));
+                            "Chưa có bài học nào đã hoàn thành giảng dạy điểm kiến thức này."));
             Set<UUID> excluded = new HashSet<>(attempts.revealedPackageIds(userId));
             excluded.addAll(reviews.assignedPackageIds(userId));
             List<UUID> excludedList = excluded.stream().sorted(java.util.Comparator.comparing(UUID::toString)).toList();
@@ -131,7 +131,7 @@ public class StartBasketReviewUseCase {
                 MasteryProfile current = eligibleProfile(userId, knowledgePointId);
                 if (current.tier() != profile.tier()) {
                     throw new LearningRequestException(409, "NOT_IN_REVIEW_BASKET",
-                            "This knowledge point is not in the review basket");
+                            "Điểm kiến thức này không nằm trong giỏ ôn tập.");
                 }
                 Set<UUID> assigned = new HashSet<>(attempts.revealedPackageIds(userId));
                 assigned.addAll(reviews.assignedPackageIds(userId));
@@ -170,7 +170,7 @@ public class StartBasketReviewUseCase {
 
     private static LearningRequestException notInBasket() {
         return new LearningRequestException(409, "NOT_IN_REVIEW_BASKET",
-                "This knowledge point is not in the review basket");
+                "Điểm kiến thức này không nằm trong giỏ ôn tập.");
     }
 
     private PaywallGate.Request requireKnowledgePointOpen(UUID userId, UUID knowledgePointId) {
@@ -178,7 +178,7 @@ public class StartBasketReviewUseCase {
                 .filter(candidate -> candidate.knowledgePoints().stream()
                         .anyMatch(point -> point.id().equals(knowledgePointId)))
                 .findFirst().orElseThrow(() -> new LearningRequestException(409,
-                        "NO_LESSON_FOR_KNOWLEDGE_POINT", "No completed lesson teaches this knowledge point"));
+                        "NO_LESSON_FOR_KNOWLEDGE_POINT", "Chưa có bài học nào đã hoàn thành giảng dạy điểm kiến thức này."));
         var point = topic.knowledgePoints().stream().filter(candidate -> candidate.id().equals(knowledgePointId))
                 .findFirst().orElseThrow();
         PaywallGate.Request request = paywall.forLearner(userId);
@@ -193,7 +193,7 @@ public class StartBasketReviewUseCase {
 
     private static LearningRequestException noUnrevealedSet() {
         return new LearningRequestException(409, "NO_UNREVEALED_SET",
-                "No practice set the learner has not seen is left for this knowledge point");
+                "Hiện không còn bộ bài tập mới nào cho điểm kiến thức này.");
     }
 
     private record StartOutcome(UUID reviewId, boolean candidateBecameUnavailable,

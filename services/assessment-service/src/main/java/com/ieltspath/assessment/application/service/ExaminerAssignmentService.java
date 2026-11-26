@@ -49,7 +49,7 @@ public class ExaminerAssignmentService {
     @Transactional(propagation = Propagation.MANDATORY)
     public void requireAvailable(UUID examinerId, int slots) {
         ExaminerDirectory.Examiner examiner = directory.find(examinerId)
-                .orElseThrow(() -> new AssessmentNotFoundException("Examiner not found"));
+                .orElseThrow(() -> new AssessmentNotFoundException("Không tìm thấy giám khảo. Vui lòng chọn giám khảo khác."));
         if (!examiner.acceptingSubmissions()) {
             throw new ExaminerUnavailableException(ExaminerUnavailableException.Reason.NOT_ACCEPTING);
         }
@@ -97,10 +97,10 @@ public class ExaminerAssignmentService {
     public void cancel(UUID learnerId, UUID jobId) {
         ExaminerAssignmentStore.JobRef job = store.lockJob(jobId)
                 .filter(found -> found.learnerId().equals(learnerId))
-                .orElseThrow(() -> new AssessmentNotFoundException("Grading job not found"));
+                .orElseThrow(() -> new AssessmentNotFoundException("Không tìm thấy yêu cầu chấm bài."));
         if ("CANCELLED".equals(job.status())) return;
         if (!ExaminerAssignmentPolicy.isOpen(job.status())) {
-            throw new RevisionConflictException("Grading of this submission is already finished");
+            throw new RevisionConflictException("Bài nộp này đã được chấm xong.");
         }
         if (job.requestedExaminerId() == null || !ExaminerAssignmentPolicy.isOverdue(job.requestedAt(), Instant.now())) {
             throw new GradingCancelNotAllowedException(GradingCancelNotAllowedException.Reason.NOT_OVERDUE);
@@ -119,9 +119,9 @@ public class ExaminerAssignmentService {
     public MyJobView choose(UUID learnerId, UUID jobId, UUID examinerId) {
         ExaminerAssignmentStore.JobRef job = store.lockJob(jobId)
                 .filter(found -> found.learnerId().equals(learnerId))
-                .orElseThrow(() -> new AssessmentNotFoundException("Grading job not found"));
+                .orElseThrow(() -> new AssessmentNotFoundException("Không tìm thấy yêu cầu chấm bài."));
         if (!ExaminerAssignmentPolicy.isOpen(job.status())) {
-            throw new RevisionConflictException("Grading of this submission is already finished");
+            throw new RevisionConflictException("Bài nộp này đã được chấm xong.");
         }
         boolean replacing = job.requestedExaminerId() != null;
         if (replacing) {

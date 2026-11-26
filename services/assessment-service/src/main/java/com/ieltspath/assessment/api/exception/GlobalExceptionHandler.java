@@ -48,14 +48,15 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(StorageException.class)
     public ResponseEntity<ErrorResponse> storageUnavailable(StorageException e, HttpServletRequest r) {
         log.error("Speaking recording storage failed: operation={} reason={}", e.operation(), e.reason());
-        return build(HttpStatus.SERVICE_UNAVAILABLE, "Recording storage is unavailable", r.getRequestURI(), null,
-                "STORAGE_UNAVAILABLE");
+        return build(HttpStatus.SERVICE_UNAVAILABLE,
+                "Dịch vụ lưu trữ bản ghi âm tạm thời không khả dụng. Vui lòng thử lại sau.",
+                r.getRequestURI(), null, "STORAGE_UNAVAILABLE");
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ErrorResponse> uploadTooLarge(MaxUploadSizeExceededException e, HttpServletRequest r) {
-        return build(HttpStatus.PAYLOAD_TOO_LARGE, "Recording file is too large", r.getRequestURI(), null,
-                "UPLOAD_TOO_LARGE");
+        return build(HttpStatus.PAYLOAD_TOO_LARGE, "Tệp ghi âm vượt quá dung lượng cho phép.",
+                r.getRequestURI(), null, "UPLOAD_TOO_LARGE");
     }
 
     @ExceptionHandler(JobAlreadyClaimedException.class)
@@ -82,8 +83,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(UserServiceUnavailableException.class)
     public ResponseEntity<ErrorResponse> userServiceUnavailable(UserServiceUnavailableException e, HttpServletRequest r) {
-        return build(HttpStatus.SERVICE_UNAVAILABLE, "User Service is unavailable", r.getRequestURI(), null,
-                "USER_SERVICE_UNAVAILABLE");
+        return build(HttpStatus.SERVICE_UNAVAILABLE,
+                "Dịch vụ người dùng tạm thời không khả dụng. Vui lòng thử lại sau.",
+                r.getRequestURI(), null, "USER_SERVICE_UNAVAILABLE");
     }
 
     @ExceptionHandler(HumanGradingCreditInsufficientException.class)
@@ -130,45 +132,49 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ContentUnavailableException.class)
     public ResponseEntity<ErrorResponse> contentUnavailable(ContentUnavailableException e, HttpServletRequest r) {
-        return build(HttpStatus.SERVICE_UNAVAILABLE, "Content Service is unavailable", r.getRequestURI(), null,
-                "CONTENT_UNAVAILABLE");
+        return build(HttpStatus.SERVICE_UNAVAILABLE,
+                "Dịch vụ nội dung tạm thời không khả dụng. Vui lòng thử lại sau.",
+                r.getRequestURI(), null, "CONTENT_UNAVAILABLE");
     }
 
     @ExceptionHandler({RevisionConflictException.class, OptimisticLockException.class})
     public ResponseEntity<ErrorResponse> conflict(Exception e, HttpServletRequest r) {
-        return build(HttpStatus.CONFLICT, "The assessment was changed by another request", r.getRequestURI(), null);
+        return build(HttpStatus.CONFLICT, "Bài thi đã được cập nhật bởi một yêu cầu khác. Vui lòng tải lại và thử lại.",
+                r.getRequestURI(), null);
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> integrity(DataIntegrityViolationException e, HttpServletRequest r) {
-        return build(HttpStatus.CONFLICT, "The assessment request conflicts with existing data", r.getRequestURI(), null);
+        return build(HttpStatus.CONFLICT, "Yêu cầu xung đột với dữ liệu hiện có. Vui lòng kiểm tra lại.",
+                r.getRequestURI(), null);
     }
 
     @ExceptionHandler(AssessmentAccessDeniedException.class)
     public ResponseEntity<ErrorResponse> denied(AssessmentAccessDeniedException e, HttpServletRequest r) {
-        return build(HttpStatus.FORBIDDEN, "Access denied", r.getRequestURI(), null);
+        return build(HttpStatus.FORBIDDEN, "Bạn không có quyền truy cập tài nguyên này.", r.getRequestURI(), null);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> validation(MethodArgumentNotValidException e, HttpServletRequest r) {
         Map<String, String> details = new HashMap<>();
         for (FieldError f : e.getBindingResult().getFieldErrors()) details.put(f.getField(), f.getDefaultMessage());
-        return build(HttpStatus.BAD_REQUEST, "Validation failed", r.getRequestURI(), details);
+        return build(HttpStatus.BAD_REQUEST, "Dữ liệu gửi lên không hợp lệ.", r.getRequestURI(), details);
     }
 
     @ExceptionHandler(org.springframework.web.client.RestClientException.class)
     public ResponseEntity<ErrorResponse> dependencyUnavailable(org.springframework.web.client.RestClientException e, HttpServletRequest r) {
-        return build(HttpStatus.SERVICE_UNAVAILABLE, "A required service is unavailable", r.getRequestURI(), null);
+        return build(HttpStatus.SERVICE_UNAVAILABLE, "Dịch vụ liên quan tạm thời không khả dụng. Vui lòng thử lại sau.",
+                r.getRequestURI(), null);
     }
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> securityDenied(AccessDeniedException e, HttpServletRequest r) {
-        return build(HttpStatus.FORBIDDEN, "Access denied", r.getRequestURI(), null);
+        return build(HttpStatus.FORBIDDEN, "Bạn không có quyền thực hiện thao tác này.", r.getRequestURI(), null);
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ErrorResponse> methodNotAllowed(HttpRequestMethodNotSupportedException e, HttpServletRequest r) {
-        return build(HttpStatus.METHOD_NOT_ALLOWED, "Method not allowed", r.getRequestURI(), null);
+        return build(HttpStatus.METHOD_NOT_ALLOWED, "Phương thức yêu cầu không được hỗ trợ.", r.getRequestURI(), null);
     }
 
     @ExceptionHandler(ResponseStatusException.class)
@@ -177,13 +183,19 @@ public class GlobalExceptionHandler {
         HttpStatus knownStatus = HttpStatus.resolve(status.value());
         String error = knownStatus == null ? "Request failed" : knownStatus.getReasonPhrase();
         String reason = e.getReason();
+        String raw = reason == null ? error : reason;
+        String userMessage = VietnameseErrorMessages.userFacing(status.value(), raw);
+        if (!userMessage.equals(raw)) {
+            log.warn("Replaced non-Vietnamese ResponseStatusException message (status={}): {}", status.value(), raw);
+        }
         return ResponseEntity.status(status).body(new ErrorResponse(LocalDateTime.now(), status.value(), error,
-                reason == null ? error : reason, r.getRequestURI(), null, reason));
+                userMessage, r.getRequestURI(), null, reason));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> generic(Exception e, HttpServletRequest r) {
-        return build(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected internal error occurred", r.getRequestURI(), null);
+        return build(HttpStatus.INTERNAL_SERVER_ERROR, "Hệ thống gặp lỗi nội bộ, vui lòng thử lại sau.",
+                r.getRequestURI(), null);
     }
 
     private ResponseEntity<ErrorResponse> build(HttpStatus s, String m, String p, Map<String, String> d) {
@@ -191,7 +203,11 @@ public class GlobalExceptionHandler {
     }
 
     private ResponseEntity<ErrorResponse> build(HttpStatus s, String m, String p, Map<String, String> d, String code) {
+        String userMessage = VietnameseErrorMessages.userFacing(s.value(), m);
+        if (!userMessage.equals(m)) {
+            log.warn("Replaced non-Vietnamese error message (status={}, code={}): {}", s.value(), code, m);
+        }
         return ResponseEntity.status(s)
-                .body(new ErrorResponse(LocalDateTime.now(), s.value(), s.getReasonPhrase(), m, p, d, code));
+                .body(new ErrorResponse(LocalDateTime.now(), s.value(), s.getReasonPhrase(), userMessage, p, d, code));
     }
 }

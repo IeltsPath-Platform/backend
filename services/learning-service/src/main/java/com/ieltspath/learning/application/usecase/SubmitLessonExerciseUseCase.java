@@ -102,9 +102,9 @@ public class SubmitLessonExerciseUseCase {
         Lesson lesson = context.lesson();
         Block block = lesson.blocks().stream().filter(item -> item.blockId().equals(blockId)
                         && "EXERCISE".equals(item.blockType())).findFirst()
-                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Exercise block was not found"));
+                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Không tìm thấy khối bài tập."));
         if (block.isEssay()) {
-            throw new LearningRequestException(409, "ESSAY_BLOCK", "Essay blocks are submitted as essays");
+            throw new LearningRequestException(409, "ESSAY_BLOCK", "Khối bài viết luận cần được nộp tại mục nộp bài viết.");
         }
         List<Question> questions = LessonViewAssembler.orderedQuestions(block);
         Map<UUID, Object> answers = AnswerSheet.require(
@@ -114,7 +114,7 @@ public class SubmitLessonExerciseUseCase {
         List<AnswerSpecGrader.Grade> grades = questions.stream()
                 .map(question -> grader.grade(question.answerSpec(), answers.get(question.questionVersionId()))).toList();
         if (grades.stream().anyMatch(grade -> !grade.gradable())) {
-            throw new LearningRequestException(422, "UNGRADABLE_EXERCISE", "Exercise contains unsupported questions");
+            throw new LearningRequestException(422, "UNGRADABLE_EXERCISE", "Bài tập chứa dạng câu hỏi chưa được hỗ trợ.");
         }
         boolean firstSubmission = !submissions.exists(userId, lessonId, blockId);
         // Every submission is logged per question; only the first one also becomes mastery evidence below.
@@ -219,6 +219,6 @@ public class SubmitLessonExerciseUseCase {
     }
 
     private static LearningRequestException requestConflict() {
-        return new LearningRequestException(409, "REQUEST_CONFLICT", "requestId belongs to another submission");
+        return new LearningRequestException(409, "REQUEST_CONFLICT", "Mã yêu cầu này đã được sử dụng cho một bài nộp khác.");
     }
 }

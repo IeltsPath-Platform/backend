@@ -108,9 +108,9 @@ public class SubmitLessonEssayUseCase {
         Block block = lesson.blocks().stream()
                 .filter(item -> item.blockId().equals(blockId) && "EXERCISE".equals(item.blockType()))
                 .findFirst()
-                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Essay block was not found"));
+                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Không tìm thấy khối bài viết."));
         if (!block.isEssay()) {
-            throw new LearningRequestException(409, "NOT_ESSAY_BLOCK", "This block is not an essay");
+            throw new LearningRequestException(409, "NOT_ESSAY_BLOCK", "Khối nội dung này không phải là bài viết luận.");
         }
         flow.requireBalance(premium);
 
@@ -151,7 +151,7 @@ public class SubmitLessonEssayUseCase {
             if (revising != null) {
                 if (essays.hasActiveRevision(revising.id())) {
                     throw new LearningRequestException(409, "REVISION_NOT_LATEST",
-                            "This essay has already been revised; revise the newest version");
+                            "Bài viết này đã có bản chỉnh sửa mới hơn; vui lòng sửa trên bản mới nhất.");
                 }
                 submission.revising(revising.id(), revising.revisionNo() + 1);
             }

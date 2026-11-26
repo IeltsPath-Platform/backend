@@ -18,6 +18,6 @@ public class GetSpeakingSubmissionUseCase {
     public SpeakingSubmissionResult execute(UUID userId, UUID submissionId) {
         return submissions.findOwned(submissionId, userId).map(SpeakingSubmissionResult::from)
                 .orElseThrow(() -> new LearningRequestException(404, "SPEAKING_SUBMISSION_NOT_FOUND",
-                        "Speaking submission not found"));
+                        "Không tìm thấy bài nộp Speaking."));
     }
 }

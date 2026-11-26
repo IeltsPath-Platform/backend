@@ -80,7 +80,7 @@ public class SubmitPracticeEssayUseCase {
                 .filter(candidate -> candidate.questionVersionId().equals(questionVersionId))
                 .filter(ItemGrading::isEssay).findFirst()
                 .orElseThrow(() -> new LearningRequestException(409, "NOT_ESSAY_ITEM",
-                        "This question is not an essay of the practice set"));
+                        "Câu hỏi này không phải là bài viết luận của bộ luyện tập."));
         flow.requireBalance(premium);
 
         WritingSubmission grading = transaction.execute(status -> startGrading(userId, attemptId, item, requestId,
@@ -91,9 +91,9 @@ public class SubmitPracticeEssayUseCase {
 
     private PracticeAttempt owned(UUID userId, UUID attemptId) {
         PracticeAttempt attempt = attempts.findOwned(userId, attemptId)
-                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Practice attempt was not found"));
+                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Không tìm thấy lượt luyện tập."));
         if (attempt.submitted()) {
-            throw new LearningRequestException(409, "ATTEMPT_SUBMITTED", "The practice attempt was already submitted");
+            throw new LearningRequestException(409, "ATTEMPT_SUBMITTED", "Lượt luyện tập này đã được nộp trước đó.");
         }
         return attempt;
     }
@@ -110,7 +110,7 @@ public class SubmitPracticeEssayUseCase {
         PracticeAttempt attempt = owned(userId, attemptId);
         if (attempt.origin() == com.ieltspath.learning.domain.vo.PracticeOrigin.FREE) {
             throw new LearningRequestException(409, "FREE_PRACTICE_ESSAY_UNSUPPORTED",
-                    "Free practice does not take essays");
+                    "Luyện tập tự do không hỗ trợ bài viết luận.");
         }
         access.require(userId, attempt.lessonId());
         // The examiner's grade of this question already counts toward mastery; an AI grade on top would count it twice.

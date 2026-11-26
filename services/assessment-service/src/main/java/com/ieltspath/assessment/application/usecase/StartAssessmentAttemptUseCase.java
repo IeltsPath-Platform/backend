@@ -34,7 +34,7 @@ public class StartAssessmentAttemptUseCase {
 
     public AssessmentAttemptResult execute(StartAssessmentAttemptCommand command) {
         var packageVersion = content.findPackageVersion(command.packageVersionId())
-                .orElseThrow(() -> new AssessmentNotFoundException("Package version not found"));
+                .orElseThrow(() -> new AssessmentNotFoundException("Không tìm thấy phiên bản gói đề thi."));
         AttemptType type = AttemptType.forContentPackageType(packageVersion.packageType());
         boolean practiceTest = type == AttemptType.OFFICIAL_PRACTICE;
         if (practiceTest && packageVersion.requiredFeatureKey() != null && !entitlement.premium()) {
@@ -43,16 +43,16 @@ public class StartAssessmentAttemptUseCase {
         List<ContentPackageProvider.Section> allSections = packageVersion.sections();
         List<ContentPackageProvider.Section> selected = allSections;
         if (command.sectionIds() != null && !command.sectionIds().isEmpty()) {
-            if (!practiceTest) throw new PackageNotAttemptableException("Sections can only be selected for practice tests");
+            if (!practiceTest) throw new PackageNotAttemptableException("Chỉ bài luyện tập mới hỗ trợ chọn từng phần thi.");
             if (new HashSet<>(command.sectionIds()).size() != command.sectionIds().size()) {
-                throw new PackageNotAttemptableException("Selected sections must be unique");
+                throw new PackageNotAttemptableException("Các phần thi được chọn không được trùng lặp.");
             }
             selected = allSections.stream().filter(s -> command.sectionIds().contains(s.sectionId())).toList();
             if (selected.size() != command.sectionIds().size()) {
-                throw new PackageNotAttemptableException("A selected section does not belong to this package version");
+                throw new PackageNotAttemptableException("Có phần thi được chọn không thuộc phiên bản gói đề này.");
             }
         }
-        if (selected.isEmpty()) throw new PackageNotAttemptableException("Package version has no sections");
+        if (selected.isEmpty()) throw new PackageNotAttemptableException("Phiên bản gói đề thi chưa có phần thi nào.");
         selected = selected.stream().sorted(java.util.Comparator.comparingInt(ContentPackageProvider.Section::sortOrder)).toList();
         AttemptScope scope = practiceTest && selected.size() < allSections.size() ? AttemptScope.PART : AttemptScope.FULL;
         Skill skill = null;
@@ -60,18 +60,18 @@ public class StartAssessmentAttemptUseCase {
             try {
                 skill = Skill.valueOf(selected.getFirst().skill());
             } catch (RuntimeException invalidSkill) {
-                throw new PackageNotAttemptableException("Practice test section must have a skill");
+                throw new PackageNotAttemptableException("Phần thi của bài luyện tập phải có kỹ năng.");
             }
             Skill selectedSkill = skill;
             if (selected.stream().anyMatch(s -> !selectedSkill.name().equals(s.skill()))) {
-                throw new PackageNotAttemptableException("All selected sections must use the same skill");
+                throw new PackageNotAttemptableException("Các phần thi được chọn phải thuộc cùng một kỹ năng.");
             }
         }
         Instant expiresAt = null;
         // Only practice tests run a section clock; every other package type keeps starting without a deadline.
         if (practiceTest && command.mode() == com.ieltspath.assessment.domain.vo.AttemptMode.TIMED) {
             if (selected.stream().anyMatch(s -> s.timeLimitSeconds() == null || s.timeLimitSeconds() <= 0)) {
-                throw new PackageNotAttemptableException("Timed attempts require a time limit on every section");
+                throw new PackageNotAttemptableException("Bài làm tính giờ yêu cầu mỗi phần thi phải có giới hạn thời gian.");
             }
             long seconds = selected.stream().mapToLong(ContentPackageProvider.Section::timeLimitSeconds).sum();
             expiresAt = Instant.now().plusSeconds(seconds);

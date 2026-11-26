@@ -11,7 +11,7 @@ public enum AttemptType {
      */
     public static AttemptType forContentPackageType(String packageType) {
         if (packageType == null) {
-            throw new PackageNotAttemptableException("Package type is missing");
+            throw new PackageNotAttemptableException("Thiếu thông tin loại gói bài thi.");
         }
         return switch (packageType) {
             case "TOPIC_TEST" -> TOPIC_GATE;
@@ -20,8 +20,7 @@ public enum AttemptType {
             case "PRACTICE_TEST" -> OFFICIAL_PRACTICE;
             case "PLACEMENT_TEST" -> PLACEMENT;
             case "QUIZ" -> QUIZ;
-            default -> throw new PackageNotAttemptableException("Packages of type " + packageType
-                    + " cannot be taken as an assessment attempt");
+            default -> throw new PackageNotAttemptableException("Loại gói đề này không thể dùng để làm bài đánh giá.");
         };
     }
 }

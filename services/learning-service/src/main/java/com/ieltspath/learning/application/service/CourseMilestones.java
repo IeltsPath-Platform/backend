@@ -43,6 +43,6 @@ public class CourseMilestones {
     /** For an event: the kept count, never a call to Content. Without one the event fails and is tried again. */
     public int countForEvent(UUID courseId) {
         return counts.find(courseId).orElseThrow(() -> new LearningRequestException(503, "MILESTONE_COUNT_UNKNOWN",
-                "The practice test milestones of this course are not known yet"));
+                "Chưa xác định được các mốc bài thi luyện tập của khóa học này."));
     }
 }

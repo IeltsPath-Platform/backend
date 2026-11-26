@@ -37,7 +37,7 @@ spring:
 assessment:
   placement:
     speaking-grading:
-      enabled: ${ASSESSMENT_PLACEMENT_SPEAKING_GRADING_ENABLED:false}
+      enabled: ${ASSESSMENT_PLACEMENT_SPEAKING_GRADING_ENABLED:true}
       timeout-seconds: ${ASSESSMENT_PLACEMENT_SPEAKING_GRADING_TIMEOUT_SECONDS:600}
       timeout-poll-ms: ${ASSESSMENT_PLACEMENT_SPEAKING_GRADING_TIMEOUT_POLL_MS:30000}
       retry-delay-ms: ${ASSESSMENT_PLACEMENT_SPEAKING_GRADING_RETRY_DELAY_MS:30000}
@@ -84,6 +84,12 @@ assessment:
       batch-size: 50
       max-attempts: 20
       confirm-timeout: PT5S
+    purge:
+      enabled: ${ASSESSMENT_OUTBOX_PURGE_ENABLED:true}
+      retention-days: ${ASSESSMENT_OUTBOX_PURGE_RETENTION_DAYS:30}
+      batch-size: 1000
+      max-batches-per-run: 20
+      cron: ${ASSESSMENT_OUTBOX_PURGE_CRON:0 49 3 * * *}
 
 app:
   storage:

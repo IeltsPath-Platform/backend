@@ -21,8 +21,8 @@ public class GetStudyTimeStatisticsUseCase {
     @Transactional(readOnly=true)
     public StudyTimeStatisticsResult execute(UUID user,LocalDate from,LocalDate to,String grain,UUID courseId) {
         if(from==null || to==null || to.isBefore(from) || ChronoUnit.DAYS.between(from,to)>=366)
-            throw new IllegalArgumentException("Study-time range must contain 1 to 366 days");
-        if(!Set.of("DAY","WEEK","MONTH").contains(grain)) throw new IllegalArgumentException("grain must be DAY, WEEK or MONTH");
+            throw new IllegalArgumentException("Khoảng thời gian thống kê phải từ 1 đến 366 ngày.");
+        if(!Set.of("DAY","WEEK","MONTH").contains(grain)) throw new IllegalArgumentException("Đơn vị thống kê phải là DAY, WEEK hoặc MONTH.");
         var zone=timezones.zoneOf(user);
         var now=clock.instant();
         LocalDate today=now.atZone(zone).toLocalDate(), dataFrom=sessions.trackingStartedAt().atZone(zone).toLocalDate();

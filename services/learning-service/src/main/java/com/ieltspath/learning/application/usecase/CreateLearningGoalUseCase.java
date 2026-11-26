@@ -51,7 +51,7 @@ public class CreateLearningGoalUseCase {
             studyGoals.execute(saved);
             return toResult(saved);
         } catch (DataIntegrityViolationException exception) {
-            throw new LearningGoalConflictException("An active learning goal already exists for this user");
+            throw new LearningGoalConflictException("Bạn đã có một mục tiêu học tập đang hoạt động.");
         }
     }
 

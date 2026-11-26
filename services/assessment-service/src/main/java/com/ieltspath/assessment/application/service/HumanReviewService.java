@@ -73,7 +73,7 @@ public class HumanReviewService {
     @Transactional(readOnly = true)
     public HumanReviewStore.ReviewResult get(UUID reviewId, UUID learnerId) {
         HumanReviewStore.ReviewResult result = store.find(reviewId, learnerId).orElseThrow(
-                () -> new AssessmentNotFoundException("Human review not found"));
+                () -> new AssessmentNotFoundException("Không tìm thấy yêu cầu chấm bài bởi giám khảo."));
         if (!"DONE".equals(result.status())) return result;
         Set<String> approved = approvedCodes();
         List<String> codes = result.errorCodes() == null ? null
@@ -147,7 +147,7 @@ public class HumanReviewService {
     public void saveDraft(UUID jobId, UUID examinerId, JsonNode payload) {
         requireObject(payload, "draft");
         if (payload.toString().getBytes(StandardCharsets.UTF_8).length > MAX_DRAFT_BYTES) {
-            throw new InvalidAssessmentStateException("draft must not be larger than 200 KB");
+            throw new InvalidAssessmentStateException("Bản nháp nhận xét không được vượt quá 200 KB.");
         }
         store.saveDraft(jobId, examinerId, payload);
     }
@@ -170,13 +170,13 @@ public class HumanReviewService {
     private void requireAnnotationsQuoteTheEssay(UUID jobId, List<CompleteHumanReviewCommand.Annotation> annotations) {
         if (annotations.isEmpty()) return;
         String essay = store.essay(jobId).orElseThrow(
-                () -> new AssessmentNotFoundException("Standalone human review not found"));
+                () -> new AssessmentNotFoundException("Không tìm thấy bài viết cần chấm."));
         for (int index = 0; index < annotations.size(); index++) {
             var annotation = annotations.get(index);
             if (annotation.start() < 0 || annotation.end() <= annotation.start() || annotation.end() > essay.length()
                     || !essay.substring(annotation.start(), annotation.end()).equals(annotation.excerpt())) {
                 throw new InvalidAssessmentStateException(
-                        "annotations[" + index + "] must quote the essay between start and end");
+                        "Đoạn trích lỗi đánh dấu không khớp chính xác với vị trí trong bài viết.");
             }
         }
     }
@@ -204,11 +204,11 @@ public class HumanReviewService {
     private static void requireHalfBand(java.math.BigDecimal band, String field) {
         if (band == null || band.signum() < 0 || band.compareTo(java.math.BigDecimal.valueOf(9)) > 0
                 || band.multiply(java.math.BigDecimal.valueOf(2)).stripTrailingZeros().scale() > 0) {
-            throw new InvalidAssessmentStateException(field + " must be an IELTS half-band from 0 to 9");
+            throw new InvalidAssessmentStateException("Điểm tiêu chí phải là điểm band IELTS từ 0 đến 9 theo bước 0,5.");
         }
     }
 
     private static void requireObject(JsonNode node, String field) {
-        if (node == null || !node.isObject()) throw new InvalidAssessmentStateException(field + " must be a JSON object");
+        if (node == null || !node.isObject()) throw new InvalidAssessmentStateException("Dữ liệu nhận xét phải ở định dạng đối tượng JSON hợp lệ.");
     }
 }

@@ -40,7 +40,7 @@ public record Mp1Params(int window, int maxPracticeInWindow, double halfLifeDays
         Objects.requireNonNull(weights, "weights");
         if (window < 1 || maxPracticeInWindow < 0 || halfLifeDays <= 0 || minEvidence < 1 || minDistinctDays < 1
                 || minConfidence < 0 || hysteresis < 0 || hysteresis >= 0.1 || sameItemDays < 0) {
-            throw new IllegalArgumentException("Invalid MP-1.0 parameters");
+            throw new IllegalArgumentException("Tham số MP-1.0 không hợp lệ.");
         }
     }
 

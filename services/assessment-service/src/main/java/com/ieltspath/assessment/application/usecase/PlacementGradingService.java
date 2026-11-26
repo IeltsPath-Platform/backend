@@ -185,7 +185,7 @@ public class PlacementGradingService {
         for (AttemptItem item : items) {
             AnswerSnapshot answer = AnswerSnapshot.parse(json, item.answerSnapshot())
                     .filter(snapshot -> snapshot.maxScore() != null && snapshot.maxScore() > 0)
-                    .orElseThrow(() -> new InvalidAssessmentStateException("Placement item has no answer snapshot"));
+                    .orElseThrow(() -> new InvalidAssessmentStateException("Câu hỏi bài kiểm tra đầu vào thiếu dữ liệu đáp án."));
             Skill skill = skillBySection.get(item.attemptSectionId());
             boolean correct;
             Boolean judged;
@@ -312,7 +312,7 @@ public class PlacementGradingService {
             JsonNode node = json.readTree(section.snapshot());
             return Skill.valueOf(node.path("skill").asText());
         } catch (Exception exception) {
-            throw new InvalidAssessmentStateException("Placement section has no valid skill");
+            throw new InvalidAssessmentStateException("Phần thi kiểm tra đầu vào chưa có kỹ năng hợp lệ.");
         }
     }
 }

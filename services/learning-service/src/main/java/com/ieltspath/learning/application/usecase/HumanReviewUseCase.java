@@ -73,7 +73,7 @@ public class HumanReviewUseCase {
      */
     public UUID request(UUID userId, UUID submissionId, UUID examinerId) {
         if (examinerId == null) {
-            throw new LearningRequestException(400, "EXAMINER_REQUIRED", "Choose the examiner who will grade the essay");
+            throw new LearningRequestException(400, "EXAMINER_REQUIRED", "Vui lòng chọn giám khảo chấm bài.");
         }
         WritingSubmission essay = owned(userId, submissionId);
         var existing = requests.findReviewId(submissionId);
@@ -83,7 +83,7 @@ public class HumanReviewUseCase {
         }
         if (essay.status() != WritingSubmissionStatus.GRADED && essay.status() != WritingSubmissionStatus.AWAITING_EXAMINER) {
             throw new LearningRequestException(409, "NOT_REVIEWABLE",
-                    "Only a graded essay, or one sent to an examiner, can be sent to a Mentor");
+                    "Chỉ bài viết đã chấm hoặc đang chờ giám khảo mới có thể gửi chấm bởi giám khảo.");
         }
         var rubric = content.getActiveRubric(essay.prompt().task());
 
@@ -109,7 +109,7 @@ public class HumanReviewUseCase {
     public HumanReviewClient.Review review(UUID userId, UUID submissionId) {
         owned(userId, submissionId);
         UUID reviewId = requests.findReviewId(submissionId).orElseThrow(() -> new LearningRequestException(404,
-                "NO_HUMAN_REVIEW", "No Mentor review was asked for this essay"));
+                "NO_HUMAN_REVIEW", "Bài viết này chưa có yêu cầu chấm bởi giám khảo."));
         return client.fetchReview(reviewId, userId);
     }
 
@@ -120,7 +120,7 @@ public class HumanReviewUseCase {
      */
     public HumanReviewClient.Review cancel(UUID userId, UUID reviewSubmissionId) {
         UUID submissionId = requests.findSubmissionId(reviewSubmissionId, userId).orElseThrow(() -> new LearningRequestException(404,
-                "NO_HUMAN_REVIEW", "No Mentor review was asked for this essay"));
+                "NO_HUMAN_REVIEW", "Bài viết này chưa có yêu cầu chấm bởi giám khảo."));
         HumanReviewClient.Review cancelled = client.cancelReview(reviewSubmissionId);
         client.refundCredit(submissionId);
         return cancelled;
@@ -136,7 +136,7 @@ public class HumanReviewUseCase {
         }
         if (review != null && "CANCELLED".equals(review.status())) {
             throw new LearningRequestException(409, "REVIEW_CANCELLED",
-                    "This request was cancelled and its credit given back; send the essay again as a new one");
+                    "Yêu cầu chấm này đã bị hủy và lượt chấm đã được hoàn lại; vui lòng gửi bài viết lại như một bài mới.");
         }
     }
 
@@ -158,7 +158,7 @@ public class HumanReviewUseCase {
 
     private WritingSubmission owned(UUID userId, UUID submissionId) {
         return essays.findOwned(submissionId, userId).orElseThrow(
-                () -> new LearningRequestException(404, "NOT_FOUND", "Submission was not found"));
+                () -> new LearningRequestException(404, "NOT_FOUND", "Không tìm thấy bài nộp."));
     }
 
     private void refund(UUID submissionId) {

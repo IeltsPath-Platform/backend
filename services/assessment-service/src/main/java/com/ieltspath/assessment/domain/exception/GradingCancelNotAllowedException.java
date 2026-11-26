@@ -8,8 +8,8 @@ public class GradingCancelNotAllowedException extends RuntimeException {
 
     public GradingCancelNotAllowedException(Reason reason) {
         super(switch (reason) {
-            case NOT_OVERDUE -> "The examiner can still be waited for: the deadline has not passed";
-            case CHANGES_LEFT -> "The examiner can still be changed; cancel once no change is left";
+            case NOT_OVERDUE -> "Chưa quá hạn chấm bài nên chưa thể hủy yêu cầu chấm.";
+            case CHANGES_LEFT -> "Bạn vẫn còn lượt đổi giám khảo; chỉ có thể hủy sau khi đã hết lượt đổi.";
         });
         this.reason = reason;
     }

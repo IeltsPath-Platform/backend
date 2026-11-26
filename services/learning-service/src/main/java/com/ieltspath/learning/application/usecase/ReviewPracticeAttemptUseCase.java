@@ -31,9 +31,9 @@ public class ReviewPracticeAttemptUseCase {
     @Transactional(readOnly = true)
     public Result execute(UUID userId, UUID attemptId) {
         var attempt = attempts.findOwned(userId, attemptId)
-                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Practice attempt was not found"));
+                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Không tìm thấy lượt luyện tập."));
         if (!attempt.submitted()) {
-            throw new LearningRequestException(409, "ATTEMPT_NOT_SUBMITTED", "Practice attempt is still open");
+            throw new LearningRequestException(409, "ATTEMPT_NOT_SUBMITTED", "Lượt luyện tập này vẫn đang mở.");
         }
         return new Result(view.assemble(attempt, content.getPackageVersion(attempt.packageVersionId())),
                 attempt.response());

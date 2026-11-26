@@ -68,7 +68,7 @@ public class SubmitPracticeEssayToExaminerUseCase {
     public WritingSubmissionResult execute(UUID userId, UUID attemptId, UUID questionVersionId, UUID requestId,
                                            String essayText, UUID examinerId) {
         if (examinerId == null) {
-            throw new LearningRequestException(400, "EXAMINER_REQUIRED", "Choose the examiner who will grade the essay");
+            throw new LearningRequestException(400, "EXAMINER_REQUIRED", "Vui lòng chọn giám khảo chấm bài.");
         }
         int words = flow.validate(essayText);
         Optional<WritingSubmission> existing = essays.findByRequestId(requestId);
@@ -89,12 +89,12 @@ public class SubmitPracticeEssayToExaminerUseCase {
 
     private PracticeAttempt open(UUID userId, UUID attemptId) {
         PracticeAttempt attempt = attempts.findOwned(userId, attemptId)
-                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Practice attempt was not found"));
+                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Không tìm thấy lượt luyện tập."));
         if (attempt.submitted()) {
-            throw new LearningRequestException(409, "ATTEMPT_SUBMITTED", "The practice attempt was already submitted");
+            throw new LearningRequestException(409, "ATTEMPT_SUBMITTED", "Lượt luyện tập này đã được nộp trước đó.");
         }
         if (attempt.origin() == PracticeOrigin.FREE) {
-            throw new LearningRequestException(409, "FREE_PRACTICE_ESSAY_UNSUPPORTED", "Free practice does not take essays");
+            throw new LearningRequestException(409, "FREE_PRACTICE_ESSAY_UNSUPPORTED", "Luyện tập tự do không hỗ trợ bài viết luận.");
         }
         return attempt;
     }
@@ -104,7 +104,7 @@ public class SubmitPracticeEssayToExaminerUseCase {
                 .filter(candidate -> candidate.questionVersionId().equals(questionVersionId))
                 .filter(ItemGrading::isEssay).findFirst()
                 .orElseThrow(() -> new LearningRequestException(409, "NOT_ESSAY_ITEM",
-                        "This question is not an essay of the practice set"));
+                        "Câu hỏi này không phải là bài viết luận của bộ luyện tập."));
     }
 
     /** Stores the essay unless a concurrent request with the same id stored it first; that one is returned then. */
@@ -118,7 +118,7 @@ public class SubmitPracticeEssayToExaminerUseCase {
         WritingSubmission submission = WritingSubmission.startPracticeForExaminer(UUID.randomUUID(), userId,
                 attempt.lessonId(), attemptId, requestId, essayText, words, EssayPrompts.of(item), clock.instant());
         if (!essays.save(submission)) {
-            throw new LearningRequestException(409, "REQUEST_CONFLICT", "requestId belongs to another submission");
+            throw new LearningRequestException(409, "REQUEST_CONFLICT", "Mã yêu cầu này đã được sử dụng cho một bài nộp khác.");
         }
         return submission;
     }
@@ -131,7 +131,7 @@ public class SubmitPracticeEssayToExaminerUseCase {
         if (latest == null) return;
         switch (latest.status()) {
             case GRADED -> throw new LearningRequestException(409, "ESSAY_ALREADY_GRADED",
-                    "This essay was already graded by the AI; ask a teacher from its result instead");
+                    "Bài viết này đã được AI chấm; vui lòng gửi yêu cầu giám khảo từ màn hình kết quả.");
             case GRADING, PAYMENT_PENDING -> throw EssaySubmissionFlow.gradingInProgress();
             case AWAITING_EXAMINER -> {
                 if (requests.findReviewId(latest.id()).isPresent()) throw examinerPending(latest.id());
@@ -142,7 +142,7 @@ public class SubmitPracticeEssayToExaminerUseCase {
 
     static LearningRequestException examinerPending(UUID submissionId) {
         return new LearningRequestException(409, "EXAMINER_REVIEW_PENDING",
-                "This essay was already sent to an examiner who has not graded it yet", submissionId);
+                "Bài viết này đã được gửi đến giám khảo và đang chờ chấm.", submissionId);
     }
 
     private static boolean sameEssay(WritingSubmission submission, UUID userId, UUID attemptId, UUID questionVersionId) {

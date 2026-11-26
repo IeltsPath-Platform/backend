@@ -58,7 +58,7 @@ public class PracticeController {
             return Optional.of(LearningSkill.valueOf(value));
         } catch (IllegalArgumentException unknown) {
             throw new LearningRequestException(400, "INVALID_SKILL",
-                    "skill must be LISTENING, READING, WRITING or SPEAKING");
+                    "Kỹ năng phải là LISTENING, READING, WRITING hoặc SPEAKING.");
         }
     }
 

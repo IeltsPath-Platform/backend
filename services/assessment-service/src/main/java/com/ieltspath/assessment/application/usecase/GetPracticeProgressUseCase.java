@@ -19,7 +19,7 @@ public class GetPracticeProgressUseCase {
 
     /** An empty {@code packageIds} returns the progress of every package, otherwise only of the listed ones. */
     public PracticeProgressResult execute(UUID userId, Skill skill, AttemptScope scope, List<UUID> packageIds) {
-        if (packageIds.size() > MAX_PACKAGE_IDS) throw new IllegalArgumentException("Too many package ids");
+        if (packageIds.size() > MAX_PACKAGE_IDS) throw new IllegalArgumentException("Số lượng gói bài thi vượt quá giới hạn cho phép.");
         return new PracticeProgressResult(reader.findProgress(userId, skill, scope, packageIds).stream()
                 .map(key -> new PracticeProgressResult.Key(key.packageId(), key.partNo())).toList());
     }

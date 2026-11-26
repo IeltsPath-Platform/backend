@@ -32,7 +32,7 @@ public class GetEssayHistoryUseCase {
     @Transactional(readOnly = true)
     public EssayHistoryResult execute(UUID userId, UUID submissionId) {
         WritingSubmission any = essays.findOwned(submissionId, userId).orElseThrow(
-                () -> new LearningRequestException(404, "NOT_FOUND", "Submission was not found"));
+                () -> new LearningRequestException(404, "NOT_FOUND", "Không tìm thấy bài nộp."));
         WritingSubmission root = any;
         while (root.previousSubmissionId() != null) {
             root = essays.findOwned(root.previousSubmissionId(), userId).orElseThrow();

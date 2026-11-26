@@ -17,7 +17,7 @@ import java.util.UUID;
 
 @Repository
 public class CommunityEventOutboxAdapter implements CommunityEventOutbox {
-    private static final java.time.Duration SOCIAL_DEDUPE_WINDOW = java.time.Duration.ofHours(24);
+    static final java.time.Duration SOCIAL_DEDUPE_WINDOW = java.time.Duration.ofHours(24);
     private static final java.util.Set<String> SOCIAL_SIGNALS =
             java.util.Set.of(CommunityEventTypes.POST_REACTED, CommunityEventTypes.USER_FOLLOWED);
     private final JdbcTemplate jdbc;

@@ -95,6 +95,6 @@ class StudySessionTest {
         seventeen.add(interval(16000,17000));
         var error=assertThrows(IllegalArgumentException.class,
                 ()->session().accept(1,1,seventeen,start.plusSeconds(30),false));
-        assertEquals("At most 16 intervals are allowed",error.getMessage());
+        assertEquals("Chỉ cho phép tối đa 16 khoảng thời gian hoạt động.",error.getMessage());
     }
 }

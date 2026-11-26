@@ -45,9 +45,9 @@ public class GetPlacementResultUseCase {
     public PlacementResult execute(UUID userId, UUID attemptId) {
         var attempt = attempts.findByIdAndUserId(attemptId, userId)
                 .filter(candidate -> candidate.getAttemptType() == AttemptType.PLACEMENT)
-                .orElseThrow(() -> new AssessmentNotFoundException("Placement attempt not found"));
+                .orElseThrow(() -> new AssessmentNotFoundException("Không tìm thấy lượt làm bài kiểm tra đầu vào."));
         var result = results.findLatestCompletedByAttemptId(attemptId)
-                .orElseThrow(() -> new AssessmentNotFoundException("Assessment result not found"));
+                .orElseThrow(() -> new AssessmentNotFoundException("Không tìm thấy kết quả bài thi."));
         var skills = grading.skillBands(attemptId, result.id()).entrySet().stream()
                 .map(entry -> new PlacementResult.SkillBand(entry.getKey(), entry.getValue()))
                 .toList();

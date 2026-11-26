@@ -12,8 +12,8 @@ public class GetJobEssayUseCase {
     public GetJobEssayUseCase(ExaminerQueueStore store) { this.store=store; }
     @Transactional(readOnly=true)
     public ExaminerQueueStore.Essay execute(UUID examiner,UUID jobId) {
-        var job=store.find(jobId).orElseThrow(()->new AssessmentNotFoundException("Grading job not found"));
-        if (!examiner.equals(job.assignedExaminerId())) throw new AssessmentAccessDeniedException("Claim the job before reading its essay");
-        return store.essay(jobId).orElseThrow(()->new AssessmentNotFoundException("Essay not found"));
+        var job=store.find(jobId).orElseThrow(()->new AssessmentNotFoundException("Không tìm thấy yêu cầu chấm bài."));
+        if (!examiner.equals(job.assignedExaminerId())) throw new AssessmentAccessDeniedException("Vui lòng nhận bài chấm trước khi xem nội dung bài viết.");
+        return store.essay(jobId).orElseThrow(()->new AssessmentNotFoundException("Không tìm thấy bài viết."));
     }
 }

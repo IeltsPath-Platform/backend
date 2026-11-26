@@ -26,7 +26,7 @@ class LessonAccessGateTest {
 
         assertThat(error.getCode()).isEqualTo("REVIEW_REQUIRED");
         assertThat(error.getReviews()).containsExactly(review);
-        assertThat(error.getMessage()).isEqualTo("Complete the pending reviews first.");
+        assertThat(error.getMessage()).isEqualTo("Vui lòng hoàn thành các bài ôn tập đang chờ trước khi tiếp tục.");
         assertThatThrownBy(() -> error.getReviews().clear()).isInstanceOf(UnsupportedOperationException.class);
     }
 
@@ -114,7 +114,7 @@ class LessonAccessGateTest {
         assertThat(error.getCode()).isEqualTo("PRACTICE_REQUIRED");
         assertThat(error.getLessonIds()).containsExactly(FIRST, SECOND);
         assertThat(error.getReviews()).isEmpty();
-        assertThat(error.getMessage()).isEqualTo("Complete practice of the earlier lessons first.");
+        assertThat(error.getMessage()).isEqualTo("Vui lòng hoàn thành phần luyện tập của các bài học trước.");
         assertThatThrownBy(() -> error.getLessonIds().clear()).isInstanceOf(UnsupportedOperationException.class);
     }
 

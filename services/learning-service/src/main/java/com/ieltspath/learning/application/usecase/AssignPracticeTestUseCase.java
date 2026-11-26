@@ -22,13 +22,13 @@ public class AssignPracticeTestUseCase {
     public TestAssignmentResult execute(UUID userId,UUID courseId,UUID packageId) {
         lock.lock(userId);
         var milestone=list.execute(userId,courseId).stream().filter(m -> m.packageId().equals(packageId)).findFirst()
-                .orElseThrow(() -> new LearningRequestException(404,"PRACTICE_TEST_NOT_FOUND","Practice test is not a milestone of this course"));
-        if ("LOCKED".equals(milestone.status())) throw new LearningRequestException(403,"PRACTICE_TEST_LOCKED","Pass the milestone topic first");
+                .orElseThrow(() -> new LearningRequestException(404,"PRACTICE_TEST_NOT_FOUND","Bài luyện tập không thuộc cột mốc của khóa học này."));
+        if ("LOCKED".equals(milestone.status())) throw new LearningRequestException(403,"PRACTICE_TEST_LOCKED","Vui lòng hoàn thành chủ đề cột mốc trước.");
         var existing=assignments.find(userId,packageId);
         if (existing.isPresent()) {
             var a=existing.get();
             if (!a.courseId().equals(courseId)) throw new LearningRequestException(409,"PRACTICE_TEST_ALREADY_ASSIGNED",
-                    "This practice test was assigned in another course");
+                    "Bài luyện tập này đã được giao trong một khóa học khác.");
             // A retake may use the current version, while the stored first result and its version stay frozen.
             return new TestAssignmentResult(a.id(),packageId,a.isConsumed()?milestone.packageVersionId():a.packageVersionId());
         }

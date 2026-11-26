@@ -70,7 +70,7 @@ public class RestEssayPromptActivationClient implements EssayPromptActivationPro
                     .uri("/internal/assessments/ai-prompt-activations?task={task}", task)
                     .headers(headers -> {
                         headers.setBearerAuth(GatewayRequestHeaders.bearerToken().orElseThrow(
-                                () -> new LearningRequestException(401, "UNAUTHORIZED", "Authenticated gateway JWT required")));
+                                () -> new LearningRequestException(401, "UNAUTHORIZED", "Yêu cầu cần có phiên đăng nhập hợp lệ.")));
                         headers.set(SecurityHeaders.CORRELATION_ID, GatewayRequestHeaders.correlationId());
                     })
                     .retrieve().body(Activation.class));
@@ -116,7 +116,7 @@ public class RestEssayPromptActivationClient implements EssayPromptActivationPro
     }
 
     private LearningRequestException unavailable() {
-        return new LearningRequestException(503, "PROMPT_VERSION_UNAVAILABLE", "Essay prompt activation is unavailable");
+        return new LearningRequestException(503, "PROMPT_VERSION_UNAVAILABLE", "Dịch vụ cấu hình đề bài viết tạm thời không khả dụng.");
     }
 
     private record Activation(String task, String promptVersion, String model, String reasoningEffort) {}

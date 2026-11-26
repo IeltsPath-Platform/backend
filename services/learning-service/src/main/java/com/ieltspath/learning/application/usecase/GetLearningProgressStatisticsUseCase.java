@@ -25,15 +25,15 @@ public class GetLearningProgressStatisticsUseCase {
     @Transactional(readOnly = true)
     public LearningProgressStatistics execute(UUID userId, UUID selectedCourse, int page, int size) {
         if (page < 0 || page > 10000 || size < 1 || size > 20)
-            throw new LearningRequestException(400, "INVALID_PAGE", "Page must be 0..10000 and size 1..20");
+            throw new LearningRequestException(400, "INVALID_PAGE", "Số trang phải từ 0 đến 10000 và kích thước từ 1 đến 20.");
         var activities = reader.startedCourses(userId);
         if (activities.size() > 100) {
             throw new LearningRequestException(422, "PROGRESS_SCOPE_TOO_LARGE",
-                    "Progress statistics support at most 100 started courses");
+                    "Thống kê tiến độ hỗ trợ tối đa 100 khóa học đã bắt đầu.");
         }
         if (selectedCourse != null) {
             activities = activities.stream().filter(a -> a.courseId().equals(selectedCourse)).toList();
-            if (activities.isEmpty()) throw new LearningRequestException(404, "NOT_FOUND", "Started course was not found");
+            if (activities.isEmpty()) throw new LearningRequestException(404, "NOT_FOUND", "Không tìm thấy khóa học đã bắt đầu.");
         }
         var metadata = activities.isEmpty() ? new LearningContentClient.ProgressMetadata("empty", true, List.of())
                 : content.progressMetadata(activities.stream().map(LearningProgressReader.CourseActivity::courseId).toList());

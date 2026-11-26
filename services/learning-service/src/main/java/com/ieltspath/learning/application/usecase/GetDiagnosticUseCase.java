@@ -27,7 +27,7 @@ public class GetDiagnosticUseCase {
 
     public DiagnosticResult execute(UUID userId, UUID sessionId) {
         DiagnosticSession session = diagnostics.findSession(userId, sessionId)
-                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Diagnosis was not found"));
+                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Không tìm thấy phiên chẩn đoán."));
         Map<UUID, KnowledgePointDirectory.Entry> described = directory.describe();
         List<ProbeRow> rows = diagnostics.findProbes(sessionId).stream().map(probe -> new ProbeRow(probe.id(),
                 point(described, probe.knowledgePointId()), probe.parentKnowledgePointId(), probe.depth(),

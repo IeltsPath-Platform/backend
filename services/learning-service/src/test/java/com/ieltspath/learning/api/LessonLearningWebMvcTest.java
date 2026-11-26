@@ -517,7 +517,7 @@ class LessonLearningWebMvcTest {
         JsonNode response = body(mvc.perform(authenticated(submission(request)))
                 .andExpect(status().isUnprocessableEntity()).andReturn());
         assertEquals(Set.of("detail"), keys(response));
-        assertEquals("Invalid request", response.path("detail").asText());
+        assertEquals("Dữ liệu gửi lên không hợp lệ.", response.path("detail").asText());
         verifyNoInteractions(getTopicLessonsUseCase, getLessonUseCase, submitLessonExerciseUseCase, completeLessonUseCase);
     }
 

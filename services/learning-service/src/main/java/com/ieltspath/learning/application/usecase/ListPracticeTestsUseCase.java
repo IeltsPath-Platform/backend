@@ -35,7 +35,7 @@ public class ListPracticeTestsUseCase {
         var topics=curricula.find(userId).topics().stream()
                 .filter(t -> courseId.equals(t.courseId()) && t.sequenceOrder()!=null)
                 .sorted(Comparator.comparingInt(TopicProgress::sequenceOrder)).toList();
-        if (topics.isEmpty()) throw new LearningRequestException(404,"COURSE_NOT_FOUND","Active course not found");
+        if (topics.isEmpty()) throw new LearningRequestException(404,"COURSE_NOT_FOUND","Không tìm thấy khóa học đang hoạt động.");
         var milestones=content.getPracticeTestMilestones(courseId);
         milestoneCounts.remember(courseId,milestones.size());
         var assigned=assignments.findByCourse(userId,courseId).stream()

@@ -41,7 +41,7 @@ public class GetCourseScoreUseCase {
     @Transactional(readOnly = true)
     public CourseScoreResult execute(UUID userId, UUID courseId) {
         boolean known = curricula.find(userId).topics().stream().anyMatch(topic -> courseId.equals(topic.courseId()));
-        if (!known) throw new LearningRequestException(404, "COURSE_NOT_FOUND", "Course was not found");
+        if (!known) throw new LearningRequestException(404, "COURSE_NOT_FOUND", "Không tìm thấy khóa học.");
         CourseScoreConfig config = configs.effective(courseId);
         var evaluation = scores.evaluate(userId, courseId, config, milestones.countForRequest(courseId));
         var score = evaluation.score();

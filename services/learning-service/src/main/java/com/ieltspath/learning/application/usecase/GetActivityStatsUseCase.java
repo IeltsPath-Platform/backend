@@ -38,9 +38,9 @@ public class GetActivityStatsUseCase {
 
     @Transactional(readOnly = true)
     public Result execute(LocalDate from, LocalDate to) {
-        if (to.isBefore(from)) throw new LearningRequestException(400, "INVALID_RANGE", "to must not be before from");
+        if (to.isBefore(from)) throw new LearningRequestException(400, "INVALID_RANGE", "Ngày kết thúc không được trước ngày bắt đầu.");
         if (ChronoUnit.DAYS.between(from, to) + 1 > MAX_DAYS) {
-            throw new LearningRequestException(400, "RANGE_TOO_LONG", "A range may cover at most 180 days");
+            throw new LearningRequestException(400, "RANGE_TOO_LONG", "Khoảng thời gian thống kê tối đa 180 ngày.");
         }
         Instant start = from.atStartOfDay(ZoneOffset.UTC).toInstant();
         Instant end = to.atStartOfDay(ZoneOffset.UTC).toInstant();
