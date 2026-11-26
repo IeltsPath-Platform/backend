@@ -47,7 +47,7 @@ class PublishedVersionLockMigrationTest {
                     published_at TIMESTAMPTZ, updated_at TIMESTAMPTZ
                 )
                 """);
-        var migration = new ClassPathResource("db/migration/V152__lock_published_versions.sql");
+        var migration = new ClassPathResource("db/migration/V154__lock_published_versions.sql");
         try (var input = migration.getInputStream()) {
             jdbc.execute(StreamUtils.copyToString(input, StandardCharsets.UTF_8));
         }
