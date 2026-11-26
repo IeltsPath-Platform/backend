@@ -3,6 +3,9 @@ spring:
     url: ${CONTENT_DB_URL:jdbc:postgresql://localhost:5440/content_db}
     username: ${CONTENT_DB_USERNAME:postgres}
     password: ${CONTENT_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${CONTENT_DB_POOL_MAX_SIZE:5}
+      minimum-idle: ${CONTENT_DB_POOL_MIN_IDLE:1}
   jpa:
     hibernate:
       ddl-auto: validate

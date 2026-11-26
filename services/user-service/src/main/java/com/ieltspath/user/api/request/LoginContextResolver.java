@@ -6,6 +6,7 @@ import org.springframework.http.HttpHeaders;
 
 public final class LoginContextResolver {
     private static final String FORWARDED_FOR = "X-Forwarded-For";
+    private static final String GATEWAY_CLIENT_IP = "X-Gateway-Client-IP";
 
     private LoginContextResolver() {
     }
@@ -19,6 +20,8 @@ public final class LoginContextResolver {
     }
 
     private static String clientAddress(HttpServletRequest request) {
+        String gatewayClientIp = request.getHeader(GATEWAY_CLIENT_IP);
+        if (gatewayClientIp != null && !gatewayClientIp.isBlank()) return gatewayClientIp.trim();
         String forwarded = request.getHeader(FORWARDED_FOR);
         if (forwarded != null && !forwarded.isBlank()) {
             String[] hops = forwarded.split(",");

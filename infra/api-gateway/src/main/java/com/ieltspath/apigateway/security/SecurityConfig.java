@@ -176,7 +176,7 @@ public class SecurityConfig {
         config.setAllowedOriginPatterns(allowedOriginPatterns(authProperties));
         config.setAllowedMethods(CORS_METHODS.stream().map(HttpMethod::name).toList());
         config.setAllowedHeaders(List.of("*"));
-        config.setExposedHeaders(List.of(HttpHeaders.AUTHORIZATION, HttpHeaders.CONTENT_TYPE));
+        config.setExposedHeaders(List.of(HttpHeaders.AUTHORIZATION, HttpHeaders.CONTENT_TYPE, HttpHeaders.DATE));
         config.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

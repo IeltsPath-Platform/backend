@@ -52,7 +52,7 @@ class ClientRateLimitGatewayFilterFactoryTest {
     void setUp() {
         limiter = mock(RedisRateLimiter.class);
         keys = mock(ClientKeyResolver.class);
-        properties = new RateLimitProperties(List.of(), Map.of(
+        properties = new RateLimitProperties(false, List.of(), Map.of(
                 "auth", new RateLimitProperties.Tier(1, 5),
                 "upload", new RateLimitProperties.Tier(1, 5),
                 "ai", new RateLimitProperties.Tier(1, 3),

@@ -7,6 +7,9 @@ spring:
     url: ${ASSESSMENT_DB_URL:jdbc:postgresql://localhost:5440/assessment_db}
     username: ${ASSESSMENT_DB_USERNAME:postgres}
     password: ${ASSESSMENT_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${ASSESSMENT_DB_POOL_MAX_SIZE:8}
+      minimum-idle: ${ASSESSMENT_DB_POOL_MIN_IDLE:1}
   jpa:
     hibernate:
       ddl-auto: validate

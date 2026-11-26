@@ -66,6 +66,25 @@ class RedisLoginAttemptLimiterTest {
     }
 
     @Test
+    void allowsThirtyDifferentAccountsFromTheSameIpWhenTheyHaveNoFailures() {
+        for (int account = 0; account < 30; account++) {
+            limiter.checkAllowed("learner" + account + "@example.com", "203.0.113.9");
+        }
+    }
+
+    @Test
+    void blocksDistributedFailuresFromTheSameIp() {
+        for (int account = 0; account < 21; account++) {
+            limiter.recordFailure("learner" + account + "@example.com", "203.0.113.9");
+        }
+
+        assertThatThrownBy(() -> limiter.checkAllowed("another@example.com", "203.0.113.9"))
+                .isInstanceOf(LoginRateLimitedException.class)
+                .satisfies(exception -> assertThat(((LoginRateLimitedException) exception).retryAfter())
+                        .isBetween(Duration.ofSeconds(1), Duration.ofMinutes(1)));
+    }
+
+    @Test
     void opensShortWaitWindowAfterTwentyFailuresAcrossIps() {
         for (int attempt = 0; attempt < 21; attempt++) {
             limiter.checkAllowed("learner@example.com", "203.0.113." + (attempt + 1));
