@@ -164,14 +164,20 @@ public class JdbcHumanReviewStore implements HumanReviewStore {
                 .addValue("annotations", annotations == null ? null : annotations.toString(), Types.VARCHAR)
                 .addValue("id", job.submissionId()));
         if (changed != 1) throw new RevisionConflictException("Bài chấm này đã được hoàn thành trước đó.");
-        jdbc.update("UPDATE grading_jobs SET status='COMPLETED',completed_at=CURRENT_TIMESTAMP WHERE id=:id",
+        jdbc.update("UPDATE grading_jobs SET status='PROCESSING' WHERE id=:id AND status='QUEUED' AND assigned_examiner_id=:examiner",
+                new MapSqlParameterSource("id", jobId).addValue("examiner", examinerId));
+        int completedJob = jdbc.update("UPDATE grading_jobs SET status='COMPLETED',completed_at=CURRENT_TIMESTAMP WHERE id=:id AND status='PROCESSING'",
                 new MapSqlParameterSource("id", jobId));
+        if (completedJob != 1) throw new RevisionConflictException("Bài chấm này không còn ở trạng thái đang xử lý.");
+        jdbc.update("UPDATE human_reviews SET status='IN_REVIEW',started_at=COALESCE(started_at,CURRENT_TIMESTAMP) WHERE grading_job_id=:id AND grader_user_id=:examiner AND status='ASSIGNED'",
+                new MapSqlParameterSource("id", jobId).addValue("examiner", examinerId));
         // A completed review keeps no draft: the draft goes in the same statement that sets COMPLETED.
-        jdbc.update("""
+        int completedReview = jdbc.update("""
                 UPDATE human_reviews SET status='COMPLETED',completed_at=CURRENT_TIMESTAMP,
                     draft_payload=NULL,draft_saved_at=NULL
-                WHERE grading_job_id=:id AND grader_user_id=:examiner
+                WHERE grading_job_id=:id AND grader_user_id=:examiner AND status='IN_REVIEW'
                 """, new MapSqlParameterSource("id", jobId).addValue("examiner", examinerId));
+        if (completedReview != 1) throw new RevisionConflictException("Bài chấm này không còn ở trạng thái đang chấm.");
         UUID sourceSubmissionId = jdbc.queryForObject(
                 "SELECT source_submission_id FROM human_review_submissions WHERE id=:id",
                 new MapSqlParameterSource("id", job.submissionId()), UUID.class);
@@ -211,7 +217,7 @@ public class JdbcHumanReviewStore implements HumanReviewStore {
                 FROM grading_jobs j
                 WHERE r.grading_job_id=j.id AND j.id=:id AND j.grading_mode='HUMAN'
                   AND j.human_review_submission_id IS NOT NULL AND j.assigned_examiner_id=:examiner
-                  AND j.status IN ('QUEUED','PROCESSING') AND r.status<>'COMPLETED'
+                  AND j.status IN ('QUEUED','PROCESSING') AND r.status IN ('ASSIGNED','IN_REVIEW')
                 """, new MapSqlParameterSource("payload", payload.toString()).addValue("id", jobId)
                 .addValue("examiner", examinerId));
         if (changed == 1) return;

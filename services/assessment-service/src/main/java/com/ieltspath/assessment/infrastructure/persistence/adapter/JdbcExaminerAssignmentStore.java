@@ -138,7 +138,7 @@ public class JdbcExaminerAssignmentStore implements ExaminerAssignmentStore {
         jdbc.update("""
                 UPDATE human_reviews SET status='QUEUED',grader_user_id=NULL,assigned_at=NULL,started_at=NULL,
                     completed_at=NULL,draft_payload=NULL,draft_saved_at=NULL
-                WHERE grading_job_id IN (:ids) AND status<>'COMPLETED'
+                WHERE grading_job_id IN (:ids) AND status IN ('ASSIGNED','IN_REVIEW')
                 """, args);
     }
 
