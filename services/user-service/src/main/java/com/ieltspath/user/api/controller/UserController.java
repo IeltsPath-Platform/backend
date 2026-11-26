@@ -1,12 +1,14 @@
 package com.ieltspath.user.api.controller;
 
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
+import com.ieltspath.user.api.dto.request.DeleteAccountRequest;
 import com.ieltspath.user.api.dto.request.RegisterRequest;
 import com.ieltspath.user.api.dto.request.UpdateUserRequest;
 import com.ieltspath.user.api.dto.response.RoleResponse;
 import com.ieltspath.user.api.dto.response.UserResponse;
 import com.ieltspath.user.application.command.RegisterCommand;
 import com.ieltspath.user.application.command.UpdateUserCommand;
+import com.ieltspath.user.application.usecase.DeleteMyAccountUseCase;
 import com.ieltspath.user.application.usecase.GetMyProfileUseCase;
 import com.ieltspath.user.application.usecase.RegisterUseCase;
 import com.ieltspath.user.application.usecase.UpdateUserUseCase;
@@ -15,6 +17,7 @@ import com.ieltspath.user.domain.aggregate.User;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -35,6 +38,7 @@ public class UserController {
     private final RegisterUseCase registerUseCase;
     private final GetMyProfileUseCase getMyProfileUseCase;
     private final UpdateUserUseCase updateUserUseCase;
+    private final DeleteMyAccountUseCase deleteMyAccountUseCase;
     private final CurrentUserProvider currentUserProvider;
 
     @PostMapping("/register")
@@ -62,6 +66,16 @@ public class UserController {
                 request.fullName(),
                 request.phoneNumber()
         )));
+    }
+
+    @DeleteMapping("/me")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteMe(@RequestBody(required = false) DeleteAccountRequest request) {
+        UUID userId = currentUserProvider.requireUserId();
+        deleteMyAccountUseCase.execute(
+                userId,
+                request == null ? null : request.currentPassword(),
+                request == null ? null : request.googleIdToken());
     }
 
     private UserResponse toResponse(User user) {

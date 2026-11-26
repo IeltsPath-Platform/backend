@@ -8,6 +8,7 @@ import com.ieltspath.events.user.GoogleAccountUnlinkedV1;
 import com.ieltspath.events.user.PasswordChangedV1;
 import com.ieltspath.events.user.PasswordResetGoogleOnlyV1;
 import com.ieltspath.events.user.PasswordResetRequestedV1;
+import com.ieltspath.events.user.UserDeletedV1;
 import com.ieltspath.events.user.UserEmailVerificationStateV1;
 import com.ieltspath.events.user.UserMessaging;
 import com.ieltspath.user.domain.aggregate.OutboxEvent;
@@ -34,7 +35,7 @@ public class RabbitUserEventPublisher implements UserEventPublisher {
     private static final Set<String> SUPPORTED_EVENT_TYPES = Set.of(
             PasswordResetRequestedV1.EVENT_TYPE, PasswordChangedV1.EVENT_TYPE, GoogleAccountLinkedV1.EVENT_TYPE,
             GoogleAccountUnlinkedV1.EVENT_TYPE, PasswordResetGoogleOnlyV1.EVENT_TYPE, EmailVerificationRequestedV1.EVENT_TYPE,
-            UserEmailVerificationStateV1.EVENT_TYPE);
+            UserEmailVerificationStateV1.EVENT_TYPE, UserDeletedV1.EVENT_TYPE);
 
     private final RabbitTemplate rabbitTemplate;
     private final ObjectMapper mapper;

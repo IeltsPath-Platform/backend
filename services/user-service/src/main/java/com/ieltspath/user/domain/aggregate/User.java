@@ -32,6 +32,7 @@ public class User {
     private LocalDateTime updatedAt;
     private LocalDateTime emailVerifiedAt;
     private LocalDateTime passwordClearedAt;
+    private LocalDateTime deletedAt;
 
     public void updateProfile(String fullName, PhoneNumber phoneNumber) {
         this.fullName = new FullName(fullName).value();
@@ -54,6 +55,18 @@ public class User {
 
     public void deactivate() {
         this.status = UserStatus.INACTIVE;
+        touch();
+    }
+
+    public void markDeleted(LocalDateTime now) {
+        this.status = UserStatus.DELETED;
+        this.deletedAt = now;
+        this.email = new Email("deleted+" + this.id + "@deleted.local");
+        this.fullName = "Người dùng đã xóa";
+        this.phoneNumber = null;
+        this.passwordHash = null;
+        this.passwordClearedAt = null;
+        this.emailVerifiedAt = null;
         touch();
     }
 
