@@ -35,7 +35,7 @@ class StudyTimeMigrationTest {
         UUID negativeMinutesUser = insertLegacyGoal(jdbc, -15);
 
         Flyway.configure().dataSource(dataSource).locations("classpath:db/migration")
-                .schemas(schema).defaultSchema(schema).load().migrate();
+                .schemas(schema).defaultSchema(schema).target(MigrationVersion.fromVersion("18")).load().migrate();
 
         assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM study_goal_history", Integer.class));
         assertNull(jdbc.queryForObject("SELECT minutes FROM study_goal_history WHERE user_id = ?",
