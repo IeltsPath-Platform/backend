@@ -1,5 +1,7 @@
 package com.ieltspath.community.api.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
+
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.commonsecurity.role.CanonicalRoles;
 import com.ieltspath.community.api.dto.request.CommentRequest;
@@ -37,6 +39,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/community")
 @RequiredArgsConstructor
+@PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN')")
 public class CommunityController {
     private final CurrentUserProvider currentUserProvider;
     private final CreatePostUseCase createPostUseCase;

@@ -1,5 +1,7 @@
 package com.ieltspath.library.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.library.api.dto.request.AddNotebookEntryRequest;
 import com.ieltspath.library.api.dto.request.SetUnderstandingLevelRequest;
@@ -30,6 +32,7 @@ import java.util.UUID;
 @Validated
 @RequestMapping("/api/learning-support/flashcards/notebook")
 @RequiredArgsConstructor
+@LearnerOnly
 public class VocabularyNotebookController {
     private final CurrentUserProvider currentUser;
     private final AddNotebookEntryUseCase add;

@@ -9,7 +9,6 @@ import com.ieltspath.learning.application.port.LearningContentClient.LessonCandi
 import com.ieltspath.learning.application.port.LearningContentClient.PackageCandidate;
 import com.ieltspath.learning.application.port.LearningContentClient.SuggestionCandidates;
 import com.ieltspath.learning.application.usecase.GetSuggestionsUseCase;
-import com.ieltspath.learning.application.usecase.StaffInsightUseCase;
 import com.ieltspath.learning.domain.vo.LearningSkill;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -62,7 +61,6 @@ class SuggestionsAndOverviewIntegrationTest {
 
     @Autowired JdbcTemplate jdbc;
     @Autowired GetSuggestionsUseCase suggestions;
-    @Autowired StaffInsightUseCase insight;
     @MockitoBean LearningContentClient content;
     @MockitoBean TopicCatalog topicCatalog;
     @MockitoBean AccessClient access;
@@ -331,32 +329,4 @@ class SuggestionsAndOverviewIntegrationTest {
         assertEquals(0, new BigDecimal("6.0").compareTo(captor.getValue()));
     }
 
-    @Test
-    void theOverviewGathersCoursesTiersReviewsFlagsAndOpenWork() {
-        UUID review = UUID.randomUUID();
-        jdbc.update("INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status, skill, blocking) "
-                + "VALUES (?, ?, ?, ?, 'PENDING', 'READING', TRUE)", review, user, consolidate, UUID.randomUUID());
-        UUID flag = UUID.randomUUID();
-        jdbc.update("INSERT INTO learner_flags (id, user_id, kind, evidence) VALUES (?, ?, 'BURST_SUBMISSIONS', "
-                + "'{}'::jsonb)", flag, user);
-        jdbc.update("INSERT INTO work_items (id, queue, kind, subject_user_id, subject_ref) VALUES (?, 'EXAMINER', "
-                + "'LEARNER_FLAG', ?, ?)", UUID.randomUUID(), user, flag);
-
-        var overview = insight.overview(user);
-
-        assertEquals(1, overview.courses().size());
-        var courseView = overview.courses().getFirst();
-        assertEquals(course, courseView.courseId());
-        assertEquals(1, courseView.topics());
-        assertEquals(0, courseView.topicsDone());
-        assertEquals("IN_PROGRESS", courseView.status());
-        assertEquals(Map.of("PRIORITY", 0, "CONSOLIDATE", 1, "MAINTAIN", 2, "INSUFFICIENT", 0),
-                overview.knowledgePointsByTier());
-        assertEquals(List.of(review), overview.pendingReviews().stream().map(r -> r.reviewId()).toList());
-        assertEquals(1, overview.flags().size());
-        assertEquals(1, overview.openWork().size());
-
-        jdbc.update("UPDATE topic_progress SET tested_at = now(), first_test_percent = 40 WHERE user_id = ?", user);
-        assertEquals(1, insight.overview(user).courses().getFirst().topicsDone(), "a tested topic counts as done");
-    }
 }

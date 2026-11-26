@@ -1,5 +1,7 @@
 package com.ieltspath.learning.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.learning.application.result.PracticeAttemptView;
 import com.ieltspath.learning.application.usecase.StartFreePracticeUseCase;
@@ -17,6 +19,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/learning")
 @RequiredArgsConstructor
+@LearnerOnly
 public class FreePracticeController {
     private final CurrentUserProvider currentUser;
     private final StartFreePracticeUseCase start;

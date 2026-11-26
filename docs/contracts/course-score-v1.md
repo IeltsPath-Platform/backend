@@ -31,7 +31,7 @@ configuration screen.
 
 ## `GET /api/learning/courses/{courseId}/score`
 
-Role `CUSTOMER`, own score only. `GET /api/learning/admin/learners/{userId}/courses/{courseId}/score`: `EXAMINER`.
+Role `CUSTOMER`, own score only. There is no staff endpoint that accepts a learner ID.
 
 ```json
 {

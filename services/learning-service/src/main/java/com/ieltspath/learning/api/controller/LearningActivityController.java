@@ -1,5 +1,7 @@
 package com.ieltspath.learning.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.learning.api.dto.request.CreateLearningActivityRequest;
 import com.ieltspath.learning.api.dto.response.LearningActivityResponse;
@@ -19,6 +21,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/learning/activities")
 @RequiredArgsConstructor
+@LearnerOnly
 public class LearningActivityController {
     private final CurrentUserProvider currentUserProvider;
     private final CreateLearningActivityUseCase createLearningActivityUseCase;

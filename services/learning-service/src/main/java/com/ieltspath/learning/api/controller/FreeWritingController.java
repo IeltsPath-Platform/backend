@@ -1,5 +1,7 @@
 package com.ieltspath.learning.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.learning.api.dto.request.SubmitFreeWritingRequest;
 import com.ieltspath.learning.api.dto.request.SubmitFreeWritingToExaminerRequest;
@@ -23,6 +25,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/learning/free-writing")
 @RequiredArgsConstructor
+@LearnerOnly
 public class FreeWritingController {
     private final CurrentUserProvider currentUser;
     private final SubmitFreeWritingUseCase submitFreeWriting;

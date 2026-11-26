@@ -1,5 +1,7 @@
 package com.ieltspath.game.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.game.api.dto.request.StartGameSessionRequest;
 import com.ieltspath.game.api.dto.request.SubmitGameAnswerRequest;
@@ -16,6 +18,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/games/sessions")
+@LearnerOnly
 public class GameSessionController {
     private final CurrentUserProvider currentUserProvider;
     private final StartGameSessionUseCase startSession;

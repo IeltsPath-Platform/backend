@@ -1,5 +1,7 @@
 package com.ieltspath.game.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.game.application.result.CurrentWordResult;
 import com.ieltspath.game.application.usecase.GetCurrentWordUseCase;
@@ -10,6 +12,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/games/matches")
+@LearnerOnly
 public class WordlyCurrentWordController {
     private final CurrentUserProvider user;
     private final GetCurrentWordUseCase current;

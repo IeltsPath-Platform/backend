@@ -1,5 +1,7 @@
 package com.ieltspath.assessment.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.assessment.api.dto.request.CreateGradingJobRequest;
 import com.ieltspath.assessment.api.dto.response.GradingJobResponse;
 import com.ieltspath.assessment.application.command.CreateGradingJobCommand;
@@ -59,6 +61,7 @@ public class GradingJobController {
     }
 
     @PostMapping
+    @LearnerOnly
     @ResponseStatus(HttpStatus.CREATED)
     public GradingJobResponse create(@Valid @RequestBody CreateGradingJobRequest request) {
         var result = createGradingJobUseCase.execute(new CreateGradingJobCommand(
@@ -74,6 +77,7 @@ public class GradingJobController {
     }
 
     @GetMapping("/{id}")
+    @LearnerOnly
     public GradingJobResponse get(@PathVariable("id") UUID id) {
         return GradingJobResponse.from(getGradingJobUseCase.execute(currentUser.requireUserId(), id));
     }

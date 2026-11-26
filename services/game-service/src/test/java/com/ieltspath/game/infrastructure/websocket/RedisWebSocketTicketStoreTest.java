@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import java.time.Duration;
 import java.util.UUID;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -33,9 +34,11 @@ class RedisWebSocketTicketStoreTest {
         UUID room = UUID.randomUUID();
         UUID user = UUID.randomUUID();
 
-        var ticket = store.issue(room, user);
+        var ticket = store.issue(room, user, Set.of("CUSTOMER"));
 
-        assertEquals(room, store.consume(ticket.token()).orElseThrow().roomId());
+        var consumed = store.consume(ticket.token()).orElseThrow();
+        assertEquals(room, consumed.roomId());
+        assertEquals(Set.of("CUSTOMER"), consumed.roles());
         assertFalse(store.consume(ticket.token()).isPresent());
     }
 
@@ -46,7 +49,7 @@ class RedisWebSocketTicketStoreTest {
         var acceptingInstance = new RedisWebSocketTicketStore(template, Duration.ofSeconds(30));
         UUID user = UUID.randomUUID();
 
-        var ticket = issuingInstance.issue(UUID.randomUUID(), user);
+        var ticket = issuingInstance.issue(UUID.randomUUID(), user, Set.of("CUSTOMER"));
 
         assertEquals(user, acceptingInstance.consume(ticket.token()).orElseThrow().userId());
     }
@@ -63,7 +66,7 @@ class RedisWebSocketTicketStoreTest {
     @Test
     void ticketExpiresAfterTheConfiguredTtl() throws InterruptedException {
         var store = new RedisWebSocketTicketStore(template(), Duration.ofSeconds(1));
-        var ticket = store.issue(UUID.randomUUID(), UUID.randomUUID());
+        var ticket = store.issue(UUID.randomUUID(), UUID.randomUUID(), Set.of("CUSTOMER"));
 
         Thread.sleep(1500);
 

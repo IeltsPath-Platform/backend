@@ -1,4 +1,6 @@
 package com.ieltspath.game.api.controller;
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.game.application.usecase.UseWordlyHintUseCase;
 import com.ieltspath.game.api.dto.response.WordlyHintResponse;
@@ -8,6 +10,7 @@ import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 @RestController
 @RequestMapping("/api/games/matches")
+@LearnerOnly
 public class WordlyHintController {
  private final CurrentUserProvider user;private final UseWordlyHintUseCase hint;
  public WordlyHintController(CurrentUserProvider user,UseWordlyHintUseCase hint){this.user=user;this.hint=hint;}

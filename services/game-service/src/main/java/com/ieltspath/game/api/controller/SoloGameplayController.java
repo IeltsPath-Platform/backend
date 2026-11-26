@@ -1,5 +1,7 @@
 package com.ieltspath.game.api.controller;
 
+import com.ieltspath.commonsecurity.authorization.LearnerOnly;
+
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.game.application.usecase.RocketGameplayUseCase;
 import com.ieltspath.game.application.usecase.SoloGameplayUseCase;
@@ -14,6 +16,7 @@ import java.util.*;
 
 @RestController
 @RequestMapping("/api/games/matches")
+@LearnerOnly
 public class SoloGameplayController {
     private final CurrentUserProvider user;
     private final SoloGameplayUseCase gameplay;

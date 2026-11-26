@@ -35,6 +35,7 @@ public class GameWebSocketHandshakeInterceptor implements HandshakeInterceptor {
         var ticket = ticketStore.consume(opaqueTicket);
         if (ticket.isEmpty()) return false;
         var grant = ticket.get();
+        if (!grant.roles().contains("CUSTOMER")) return false;
         var room = roomRepository.findById(grant.roomId());
         if (room.isEmpty() || !room.get().hasActiveMember(grant.userId())) return false;
         if (room.get().status() == com.ieltspath.game.domain.aggregate.GameRoom.GameRoomStatus.CLOSED
