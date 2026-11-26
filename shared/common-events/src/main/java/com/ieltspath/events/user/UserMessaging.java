@@ -9,6 +9,7 @@ public final class UserMessaging {
     public static final String PASSWORD_RESET_GOOGLE_ONLY_ROUTING_KEY = "user.password-reset-google-only.v1";
     public static final String EMAIL_VERIFICATION_REQUESTED_ROUTING_KEY = "user.email-verification-requested.v1";
     public static final String EMAIL_VERIFICATION_STATE_ROUTING_KEY = "user.email-verification-state.v1";
+    public static final String USER_DELETED_ROUTING_KEY = "user.deleted.v1";
 
     private UserMessaging() { }
 }
