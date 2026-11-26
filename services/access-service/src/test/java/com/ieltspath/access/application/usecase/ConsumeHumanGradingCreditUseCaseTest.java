@@ -2,12 +2,10 @@ package com.ieltspath.access.application.usecase;
 
 import com.ieltspath.access.application.command.ConsumeHumanGradingCreditCommand;
 import com.ieltspath.access.application.command.RefundHumanGradingCreditCommand;
-import com.ieltspath.access.domain.aggregate.Plan;
 import com.ieltspath.access.domain.aggregate.Subscription;
 import com.ieltspath.access.domain.exception.InsufficientCreditsException;
 import com.ieltspath.access.domain.repository.HumanGradingCreditConsumptionRepository;
 import com.ieltspath.access.domain.repository.OutboxEventRepository;
-import com.ieltspath.access.domain.repository.PlanRepository;
 import com.ieltspath.access.domain.repository.SubscriptionRepository;
 import org.junit.jupiter.api.Test;
 
@@ -22,40 +20,36 @@ class ConsumeHumanGradingCreditUseCaseTest {
     private final SubscriptionRepository subscriptions = mock(SubscriptionRepository.class);
     private final OutboxEventRepository outbox = mock(OutboxEventRepository.class);
     private final HumanGradingCreditConsumptionRepository consumptions = mock(HumanGradingCreditConsumptionRepository.class);
-    private final PlanRepository plans = mock(PlanRepository.class);
     private final ConsumeHumanGradingCreditUseCase useCase =
-            new ConsumeHumanGradingCreditUseCase(subscriptions, outbox, consumptions, plans);
+            new ConsumeHumanGradingCreditUseCase(subscriptions, outbox, consumptions);
 
     @Test
-    void unlimitedPlanDoesNotSpendAndRepeatIsIdempotent() {
+    void activeSubscriptionSpendsCreditAndRepeatIsIdempotent() {
         UUID userId = UUID.randomUUID();
         UUID subscriptionId = UUID.randomUUID();
         UUID submissionId = UUID.randomUUID();
         Subscription subscription = mock(Subscription.class);
-        Plan plan = mock(Plan.class);
         when(subscription.getId()).thenReturn(subscriptionId);
         when(subscription.getPlanId()).thenReturn(UUID.randomUUID());
-        when(subscription.getRemainingCredits()).thenReturn(3);
+        when(subscription.getRemainingCredits()).thenReturn(3, 2);
         when(subscriptions.findActiveByUserId(userId)).thenReturn(Optional.of(subscription));
-        when(plans.findById(subscription.getPlanId())).thenReturn(Optional.of(plan));
-        when(plan.hasFeature("HUMAN_GRADING_UNLIMITED")).thenReturn(true);
         when(consumptions.findBySubmissionId(submissionId)).thenReturn(Optional.empty());
 
         var first = useCase.consume(new ConsumeHumanGradingCreditCommand(userId, submissionId));
         when(consumptions.findBySubmissionId(submissionId)).thenReturn(Optional.of(
                 new com.ieltspath.access.domain.entity.HumanGradingCreditConsumption(submissionId, userId,
-                        subscriptionId, 3, null, false)));
+                        subscriptionId, 2, null, true)));
         var repeat = useCase.consume(new ConsumeHumanGradingCreditCommand(userId, submissionId));
 
-        assertFalse(first.charged());
+        assertTrue(first.charged());
         assertFalse(repeat.charged());
-        verify(subscription, never()).consumeHumanGradingCredit();
-        verify(subscriptions, never()).save(subscription);
-        verify(consumptions).save(argThat(saved -> !saved.creditSpent()));
+        verify(subscription).consumeHumanGradingCredit();
+        verify(subscriptions).save(subscription);
+        verify(consumptions).save(argThat(saved -> saved.creditSpent()));
     }
 
     @Test
-    void refundOfUnlimitedRequestDoesNotMintCredit() {
+    void refundOfPreviouslyUnchargedRequestDoesNotMintCredit() {
         UUID userId = UUID.randomUUID();
         UUID subscriptionId = UUID.randomUUID();
         UUID submissionId = UUID.randomUUID();
@@ -80,13 +74,10 @@ class ConsumeHumanGradingCreditUseCaseTest {
         UUID subscriptionId = UUID.randomUUID();
         UUID submissionId = UUID.randomUUID();
         Subscription subscription = mock(Subscription.class);
-        Plan plan = mock(Plan.class);
         when(subscription.getId()).thenReturn(subscriptionId);
         when(subscription.getPlanId()).thenReturn(UUID.randomUUID());
         when(subscription.getRemainingCredits()).thenReturn(1);
         when(subscriptions.findActiveByUserId(userId)).thenReturn(Optional.of(subscription));
-        when(plans.findById(subscription.getPlanId())).thenReturn(Optional.of(plan));
-        when(plan.hasFeature("HUMAN_GRADING_UNLIMITED")).thenReturn(false);
         when(consumptions.findBySubmissionId(submissionId)).thenReturn(Optional.empty());
 
         var result = useCase.consume(new ConsumeHumanGradingCreditCommand(userId, submissionId));
