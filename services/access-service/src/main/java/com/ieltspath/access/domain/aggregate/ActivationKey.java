@@ -126,7 +126,7 @@ public class ActivationKey {
         }
 
         if (!status.canMoveTo(KeyStatus.REDEEMED)) {
-            throw new InvalidKeyOperationException("Activation key is no longer usable");
+            throw new InvalidKeyOperationException("Mã kích hoạt không còn dùng được.");
         }
         this.status = KeyStatus.REDEEMED;
         this.redeemedAt = Instant.now();
@@ -138,7 +138,7 @@ public class ActivationKey {
             throw new InvalidKeyOperationException("Không thu hồi được mã đã kích hoạt.");
         }
         if (!status.canMoveTo(KeyStatus.REVOKED)) {
-            throw new InvalidKeyOperationException("Only an active key can be revoked");
+            throw new InvalidKeyOperationException("Chỉ thu hồi được mã đang còn hiệu lực.");
         }
         this.status = KeyStatus.REVOKED;
     }

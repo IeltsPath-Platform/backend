@@ -117,9 +117,8 @@ public class JdbcExaminerAssignmentStore implements ExaminerAssignmentStore {
         var args = new MapSqlParameterSource("id", jobId);
         jdbc.update("UPDATE grading_jobs SET status='CANCELLED' WHERE id=:id AND status IN ('QUEUED','PROCESSING')", args);
         jdbc.update("""
-                UPDATE human_reviews SET status='QUEUED',grader_user_id=NULL,assigned_at=NULL,started_at=NULL,
-                    completed_at=NULL,draft_payload=NULL,draft_saved_at=NULL
-                WHERE grading_job_id=:id AND status IN ('ASSIGNED','IN_REVIEW')
+                UPDATE human_reviews SET draft_payload=NULL,draft_saved_at=NULL
+                WHERE grading_job_id=:id AND status<>'COMPLETED'
                 """, args);
     }
 

@@ -90,8 +90,7 @@ public class JdbcExaminerQueueStore implements ExaminerQueueStore {
                               ELSE (j.requested_examiner_id=:examiner
                                     AND (j.assigned_examiner_id IS NULL OR j.assigned_examiner_id=:examiner)) END)
                 )
-                UPDATE grading_jobs j SET assigned_examiner_id=:examiner,claimed_at=CURRENT_TIMESTAMP,
-                    status='PROCESSING'
+                UPDATE grading_jobs j SET assigned_examiner_id=:examiner,claimed_at=CURRENT_TIMESTAMP
                 FROM target t
                 WHERE (j.id=t.id OR (t.attempt_id IS NOT NULL AND EXISTS (
                     SELECT 1 FROM learner_submissions l JOIN attempt_items i ON i.id=l.attempt_item_id

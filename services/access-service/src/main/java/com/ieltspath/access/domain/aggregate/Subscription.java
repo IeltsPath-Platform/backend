@@ -114,7 +114,7 @@ public class Subscription {
 
     public void extend(int additionalDays, int additionalCredits) {
         if (status != SubscriptionStatus.ACTIVE) {
-            throw new IllegalStateException("Only an active subscription can be extended");
+            throw new IllegalStateException("Chỉ gia hạn được gói đang hoạt động.");
         }
         Instant baseTime = (endsAt != null && endsAt.isAfter(Instant.now())) ? endsAt : Instant.now();
         this.endsAt = baseTime.plus(additionalDays, ChronoUnit.DAYS);
@@ -124,7 +124,7 @@ public class Subscription {
 
     public void expire() {
         if (!status.canMoveTo(SubscriptionStatus.EXPIRED)) {
-            throw new IllegalStateException("Only an active subscription can expire");
+            throw new IllegalStateException("Chỉ gói đang hoạt động mới chuyển sang hết hạn được.");
         }
         this.status = SubscriptionStatus.EXPIRED;
         this.updatedAt = Instant.now();
@@ -152,7 +152,7 @@ public class Subscription {
     public void cancel() {
         if (status == SubscriptionStatus.CANCELLED) return;
         if (!status.canMoveTo(SubscriptionStatus.CANCELLED)) {
-            throw new IllegalStateException("Only an active subscription can be cancelled");
+            throw new IllegalStateException("Chỉ huỷ được gói đang hoạt động.");
         }
         this.status = SubscriptionStatus.CANCELLED;
         this.cancelledAt = Instant.now();

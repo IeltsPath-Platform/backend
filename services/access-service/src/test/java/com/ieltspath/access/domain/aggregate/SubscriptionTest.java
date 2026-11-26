@@ -94,7 +94,7 @@ class SubscriptionTest {
 
         assertThatThrownBy(sub::expire)
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Only an active subscription can expire");
+                .hasMessage("Chỉ gói đang hoạt động mới chuyển sang hết hạn được.");
     }
 
     @Test

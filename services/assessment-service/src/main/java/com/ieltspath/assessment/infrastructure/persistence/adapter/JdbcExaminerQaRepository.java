@@ -64,7 +64,7 @@ public class JdbcExaminerQaRepository implements ExaminerQaRepository {
         jdbc.update("UPDATE grading_jobs SET status='PROCESSING' WHERE id=? AND status='QUEUED' AND assigned_examiner_id=?",
                 jobId, reviewerId);
         int completedJob = jdbc.update("UPDATE grading_jobs SET status='COMPLETED',completed_at=CURRENT_TIMESTAMP WHERE id=? AND status='PROCESSING'", jobId);
-        if (completedJob != 1) throw new InvalidAssessmentStateException("QA grading job is no longer processing");
+        if (completedJob != 1) throw new InvalidAssessmentStateException("Bài kiểm tra chất lượng này không còn ở trạng thái đang xử lý.");
         jdbc.update("UPDATE human_reviews SET status='IN_REVIEW',started_at=COALESCE(started_at,CURRENT_TIMESTAMP) WHERE grading_job_id=? AND status='ASSIGNED'", jobId);
         jdbc.update("UPDATE human_reviews SET status='COMPLETED',completed_at=CURRENT_TIMESTAMP WHERE grading_job_id=? AND status='IN_REVIEW'", jobId);
     }
