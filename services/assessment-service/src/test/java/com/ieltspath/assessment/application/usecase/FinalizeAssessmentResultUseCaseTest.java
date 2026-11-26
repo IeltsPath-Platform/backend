@@ -155,7 +155,7 @@ class FinalizeAssessmentResultUseCaseTest {
     }
 
     @Test
-    void completedResultIsNotAnnouncedTwice() {
+    void completedResultIsNotAnnouncedAgainAfterItsOldOutboxRowWasPurged() {
         AssessmentResult completed = new AssessmentResult(resultId, attemptId, 1, AssessmentResult.COMPLETED, 6.5,
                 Instant.now());
         when(results.findForUpdateById(resultId)).thenReturn(Optional.of(completed));
