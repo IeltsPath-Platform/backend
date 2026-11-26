@@ -42,29 +42,51 @@ public class JdbcDeletedUserRepository implements DeletedUserRepository {
                 """, eventId, userId, ts);
     }
 
-    public record Job(UUID eventId, UUID userId) { }
+    public record Job(UUID eventId, UUID userId, int attempts) { }
 
-    public List<Job> claimPendingJobs(int limit) {
+    public record SpeakingRecordingRef(UUID id, String objectKey) { }
+
+    public List<Job> claimPendingJobs(int limit, long leaseSeconds, int maxAttempts) {
         return jdbc.query("""
-                SELECT event_id, user_id
-                FROM user_deletion_jobs
-                WHERE status = 'PENDING'
-                ORDER BY created_at ASC
-                FOR UPDATE SKIP LOCKED
-                LIMIT ?
+                UPDATE user_deletion_jobs
+                SET status = 'PROCESSING',
+                    claimed_at = CURRENT_TIMESTAMP,
+                    attempts = attempts + 1
+                WHERE event_id IN (
+                    SELECT event_id
+                    FROM user_deletion_jobs
+                    WHERE (status = 'PENDING'
+                           OR (status = 'PROCESSING' AND claimed_at < CURRENT_TIMESTAMP - make_interval(secs => ?)))
+                      AND attempts < ?
+                    ORDER BY created_at ASC
+                    FOR UPDATE SKIP LOCKED
+                    LIMIT ?
+                )
+                RETURNING event_id, user_id, attempts
                 """, (rs, rowNum) -> new Job(
                 UUID.fromString(rs.getString("event_id")),
-                UUID.fromString(rs.getString("user_id"))), limit);
+                UUID.fromString(rs.getString("user_id")),
+                rs.getInt("attempts")), leaseSeconds, maxAttempts, limit);
     }
 
-    public List<String> findSpeakingRecordingKeys(UUID userId, int limit) {
-        return jdbc.queryForList("""
-                SELECT r.object_key
+    public List<SpeakingRecordingRef> findSpeakingRecordingsBatch(UUID userId, int limit) {
+        return jdbc.query("""
+                SELECT r.id, r.object_key
                 FROM speaking_recordings r
                 JOIN speaking_submissions s ON s.id = r.submission_id
                 WHERE s.user_id = ? AND r.object_key IS NOT NULL
+                ORDER BY r.id ASC
                 LIMIT ?
-                """, String.class, userId, limit);
+                """, (rs, rowNum) -> new SpeakingRecordingRef(
+                UUID.fromString(rs.getString("id")),
+                rs.getString("object_key")), userId, limit);
+    }
+
+    public void deleteSpeakingRecordingsByIds(List<UUID> ids) {
+        if (ids.isEmpty()) return;
+        for (UUID id : ids) {
+            jdbc.update("DELETE FROM speaking_recordings WHERE id = ?", id);
+        }
     }
 
     public int deleteBatchByUserId(String tableName, String userColumn, UUID userId, int limit) {
@@ -113,8 +135,24 @@ public class JdbcDeletedUserRepository implements DeletedUserRepository {
     public void markJobDone(UUID eventId) {
         jdbc.update("""
                 UPDATE user_deletion_jobs
-                SET status = 'DONE', completed_at = CURRENT_TIMESTAMP
+                SET status = 'DONE', completed_at = CURRENT_TIMESTAMP, last_error = NULL
                 WHERE event_id = ?
                 """, eventId);
+    }
+
+    public void markJobFailed(UUID eventId, String errorCode) {
+        jdbc.update("""
+                UPDATE user_deletion_jobs
+                SET status = 'FAILED', last_error = ?, completed_at = CURRENT_TIMESTAMP
+                WHERE event_id = ?
+                """, errorCode, eventId);
+    }
+
+    public void recordJobError(UUID eventId, String errorCode) {
+        jdbc.update("""
+                UPDATE user_deletion_jobs
+                SET last_error = ?
+                WHERE event_id = ?
+                """, errorCode, eventId);
     }
 }

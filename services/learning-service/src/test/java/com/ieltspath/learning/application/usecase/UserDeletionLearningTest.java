@@ -94,4 +94,45 @@ class UserDeletionLearningTest {
         verify(deletedUsers).isDeleted(userId);
         verifyNoInteractions(lock);
     }
+
+    @Test
+    void workerLeavesJobIncompleteWhenStorageDeleteFailsAndMarksFailedAtMaxAttempts() {
+        var repo = mock(com.ieltspath.learning.infrastructure.persistence.JdbcDeletedUserRepository.class);
+        @SuppressWarnings("unchecked")
+        org.springframework.beans.factory.ObjectProvider<com.ieltspath.commonstorage.ObjectStorage> provider =
+                mock(org.springframework.beans.factory.ObjectProvider.class);
+        var storage = mock(com.ieltspath.commonstorage.ObjectStorage.class);
+        when(provider.getIfAvailable()).thenReturn(storage);
+
+        var settings = mock(com.ieltspath.learning.application.service.SpeakingPracticeSettings.class);
+        when(settings.bucket()).thenReturn("speaking-recordings");
+
+        var txManager = mock(org.springframework.transaction.PlatformTransactionManager.class);
+        when(txManager.getTransaction(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new org.springframework.transaction.support.SimpleTransactionStatus());
+
+        UUID eventId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UUID okId = UUID.randomUUID();
+        UUID failId = UUID.randomUUID();
+        var job = new com.ieltspath.learning.infrastructure.persistence.JdbcDeletedUserRepository.Job(eventId, userId, 10);
+        when(repo.claimPendingJobs(5, 300L, 10)).thenReturn(List.of(job));
+        when(repo.findSpeakingRecordingsBatch(userId, 100)).thenReturn(List.of(
+                new com.ieltspath.learning.infrastructure.persistence.JdbcDeletedUserRepository.SpeakingRecordingRef(okId, "practice/" + userId + "/ok.webm"),
+                new com.ieltspath.learning.infrastructure.persistence.JdbcDeletedUserRepository.SpeakingRecordingRef(failId, "practice/" + userId + "/fail.webm")));
+        org.mockito.Mockito.doThrow(new com.ieltspath.commonstorage.StorageException(
+                "delete", com.ieltspath.commonstorage.StorageException.Reason.NOT_FOUND, 404, false, "ref1"))
+                .when(storage).delete("speaking-recordings", "practice/" + userId + "/ok.webm");
+        org.mockito.Mockito.doThrow(new com.ieltspath.commonstorage.StorageException(
+                "delete", com.ieltspath.commonstorage.StorageException.Reason.UNAVAILABLE, 503, true, "ref2"))
+                .when(storage).delete("speaking-recordings", "practice/" + userId + "/fail.webm");
+
+        var worker = new com.ieltspath.learning.infrastructure.scheduler.UserDeletionJobWorker(
+                repo, provider, settings, txManager, 300L, 10);
+        worker.processPending();
+
+        verify(repo).deleteSpeakingRecordingsByIds(List.of(okId));
+        verify(repo, org.mockito.Mockito.never()).markJobDone(eventId);
+        verify(repo).markJobFailed(eventId, "IllegalStateException");
+    }
 }

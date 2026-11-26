@@ -42,29 +42,67 @@ public class JdbcDeletedUserStore implements DeletedUserStore {
                 """, eventId, userId, ts);
     }
 
-    public record Job(UUID eventId, UUID userId) { }
+    public record Job(UUID eventId, UUID userId, int attempts) { }
 
-    public List<Job> claimPendingJobs(int limit) {
+    public record MediaRef(UUID id, String key) { }
+
+    public List<Job> claimPendingJobs(int limit, long leaseSeconds, int maxAttempts) {
         return jdbc.query("""
-                SELECT event_id, user_id
-                FROM user_deletion_jobs
-                WHERE status = 'PENDING'
-                ORDER BY created_at ASC
-                FOR UPDATE SKIP LOCKED
-                LIMIT ?
+                UPDATE user_deletion_jobs
+                SET status = 'PROCESSING',
+                    claimed_at = CURRENT_TIMESTAMP,
+                    attempts = attempts + 1
+                WHERE event_id IN (
+                    SELECT event_id
+                    FROM user_deletion_jobs
+                    WHERE (status = 'PENDING'
+                           OR (status = 'PROCESSING' AND claimed_at < CURRENT_TIMESTAMP - make_interval(secs => ?)))
+                      AND attempts < ?
+                    ORDER BY created_at ASC
+                    FOR UPDATE SKIP LOCKED
+                    LIMIT ?
+                )
+                RETURNING event_id, user_id, attempts
                 """, (rs, rowNum) -> new Job(
                 UUID.fromString(rs.getString("event_id")),
-                UUID.fromString(rs.getString("user_id"))), limit);
+                UUID.fromString(rs.getString("user_id")),
+                rs.getInt("attempts")), leaseSeconds, maxAttempts, limit);
     }
 
-    public List<String> findFlashcardImageKeys(UUID userId) {
-        return jdbc.queryForList("""
-                SELECT image_key FROM flashcards
+    public List<MediaRef> findFlashcardImagesBatch(UUID userId, int limit) {
+        return jdbc.query("""
+                SELECT id, image_key
+                FROM flashcards
                 WHERE user_id = ? AND image_key IS NOT NULL
-                UNION
-                SELECT cover_image_key FROM flashcard_decks
+                ORDER BY id ASC
+                LIMIT ?
+                """, (rs, rowNum) -> new MediaRef(
+                UUID.fromString(rs.getString("id")),
+                rs.getString("image_key")), userId, limit);
+    }
+
+    public void clearFlashcardImageKeys(List<UUID> ids) {
+        for (UUID id : ids) {
+            jdbc.update("UPDATE flashcards SET image_key = NULL WHERE id = ?", id);
+        }
+    }
+
+    public List<MediaRef> findDeckCoverImagesBatch(UUID userId, int limit) {
+        return jdbc.query("""
+                SELECT id, cover_image_key
+                FROM flashcard_decks
                 WHERE user_id = ? AND cover_image_key IS NOT NULL
-                """, String.class, userId, userId);
+                ORDER BY id ASC
+                LIMIT ?
+                """, (rs, rowNum) -> new MediaRef(
+                UUID.fromString(rs.getString("id")),
+                rs.getString("cover_image_key")), userId, limit);
+    }
+
+    public void clearDeckCoverImageKeys(List<UUID> ids) {
+        for (UUID id : ids) {
+            jdbc.update("UPDATE flashcard_decks SET cover_image_key = NULL WHERE id = ?", id);
+        }
     }
 
     public void deletePersonalLibraryData(UUID userId) {
@@ -98,8 +136,24 @@ public class JdbcDeletedUserStore implements DeletedUserStore {
     public void markJobDone(UUID eventId) {
         jdbc.update("""
                 UPDATE user_deletion_jobs
-                SET status = 'DONE', completed_at = CURRENT_TIMESTAMP
+                SET status = 'DONE', completed_at = CURRENT_TIMESTAMP, last_error = NULL
                 WHERE event_id = ?
                 """, eventId);
+    }
+
+    public void markJobFailed(UUID eventId, String errorCode) {
+        jdbc.update("""
+                UPDATE user_deletion_jobs
+                SET status = 'FAILED', last_error = ?, completed_at = CURRENT_TIMESTAMP
+                WHERE event_id = ?
+                """, errorCode, eventId);
+    }
+
+    public void recordJobError(UUID eventId, String errorCode) {
+        jdbc.update("""
+                UPDATE user_deletion_jobs
+                SET last_error = ?
+                WHERE event_id = ?
+                """, errorCode, eventId);
     }
 }

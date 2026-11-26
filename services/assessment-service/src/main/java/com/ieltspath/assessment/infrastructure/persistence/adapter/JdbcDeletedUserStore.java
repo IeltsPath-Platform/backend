@@ -42,28 +42,50 @@ public class JdbcDeletedUserStore implements DeletedUserStore {
                 """, eventId, userId, ts);
     }
 
-    public record Job(UUID eventId, UUID userId) { }
+    public record Job(UUID eventId, UUID userId, int attempts) { }
 
-    public List<Job> claimPendingJobs(int limit) {
+    public record SpeakingSubmissionRef(UUID id, String mediaReference) { }
+
+    public List<Job> claimPendingJobs(int limit, long leaseSeconds, int maxAttempts) {
         return jdbc.query("""
-                SELECT event_id, user_id
-                FROM user_deletion_jobs
-                WHERE status = 'PENDING'
-                ORDER BY created_at ASC
-                FOR UPDATE SKIP LOCKED
-                LIMIT ?
+                UPDATE user_deletion_jobs
+                SET status = 'PROCESSING',
+                    claimed_at = CURRENT_TIMESTAMP,
+                    attempts = attempts + 1
+                WHERE event_id IN (
+                    SELECT event_id
+                    FROM user_deletion_jobs
+                    WHERE (status = 'PENDING'
+                           OR (status = 'PROCESSING' AND claimed_at < CURRENT_TIMESTAMP - make_interval(secs => ?)))
+                      AND attempts < ?
+                    ORDER BY created_at ASC
+                    FOR UPDATE SKIP LOCKED
+                    LIMIT ?
+                )
+                RETURNING event_id, user_id, attempts
                 """, (rs, rowNum) -> new Job(
                 UUID.fromString(rs.getString("event_id")),
-                UUID.fromString(rs.getString("user_id"))), limit);
+                UUID.fromString(rs.getString("user_id")),
+                rs.getInt("attempts")), leaseSeconds, maxAttempts, limit);
     }
 
-    public List<String> findSpeakingRecordingRefs(UUID userId, int limit) {
-        return jdbc.queryForList("""
-                SELECT media_reference
+    public List<SpeakingSubmissionRef> findSpeakingSubmissionsBatch(UUID userId, int limit) {
+        return jdbc.query("""
+                SELECT id, media_reference
                 FROM learner_submissions
                 WHERE user_id = ? AND skill = 'SPEAKING' AND media_reference IS NOT NULL
+                ORDER BY id ASC
                 LIMIT ?
-                """, String.class, userId, limit);
+                """, (rs, rowNum) -> new SpeakingSubmissionRef(
+                UUID.fromString(rs.getString("id")),
+                rs.getString("media_reference")), userId, limit);
+    }
+
+    public void clearMediaReferenceByIds(List<UUID> ids) {
+        if (ids.isEmpty()) return;
+        for (UUID id : ids) {
+            jdbc.update("UPDATE learner_submissions SET media_reference = NULL WHERE id = ?", id);
+        }
     }
 
     public void deleteUserAssessmentData(UUID userId) {
@@ -158,8 +180,24 @@ public class JdbcDeletedUserStore implements DeletedUserStore {
     public void markJobDone(UUID eventId) {
         jdbc.update("""
                 UPDATE user_deletion_jobs
-                SET status = 'DONE', completed_at = CURRENT_TIMESTAMP
+                SET status = 'DONE', completed_at = CURRENT_TIMESTAMP, last_error = NULL
                 WHERE event_id = ?
                 """, eventId);
+    }
+
+    public void markJobFailed(UUID eventId, String errorCode) {
+        jdbc.update("""
+                UPDATE user_deletion_jobs
+                SET status = 'FAILED', last_error = ?, completed_at = CURRENT_TIMESTAMP
+                WHERE event_id = ?
+                """, errorCode, eventId);
+    }
+
+    public void recordJobError(UUID eventId, String errorCode) {
+        jdbc.update("""
+                UPDATE user_deletion_jobs
+                SET last_error = ?
+                WHERE event_id = ?
+                """, errorCode, eventId);
     }
 }

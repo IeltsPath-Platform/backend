@@ -42,24 +42,32 @@ public class JdbcDeletedUserStore implements DeletedUserStore {
                 """, eventId, userId, ts);
     }
 
-    public record Job(UUID eventId, UUID userId) { }
+    public record Job(UUID eventId, UUID userId, int attempts) { }
 
-    public List<Job> claimPendingJobs(int limit) {
+    public List<Job> claimPendingJobs(int limit, long leaseSeconds, int maxAttempts) {
         return jdbc.query("""
-                SELECT event_id, user_id
-                FROM user_deletion_jobs
-                WHERE status = 'PENDING'
-                ORDER BY created_at ASC
-                FOR UPDATE SKIP LOCKED
-                LIMIT ?
+                UPDATE user_deletion_jobs
+                SET status = 'PROCESSING',
+                    claimed_at = CURRENT_TIMESTAMP,
+                    attempts = attempts + 1
+                WHERE event_id IN (
+                    SELECT event_id
+                    FROM user_deletion_jobs
+                    WHERE (status = 'PENDING'
+                           OR (status = 'PROCESSING' AND claimed_at < CURRENT_TIMESTAMP - make_interval(secs => ?)))
+                      AND attempts < ?
+                    ORDER BY created_at ASC
+                    FOR UPDATE SKIP LOCKED
+                    LIMIT ?
+                )
+                RETURNING event_id, user_id, attempts
                 """, (rs, rowNum) -> new Job(
                 UUID.fromString(rs.getString("event_id")),
-                UUID.fromString(rs.getString("user_id"))), limit);
+                UUID.fromString(rs.getString("user_id")),
+                rs.getInt("attempts")), leaseSeconds, maxAttempts, limit);
     }
 
     public void deleteUserGameData(UUID userId) {
-        jdbc.update("DELETE FROM leaderboard_entries WHERE user_id = ?", userId);
-        jdbc.update("DELETE FROM quiz_participations WHERE user_id = ?", userId);
         jdbc.update("DELETE FROM game_guess_receipts WHERE user_id = ?", userId);
         jdbc.update("""
                 DELETE FROM game_guesses
@@ -93,8 +101,24 @@ public class JdbcDeletedUserStore implements DeletedUserStore {
     public void markJobDone(UUID eventId) {
         jdbc.update("""
                 UPDATE user_deletion_jobs
-                SET status = 'DONE', completed_at = CURRENT_TIMESTAMP
+                SET status = 'DONE', completed_at = CURRENT_TIMESTAMP, last_error = NULL
                 WHERE event_id = ?
                 """, eventId);
+    }
+
+    public void markJobFailed(UUID eventId, String errorCode) {
+        jdbc.update("""
+                UPDATE user_deletion_jobs
+                SET status = 'FAILED', last_error = ?, completed_at = CURRENT_TIMESTAMP
+                WHERE event_id = ?
+                """, errorCode, eventId);
+    }
+
+    public void recordJobError(UUID eventId, String errorCode) {
+        jdbc.update("""
+                UPDATE user_deletion_jobs
+                SET last_error = ?
+                WHERE event_id = ?
+                """, errorCode, eventId);
     }
 }
