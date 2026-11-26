@@ -3,15 +3,17 @@ package com.ieltspath.access.api.controller;
 import com.ieltspath.commonsecurity.authorization.LearnerOnly;
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
 class LearnerOnlyControllerCoverageTest {
     @Test
-    void learnerAccessAndCatalogControllersAreRestricted() {
-        assertThat(List.of(AccessCatalogController.class, LearnerAccessController.class))
-                .allSatisfy(controller -> assertThat(controller.isAnnotationPresent(LearnerOnly.class))
-                        .as("%s should require CUSTOMER", controller.getSimpleName()).isTrue());
+    void learnerAccessIsRestrictedToLearners() {
+        assertThat(LearnerAccessController.class.isAnnotationPresent(LearnerOnly.class)).isTrue();
+    }
+
+    /** The sales screens read the key products to issue keys, so the catalogue stays open to every signed-in user. */
+    @Test
+    void theCatalogueStaysOpenToStaff() {
+        assertThat(AccessCatalogController.class.isAnnotationPresent(LearnerOnly.class)).isFalse();
     }
 }
