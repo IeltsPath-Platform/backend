@@ -70,6 +70,14 @@ class JdbcWritingTaskReaderTest {
         return reader.find(version, section).orElseThrow();
     }
 
+    /**
+     * Rewrites the stored prompt of a published test to set up a case. The database refuses that for published content,
+     * so the lock is switched off inside this test's transaction, which is rolled back afterwards.
+     */
+    private void unlockPublishedQuestions() {
+        sql.execute("ALTER TABLE question_versions DISABLE TRIGGER trg_question_versions_published_content_lock");
+    }
+
     @Test
     void taskOneCarriesItsChartGuideAndSixSteps() throws Exception {
         var task = task("PT-WRITING-01", 1);
@@ -128,6 +136,7 @@ class JdbcWritingTaskReaderTest {
 
     @Test
     void aPromptWithOnlyThePlaceholderHasNoSample() {
+        unlockPublishedQuestions();
         sql.update("""
                 UPDATE question_versions SET explanation = 'Graded by the essay grader.'
                 WHERE id = (SELECT sq.question_version_id FROM content_packages p
@@ -158,6 +167,7 @@ class JdbcWritingTaskReaderTest {
 
     @Test
     void aModelAnswerStoredWithThePromptIsTheSample() {
+        unlockPublishedQuestions();
         sql.update("""
                 UPDATE question_versions SET explanation = ?
                 WHERE id = (SELECT sq.question_version_id FROM content_packages p

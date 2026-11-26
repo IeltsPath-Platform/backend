@@ -24,6 +24,20 @@ public class JdbcAuthorPackageReader implements AuthorPackageReader {
 
     private static final int STEM_PREVIEW_LENGTH = 200;
 
+    /** The version shown for a package and the shape of its sections: its single skill, part numbers and counts. */
+    private static final String SHAPE_JOINS = """
+            LEFT JOIN LATERAL (SELECT v.id FROM content_package_versions v WHERE v.package_id = p.id
+                               ORDER BY (v.id = p.current_published_version_id) DESC, v.version_number DESC
+                               LIMIT 1) shown ON TRUE
+            LEFT JOIN LATERAL (SELECT COUNT(s.id)::int AS section_count,
+                                      CASE WHEN COUNT(DISTINCT s.skill) = 1 THEN MIN(s.skill) END AS skill,
+                                      array_remove(array_agg(DISTINCT s.part_no ORDER BY s.part_no), NULL) AS part_nos,
+                                      (SELECT COUNT(*)::int FROM section_questions sq
+                                       JOIN content_sections qs ON qs.id = sq.section_id
+                                       WHERE qs.package_version_id = shown.id) AS question_count
+                               FROM content_sections s WHERE s.package_version_id = shown.id) shape ON TRUE
+            """;
+
     private final NamedParameterJdbcTemplate jdbc;
 
     public JdbcAuthorPackageReader(NamedParameterJdbcTemplate jdbc) {
@@ -73,7 +87,9 @@ public class JdbcAuthorPackageReader implements AuthorPackageReader {
             where.append(" AND (p.code ILIKE :q ESCAPE '\\' OR p.title ILIKE :q ESCAPE '\\')");
             params.addValue("q", "%" + escapeLike(filter.q().strip()) + "%");
         }
-        Long total = jdbc.queryForObject("SELECT COUNT(*) FROM content_packages p" + where, params, Long.class);
+        // The skill filter reads the shape of the shown version, so the count needs the same joins as the page.
+        String countFrom = "SELECT COUNT(*) FROM content_packages p " + (filter.skill() != null ? SHAPE_JOINS : "");
+        Long total = jdbc.queryForObject(countFrom + where, params, Long.class);
         params.addValue("limit", size).addValue("offset", (long) page * size);
         List<AuthorPackageSummary> items = jdbc.query("""
                 SELECT p.id, p.code, p.title, p.package_type, p.required_feature_key, p.status,
@@ -85,17 +101,7 @@ public class JdbcAuthorPackageReader implements AuthorPackageReader {
                                WHERE v.package_id = p.id AND v.status = 'DRAFT') AS has_draft,
                        shape.skill, shape.part_nos, shape.section_count, shape.question_count
                 FROM content_packages p
-                LEFT JOIN LATERAL (SELECT v.id FROM content_package_versions v WHERE v.package_id = p.id
-                                   ORDER BY (v.id = p.current_published_version_id) DESC, v.version_number DESC
-                                   LIMIT 1) shown ON TRUE
-                LEFT JOIN LATERAL (SELECT COUNT(s.id)::int AS section_count,
-                                          CASE WHEN COUNT(DISTINCT s.skill) = 1 THEN MIN(s.skill) END AS skill,
-                                          array_remove(array_agg(DISTINCT s.part_no ORDER BY s.part_no), NULL) AS part_nos,
-                                          (SELECT COUNT(*)::int FROM section_questions sq
-                                           JOIN content_sections qs ON qs.id = sq.section_id
-                                           WHERE qs.package_version_id = shown.id) AS question_count
-                                   FROM content_sections s WHERE s.package_version_id = shown.id) shape ON TRUE
-                """ + where + """
+                """ + SHAPE_JOINS + where + """
 
                 ORDER BY p.updated_at DESC, p.id
                 LIMIT :limit OFFSET :offset
