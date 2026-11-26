@@ -2,6 +2,7 @@ package com.ieltspath.assessment.application.usecase;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.assessment.application.port.GateEssayJobStore;
+import com.ieltspath.assessment.application.port.PlacementSpeakingGradeStore;
 import com.ieltspath.assessment.domain.aggregate.AssessmentAttempt;
 import com.ieltspath.assessment.domain.entity.AssessmentResult;
 import com.ieltspath.assessment.domain.entity.AttemptItem;
@@ -52,6 +53,7 @@ class PlacementGradingServiceTest {
     @Mock AssessmentResultCompleter completer;
     @Mock GateEssayJobStore jobs;
     @Mock AutoGradeAttemptService autoGrader;
+    @Mock PlacementSpeakingGradeStore speakingGrades;
 
     private final Map<UUID, String> skillBySection = new java.util.HashMap<>();
     private final UUID userId = UUID.randomUUID();
@@ -84,6 +86,28 @@ class PlacementGradingServiceTest {
         service(5.5).onSubmit(attempt);
         assertThat(savedBand()).isEqualTo(3.5);
         assertThat(savedSkillBands()).containsEntry(Skill.SPEAKING, 5.5);
+    }
+
+    @Test
+    void disabledPlacementSpeakingGradingKeepsLegacyBandAndDoesNotReadRecordingJobs() {
+        arrangeItems();
+        when(jobs.submittedEssays(List.of(writing.id()))).thenReturn(Map.of());
+
+        service(5.5,speakingGrades,false).onSubmit(attempt);
+
+        assertThat(savedSkillBands()).containsEntry(Skill.SPEAKING,5.5);
+        verifyNoInteractions(speakingGrades);
+    }
+
+    @Test
+    void enabledPlacementSpeakingGradingDoesNotInventABandWhenTheLearnerSkipsRecording() {
+        arrangeItems();
+        when(jobs.submittedEssays(List.of(writing.id()))).thenReturn(Map.of());
+        when(speakingGrades.recordings(attempt.getId(),userId)).thenReturn(List.of());
+
+        service(5.5,speakingGrades,true).onSubmit(attempt);
+
+        assertThat(savedSkillBands()).doesNotContainKey(Skill.SPEAKING);
     }
 
     @Test
@@ -359,6 +383,11 @@ class PlacementGradingServiceTest {
     private PlacementGradingService service(Double configuredSpeakingBand) {
         return new PlacementGradingService(attempts, sections, attemptItems, responses, results, itemResults,
                 completer, jobs, autoGrader, new ObjectMapper(), skillScores, configuredSpeakingBand, 5.5);
+    }
+
+    private PlacementGradingService service(Double configuredSpeakingBand,PlacementSpeakingGradeStore store,boolean enabled) {
+        return new PlacementGradingService(attempts,sections,attemptItems,responses,results,itemResults,completer,jobs,
+                autoGrader,new ObjectMapper(),skillScores,configuredSpeakingBand,5.5,store,enabled);
     }
 
     private AttemptItem item(String skill, String answerSnapshot) {
