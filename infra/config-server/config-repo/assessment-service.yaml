@@ -1,4 +1,4 @@
-spring:
+﻿spring:
   servlet:
     multipart:
       max-file-size: 5MB
@@ -37,7 +37,7 @@ spring:
 assessment:
   placement:
     speaking-grading:
-      enabled: ${ASSESSMENT_PLACEMENT_SPEAKING_GRADING_ENABLED:false}
+      enabled: ${ASSESSMENT_PLACEMENT_SPEAKING_GRADING_ENABLED:true}
       timeout-seconds: ${ASSESSMENT_PLACEMENT_SPEAKING_GRADING_TIMEOUT_SECONDS:600}
       timeout-poll-ms: ${ASSESSMENT_PLACEMENT_SPEAKING_GRADING_TIMEOUT_POLL_MS:30000}
       retry-delay-ms: ${ASSESSMENT_PLACEMENT_SPEAKING_GRADING_RETRY_DELAY_MS:30000}
