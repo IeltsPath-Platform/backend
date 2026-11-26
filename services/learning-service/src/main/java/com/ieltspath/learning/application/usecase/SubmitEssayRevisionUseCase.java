@@ -30,24 +30,24 @@ public class SubmitEssayRevisionUseCase {
         if (sent.isPresent()) {
             WritingSubmission existing = sent.get();
             if (!existing.userId().equals(userId) || !submissionId.equals(existing.previousSubmissionId())) {
-                throw new LearningRequestException(409, "REQUEST_CONFLICT", "requestId belongs to another submission");
+                throw new LearningRequestException(409, "REQUEST_CONFLICT", "Mã yêu cầu này đã được sử dụng cho một bài nộp khác.");
             }
             return submit.execute(userId, existing.lessonId(), existing.blockId(), requestId, essayText, null);
         }
         WritingSubmission previous = essays.findOwned(submissionId, userId).orElseThrow(
-                () -> new LearningRequestException(404, "NOT_FOUND", "Submission was not found"));
+                () -> new LearningRequestException(404, "NOT_FOUND", "Không tìm thấy bài nộp."));
         if (previous.blockId() == null) {
-            throw new LearningRequestException(409, "NOT_REVISABLE", "Only a lesson essay can be revised");
+            throw new LearningRequestException(409, "NOT_REVISABLE", "Chỉ có thể chỉnh sửa lại bài viết thuộc bài học.");
         }
         if (previous.status() != WritingSubmissionStatus.GRADED) {
-            throw new LearningRequestException(409, "NOT_REVISABLE", "Only a graded essay can be revised");
+            throw new LearningRequestException(409, "NOT_REVISABLE", "Chỉ có thể chỉnh sửa lại bài viết đã được chấm.");
         }
         if (previous.revisionLimitReached()) {
-            throw new LearningRequestException(409, "REVISION_LIMIT", "This essay has no revisions left");
+            throw new LearningRequestException(409, "REVISION_LIMIT", "Bài viết này đã hết lượt chỉnh sửa.");
         }
         if (essays.hasActiveRevision(previous.id())) {
             throw new LearningRequestException(409, "REVISION_NOT_LATEST",
-                    "This essay has already been revised; revise the newest version");
+                    "Bài viết này đã có bản chỉnh sửa mới hơn; vui lòng sửa trên bản mới nhất.");
         }
         return submit.execute(userId, previous.lessonId(), previous.blockId(), requestId, essayText, previous);
     }

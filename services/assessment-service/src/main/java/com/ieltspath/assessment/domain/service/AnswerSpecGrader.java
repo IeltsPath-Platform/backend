@@ -45,7 +45,7 @@ public final class AnswerSpecGrader {
         if (answer == null || answer instanceof String) {
             return (String) answer;
         }
-        throw new IllegalArgumentException("Answer must be a string or null.");
+        throw new IllegalArgumentException("Câu trả lời phải là chuỗi ký tự hoặc để trống.");
     }
 
     private static String normalize(String value) {

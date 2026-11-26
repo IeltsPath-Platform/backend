@@ -49,7 +49,7 @@ public class PlacementController {
         try {
             pool = PlacementPool.valueOf(request.pool());
         } catch (RuntimeException exception) {
-            throw new LearningRequestException(400, "INVALID_PLACEMENT_POOL", "Placement pool is invalid");
+            throw new LearningRequestException(400, "INVALID_PLACEMENT_POOL", "Nhóm đề kiểm tra đầu vào không hợp lệ.");
         }
         return PlacementAssignmentResponse.from(assignments.execute(currentUser.requireUserId(), pool));
     }

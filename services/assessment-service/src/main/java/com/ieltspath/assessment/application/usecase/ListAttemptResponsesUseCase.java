@@ -29,7 +29,7 @@ public class ListAttemptResponsesUseCase {
     @Transactional(readOnly = true)
     public List<AttemptResponseResult> execute(UUID userId, UUID attemptId) {
         attempts.findByIdAndUserId(attemptId, userId)
-                .orElseThrow(() -> new AssessmentNotFoundException("Assessment attempt not found"));
+                .orElseThrow(() -> new AssessmentNotFoundException("Không tìm thấy lượt làm bài thi. Vui lòng kiểm tra lại."));
         List<UUID> itemIds = items.findByAttemptId(attemptId).stream().map(AttemptItem::id).toList();
         if (itemIds.isEmpty()) return List.of();
         return responses.findByAttemptItemIds(itemIds).stream()

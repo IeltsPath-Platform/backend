@@ -42,19 +42,19 @@ public class FinalizeAssessmentResultUseCase {
     @Transactional
     public AssessmentResultResult execute(FinalizeAssessmentResultCommand command) {
         AssessmentResult result = results.findForUpdateById(command.resultId())
-                .orElseThrow(() -> new AssessmentNotFoundException("Assessment result not found"));
+                .orElseThrow(() -> new AssessmentNotFoundException("Không tìm thấy kết quả bài thi."));
         if (result.isCompleted()) {
             // Already final: its outbox row was written by the transaction that completed it.
             return toResult(result);
         }
         AssessmentResult latest = results.findLatestByAttemptId(result.attemptId()).orElse(result);
         if (latest.resultVersion() != result.resultVersion()) {
-            throw new InvalidAssessmentStateException("Only the latest result version can be finalized");
+            throw new InvalidAssessmentStateException("Chỉ có thể hoàn tất phiên bản kết quả mới nhất.");
         }
         var attempt = attempts.findById(result.attemptId())
-                .orElseThrow(() -> new AssessmentNotFoundException("Assessment attempt not found"));
+                .orElseThrow(() -> new AssessmentNotFoundException("Không tìm thấy lượt làm bài thi. Vui lòng kiểm tra lại."));
         if (attempt.getStatus() != AttemptStatus.SUBMITTED) {
-            throw new InvalidAssessmentStateException("Only a submitted attempt can have a final result");
+            throw new InvalidAssessmentStateException("Chỉ có thể chốt kết quả cho lượt làm bài đã nộp.");
         }
 
         var gradedItems = itemResults.findByResultId(result.id());

@@ -45,7 +45,7 @@ public class ReviewController {
                                             @RequestParam(name = "skill", required = false) LearningSkill skill,
                                             @RequestParam(name = "limit", defaultValue = "20") int limit) {
         if (limit < 1 || limit > 100) {
-            throw new LearningRequestException(400, "INVALID_LIMIT", "limit must be between 1 and 100");
+            throw new LearningRequestException(400, "INVALID_LIMIT", "Giới hạn số lượng phải từ 1 đến 100.");
         }
         return listReviewsUseCase.execute(currentUser.requireUserId(), status, skill, limit).stream()
                 .map(ReviewListResponse::from).toList();

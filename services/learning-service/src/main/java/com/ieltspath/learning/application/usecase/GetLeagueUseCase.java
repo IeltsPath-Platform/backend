@@ -60,7 +60,7 @@ public class GetLeagueUseCase {
     @Transactional(readOnly = true)
     public List<HistoryEntry> history(UUID userId, int weeks) {
         if (weeks < 1 || weeks > MAX_HISTORY_WEEKS) {
-            throw new LearningRequestException(400, "INVALID_WEEKS", "weeks must be between 1 and " + MAX_HISTORY_WEEKS);
+            throw new LearningRequestException(400, "INVALID_WEEKS", "Số tuần phải từ 1 đến " + MAX_HISTORY_WEEKS + ".");
         }
         return repository.history(userId, weeks).stream().map(this::toEntry).toList();
     }

@@ -31,7 +31,7 @@ public class GetPracticeAttemptUseCase {
     @Transactional(readOnly = true)
     public Result execute(UUID userId, UUID attemptId) {
         var attempt = attempts.findOwned(userId, attemptId)
-                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Practice attempt was not found"));
+                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Không tìm thấy lượt luyện tập."));
         if (attempt.submitted()) return new Result(null, attempt.response());
         // A free attempt has no lesson to re-check; its owner is already checked above.
         if (attempt.origin() == PracticeOrigin.LESSON) access.require(userId, attempt.lessonId());

@@ -83,10 +83,10 @@ public class CreateSpeakingSubmissionUseCase {
     private void requireAvailable(boolean consent) {
         if (!availability.isAvailable()) {
             throw new LearningRequestException(503, "SPEAKING_GRADING_DISABLED",
-                    "AI Speaking grading is not available yet");
+                    "Chức năng chấm bài Speaking bằng AI hiện chưa khả dụng.");
         }
         if (!consent) {
-            throw new LearningRequestException(422, "CONSENT_REQUIRED", "Consent to process the recordings is required");
+            throw new LearningRequestException(422, "CONSENT_REQUIRED", "Cần đồng ý xử lý bản ghi âm để tiếp tục.");
         }
     }
 
@@ -115,7 +115,7 @@ public class CreateSpeakingSubmissionUseCase {
                 submissions.save(active);
             } else {
                 throw new LearningRequestException(409, "SPEAKING_SUBMISSION_IN_PROGRESS",
-                        "You already have a Speaking submission waiting to be graded", active.id());
+                        "Bạn đang có một bài nộp Speaking khác đang chờ chấm.", active.id());
             }
         }
         SpeakingSubmission submission = SpeakingSubmission.start(UUID.randomUUID(), userId, requestId, packageVersionId,
@@ -129,7 +129,7 @@ public class CreateSpeakingSubmissionUseCase {
                                              UUID attemptId) {
         if (!existing.userId().equals(userId) || !existing.packageVersionId().equals(packageVersionId)
                 || !java.util.Objects.equals(existing.practiceAttemptId(), attemptId)) {
-            throw new LearningRequestException(409, "REQUEST_CONFLICT", "This request id was used for another submission");
+            throw new LearningRequestException(409, "REQUEST_CONFLICT", "Mã yêu cầu này đã được sử dụng cho một bài nộp khác.");
         }
         return existing;
     }
@@ -168,11 +168,11 @@ public class CreateSpeakingSubmissionUseCase {
         try {
             balance = points.balance();
         } catch (AccessUnavailableException exception) {
-            throw new LearningRequestException(503, "PAYMENT_UNAVAILABLE", "Payment is unavailable");
+            throw new LearningRequestException(503, "PAYMENT_UNAVAILABLE", "Dịch vụ thanh toán tạm thời không khả dụng.");
         }
         if (balance < settings.pointCost()) {
             throw new LearningRequestException(402, "INSUFFICIENT_POINTS",
-                    "Grading costs " + settings.pointCost() + " points");
+                    "Chấm bài cần " + settings.pointCost() + " điểm.");
         }
     }
 }

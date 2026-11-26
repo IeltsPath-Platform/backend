@@ -44,7 +44,7 @@ public class AssignPlacementTestUseCase {
         if (assignments.countSince(userId, now.minus(Duration.ofHours(24))) >= limit) throw limitReached();
         var candidates = catalog.packages(pool);
         if (candidates.isEmpty()) throw new LearningRequestException(404, "NO_PLACEMENT_TEST",
-                "No published placement test is available");
+                "Hiện chưa có bài kiểm tra đầu vào nào được xuất bản.");
         var created = creator.create(userId, pool, candidates, now, now.minus(reuseWindow),
                 now.minus(Duration.ofHours(24)), limit);
         return result(created, remaining(userId, now), nextRetake(userId, now));
@@ -63,6 +63,6 @@ public class AssignPlacementTestUseCase {
         return new PlacementAssignmentResult(a.id(), a.pool(), a.packageId(), a.packageVersionId(), left, next);
     }
     private static LearningRequestException limitReached() {
-        return new LearningRequestException(429, "PLACEMENT_LIMIT_REACHED", "Placement limit reached");
+        return new LearningRequestException(429, "PLACEMENT_LIMIT_REACHED", "Bạn đã đạt giới hạn số lần làm bài kiểm tra đầu vào.");
     }
 }

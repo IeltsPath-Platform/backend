@@ -98,7 +98,7 @@ public class SubmitFreeWritingToExaminerUseCase {
 
     private static LearningRequestException reviewPending(UUID submissionId) {
         return new LearningRequestException(409, "EXAMINER_REVIEW_PENDING",
-                "This essay was already sent to an examiner who has not graded it yet", submissionId);
+                "Bài viết này đã được gửi đến giám khảo và đang chờ chấm.", submissionId);
     }
 
     private static LearningRequestException premiumRequired() {
@@ -125,7 +125,7 @@ public class SubmitFreeWritingToExaminerUseCase {
         WritingSubmission submission = WritingSubmission.startFreeForExaminer(UUID.randomUUID(), userId, requestId,
                 essayText, words, EssayPrompts.of(item), clock.instant());
         if (!essays.save(submission)) {
-            throw new LearningRequestException(409, "REQUEST_CONFLICT", "requestId belongs to another submission");
+            throw new LearningRequestException(409, "REQUEST_CONFLICT", "Mã yêu cầu này đã được sử dụng cho một bài nộp khác.");
         }
         return submission;
     }

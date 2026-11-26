@@ -59,20 +59,20 @@ public class UploadSpeakingRecordingUseCase {
     public SpeakingSubmissionResult execute(UUID userId, UUID submissionId, UUID questionVersionId,
                                             String declaredContentType, byte[] content, Integer durationMs) {
         if (durationMs != null && (durationMs < 0 || durationMs > MAX_DURATION_MS)) {
-            throw new IllegalArgumentException("durationMs is out of range");
+            throw new IllegalArgumentException("Thời lượng bản ghi âm nằm ngoài giới hạn cho phép.");
         }
         SpeakingSubmission snapshot = submissions.findOwned(submissionId, userId).orElseThrow(UploadSpeakingRecordingUseCase::notFound);
         if (!snapshot.isAcceptingRecordings()) {
             throw new LearningRequestException(409, "SPEAKING_SUBMISSION_NOT_UPLOADING",
-                    "This submission no longer takes recordings", submissionId);
+                    "Bài nộp này không còn tiếp nhận tệp ghi âm mới.", submissionId);
         }
         SpeakingRecording current = snapshot.recordingFor(questionVersionId).orElseThrow(
-                () -> new LearningRequestException(404, "SPEAKING_QUESTION_NOT_FOUND", "The question is not in this submission"));
+                () -> new LearningRequestException(404, "SPEAKING_QUESTION_NOT_FOUND", "Câu hỏi này không thuộc bài nộp Speaking."));
 
         String contentType = UploadPolicy.of(settings.maxRecordingBytes(), ALLOWED_TYPES).check(content, declaredContentType);
         if (!WavFormat.isPcm16kMono(content)) {
             throw new LearningRequestException(422, "RECORDING_FORMAT_UNSUPPORTED",
-                    "The recording must be WAV, 16-bit, mono, 16 kHz");
+                    "Tệp ghi âm phải có định dạng WAV, 16-bit, mono, 16 kHz.");
         }
         int attempt = current.attempt() + 1;
         String key = SpeakingRecordingKeys.uniqueKey(userId, snapshot.createdAt().atZone(ZoneId.of(settings.timezone())).toLocalDate(),
@@ -84,7 +84,7 @@ public class UploadSpeakingRecordingUseCase {
         } catch (StorageException exception) {
             if (exception.reason() == StorageException.Reason.ALREADY_EXISTS) {
                 throw new LearningRequestException(409, "SPEAKING_UPLOAD_CONFLICT",
-                        "This recording is being uploaded by another request", submissionId);
+                        "Bản ghi âm này đang được tải lên bởi một yêu cầu khác.", submissionId);
             }
             throw exception;
         }
@@ -109,12 +109,12 @@ public class UploadSpeakingRecordingUseCase {
         SpeakingSubmission submission = submissions.findForUpdate(submissionId).orElseThrow(UploadSpeakingRecordingUseCase::notFound);
         if (!submission.isAcceptingRecordings()) {
             throw new LearningRequestException(409, "SPEAKING_SUBMISSION_NOT_UPLOADING",
-                    "This submission no longer takes recordings", submissionId);
+                    "Bài nộp này không còn tiếp nhận tệp ghi âm mới.", submissionId);
         }
         // Another upload for the same question finished while this file was being stored.
         if (submission.recordingFor(questionVersionId).map(SpeakingRecording::attempt).orElse(-1) != expectedAttempt) {
             throw new LearningRequestException(409, "SPEAKING_UPLOAD_CONFLICT",
-                    "This recording is being uploaded by another request", submissionId);
+                    "Bản ghi âm này đang được tải lên bởi một yêu cầu khác.", submissionId);
         }
         Optional<String> replaced = submission.attachRecording(questionVersionId, attempt, key, contentType, size,
                 durationMs, Instant.now(clock));
@@ -133,6 +133,6 @@ public class UploadSpeakingRecordingUseCase {
     }
 
     private static LearningRequestException notFound() {
-        return new LearningRequestException(404, "SPEAKING_SUBMISSION_NOT_FOUND", "Speaking submission not found");
+        return new LearningRequestException(404, "SPEAKING_SUBMISSION_NOT_FOUND", "Không tìm thấy bài nộp Speaking.");
     }
 }

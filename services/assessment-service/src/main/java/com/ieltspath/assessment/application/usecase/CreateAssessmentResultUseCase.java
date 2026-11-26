@@ -23,14 +23,14 @@ public class CreateAssessmentResultUseCase {
     /** Grader entry (EXAMINER, enforced by the controller): any learner's attempt. */
     @Transactional
     public AssessmentResultResult executeForGrader(UUID attemptId, Double overallBand){
-        var attempt=attempts.findById(attemptId).orElseThrow(()->new AssessmentNotFoundException("Assessment attempt not found"));
+        var attempt=attempts.findById(attemptId).orElseThrow(()->new AssessmentNotFoundException("Không tìm thấy lượt làm bài thi. Vui lòng kiểm tra lại."));
         examinerPolicy.requireAssignment(attemptId);
         return openNextVersion(attempt,overallBand);
     }
     private AssessmentResultResult openNextVersion(AssessmentAttempt attempt, Double overallBand){
-        if(attempt.getStatus()!=AttemptStatus.SUBMITTED) throw new InvalidAssessmentStateException("Only submitted attempts can have a result");
+        if(attempt.getStatus()!=AttemptStatus.SUBMITTED) throw new InvalidAssessmentStateException("Chỉ có thể tạo kết quả cho lượt làm bài đã nộp.");
         var latest=results.findLatestByAttemptId(attempt.getId());
-        if(latest.isPresent()&&latest.get().isGradable()) throw new InvalidAssessmentStateException("The latest result version is still being graded");
+        if(latest.isPresent()&&latest.get().isGradable()) throw new InvalidAssessmentStateException("Phiên bản kết quả gần nhất vẫn đang được chấm.");
         int version=latest.map(r->r.resultVersion()+1).orElse(1);
         var saved=results.save(new AssessmentResult(UUID.randomUUID(),attempt.getId(),version,AssessmentResult.DRAFT,overallBand,null));
         if (latest.isPresent() && latest.get().isCompleted()) examinerPolicy.prepareRegrade(attempt.getId());

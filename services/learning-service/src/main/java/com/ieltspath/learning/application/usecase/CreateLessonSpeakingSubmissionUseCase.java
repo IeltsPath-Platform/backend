@@ -36,20 +36,20 @@ public class CreateLessonSpeakingSubmissionUseCase {
 
     public SpeakingSubmissionResult execute(UUID userId, UUID attemptId, UUID requestId, boolean consent) {
         PracticeAttempt attempt = attempts.findOwned(userId, attemptId)
-                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Practice attempt was not found"));
+                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Không tìm thấy lượt luyện tập."));
         if (attempt.submitted()) {
-            throw new LearningRequestException(409, "ATTEMPT_SUBMITTED", "The practice attempt was already submitted");
+            throw new LearningRequestException(409, "ATTEMPT_SUBMITTED", "Lượt luyện tập này đã được nộp trước đó.");
         }
         if (attempt.origin() == PracticeOrigin.FREE) {
             throw new LearningRequestException(409, "FREE_PRACTICE_SPEAKING_UNSUPPORTED",
-                    "Free practice does not take recorded answers here");
+                    "Luyện tập tự do không hỗ trợ nộp bài ghi âm tại đây.");
         }
         access.require(userId, attempt.lessonId());
         boolean replay = submissions.findByRequestId(requestId).isPresent();
         if (!replay && submissions.findLatestForAttempt(userId, attemptId)
                 .filter(latest -> latest.status() == SpeakingSubmissionStatus.GRADED).isPresent()) {
             throw new LearningRequestException(409, "SPEAKING_ALREADY_GRADED",
-                    "This attempt already has a graded answer; start a new attempt to answer again");
+                    "Lượt luyện tập này đã có bài nói được chấm; vui lòng tạo lượt mới để trả lời lại.");
         }
         return create.executeForAttempt(userId, requestId, attempt.packageVersionId(), attempt.lessonId(), attemptId,
                 consent);

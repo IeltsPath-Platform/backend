@@ -11,9 +11,9 @@ public class ExaminerUnavailableException extends RuntimeException {
 
     public ExaminerUnavailableException(Reason reason) {
         super(switch (reason) {
-            case FULL -> "The examiner has reached the limit of submissions for today";
-            case NOT_ACCEPTING -> "The examiner is not accepting submissions";
-            case OVERDUE_BACKLOG -> "The examiner has too many late submissions and takes no new ones for now";
+            case FULL -> "Giám khảo đã nhận đủ số bài chấm trong hôm nay. Vui lòng chọn giám khảo khác.";
+            case NOT_ACCEPTING -> "Giám khảo hiện không nhận chấm bài mới. Vui lòng chọn giám khảo khác.";
+            case OVERDUE_BACKLOG -> "Giám khảo đang có quá nhiều bài quá hạn nên tạm thời không nhận thêm bài mới.";
         });
         this.reason = reason;
     }

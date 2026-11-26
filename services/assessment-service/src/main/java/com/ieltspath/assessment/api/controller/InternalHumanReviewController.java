@@ -30,7 +30,7 @@ public class InternalHumanReviewController {
     public HumanReviewResponse create(@Valid @RequestBody CreateHumanReviewRequest request) {
         UUID learnerId = currentUser.requireUserId();
         if (request.learnerId() != null && !learnerId.equals(request.learnerId())) {
-            throw new AssessmentAccessDeniedException("A review can only be requested for the authenticated learner");
+            throw new AssessmentAccessDeniedException("Chỉ có thể yêu cầu chấm bài cho chính tài khoản đang đăng nhập.");
         }
         HumanReviewStore.Review review = reviews.create(new HumanReviewStore.CreateReview(request.requestId(),
                 learnerId, request.sourceSubmissionId(), request.source().name(), request.task(),

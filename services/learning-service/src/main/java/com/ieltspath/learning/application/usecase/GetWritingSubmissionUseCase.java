@@ -21,6 +21,6 @@ public class GetWritingSubmissionUseCase {
 
     public WritingSubmissionResult execute(UUID userId, UUID submissionId) {
         return essays.findOwned(submissionId, userId).map(view::assemble)
-                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Submission was not found"));
+                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Không tìm thấy bài nộp."));
     }
 }

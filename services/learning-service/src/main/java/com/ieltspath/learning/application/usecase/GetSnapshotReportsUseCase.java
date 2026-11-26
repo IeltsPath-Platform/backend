@@ -48,7 +48,7 @@ public class GetSnapshotReportsUseCase {
     public WeeklyReport weekly(UUID userId, LocalDate weekStart) {
         LocalDate start = weekStart == null ? snapshotService.lastWeekStart() : weekStart;
         if (start.getDayOfWeek() != DayOfWeek.MONDAY) {
-            throw new LearningRequestException(400, "INVALID_WEEK_START", "weekStart must be a Monday");
+            throw new LearningRequestException(400, "INVALID_WEEK_START", "Ngày bắt đầu tuần phải là thứ Hai.");
         }
         Optional<Snapshot> current = snapshots.find(Period.WEEK, userId, start);
         Optional<Snapshot> previous = snapshots.find(Period.WEEK, userId, start.minusWeeks(1));
@@ -61,7 +61,7 @@ public class GetSnapshotReportsUseCase {
     public History history(UUID userId, int weeks) {
         if (weeks < MIN_HISTORY_WEEKS || weeks > MAX_HISTORY_WEEKS) {
             throw new LearningRequestException(400, "INVALID_WEEKS",
-                    "weeks must be between " + MIN_HISTORY_WEEKS + " and " + MAX_HISTORY_WEEKS);
+                    "Số tuần phải nằm trong khoảng từ " + MIN_HISTORY_WEEKS + " đến " + MAX_HISTORY_WEEKS + ".");
         }
         LocalDate last = snapshotService.lastWeekStart();
         List<HistoryPoint> points = snapshots.range(Period.WEEK, userId, last.minusWeeks(weeks - 1L), last).stream()
@@ -79,7 +79,7 @@ public class GetSnapshotReportsUseCase {
     public MonthlyReport monthly(UUID userId, LocalDate monthStart) {
         LocalDate start = monthStart == null ? snapshotService.lastMonthStart() : monthStart;
         if (start.getDayOfMonth() != 1) {
-            throw new LearningRequestException(400, "INVALID_MONTH_START", "monthStart must be the first of a month");
+            throw new LearningRequestException(400, "INVALID_MONTH_START", "Ngày bắt đầu tháng phải là ngày mùng 1.");
         }
         return new MonthlyReport(start, snapshots.find(Period.MONTH, userId, start)
                 .map(GetSnapshotReportsUseCase::view).orElse(null));

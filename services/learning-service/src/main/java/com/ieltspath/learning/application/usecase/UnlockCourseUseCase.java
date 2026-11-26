@@ -42,12 +42,12 @@ public class UnlockCourseUseCase {
     @Transactional
     public CourseUnlockResult execute(UUID userId, UUID courseId, String requestedTarget, UUID requestId) {
         if (requestId == null) throw new LearningRequestException(400, "IDEMPOTENCY_KEY_REQUIRED",
-                "Idempotency-Key is required");
+                "Thiếu mã định danh yêu cầu.");
         CourseUnlockTarget target;
         try {
             target = CourseUnlockTarget.parse(requestedTarget);
         } catch (IllegalArgumentException exception) {
-            throw new LearningRequestException(400, "INVALID_UNLOCK_TARGET", "Unsupported unlock target");
+            throw new LearningRequestException(400, "INVALID_UNLOCK_TARGET", "Mục tiêu mở khóa không được hỗ trợ.");
         }
 
         lock.lock(userId);
@@ -103,7 +103,7 @@ public class UnlockCourseUseCase {
     private TopicResult.Course course(UUID userId, UUID courseId) {
         return refreshTopics.execute(userId).stream().map(TopicResult::course)
                 .filter(java.util.Objects::nonNull).filter(item -> item.courseId().equals(courseId)).findFirst()
-                .orElseThrow(() -> new LearningRequestException(404, "COURSE_NOT_FOUND", "Course was not found"));
+                .orElseThrow(() -> new LearningRequestException(404, "COURSE_NOT_FOUND", "Không tìm thấy khóa học."));
     }
 
     private static LearningRequestException conflict(String code, String detail) {

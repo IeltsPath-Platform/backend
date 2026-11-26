@@ -62,12 +62,12 @@ public class SaveAssessmentResultDetailsUseCase {
     @Transactional
     public void execute(SaveAssessmentResultDetailsCommand command) {
         var attempt = attempts.findByIdAndUserId(command.attemptId(), command.userId())
-                .orElseThrow(() -> new AssessmentNotFoundException("Assessment attempt not found"));
+                .orElseThrow(() -> new AssessmentNotFoundException("Không tìm thấy lượt làm bài thi. Vui lòng kiểm tra lại."));
         if (attempt.getAttemptType() == com.ieltspath.assessment.domain.vo.AttemptType.COURSE_GATE) {
-            throw new com.ieltspath.assessment.domain.exception.AssessmentAccessDeniedException("Course results can only be edited by an examiner");
+            throw new com.ieltspath.assessment.domain.exception.AssessmentAccessDeniedException("Chỉ giám khảo mới có quyền chỉnh sửa kết quả bài thi khóa học.");
         }
         var result = results.findLatestForUpdateByAttemptId(attempt.getId())
-                .orElseThrow(() -> new AssessmentNotFoundException("Assessment result not found"));
+                .orElseThrow(() -> new AssessmentNotFoundException("Không tìm thấy kết quả bài thi."));
         requireGradable(result);
         saveDetails(attempt.getId(), result, command.skillScores(), command.itemResults(), command.errors(),
                 command.knowledgeJudgments());
@@ -81,12 +81,12 @@ public class SaveAssessmentResultDetailsUseCase {
     @Transactional
     public void executeForGrader(SaveGradingDetailsCommand command) {
         var result = results.findForUpdateById(command.resultId())
-                .orElseThrow(() -> new AssessmentNotFoundException("Assessment result not found"));
+                .orElseThrow(() -> new AssessmentNotFoundException("Không tìm thấy kết quả bài thi."));
         requireGradable(result);
         var latest = results.findLatestByAttemptId(result.attemptId()).orElse(result);
         examinerPolicy.requireAssignment(result.attemptId());
         if (latest.resultVersion() != result.resultVersion()) {
-            throw new InvalidAssessmentStateException("Only the latest result version can be graded");
+            throw new InvalidAssessmentStateException("Chỉ có thể chấm phiên bản kết quả mới nhất.");
         }
         saveDetails(result.attemptId(), result, command.skillScores(), command.itemResults(), command.errors(),
                 command.knowledgeJudgments());
@@ -96,7 +96,7 @@ public class SaveAssessmentResultDetailsUseCase {
     private static void requireGradable(AssessmentResult result) {
         if (!result.isGradable()) {
             throw new InvalidAssessmentStateException(
-                    "A finalized result cannot be changed; create a new result version to regrade");
+                    "Không thể chỉnh sửa kết quả đã chốt; vui lòng tạo phiên bản kết quả mới để chấm lại.");
         }
     }
 
@@ -107,7 +107,7 @@ public class SaveAssessmentResultDetailsUseCase {
             Set<Skill> submittedSkills = new HashSet<>();
             for (var score : skillScores) {
                 if (!submittedSkills.add(score.skill())) {
-                    throw new InvalidAssessmentStateException("Only one score per skill is allowed");
+                    throw new InvalidAssessmentStateException("Mỗi kỹ năng chỉ được ghi nhận một điểm số.");
                 }
             }
 
@@ -130,21 +130,21 @@ public class SaveAssessmentResultDetailsUseCase {
             Set<UUID> uniqueAttemptItemIds = new HashSet<>(submittedAttemptItemIds);
             if (submittedAttemptItemIds.contains(null) || uniqueAttemptItemIds.size() != submittedAttemptItemIds.size()) {
                 throw new InvalidAssessmentStateException(
-                        "Each item result must reference a distinct assessment item");
+                        "Mỗi kết quả câu hỏi phải gắn với một câu hỏi riêng biệt.");
             }
 
             Set<UUID> existingAttemptItemIds = attemptItems.findExistingIdsByAttemptId(
                     uniqueAttemptItemIds, attemptId);
             if (!existingAttemptItemIds.containsAll(uniqueAttemptItemIds)) {
                 throw new InvalidAssessmentStateException(
-                        "Item results must reference items from this assessment attempt");
+                        "Kết quả câu hỏi phải thuộc về lượt làm bài thi này.");
             }
 
             for (var item : itemResults) {
                 if (item.maxScore() != null && (item.maxScore() <= 0
                         || (item.score() != null && item.score() > item.maxScore()))) {
                     throw new InvalidAssessmentStateException(
-                            "Item maximum score must be positive and not below the awarded score");
+                            "Điểm tối đa của câu hỏi phải lớn hơn 0 và không nhỏ hơn điểm đạt được.");
                 }
             }
 
@@ -171,7 +171,7 @@ public class SaveAssessmentResultDetailsUseCase {
             Set<UUID> submittedErrorIds = new HashSet<>();
             for (ErrorAnalysisInput error : errorInputs) {
                 if (error.id() == null || !submittedErrorIds.add(error.id())) {
-                    throw new InvalidAssessmentStateException("Error analysis IDs must be present and unique");
+                    throw new InvalidAssessmentStateException("Mã phân tích lỗi phải đầy đủ và không được trùng lặp.");
                 }
             }
 
@@ -184,7 +184,7 @@ public class SaveAssessmentResultDetailsUseCase {
                     .anyMatch(error -> !itemResultByAttemptItemId.containsKey(error.attemptItemId()));
             if (referencesMissingItemResult) {
                 throw new InvalidAssessmentStateException(
-                        "Error analysis must reference an item result from this assessment");
+                        "Phân tích lỗi phải gắn với một câu hỏi đã chấm trong bài thi này.");
             }
 
             List<ErrorAnalysisItem> existingErrors = errors.findByIds(submittedErrorIds);
@@ -192,7 +192,7 @@ public class SaveAssessmentResultDetailsUseCase {
                     .anyMatch(error -> !validResultItemIds.contains(error.itemResultId()));
             if (reusesIdFromAnotherResult) {
                 throw new InvalidAssessmentStateException(
-                        "Error analysis ID already belongs to another assessment result");
+                        "Mã phân tích lỗi đã thuộc về một kết quả bài thi khác.");
             }
 
             errors.saveAll(errorInputs.stream()
@@ -211,10 +211,10 @@ public class SaveAssessmentResultDetailsUseCase {
         Set<List<UUID>> submitted = new HashSet<>();
         for (KnowledgeJudgmentInput input : inputs) {
             if (input.attemptItemId() == null || input.knowledgePointId() == null || input.judgment() == null) {
-                throw new InvalidAssessmentStateException("Knowledge judgments require item, knowledge point and judgment");
+                throw new InvalidAssessmentStateException("Đánh giá kiến thức cần đầy đủ câu hỏi, điểm kiến thức và mức đánh giá.");
             }
             if (!submitted.add(List.of(input.attemptItemId(), input.knowledgePointId()))) {
-                throw new InvalidAssessmentStateException("Only one judgment per item and knowledge point is allowed");
+                throw new InvalidAssessmentStateException("Mỗi cặp câu hỏi và điểm kiến thức chỉ được đánh giá một lần.");
             }
         }
 
@@ -222,7 +222,7 @@ public class SaveAssessmentResultDetailsUseCase {
                 .collect(Collectors.toMap(ItemResult::attemptItemId, Function.identity()));
         Set<UUID> judgedItems = inputs.stream().map(KnowledgeJudgmentInput::attemptItemId).collect(Collectors.toSet());
         if (!itemResultByAttemptItemId.keySet().containsAll(judgedItems)) {
-            throw new InvalidAssessmentStateException("Knowledge judgments must reference a graded item of this result");
+            throw new InvalidAssessmentStateException("Đánh giá kiến thức phải gắn với câu hỏi đã được chấm trong kết quả này.");
         }
         // A judgment is only meaningful for a knowledge point the item was attributed to when the attempt started.
         Set<List<UUID>> snapshotted = knowledgeSnapshot.findByAttemptItemIds(judgedItems).stream()
@@ -230,7 +230,7 @@ public class SaveAssessmentResultDetailsUseCase {
                 .collect(Collectors.toSet());
         if (!snapshotted.containsAll(submitted)) {
             throw new InvalidAssessmentStateException(
-                    "Knowledge judgments must reference a knowledge point mapped to the item");
+                    "Đánh giá kiến thức phải tham chiếu đến điểm kiến thức được gắn với câu hỏi.");
         }
 
         judgments.saveAll(inputs.stream()

@@ -40,7 +40,7 @@ public class RequestHumanGradingUseCase {
 
     public RequestResult execute(UUID userId, UUID attemptId, UUID itemId) {
         UUID submissionId = requests.submittedTopicEssay(userId, attemptId, itemId)
-                .orElseThrow(() -> new AssessmentNotFoundException("Submitted topic essay not found"));
+                .orElseThrow(() -> new AssessmentNotFoundException("Không tìm thấy bài viết đã nộp theo chủ đề."));
         String key = "human-credit:" + submissionId;
         if (jobs.jobExists(key)) return new RequestResult(submissionId, "QUEUED");
 

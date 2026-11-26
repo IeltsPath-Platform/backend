@@ -52,13 +52,13 @@ public class StreakUseCase {
         LocalDate today = today(userId);
         StreakState state = StreakRules.forRead(streaks.find(userId).orElse(StreakState.empty()), today);
         if (state.freezeAvailable()) {
-            throw new LearningRequestException(409, "FREEZE_ALREADY_OWNED", "A freeze is already owned");
+            throw new LearningRequestException(409, "FREEZE_ALREADY_OWNED", "Bạn đã có sẵn vật phẩm bảo vệ chuỗi ngày học.");
         }
         if (state.currentDays() == 0) {
-            throw new LearningRequestException(409, "NO_STREAK_TO_PROTECT", "There is no streak to protect");
+            throw new LearningRequestException(409, "NO_STREAK_TO_PROTECT", "Bạn chưa có chuỗi ngày học nào để bảo vệ.");
         }
         if (StreakRules.overLimit(state, today)) {
-            throw new LearningRequestException(409, "FREEZE_LIMIT", "Consecutive freezes are at their limit");
+            throw new LearningRequestException(409, "FREEZE_LIMIT", "Bạn đã dùng bảo vệ chuỗi đạt giới hạn liên tiếp cho phép.");
         }
         access.debit(userId, StreakRules.freezeCost(state, today), "STREAK_FREEZE", requestId,
                 requestId.toString(), "Đóng băng streak");

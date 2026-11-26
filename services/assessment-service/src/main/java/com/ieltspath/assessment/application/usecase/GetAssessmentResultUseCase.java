@@ -65,9 +65,9 @@ public class GetAssessmentResultUseCase {
     @Transactional(readOnly = true)
     public LearnerAssessmentResult execute(UUID userId, UUID attemptId) {
         var attempt = attempts.findByIdAndUserId(attemptId, userId)
-                .orElseThrow(() -> new AssessmentNotFoundException("Assessment attempt not found"));
+                .orElseThrow(() -> new AssessmentNotFoundException("Không tìm thấy lượt làm bài thi. Vui lòng kiểm tra lại."));
         var result = results.findLatestCompletedByAttemptId(attemptId)
-                .orElseThrow(() -> new AssessmentNotFoundException("Assessment result not found"));
+                .orElseThrow(() -> new AssessmentNotFoundException("Không tìm thấy kết quả bài thi."));
         List<AttemptItem> items = attemptItems.findByAttemptId(attemptId);
         Map<UUID, ItemResult> gradedByItem = itemResults.findByResultId(result.id()).stream()
                 .collect(Collectors.toMap(ItemResult::attemptItemId, Function.identity()));

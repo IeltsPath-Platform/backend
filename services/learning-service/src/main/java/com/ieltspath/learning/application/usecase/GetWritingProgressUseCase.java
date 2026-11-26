@@ -41,7 +41,7 @@ public class GetWritingProgressUseCase {
     public WritingProgressResult execute(UUID userId, String task, Integer limit) {
         int window = limit == null ? DEFAULT_LIMIT : limit;
         if (window < MIN_LIMIT || window > MAX_LIMIT) {
-            throw new LearningRequestException(400, "INVALID_LIMIT", "limit must be between 3 and 20");
+            throw new LearningRequestException(400, "INVALID_LIMIT", "Giới hạn số lượng phải từ 3 đến 20.");
         }
         List<WritingTask> tasks = task == null ? List.of(WritingTask.values()) : List.of(parseTask(task));
 
@@ -62,7 +62,7 @@ public class GetWritingProgressUseCase {
 
     private static WritingTask parseTask(String value) {
         return WritingTask.parse(value).orElseThrow(() ->
-                new LearningRequestException(400, "INVALID_TASK", "task must be TASK_1 or TASK_2"));
+                new LearningRequestException(400, "INVALID_TASK", "Loại bài viết phải là TASK_1 hoặc TASK_2."));
     }
 
     private static boolean anyNameMissing(Map<WritingTask, List<WritingProgressEssay>> byTask) {

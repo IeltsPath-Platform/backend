@@ -149,7 +149,7 @@ class SpeakingRecordingControllerTest {
         mvc.perform(multipart("/api/assessments/speaking-recordings").file(validFile())
                         .with(user("learner").roles("CUSTOMER")))
                 .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.message").value("Recording storage is unavailable"))
+                .andExpect(jsonPath("$.message").value("Dịch vụ lưu trữ bản ghi âm tạm thời không khả dụng. Vui lòng thử lại sau."))
                 .andExpect(result -> assertFalse(result.getResponse().getContentAsString().contains("UPSTREAM_ERROR")));
     }
 

@@ -28,7 +28,8 @@ public class ExaminerAvailabilityController {
     @GetMapping("/availability")
     public List<ExaminerAssignmentService.Availability> availability(@RequestParam("ids") List<UUID> ids) {
         if (ids.isEmpty() || ids.size() > MAX_IDS) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ids must hold from 1 to " + MAX_IDS + " examiners");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Danh sách giám khảo phải có từ 1 đến " + MAX_IDS + " người.");
         }
         return assignments.availability(ids);
     }

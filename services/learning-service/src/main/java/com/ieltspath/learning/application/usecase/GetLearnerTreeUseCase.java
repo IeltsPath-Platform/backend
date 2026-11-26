@@ -84,13 +84,13 @@ public class GetLearnerTreeUseCase {
                     && courseId.equals(topic.course().courseId())).toList();
         }
         final List<Topic> topics = selectedTopics;
-        if (topics.isEmpty()) throw new LearningRequestException(404, "NOT_FOUND", "Course was not found");
+        if (topics.isEmpty()) throw new LearningRequestException(404, "NOT_FOUND", "Không tìm thấy khóa học.");
         if (!topics.get(0).course().active()) {
-            throw new LearningRequestException(403, "COURSE_NOT_OPEN", "The course is closed");
+            throw new LearningRequestException(403, "COURSE_NOT_OPEN", "Khóa học này hiện đang đóng.");
         }
         boolean taking = curricula.find(userId).topics().stream()
                 .anyMatch(progress -> topics.stream().anyMatch(topic -> topic.topicId().equals(progress.topicId())));
-        if (!taking) throw new LearningRequestException(403, "COURSE_NOT_JOINED", "The learner is not taking this course");
+        if (!taking) throw new LearningRequestException(403, "COURSE_NOT_JOINED", "Bạn chưa tham gia khóa học này.");
 
         Map<UUID, KnowledgePoint> points = new LinkedHashMap<>();
         Map<UUID, Topic> topicByPoint = new LinkedHashMap<>();

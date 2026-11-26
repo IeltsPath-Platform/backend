@@ -14,7 +14,7 @@ public record AttemptItemKnowledgePoint(UUID attemptItemId, UUID knowledgePointI
         Objects.requireNonNull(knowledgePointId, "knowledgePointId must not be null");
         Objects.requireNonNull(weight, "weight must not be null");
         if (weight.signum() < 0) {
-            throw new IllegalArgumentException("Knowledge-point weight must not be negative");
+            throw new IllegalArgumentException("Trọng số điểm kiến thức không được âm.");
         }
     }
 }

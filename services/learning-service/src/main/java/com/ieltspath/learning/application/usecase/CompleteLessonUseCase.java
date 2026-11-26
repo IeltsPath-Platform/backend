@@ -40,7 +40,7 @@ public class CompleteLessonUseCase {
         LessonAccess.Context context = access.authorize(userId, lessonId);
         Lesson lesson = context.lesson();
         if (lesson.blocks().stream().anyMatch(Block::isExercise)) {
-            throw new LearningRequestException(409, "LESSON_HAS_EXERCISES", "Lesson contains exercise blocks");
+            throw new LearningRequestException(409, "LESSON_HAS_EXERCISES", "Bài học này có phần bài tập cần hoàn thành.");
         }
         LessonProgress progress = access.refresh(userId, lesson, context.progress());
         if (progress.complete(clock.instant())) {

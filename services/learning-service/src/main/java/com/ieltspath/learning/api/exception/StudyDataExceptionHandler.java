@@ -1,5 +1,6 @@
 package com.ieltspath.learning.api.exception;
 
+import com.ieltspath.commonsecurity.error.VietnameseErrorMessages;
 import com.ieltspath.learning.api.controller.AdminLearningGoalController;
 import com.ieltspath.learning.api.controller.LearningActivityController;
 import com.ieltspath.learning.api.controller.LearningGoalController;
@@ -12,6 +13,7 @@ import com.ieltspath.learning.domain.exception.LearningGoalNotFoundException;
 import com.ieltspath.learning.domain.exception.ResourceNotFoundException;
 import com.ieltspath.learning.domain.exception.StudyTrackingException;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -32,6 +34,7 @@ import java.util.Map;
  * served them: Vietnamese messages, 400 for bad input, and a {@code code} in {@code details} for study tracking. It only
  * covers those controllers; the rest of Learning keeps {@link GlobalExceptionHandler}.
  */
+@Slf4j
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @RestControllerAdvice(assignableTypes = {LearningGoalController.class, AdminLearningGoalController.class,
         LearningActivityController.class, StudySessionController.class, PracticeSessionController.class})
@@ -45,7 +48,19 @@ public class StudyDataExceptionHandler {
             case "SOURCE_UNAVAILABLE" -> HttpStatus.SERVICE_UNAVAILABLE;
             default -> HttpStatus.CONFLICT;
         };
-        return error(status, exception.getCode(), request, Map.of("code", exception.getCode()));
+        String message = switch (exception.getCode()) {
+            case "SESSION_NOT_FOUND" -> "Không tìm thấy phiên học. Vui lòng bắt đầu phiên học mới.";
+            case "SOURCE_NOT_AVAILABLE" -> "Nguồn học hiện không khả dụng hoặc không tồn tại.";
+            case "SOURCE_UNAVAILABLE" -> "Không thể xác minh nguồn học lúc này. Vui lòng thử lại sau.";
+            case "SESSION_IN_USE" -> "Phiên học đang hoạt động trên thiết bị hoặc tab khác.";
+            case "SESSION_CLOSED" -> "Phiên học đã kết thúc. Vui lòng mở phiên học mới.";
+            case "LEASE_EXPIRED" -> "Phiên học đã hết hạn giữ chỗ. Vui lòng mở lại phiên học.";
+            case "STALE_EPOCH" -> "Phiên học đã được làm mới ở nơi khác. Vui lòng tải lại.";
+            case "INVALID_SEQUENCE" -> "Thứ tự nhịp học không hợp lệ. Vui lòng đồng bộ lại phiên học.";
+            case "PAYLOAD_CONFLICT" -> "Yêu cầu xung đột với dữ liệu phiên học đã ghi nhận.";
+            default -> VietnameseErrorMessages.generic(status.value());
+        };
+        return error(status, message, request, Map.of("code", exception.getCode()));
     }
 
     @ExceptionHandler({ResourceNotFoundException.class, LearningGoalNotFoundException.class})
@@ -83,8 +98,12 @@ public class StudyDataExceptionHandler {
 
     private ResponseEntity<ErrorResponse> error(HttpStatus status, String message, HttpServletRequest request,
                                                 Map<String, String> details) {
+        String userMessage = VietnameseErrorMessages.userFacing(status.value(), message);
+        if (!userMessage.equals(message)) {
+            log.warn("Replaced non-Vietnamese error message (status={}): {}", status.value(), message);
+        }
         return ResponseEntity.status(status).body(new ErrorResponse(LocalDateTime.now(), status.value(),
-                isActivity(request) ? status.getReasonPhrase() : reasonPhrase(status), message,
+                isActivity(request) ? status.getReasonPhrase() : reasonPhrase(status), userMessage,
                 request.getRequestURI(), details));
     }
 

@@ -112,7 +112,7 @@ public final class AssessmentAttempt {
             throw new AttemptExpiredException();
         }
         if (status != AttemptStatus.IN_PROGRESS) {
-            throw new InvalidAssessmentStateException("Only an in-progress attempt can be submitted");
+            throw new InvalidAssessmentStateException("Chỉ có thể nộp bài khi lượt làm bài đang diễn ra.");
         }
         if (isPastDeadline(now)) {
             expire(now);
@@ -136,7 +136,7 @@ public final class AssessmentAttempt {
     public void expire(Instant now) {
         if (status == AttemptStatus.EXPIRED) return;
         if (status != AttemptStatus.IN_PROGRESS) {
-            throw new InvalidAssessmentStateException("Only an in-progress attempt can expire");
+            throw new InvalidAssessmentStateException("Chỉ có thể hết hạn lượt làm bài đang diễn ra.");
         }
         status = AttemptStatus.EXPIRED;
         updatedAt = now;
@@ -144,7 +144,7 @@ public final class AssessmentAttempt {
 
     public void cancel(Instant now) {
         if (attemptType != AttemptType.PLACEMENT || status != AttemptStatus.IN_PROGRESS) {
-            throw new InvalidAssessmentStateException("Only an in-progress placement attempt can be cancelled");
+            throw new InvalidAssessmentStateException("Chỉ có thể hủy bài kiểm tra đầu vào đang làm dở.");
         }
         status = AttemptStatus.CANCELLED;
         updatedAt = now;

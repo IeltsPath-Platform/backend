@@ -33,7 +33,8 @@ public class ExaminerHistoryController {
     public ExaminerHistoryStore.Page completed(@RequestParam(name = "page", defaultValue = "0") int page,
                                                @RequestParam(name = "size", defaultValue = "20") int size) {
         if (page < 0 || size < 1 || size > MAX_SIZE) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "page must be 0 or more and size from 1 to " + MAX_SIZE);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Số trang phải từ 0 trở lên và kích thước trang từ 1 đến " + MAX_SIZE + ".");
         }
         return history.completed(currentUser.requireUserId(), page, size);
     }
@@ -42,6 +43,6 @@ public class ExaminerHistoryController {
     @GetMapping("/{jobId}")
     public ExaminerHistoryStore.GradedReview review(@PathVariable("jobId") UUID jobId) {
         return history.review(currentUser.requireUserId(), jobId)
-                .orElseThrow(() -> new AssessmentNotFoundException("Graded review not found"));
+                .orElseThrow(() -> new AssessmentNotFoundException("Không tìm thấy bài đã chấm."));
     }
 }

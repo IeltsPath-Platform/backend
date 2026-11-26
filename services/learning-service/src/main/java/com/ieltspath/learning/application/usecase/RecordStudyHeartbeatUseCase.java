@@ -22,7 +22,7 @@ public class RecordStudyHeartbeatUseCase {
 
     @Transactional
     public StudyHeartbeatResult execute(UUID user,UUID id,long epoch,long sequence,List<Interval> intervals,boolean close) {
-        if(epoch<1 || sequence<1 || intervals==null || intervals.size()>16) throw new IllegalArgumentException("Invalid heartbeat");
+        if(epoch<1 || sequence<1 || intervals==null || intervals.size()>16) throw new IllegalArgumentException("Nhịp học không hợp lệ.");
         sessions.lockUser(user);
         var session=sessions.find(user,id).orElseThrow(()->new StudyTrackingException("SESSION_NOT_FOUND"));
         String hash=hash(epoch,sequence,intervals,close);

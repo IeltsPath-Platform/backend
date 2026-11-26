@@ -28,6 +28,6 @@ public final class AnswerSheet {
 
 
     private static LearningRequestException invalid() {
-        return new LearningRequestException(422, "INVALID_ANSWERS", "Submit one answer for every exercise question");
+        return new LearningRequestException(422, "INVALID_ANSWERS", "Vui lòng trả lời đầy đủ tất cả câu hỏi trong bài tập.");
     }
 }

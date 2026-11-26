@@ -2,6 +2,6 @@ package com.ieltspath.assessment.domain.exception;
 
 public class HumanGradingCreditConflictException extends AssessmentDomainException {
     public HumanGradingCreditConflictException() {
-        super("The human grading request conflicts with a previous request");
+        super("Yêu cầu chấm bài bởi giám khảo bị xung đột với một yêu cầu trước đó.");
     }
 }

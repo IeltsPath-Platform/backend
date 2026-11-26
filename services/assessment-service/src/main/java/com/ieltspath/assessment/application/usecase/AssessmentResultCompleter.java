@@ -76,17 +76,17 @@ public class AssessmentResultCompleter {
 
     private static void requireFullyGraded(List<AttemptItem> items, List<ItemResult> graded) {
         if (items.isEmpty()) {
-            throw new InvalidAssessmentStateException("An attempt without items cannot be finalized");
+            throw new InvalidAssessmentStateException("Không thể hoàn tất kết quả khi bài thi chưa có câu hỏi nào.");
         }
         Map<UUID, ItemResult> byItem = graded.stream()
                 .collect(Collectors.toMap(ItemResult::attemptItemId, Function.identity()));
         for (AttemptItem item : items) {
             ItemResult itemResult = byItem.get(item.id());
             if (itemResult == null) {
-                throw new InvalidAssessmentStateException("Every assessment item must be graded before finalization");
+                throw new InvalidAssessmentStateException("Tất cả câu hỏi trong bài thi phải được chấm trước khi hoàn tất kết quả.");
             }
             if (itemResult.score() == null || itemResult.maxScore() == null) {
-                throw new InvalidAssessmentStateException("Every graded item must record its score and maximum score");
+                throw new InvalidAssessmentStateException("Mỗi câu đã chấm phải ghi nhận đầy đủ điểm đạt được và điểm tối đa.");
             }
         }
     }

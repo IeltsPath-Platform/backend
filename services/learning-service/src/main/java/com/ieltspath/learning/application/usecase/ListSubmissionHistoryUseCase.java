@@ -33,7 +33,7 @@ public class ListSubmissionHistoryUseCase {
     /** @param skill WRITING or SPEAKING; required for {@link Scope#FREE} and ignored otherwise */
     public Page execute(UUID userId, Scope scope, String skill, int page, int size) {
         if (scope == Scope.FREE && !"WRITING".equals(skill) && !"SPEAKING".equals(skill)) {
-            throw new IllegalArgumentException("skill must be WRITING or SPEAKING for free practice");
+            throw new IllegalArgumentException("Kỹ năng luyện tập tự do phải là WRITING hoặc SPEAKING.");
         }
         int pageNo = Math.max(0, page);
         int pageSize = Math.min(Math.max(1, size), MAX_PAGE_SIZE);

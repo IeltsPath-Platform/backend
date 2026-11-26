@@ -99,26 +99,26 @@ public class SubmitReviewUseCase {
             var submission = saved.get();
             if (!submission.userId().equals(userId) || !submission.reviewId().equals(reviewId)
                     || !submission.reviewSetId().equals(command.reviewSetId())) {
-                throw new LearningRequestException(409, "REQUEST_CONFLICT", "requestId belongs to another submission");
+                throw new LearningRequestException(409, "REQUEST_CONFLICT", "Mã yêu cầu này đã được sử dụng cho một bài nộp khác.");
             }
             return submission.response();
         }
         if (owned.status() == ReviewStatus.PENDING && owned.stage() == ReviewStage.THEORY) {
-            throw new LearningRequestException(409, "THEORY_REQUIRED", "Read the theory before the next set");
+            throw new LearningRequestException(409, "THEORY_REQUIRED", "Vui lòng đọc phần lý thuyết trước khi làm bộ bài tập tiếp theo.");
         }
         if (!owned.acceptsAnswersFor(command.reviewSetId())) {
-            throw new LearningRequestException(409, "REVIEW_SET_CLOSED", "Review set is closed");
+            throw new LearningRequestException(409, "REVIEW_SET_CLOSED", "Bộ bài ôn tập đã đóng.");
         }
         ReviewSet set = owned.openSet().orElseThrow();
         if (attempts.revealedPackageIds(userId).contains(set.packageId())) {
-            throw new LearningRequestException(409, "REVIEW_SET_CLOSED", "Review set is closed");
+            throw new LearningRequestException(409, "REVIEW_SET_CLOSED", "Bộ bài ôn tập đã đóng.");
         }
         PackageVersion version;
         try {
             version = content.getPackageVersion(set.packageVersionId());
         } catch (LearningRequestException error) {
             if (error.getStatus() != 404 || !"NOT_FOUND".equals(error.getCode())) throw error;
-            throw new LearningRequestException(409, "REVIEW_SET_CLOSED", "Review set is no longer available");
+            throw new LearningRequestException(409, "REVIEW_SET_CLOSED", "Bộ bài ôn tập không còn khả dụng.");
         }
         var graded = grading.grade(version, command.answers(), "Review set");
         ErrorTrapCatalog.ErrorTraps trapCatalog = errorTrapEvidence.loadIfNeeded(
@@ -147,22 +147,22 @@ public class SubmitReviewUseCase {
             var submission = saved.get();
             if (!submission.userId().equals(userId) || !submission.reviewId().equals(reviewId)
                     || !submission.reviewSetId().equals(command.reviewSetId())) {
-                throw new LearningRequestException(409, "REQUEST_CONFLICT", "requestId belongs to another submission");
+                throw new LearningRequestException(409, "REQUEST_CONFLICT", "Mã yêu cầu này đã được sử dụng cho một bài nộp khác.");
             }
             return submission.response();
         }
         ReviewItem review = ownedReview(userId, reviewId);
         if (review.status() == ReviewStatus.PENDING && review.stage() == ReviewStage.THEORY) {
-            throw new LearningRequestException(409, "THEORY_REQUIRED", "Read the theory before the next set");
+            throw new LearningRequestException(409, "THEORY_REQUIRED", "Vui lòng đọc phần lý thuyết trước khi làm bộ bài tập tiếp theo.");
         }
         ReviewSet currentSet = review.openSet().orElse(null);
         if (!review.acceptsAnswersFor(command.reviewSetId()) || currentSet == null
                 || !currentSet.id().equals(preparedSet.id())
                 || !currentSet.packageVersionId().equals(preparedSet.packageVersionId())) {
-            throw new LearningRequestException(409, "REVIEW_SET_CLOSED", "Review set is closed");
+            throw new LearningRequestException(409, "REVIEW_SET_CLOSED", "Bộ bài ôn tập đã đóng.");
         }
         if (attempts.revealedPackageIds(userId).contains(preparedSet.packageId())) {
-            throw new LearningRequestException(409, "REVIEW_SET_CLOSED", "Review set is closed");
+            throw new LearningRequestException(409, "REVIEW_SET_CLOSED", "Bộ bài ôn tập đã đóng.");
         }
         List<Item> items = graded.items();
         var grades = graded.grades();
@@ -220,7 +220,7 @@ public class SubmitReviewUseCase {
 
     private ReviewItem ownedReview(UUID userId, UUID reviewId) {
         return reviews.findOwned(userId, reviewId)
-                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Review was not found"));
+                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Không tìm thấy bài ôn tập."));
     }
 
 }

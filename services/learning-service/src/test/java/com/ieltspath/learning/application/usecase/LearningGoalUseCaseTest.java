@@ -265,7 +265,7 @@ class LearningGoalUseCaseTest {
 
         var conflict = assertThrows(LearningGoalConflictException.class, () -> createLearningGoalUseCase.execute(
                 new CreateLearningGoalCommand(userId, BigDecimal.valueOf(7.0), null, 60)));
-        assertEquals("An active learning goal already exists for this user", conflict.getMessage());
+        assertEquals("Bạn đã có một mục tiêu học tập đang hoạt động.", conflict.getMessage());
         verify(studyGoals, never()).execute(any());
     }
 }

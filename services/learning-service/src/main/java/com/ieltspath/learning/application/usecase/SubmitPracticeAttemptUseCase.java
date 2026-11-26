@@ -142,10 +142,10 @@ public class SubmitPracticeAttemptUseCase {
     public PracticeSubmission execute(UUID userId, UUID attemptId, SubmitExerciseCommand command) {
         lock.lock(userId);
         PracticeAttempt attempt = attempts.findOwned(userId, attemptId)
-                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Practice attempt was not found"));
+                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Không tìm thấy lượt luyện tập."));
         if (!attempt.acceptsAnswers(command.requestId())) return attempt.response();
         if (attempts.findByRequestId(command.requestId()).isPresent()) {
-            throw new LearningRequestException(409, "REQUEST_CONFLICT", "requestId belongs to another submission");
+            throw new LearningRequestException(409, "REQUEST_CONFLICT", "Mã yêu cầu này đã được sử dụng cho một bài nộp khác.");
         }
         // Free practice costs hearts too, so the gate sits before the branch that handles it.
         hearts.requireHearts(userId);
@@ -341,7 +341,7 @@ public class SubmitPracticeAttemptUseCase {
                     : outcomes.resultOf(submission.id());
             if (examiner.isEmpty()) {
                 throw new LearningRequestException(409, "ESSAY_NOT_GRADED",
-                        "Submit every essay of the set and wait for its grade first");
+                        "Vui lòng nộp tất cả bài viết trong bộ đề và chờ chấm xong trước.");
             }
             graded.put(item.questionVersionId(), new GradedEssay(submission, examiner.get().passed(), true));
         }
@@ -358,12 +358,12 @@ public class SubmitPracticeAttemptUseCase {
         SpeakingSubmission answer = speaking.findLatestForAttempt(userId, attempt.id())
                 .filter(found -> found.status() == SpeakingSubmissionStatus.GRADED)
                 .orElseThrow(() -> new LearningRequestException(409, "SPEAKING_NOT_GRADED",
-                        "Record your answer and wait for its grade first"));
+                        "Vui lòng ghi âm câu trả lời và chờ chấm xong trước."));
         Map<UUID, SpeakingSubmission> graded = new HashMap<>();
         for (var item : recordedItems) {
             if (answer.recordingFor(item.questionVersionId()).isEmpty()) {
                 throw new LearningRequestException(409, "SPEAKING_NOT_GRADED",
-                        "Record your answer and wait for its grade first");
+                        "Vui lòng ghi âm câu trả lời và chờ chấm xong trước.");
             }
             graded.put(item.questionVersionId(), answer);
         }
