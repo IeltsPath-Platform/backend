@@ -28,6 +28,12 @@ public class PlacementSpeakingCompletedListener {
     private final PlacementSpeakingGradeStore grades;
     private final PlacementGradingService grading;
     private final int maxAttempts;
+    private com.ieltspath.assessment.application.port.DeletedUserStore deletedUsers;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setDeletedUsers(com.ieltspath.assessment.application.port.DeletedUserStore deletedUsers) {
+        this.deletedUsers = deletedUsers;
+    }
 
     public PlacementSpeakingCompletedListener(ObjectMapper json, PlacementSpeakingGradeStore grades,
                                               PlacementGradingService grading,
@@ -53,6 +59,10 @@ public class PlacementSpeakingCompletedListener {
             return;
         }
         try {
+            if (deletedUsers != null && deletedUsers.isDeleted(event.data().userId())) {
+                channel.basicAck(tag, false);
+                return;
+            }
             grades.complete(event);
             grading.completeIfGraded(event.data().attemptId());
             channel.basicAck(tag, false);

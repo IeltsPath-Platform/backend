@@ -31,6 +31,12 @@ public class PlacementSpeakingRequestedListener {
     private final PlacementSpeakingJobStore jobs;
     private final OutboxTraceContext traceContext;
     private final int maxAttempts;
+    private com.ieltspath.learning.domain.repository.DeletedUserRepository deletedUsers;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setDeletedUsers(com.ieltspath.learning.domain.repository.DeletedUserRepository deletedUsers) {
+        this.deletedUsers = deletedUsers;
+    }
 
     public PlacementSpeakingRequestedListener(ObjectMapper json, PlacementSpeakingJobStore jobs,
                                               OutboxTraceContext traceContext,
@@ -48,6 +54,10 @@ public class PlacementSpeakingRequestedListener {
             validate(event);
         } catch(Exception invalid) { park(message,channel,"contract violation"); return; }
         try {
+            if (deletedUsers != null && deletedUsers.isDeleted(event.data().userId())) {
+                channel.basicAck(tag, false);
+                return;
+            }
             String payload=json.writeValueAsString(event);
             Object correlation=message.getMessageProperties().getHeaders().get(Correlation.HEADER);
             String correlationId=correlation instanceof String value ? value : null;

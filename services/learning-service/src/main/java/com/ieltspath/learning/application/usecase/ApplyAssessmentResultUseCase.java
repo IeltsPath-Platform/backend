@@ -66,6 +66,12 @@ public class ApplyAssessmentResultUseCase {
     private final MasteryProfileUpdater masteryProfiles;
     private final CourseOutcomeService outcomes;
     private final Clock clock = Clock.systemUTC();
+    private com.ieltspath.learning.domain.repository.DeletedUserRepository deletedUsers;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setDeletedUsers(com.ieltspath.learning.domain.repository.DeletedUserRepository deletedUsers) {
+        this.deletedUsers = deletedUsers;
+    }
 
     public ApplyAssessmentResultUseCase(LearnerLock lock, KnowledgeEvidenceRepository evidence,
                                         LearnerCurriculumRepository curricula, AssessmentResultLog results,
@@ -95,6 +101,10 @@ public class ApplyAssessmentResultUseCase {
     @Transactional
     public void execute(AssessmentResult result) {
         UUID userId = result.userId();
+        if (deletedUsers != null && deletedUsers.isDeleted(userId)) {
+            log.info("Assessment result skipped for deleted user: eventId={}, userId={}", result.eventId(), userId);
+            return;
+        }
         lock.lock(userId);
         Optional<Integer> applied = results.appliedVersion(userId, result.attemptId());
         if (applied.isPresent() && applied.get() >= result.resultVersion()) {
