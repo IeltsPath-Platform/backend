@@ -75,6 +75,29 @@ class SubscriptionTest {
     }
 
     @Test
+    @DisplayName("An active subscription can expire")
+    void shouldExpireActiveSubscription() {
+        Subscription sub = Subscription.create(UUID.randomUUID(), UUID.randomUUID(), SubscriptionSourceType.ACTIVATION_KEY, UUID.randomUUID(), 30, 4);
+
+        sub.expire();
+
+        assertThat(sub.getStatus()).isEqualTo(SubscriptionStatus.EXPIRED);
+        assertThat(sub.isActive()).isFalse();
+    }
+
+    @Test
+    @DisplayName("A final subscription cannot expire again")
+    void shouldRejectExpireForFinalSubscription() {
+        Subscription sub = new Subscription(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), SubscriptionStatus.EXPIRED,
+                Instant.now().minus(30, ChronoUnit.DAYS), Instant.now().minus(1, ChronoUnit.DAYS),
+                SubscriptionSourceType.ACTIVATION_KEY, UUID.randomUUID(), 0, 0, null, 0, null, null);
+
+        assertThatThrownBy(sub::expire)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Only an active subscription can expire");
+    }
+
+    @Test
     @DisplayName("A cancelled subscription cannot use a credit")
     void shouldRefuseCreditOnCancelledSubscription() {
         Subscription sub = Subscription.create(UUID.randomUUID(), UUID.randomUUID(), SubscriptionSourceType.ACTIVATION_KEY, UUID.randomUUID(), 30, 4);
