@@ -117,8 +117,8 @@ class HumanGradingCreditConsumptionIntegrationTest {
         entityManager.flush();
         assertEquals(1, usedCredits(subscription));
         assertEquals(2, credits.refund(new RefundHumanGradingCreditCommand(user, submission)));
-        assertEquals(0, usedCredits(subscription));
         entityManager.flush();
+        assertEquals(0, usedCredits(subscription));
         assertEquals(1, count("SELECT count(*) FROM outbox_events WHERE event_type='HumanGradingCreditConsumed'"));
         assertEquals(1, count("SELECT count(*) FROM outbox_events WHERE event_type='HumanGradingCreditRefunded'"));
     }
