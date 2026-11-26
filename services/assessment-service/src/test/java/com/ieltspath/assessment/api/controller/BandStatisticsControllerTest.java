@@ -3,6 +3,8 @@ package com.ieltspath.assessment.api.controller;
 import com.ieltspath.commonsecurity.config.CommonSecurityAutoConfiguration;
 import com.ieltspath.assessment.application.usecase.GetBandHistoryUseCase;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -28,13 +30,16 @@ class BandStatisticsControllerTest {
         byte[] key=new byte[32];new java.security.SecureRandom().nextBytes(key);
         r.add("app.auth.internal-jwt-secret",()->Base64.getEncoder().encodeToString(key));
     }
+    private static RequestPostProcessor learner(UUID user) {
+        return jwt().jwt(j->j.subject(user.toString())).authorities(new SimpleGrantedAuthority("ROLE_CUSTOMER"));
+    }
     @Test void anonymousHistoryIsUnauthorized() throws Exception {
         mvc.perform(get("/api/assessments/me/statistics/bands").param("from","2026-10-01").param("to","2026-10-15"))
                 .andExpect(status().isUnauthorized());
     }
     @Test void invalidDateIsBadRequestInsteadOfInternalError() throws Exception {
         mvc.perform(get("/api/assessments/me/statistics/bands").param("from","bad").param("to","2026-10-15")
-                .with(jwt().jwt(j->j.subject(UUID.randomUUID().toString())))).andExpect(status().isBadRequest());
+                .with(learner(UUID.randomUUID()))).andExpect(status().isBadRequest());
         verifyNoInteractions(history);
     }
     @Test void validHistoryBindsDatesAndDefaultsAndCallsUseCase() throws Exception {
@@ -44,13 +49,13 @@ class BandStatisticsControllerTest {
                 new GetBandHistoryUseCase.Result("AVAILABLE",java.time.Instant.parse("2026-10-15T00:00:00Z"),
                         from,"PLACEMENT","OVERALL",null,List.of(),null,null,null,null));
         mvc.perform(get("/api/assessments/me/statistics/bands").param("from",from.toString()).param("to",to.toString())
-                .with(jwt().jwt(j->j.subject(user.toString())))).andExpect(status().isOk());
+                .with(learner(user))).andExpect(status().isOk());
         verify(history).execute(user,from,to,"PLACEMENT","OVERALL",null,100,"Asia/Ho_Chi_Minh");
     }
     @Test void explicitTimezoneIsPassedToUseCase() throws Exception {
         UUID user=UUID.randomUUID();
         mvc.perform(get("/api/assessments/me/statistics/bands").param("from","2026-10-01").param("to","2026-10-15")
-                .param("timezone","America/New_York").with(jwt().jwt(j->j.subject(user.toString()))))
+                .param("timezone","America/New_York").with(learner(user)))
                 .andExpect(status().isOk());
         verify(history).execute(user,LocalDate.parse("2026-10-01"),LocalDate.parse("2026-10-15"),
                 "PLACEMENT","OVERALL",null,100,"America/New_York");
@@ -60,14 +65,14 @@ class BandStatisticsControllerTest {
         when(history.execute(user,LocalDate.parse("2026-10-01"),LocalDate.parse("2026-10-15"),
                 "PLACEMENT","OVERALL",null,100,"Invalid/Zone")).thenThrow(new IllegalArgumentException("Invalid IANA timezone"));
         mvc.perform(get("/api/assessments/me/statistics/bands").param("from","2026-10-01").param("to","2026-10-15")
-                .param("timezone","Invalid/Zone").with(jwt().jwt(j->j.subject(user.toString()))))
+                .param("timezone","Invalid/Zone").with(learner(user)))
                 .andExpect(status().isBadRequest());
     }
     @Test void contextPassesAuthenticatedOwner() throws Exception {
         UUID user=UUID.randomUUID(),source=UUID.randomUUID();
         when(history.context(user,"ASSESSMENT",source)).thenReturn(new GetBandHistoryUseCase.StudyContext(source,null));
         mvc.perform(get("/api/assessments/me/statistics/study-context").param("sourceType","ASSESSMENT").param("sourceId",source.toString())
-                .with(jwt().jwt(j->j.subject(user.toString())))).andExpect(status().isOk());
+                .with(learner(user))).andExpect(status().isOk());
         verify(history).context(user,"ASSESSMENT",source);
     }
     @Test void availabilityRequiresAuthentication() throws Exception {
@@ -86,7 +91,7 @@ class BandStatisticsControllerTest {
         mvc.perform(get("/api/assessments/me/statistics/bands/availability")
                 .param("from", from.toString()).param("to", to.toString())
                 .param("userId", UUID.randomUUID().toString()).header("X-User-Id", UUID.randomUUID().toString())
-                .with(jwt().jwt(j -> j.subject(user.toString()))))
+                .with(learner(user)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.options.length()").value(1))
                 .andExpect(jsonPath("$.options[0].seriesKind").value("MOCK"))
                 .andExpect(jsonPath("$.options[0].skill").value("READING"))
@@ -99,24 +104,24 @@ class BandStatisticsControllerTest {
                 .thenReturn(new GetBandHistoryUseCase.Availability(List.of()));
         mvc.perform(get("/api/assessments/me/statistics/bands/availability")
                 .param("from", "2026-10-01").param("to", "2026-10-15").param("timezone", "UTC")
-                .with(jwt().jwt(j -> j.subject(user.toString()))))
+                .with(learner(user)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.options").isEmpty());
     }
     @Test void availabilityInvalidOrMissingDatesAreBadRequest() throws Exception {
         for (String date : List.of("bad", "2026-02-30")) {
             mvc.perform(get("/api/assessments/me/statistics/bands/availability")
                     .param("from", date).param("to", "2026-10-15")
-                    .with(jwt().jwt(j -> j.subject(UUID.randomUUID().toString()))))
+                    .with(learner(UUID.randomUUID())))
                     .andExpect(status().isBadRequest());
         }
         mvc.perform(get("/api/assessments/me/statistics/bands/availability").param("from", "2026-10-01")
-                .with(jwt().jwt(j -> j.subject(UUID.randomUUID().toString())))).andExpect(status().isBadRequest());
+                .with(learner(UUID.randomUUID()))).andExpect(status().isBadRequest());
         verifyNoInteractions(history);
     }
     @Test void availabilityValidationErrorsUseBadRequestEnvelope() throws Exception {
         when(history.availability(any(), any(), any(), any())).thenThrow(new IllegalArgumentException("Invalid band range"));
         mvc.perform(get("/api/assessments/me/statistics/bands/availability")
                 .param("from", "2026-10-15").param("to", "2026-10-01").param("timezone", "Invalid/Zone")
-                .with(jwt().jwt(j -> j.subject(UUID.randomUUID().toString())))).andExpect(status().isBadRequest());
+                .with(learner(UUID.randomUUID()))).andExpect(status().isBadRequest());
     }
 }

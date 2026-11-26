@@ -29,7 +29,7 @@ class CourseGatePolicyIntegrationTest extends ExaminerIntegrationSupport {
                 .andExpect(jsonPath("$.essays[0].comments[0]").value("Develop examples"))
                 .andExpect(jsonPath("$..band").doesNotExist()).andExpect(jsonPath("$..llmBand").doesNotExist());
         mvc.perform(get("/api/assessments/attempts/{id}/provisional-feedback",attempt).with(user(examiner.toString()).roles("EXAMINER")))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isForbidden());
         UUID result=openClaimed(attempt);
         save(result,attempt,6.5);
         finalizeResult(result,examiner,200);
