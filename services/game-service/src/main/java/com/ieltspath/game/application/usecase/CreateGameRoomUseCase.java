@@ -36,8 +36,8 @@ public class CreateGameRoomUseCase {
     @Transactional
     public GameRoomResult execute(CreateGameRoomCommand command) {
         GameType.require(command.gameType(), command.learningDomain());
-        if (command.maxPlayers() < 2 || command.maxPlayers() > 32) {
-            throw new IllegalArgumentException("maxPlayers must be between 2 and 32");
+        if (command.maxPlayers() < 2 || command.maxPlayers() > 4) {
+            throw new IllegalArgumentException("Số người chơi trong phòng phải từ 2 đến 4");
         }
         if (command.contentIds().isEmpty() || command.contentIds().size() > 20) {
             throw new IllegalArgumentException("A room requires between 1 and 20 content IDs");

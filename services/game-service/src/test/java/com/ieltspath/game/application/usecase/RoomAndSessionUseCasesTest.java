@@ -196,7 +196,7 @@ class RoomAndSessionUseCasesTest {
     void aClassicRoomForOnePlayerIsRejected() {
         var error = assertThrows(IllegalArgumentException.class,
                 () -> createRoom().execute(roomCommand(host, "WORD_MEANING_MATCH", 1, ids(1))));
-        assertEquals("maxPlayers must be between 2 and 32", error.getMessage());
+        assertEquals("Số người chơi trong phòng phải từ 2 đến 4", error.getMessage());
         verifyNoInteractions(content, rooms);
     }
 
@@ -401,5 +401,19 @@ class RoomAndSessionUseCasesTest {
         assertThrows(org.springframework.security.access.AccessDeniedException.class,
                 () -> useCase.execute(UUID.randomUUID(), host, java.util.Set.of("CONTENT_AUTHOR")));
         verifyNoInteractions(rooms, tickets);
+    }
+
+    @Test
+    void aClassicRoomHoldsAtMostFourPlayers() {
+        var contentIds = ids(1);
+        when(content.loadSnapshot("WORD_MEANING_MATCH", "VOCABULARY", contentIds)).thenReturn(items(1));
+        when(rooms.findByCode(anyString())).thenReturn(Optional.empty());
+        when(rooms.save(any())).thenAnswer(call -> call.getArgument(0));
+        when(profile.displayName()).thenReturn("Host");
+
+        assertEquals(4, createRoom().execute(roomCommand(host, "WORD_MEANING_MATCH", 4, contentIds)).maxPlayers());
+        assertThrows(IllegalArgumentException.class,
+                () -> createRoom().execute(roomCommand(host, "WORD_MEANING_MATCH", 5, contentIds)));
+        verify(rooms).save(any());
     }
 }
