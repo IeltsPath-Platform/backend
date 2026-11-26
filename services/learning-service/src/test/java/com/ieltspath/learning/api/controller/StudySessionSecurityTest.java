@@ -33,6 +33,10 @@ class StudySessionSecurityTest {
         byte[] key=new byte[32]; new SecureRandom().nextBytes(key);
         registry.add("app.auth.internal-jwt-secret",()->Base64.getEncoder().encodeToString(key));
     }
+    private static org.springframework.test.web.servlet.request.RequestPostProcessor learner(UUID user) {
+        return jwt().jwt(j->j.subject(user.toString()))
+                .authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_CUSTOMER"));
+    }
     @Test void anonymousStartIsUnauthorized() throws Exception {
         mvc.perform(post("/api/learning/study-sessions").contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isUnauthorized());
@@ -40,18 +44,18 @@ class StudySessionSecurityTest {
     }
     @Test void startUsesAuthenticatedIdentityAndIgnoresUntrustedIdentityHeaders() throws Exception {
         UUID user=UUID.randomUUID(),client=UUID.randomUUID(),source=UUID.randomUUID();
-        mvc.perform(post("/api/learning/study-sessions").with(jwt().jwt(j->j.subject(user.toString())))
+        mvc.perform(post("/api/learning/study-sessions").with(learner(user))
                 .header("X-User-Id",UUID.randomUUID()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"clientSessionId\":\""+client+"\",\"sourceType\":\"LESSON\",\"sourceId\":\""+source+"\"}"))
                 .andExpect(status().isOk());
         verify(start).execute(user,client,"LESSON",source,false);
     }
     @Test void malformedSourceAndIntervalAreRejectedBeforeUseCase() throws Exception {
-        mvc.perform(post("/api/learning/study-sessions").with(jwt().jwt(j->j.subject(UUID.randomUUID().toString())))
+        mvc.perform(post("/api/learning/study-sessions").with(learner(UUID.randomUUID()))
                 .contentType(MediaType.APPLICATION_JSON).content("{\"sourceType\":\"MOCK\"}"))
                 .andExpect(status().isBadRequest());
         mvc.perform(post("/api/learning/study-sessions/"+UUID.randomUUID()+"/heartbeats")
-                .with(jwt().jwt(j->j.subject(UUID.randomUUID().toString())))
+                .with(learner(UUID.randomUUID()))
                 .contentType(MediaType.APPLICATION_JSON).content("{\"epoch\":1,\"sequence\":1,\"intervals\":[null]}"))
                 .andExpect(status().isBadRequest());
         verifyNoInteractions(start,heartbeat);
@@ -60,17 +64,17 @@ class StudySessionSecurityTest {
         when(heartbeat.execute(any(),any(),anyLong(),anyLong(),anyList(),anyBoolean()))
                 .thenThrow(new StudyTrackingException("SESSION_NOT_FOUND"));
         mvc.perform(post("/api/learning/study-sessions/"+UUID.randomUUID()+"/close")
-                .with(jwt().jwt(j->j.subject(UUID.randomUUID().toString())))
+                .with(learner(UUID.randomUUID()))
                 .contentType(MediaType.APPLICATION_JSON).content("{\"epoch\":1,\"sequence\":1,\"intervals\":[]}"))
                 .andExpect(status().isNotFound()).andExpect(jsonPath("$.details.code").value("SESSION_NOT_FOUND"));
     }
     @Test void badStatisticsDateIsBadRequest() throws Exception {
         mvc.perform(get("/api/learning/statistics/study-time?from=invalid&to=2026-10-15")
-                .with(jwt().jwt(j->j.subject(UUID.randomUUID().toString())))).andExpect(status().isBadRequest());
+                .with(learner(UUID.randomUUID()))).andExpect(status().isBadRequest());
     }
     @Test void vocabularyReviewIsRejectedBeforeStartingASession() throws Exception {
         mvc.perform(post("/api/learning/study-sessions")
-                .with(jwt().jwt(j->j.subject(UUID.randomUUID().toString())))
+                .with(learner(UUID.randomUUID()))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"clientSessionId\":\""+UUID.randomUUID()+"\",\"sourceType\":\"VOCABULARY_REVIEW\",\"sourceId\":\""+UUID.randomUUID()+"\"}"))
                 .andExpect(status().isBadRequest());

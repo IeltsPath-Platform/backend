@@ -234,7 +234,8 @@ class WritingWebMvcTest {
     }
 
     private MockHttpServletRequestBuilder authenticated(MockHttpServletRequestBuilder request) {
-        return request.with(jwt().jwt(token -> token.subject(USER.toString())));
+        return request.with(jwt().jwt(token -> token.subject(USER.toString()))
+                .authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_CUSTOMER")));
     }
 
     private static Set<String> keys(JsonNode node) {
