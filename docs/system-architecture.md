@@ -93,6 +93,8 @@ Assessment và Content gọi LLM qua `shared/common-llm`; cấu hình, port, pro
 
 Timer `llm.call.duration` và counter `llm.tokens` mang nhãn `service`, `model`, `purpose`, `outcome`; token thêm `direction=input|output`. Không có user hay nội dung trong metric. Provider thiếu `usage` thì không tăng counter token.
 
+Access chạy đối soát ví với ledger theo lịch khi `access.points.reconciliation.enabled=true` (mặc định tắt). Counter `points.reconciliation.mismatch` đếm từng ví lệch; log cảnh báo chỉ có user ID và số dư/tổng ledger, không có email hay dữ liệu cá nhân. Chu kỳ mặc định là 24 giờ, tối đa 100 dòng mỗi lần (`access.points.reconciliation.interval`, `access.points.reconciliation.max-rows`). Use case chỉ đọc và báo cáo, không sửa số dư.
+
 Các lời gọi HTTP đồng bộ dùng `shared/common-resilience`: retry tối đa một lần sau 200 ms chỉ cho lỗi kết nối/timeout và HTTP 5xx; chỉ `READ` và `IDEMPOTENT_WRITE` được retry. Circuit breaker dùng chung theo dịch vụ đích (content, access, user, assessment, library, learning, llm), mở 30 giây sau ngưỡng lỗi cấu hình; LLM có semaphore tối đa bốn lời gọi đồng thời. Lỗi breaker/bulkhead được client ánh xạ về contract lỗi của service gọi.
 
 Gateway đặt connect timeout 2 giây và response timeout mặc định 15 giây. Route upload và AI của assessment dùng 120 giây; ba endpoint chấm essay của Learning dùng 60 giây và tier rate limit `ai`; POST tạo AI draft `PRACTICE_SET` và `SECTION_QUESTIONS` của Content dùng tier `ai` cùng response timeout 210 giây theo timeout LLM mặc định 180 giây. Polling, mở bản nháp và đọc allowance không đi qua tier gọi AI. Content gọi LLM như `WRITE`, không retry.
