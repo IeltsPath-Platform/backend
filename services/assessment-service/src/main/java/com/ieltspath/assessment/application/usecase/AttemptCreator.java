@@ -78,10 +78,10 @@ public class AttemptCreator {
                                           AttemptScope scope, Skill skill, Instant expiresAt,
                                           com.ieltspath.assessment.domain.vo.PlacementPool placementPool) {
         if (selectedSections.isEmpty() || selectedSections.stream().anyMatch(section -> section.items().isEmpty())) {
-            throw new PackageNotAttemptableException("Package version has a section without questions");
+            throw new PackageNotAttemptableException("Gói đề thi có phần chưa có câu hỏi nào.");
         }
         if (type == AttemptType.OFFICIAL_PRACTICE && packageVersion.packageId() == null) {
-            throw new PackageNotAttemptableException("Package identity is missing");
+            throw new PackageNotAttemptableException("Thiếu thông tin định danh của gói đề thi.");
         }
         if (type == AttemptType.PLACEMENT) {
             jdbc.query("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", rs -> {},
@@ -143,7 +143,7 @@ public class AttemptCreator {
 
     private Map<String, Object> groupSnapshot(ContentPackageProvider.QuestionGroup group) {
         if (group.groupId() == null || group.formatCode() == null) {
-            throw new PackageNotAttemptableException("Every question group needs an id and a format code");
+            throw new PackageNotAttemptableException("Mỗi nhóm câu hỏi phải có mã định danh và mã định dạng.");
         }
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("groupId", group.groupId());

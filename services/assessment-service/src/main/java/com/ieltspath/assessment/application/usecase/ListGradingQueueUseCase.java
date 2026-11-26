@@ -36,13 +36,13 @@ public class ListGradingQueueUseCase {
     /** The quality-review essays this reviewer claimed and has not yet reviewed. */
     @Transactional(readOnly=true)
     public ExaminerQueueStore.QueuePage claimedQaBy(UUID reviewerId,int page,int size) {
-        if (page<0 || size<1 || size>100) throw new IllegalArgumentException("Invalid pagination (size 1..100)");
+        if (page<0 || size<1 || size>100) throw new IllegalArgumentException("Thông số phân trang không hợp lệ (kích thước từ 1 đến 100).");
         return store.claimedQaBy(reviewerId,page,size);
     }
 
     private static void validate(String mode,String status,String reason,int page,int size) {
         if (!"HUMAN".equals(mode) || !STATUSES.contains(status)
                 || (reason != null && !"QA_SAMPLE".equals(reason)) || page<0 || size<1 || size>100)
-            throw new IllegalArgumentException("Invalid queue filters or pagination (size 1..100)");
+            throw new IllegalArgumentException("Bộ lọc hàng chờ hoặc thông số phân trang không hợp lệ (kích thước từ 1 đến 100).");
     }
 }

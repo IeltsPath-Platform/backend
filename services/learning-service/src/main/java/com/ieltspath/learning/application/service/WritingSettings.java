@@ -101,7 +101,7 @@ public record WritingSettings(
                 defaultTemplate, Density.OFF);
     }
 
-    @AssertTrue(message = "minWords must be below maxWords")
+    @AssertTrue(message = "Số từ tối thiểu phải nhỏ hơn số từ tối đa.")
     public boolean isWordRangeValid() {
         return minWords < maxWords;
     }

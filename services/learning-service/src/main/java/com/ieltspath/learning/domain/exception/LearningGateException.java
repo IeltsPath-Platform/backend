@@ -17,12 +17,12 @@ public final class LearningGateException extends RuntimeException {
     /** {@code lessonIds} names the earlier lessons whose Practice is still open ({@code PRACTICE_REQUIRED}). */
     public LearningGateException(String code, List<PendingReview> reviews, List<UUID> lessonIds) {
         super(switch (code) {
-            case "REVIEW_REQUIRED" -> "Complete the pending reviews first.";
-            case "TOPIC_LOCKED" -> "This topic is locked.";
-            case "LESSON_LOCKED" -> "Complete the earlier lessons first.";
-            case "PRACTICE_REQUIRED" -> "Complete practice of the earlier lessons first.";
-            case "PAYWALL" -> "Unlock this skill to access the lesson.";
-            default -> throw new IllegalArgumentException("Unknown learning gate code.");
+            case "REVIEW_REQUIRED" -> "Vui lòng hoàn thành các bài ôn tập đang chờ trước khi tiếp tục.";
+            case "TOPIC_LOCKED" -> "Chủ đề này hiện đang bị khóa. Vui lòng hoàn thành chủ đề trước đó.";
+            case "LESSON_LOCKED" -> "Vui lòng hoàn thành các bài học trước đó để mở khóa bài này.";
+            case "PRACTICE_REQUIRED" -> "Vui lòng hoàn thành phần luyện tập của các bài học trước.";
+            case "PAYWALL" -> "Vui lòng mở khóa kỹ năng này để truy cập bài học.";
+            default -> throw new IllegalArgumentException("Mã điều kiện mở bài học không hợp lệ.");
         });
         this.code = code;
         this.reviews = List.copyOf(reviews);

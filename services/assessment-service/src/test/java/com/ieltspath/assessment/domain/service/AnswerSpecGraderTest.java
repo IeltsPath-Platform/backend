@@ -81,7 +81,7 @@ class AnswerSpecGraderTest {
                 Map.of("answer", List.of("A")), Map.of("answer", Map.of("answer", "A")))) {
             assertThatThrownBy(() -> grader.grade(spec, response))
                     .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Answer must be a string or null.");
+                    .hasMessage("Câu trả lời phải là chuỗi ký tự hoặc để trống.");
         }
         assertThatThrownBy(() -> grader.grade(Map.of(), false)).isInstanceOf(IllegalArgumentException.class);
     }

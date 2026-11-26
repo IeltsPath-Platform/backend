@@ -301,7 +301,7 @@ public class RestLearningContentClient implements LearningContentClient {
             return body;
         } catch (RestClientResponseException exception) {
             if (exception.getStatusCode().value() == 404) {
-                throw new LearningRequestException(404, "NOT_FOUND", "Learning content was not found");
+                throw new LearningRequestException(404, "NOT_FOUND", "Không tìm thấy nội dung học tập.");
             }
             if (exception.getStatusCode().value() == 503) throw contentUnavailable();
             throw contentFailure();
@@ -319,16 +319,16 @@ public class RestLearningContentClient implements LearningContentClient {
         // the worker token; an unauthenticated request never does.
         headers.setBearerAuth(GatewayRequestHeaders.bearerToken()
                 .or(() -> GatewayRequestHeaders.outsideRequest() ? workerToken.get() : java.util.Optional.empty())
-                .orElseThrow(() -> new LearningRequestException(401, "UNAUTHORIZED", "Authenticated gateway JWT required")));
+                .orElseThrow(() -> new LearningRequestException(401, "UNAUTHORIZED", "Yêu cầu cần có phiên đăng nhập hợp lệ.")));
         headers.set(SecurityHeaders.CORRELATION_ID, GatewayRequestHeaders.correlationId());
     }
 
     private LearningRequestException contentUnavailable() {
-        return new LearningRequestException(503, "CONTENT_UNAVAILABLE", "Learning content is unavailable");
+        return new LearningRequestException(503, "CONTENT_UNAVAILABLE", "Dịch vụ nội dung học tập tạm thời không khả dụng.");
     }
 
     private LearningRequestException contentFailure() {
-        return new LearningRequestException(502, "CONTENT_FAILURE", "Learning content request failed");
+        return new LearningRequestException(502, "CONTENT_FAILURE", "Không thể tải nội dung học tập lúc này.");
     }
 
     private record PracticeSearch(UUID knowledgePointId, List<UUID> excludePackageIds,

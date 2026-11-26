@@ -34,7 +34,7 @@ public record AssessmentResult(UUID id, UUID attemptId, int resultVersion, Strin
     /** The band a grader decided for this version; replaces any band set when the version was opened. */
     public AssessmentResult withGradedBand(Double band) {
         if (!isGradable()) {
-            throw new InvalidAssessmentStateException("Only a draft or processing result can be graded");
+            throw new InvalidAssessmentStateException("Chỉ có thể chấm kết quả đang ở trạng thái nháp hoặc đang xử lý.");
         }
         return new AssessmentResult(id, attemptId, resultVersion, status, band, completedAt,
                 placementPool, uncappedBand, partial);
@@ -42,7 +42,7 @@ public record AssessmentResult(UUID id, UUID attemptId, int resultVersion, Strin
 
     public AssessmentResult complete(Instant at) {
         if (!isGradable()) {
-            throw new InvalidAssessmentStateException("Only a draft or processing result can be finalized");
+            throw new InvalidAssessmentStateException("Chỉ có thể hoàn tất kết quả đang ở trạng thái nháp hoặc đang xử lý.");
         }
         return new AssessmentResult(id, attemptId, resultVersion, COMPLETED, overallBand, at,
                 placementPool, uncappedBand, partial);

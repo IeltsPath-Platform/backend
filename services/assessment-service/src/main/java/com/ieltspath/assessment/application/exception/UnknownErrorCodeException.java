@@ -7,7 +7,7 @@ public class UnknownErrorCodeException extends RuntimeException {
     private final List<String> codes;
 
     public UnknownErrorCodeException(List<String> codes) {
-        super("Unknown error code(s): " + String.join(", ", codes));
+        super("Mã lỗi không tồn tại hoặc chưa được kích hoạt: " + String.join(", ", codes));
         this.codes = List.copyOf(codes);
     }
 

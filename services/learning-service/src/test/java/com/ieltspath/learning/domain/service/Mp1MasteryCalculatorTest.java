@@ -247,7 +247,7 @@ class Mp1MasteryCalculatorTest {
                 () -> new Mp1Params(8, 3, 30, 3, 2, 1.0, 0.1, 7, w),
                 () -> new Mp1Params(8, 3, 30, 3, 2, 1.0, 0.03, -1, w))) {
             org.assertj.core.api.Assertions.assertThatThrownBy(invalid::run)
-                    .isInstanceOf(IllegalArgumentException.class).hasMessage("Invalid MP-1.0 parameters");
+                    .isInstanceOf(IllegalArgumentException.class).hasMessage("Tham số MP-1.0 không hợp lệ.");
         }
         assertThat(new Mp1Params(8, 3, 30, 3, 2, 1.0, 0.099, 7, w).hysteresis()).isEqualTo(0.099);
     }

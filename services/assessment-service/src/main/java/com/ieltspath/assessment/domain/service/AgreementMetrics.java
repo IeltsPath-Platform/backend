@@ -11,7 +11,7 @@ public final class AgreementMetrics {
 
     public static Result calculate(List<BigDecimal> human, List<BigDecimal> ai) {
         if (human == null || ai == null || human.size() != ai.size() || human.isEmpty()) {
-            throw new IllegalArgumentException("Agreement scores must be non-empty lists of equal size");
+            throw new IllegalArgumentException("Danh sách điểm đối chiếu không được rỗng và phải có cùng số lượng.");
         }
         int n = human.size();
         BigDecimal absoluteError = BigDecimal.ZERO;
@@ -52,7 +52,7 @@ public final class AgreementMetrics {
     private static BigDecimal valid(BigDecimal score) {
         if (score == null || score.compareTo(BigDecimal.ZERO) < 0 || score.compareTo(BigDecimal.valueOf(9)) > 0
                 || score.multiply(BigDecimal.valueOf(2)).stripTrailingZeros().scale() > 0) {
-            throw new IllegalArgumentException("Bands must be between 0 and 9 in half-band steps");
+            throw new IllegalArgumentException("Điểm band phải nằm trong khoảng từ 0 đến 9 theo bước 0,5.");
         }
         return score;
     }

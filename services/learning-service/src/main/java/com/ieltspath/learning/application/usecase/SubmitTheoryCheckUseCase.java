@@ -51,11 +51,11 @@ public class SubmitTheoryCheckUseCase {
 
     public TheoryCheckResult execute(UUID userId, UUID reviewId, SubmitExerciseCommand command) {
         ReviewItem owned = reviews.findOwned(userId, reviewId)
-                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Review was not found"));
+                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Không tìm thấy bài ôn tập."));
         var saved = checks.find(command.requestId());
         if (saved.isPresent()) return replay(userId, reviewId, saved.get());
         if (owned.status() != ReviewStatus.PENDING || owned.stage() != ReviewStage.THEORY) {
-            throw new LearningRequestException(409, "THEORY_NOT_REQUIRED", "This review is not at the theory stage");
+            throw new LearningRequestException(409, "THEORY_NOT_REQUIRED", "Bài ôn tập này không ở giai đoạn kiểm tra lý thuyết.");
         }
         List<Question> questions;
         try {
@@ -69,11 +69,11 @@ public class SubmitTheoryCheckUseCase {
         return transaction.execute(status -> {
             lock.lock(userId);
             ReviewItem review = reviews.findOwned(userId, reviewId)
-                    .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Review was not found"));
+                    .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Không tìm thấy bài ôn tập."));
             var replay = checks.find(command.requestId());
             if (replay.isPresent()) return replay(userId, reviewId, replay.get());
             if (review.status() != ReviewStatus.PENDING || review.stage() != ReviewStage.THEORY) {
-                throw new LearningRequestException(409, "THEORY_NOT_REQUIRED", "This review is not at the theory stage");
+                throw new LearningRequestException(409, "THEORY_NOT_REQUIRED", "Bài ôn tập này không ở giai đoạn kiểm tra lý thuyết.");
             }
             return complete(userId, reviewId, review, command, preparedQuestions);
         });
@@ -86,7 +86,7 @@ public class SubmitTheoryCheckUseCase {
         int correct = 0;
         if (questions.isEmpty()) {
             if (!command.answers().isEmpty()) {
-                throw new LearningRequestException(422, "INVALID_ANSWERS", "This review has no quick-check questions");
+                throw new LearningRequestException(422, "INVALID_ANSWERS", "Bài ôn tập này không có câu hỏi kiểm tra nhanh.");
             }
         } else if (command.answers().isEmpty()) {
             // The quick check is optional: a learner who goes on to the practice set without answering it has read the
@@ -114,7 +114,7 @@ public class SubmitTheoryCheckUseCase {
 
     private static TheoryCheckResult replay(UUID userId, UUID reviewId, ReviewTheoryCheckLog.Stored saved) {
         if (!saved.userId().equals(userId) || !saved.reviewId().equals(reviewId)) {
-            throw new LearningRequestException(409, "REQUEST_CONFLICT", "requestId belongs to another submission");
+            throw new LearningRequestException(409, "REQUEST_CONFLICT", "Mã yêu cầu này đã được sử dụng cho một bài nộp khác.");
         }
         return saved.response();
     }

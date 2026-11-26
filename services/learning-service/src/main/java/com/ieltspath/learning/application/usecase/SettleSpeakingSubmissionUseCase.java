@@ -49,7 +49,7 @@ public class SettleSpeakingSubmissionUseCase {
     public SpeakingSubmissionResult execute(UUID userId, UUID submissionId) {
         SpeakingSubmission submission = submissions.findOwned(submissionId, userId)
                 .orElseThrow(() -> new LearningRequestException(404, "SPEAKING_SUBMISSION_NOT_FOUND",
-                        "Speaking submission not found"));
+                        "Không tìm thấy bài nộp Speaking."));
         if (submission.status() != SpeakingSubmissionStatus.PAYMENT_PENDING) return SpeakingSubmissionResult.from(submission);
 
         UUID ledgerEntry = submission.pointCost() == 0 ? null : points.debit(userId, submission.pointCost(),

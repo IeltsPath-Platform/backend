@@ -87,6 +87,6 @@ class AiEvaluationControllerWebMvcTest {
                         .content("{\"runId\":\"" + run + "\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("EVALUATION_NOT_PASSED"))
-                .andExpect(jsonPath("$.message").value("EVALUATION_NOT_PASSED"));
+                .andExpect(jsonPath("$.message").value("Thao tác xung đột với trạng thái hiện tại của dữ liệu."));
     }
 }

@@ -30,10 +30,10 @@ public class GetPracticeSinceEssayUseCase {
         Set<UUID> points = new LinkedHashSet<>(knowledgePointIds == null ? List.of() : knowledgePointIds);
         points.remove(null);
         if (points.size() > MAX_POINTS) {
-            throw new IllegalArgumentException("at most " + MAX_POINTS + " knowledge points");
+            throw new IllegalArgumentException("Chỉ được chọn tối đa " + MAX_POINTS + " điểm kiến thức.");
         }
         Instant since = history.essaySubmittedAt(userId, submissionId)
-                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Submission was not found"));
+                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Không tìm thấy bài nộp."));
         return points.isEmpty() ? List.of() : history.tallyKnowledgePractice(userId, points, since);
     }
 }

@@ -123,21 +123,21 @@ public class RestHumanReviewClient implements HumanReviewClient {
             int status = exception.getStatusCode().value();
             if (status == 402) {
                 throw new LearningRequestException(402, "HUMAN_GRADING_CREDIT_REQUIRED",
-                        "No human-grading credit is left");
+                        "Bạn đã hết lượt chấm bài bởi giám khảo.");
             }
             if (status == 409) {
                 if ("GRADING_CANCEL_NOT_ALLOWED".equals(errorCode(exception))) {
                     throw new LearningRequestException(409, "REVIEW_CANCEL_NOT_ALLOWED",
-                            "The request can be cancelled only when it is late and the examiner can no longer be changed");
+                            "Chỉ có thể hủy yêu cầu khi đã quá hạn chấm và không còn lượt đổi giám khảo.");
                 }
                 if (refusalIsDefinite && "EXAMINER_UNAVAILABLE".equals(errorCode(exception))) {
                     throw new LearningRequestException(409, "EXAMINER_UNAVAILABLE",
-                            "The chosen examiner cannot take this essay; choose another examiner");
+                            "Giám khảo đã chọn hiện không thể nhận bài viết này; vui lòng chọn giám khảo khác.");
                 }
-                throw new LearningRequestException(409, "HUMAN_GRADING_CONFLICT", "The review request conflicts");
+                throw new LearningRequestException(409, "HUMAN_GRADING_CONFLICT", "Yêu cầu chấm bài bị xung đột.");
             }
             if (refusalIsDefinite && status >= 400 && status < 500 && status != 401) {
-                throw new LearningRequestException(502, "HUMAN_REVIEW_REJECTED", "The Mentor review was refused");
+                throw new LearningRequestException(502, "HUMAN_REVIEW_REJECTED", "Yêu cầu chấm bài bởi giám khảo đã bị từ chối.");
             }
             throw unavailable();
         } catch (RestClientException exception) {
@@ -156,12 +156,12 @@ public class RestHumanReviewClient implements HumanReviewClient {
 
     private void forward(HttpHeaders headers) {
         headers.setBearerAuth(GatewayRequestHeaders.bearerToken().orElseThrow(
-                () -> new LearningRequestException(401, "UNAUTHORIZED", "Authenticated gateway JWT required")));
+                () -> new LearningRequestException(401, "UNAUTHORIZED", "Yêu cầu cần có phiên đăng nhập hợp lệ.")));
         headers.set(SecurityHeaders.CORRELATION_ID, GatewayRequestHeaders.correlationId());
     }
 
     private static LearningRequestException unavailable() {
-        return new LearningRequestException(503, "HUMAN_REVIEW_UNAVAILABLE", "Mentor review is unavailable");
+        return new LearningRequestException(503, "HUMAN_REVIEW_UNAVAILABLE", "Dịch vụ chấm bài bởi giám khảo tạm thời không khả dụng.");
     }
 
     private static ResilientCall defaultResilientCall() {

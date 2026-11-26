@@ -35,7 +35,7 @@ public class ExaminerGradingPolicy {
         if (jobs.isEmpty()) return;
         UUID examiner=currentUser.requireUserId();
         if (jobs.stream().anyMatch(j -> !examiner.equals(j.assignedExaminerId())))
-            throw new AssessmentAccessDeniedException("Only the assigned examiner may grade this attempt");
+            throw new AssessmentAccessDeniedException("Chỉ giám khảo được phân công mới có quyền chấm lượt làm bài này.");
     }
     @Transactional(propagation=Propagation.MANDATORY)
     public void complete(UUID attempt,UUID result,List<ItemResult> items) {
@@ -43,7 +43,7 @@ public class ExaminerGradingPolicy {
         if (jobs.isEmpty() && items.stream().noneMatch(this::hasEssayBand)) return;
         UUID examiner=currentUser.requireUserId();
         if (jobs.stream().anyMatch(j -> !examiner.equals(j.assignedExaminerId())))
-            throw new AssessmentAccessDeniedException("Only the assigned examiner may finalize this attempt");
+            throw new AssessmentAccessDeniedException("Chỉ giám khảo được phân công mới có quyền hoàn tất lượt làm bài này.");
         var byItem=items.stream().collect(Collectors.toMap(ItemResult::attemptItemId,x->x));
         for (var job:jobs) {
             if (!"COURSE_GATE".equals(job.attemptType()) || !"WRITING".equals(job.skill())) continue;
@@ -54,9 +54,9 @@ public class ExaminerGradingPolicy {
                 if (band==null || !band.isNumber() || band.decimalValue().signum()<0
                         || band.decimalValue().compareTo(java.math.BigDecimal.valueOf(9))>0
                         || band.decimalValue().multiply(java.math.BigDecimal.valueOf(2)).stripTrailingZeros().scale()>0)
-                    throw new InvalidAssessmentStateException("Each submitted course essay requires feedbackSnapshot.band (0..9 in half bands)");
+                    throw new InvalidAssessmentStateException("Mỗi bài viết khóa học đã nộp cần có điểm band từ 0 đến 9 theo bước 0,5.");
             } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-                throw new InvalidAssessmentStateException("Essay feedback must be valid JSON with a band");
+                throw new InvalidAssessmentStateException("Nhận xét bài viết phải ở định dạng JSON hợp lệ và có điểm band.");
             }
         }
         comparisons.recordExaminer(attempt,result,examiner,jobs.stream().map(ExaminerQueueStore.QueueEntry::submissionId).distinct().toList());

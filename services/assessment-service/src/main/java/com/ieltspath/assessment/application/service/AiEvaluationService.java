@@ -360,13 +360,13 @@ public class AiEvaluationService {
         if (errors == null) return;
         for (ExaminerError error : errors) {
             if (error.excerpt() == null || error.excerpt().isBlank() || essay == null || !essay.contains(error.excerpt()))
-                throw new IllegalArgumentException("Examiner error excerpt must be an exact part of the essay");
+                throw new IllegalArgumentException("Đoạn trích lỗi của giám khảo phải khớp chính xác một phần trong bài viết.");
             if (error.errorCode() == null || error.errorCode().isBlank())
-                throw new IllegalArgumentException("Examiner error needs an error code");
+                throw new IllegalArgumentException("Lỗi do giám khảo đánh dấu phải có mã lỗi.");
             if (!"LANGUAGE".equals(error.kind()) && !"DATA".equals(error.kind()))
-                throw new IllegalArgumentException("Examiner error kind must be LANGUAGE or DATA");
+                throw new IllegalArgumentException("Loại lỗi của giám khảo phải là LANGUAGE hoặc DATA.");
             if ("DATA".equals(error.kind()) && !"TASK_1".equals(task))
-                throw new IllegalArgumentException("DATA errors apply to Task 1 only");
+                throw new IllegalArgumentException("Lỗi số liệu (DATA) chỉ áp dụng cho bài viết Task 1.");
         }
     }
 
@@ -404,7 +404,7 @@ public class AiEvaluationService {
     }
 
     private String serialize(Object value) {
-        try { return json.writeValueAsString(value); } catch (Exception e) { throw new IllegalArgumentException("Invalid criteria"); }
+        try { return json.writeValueAsString(value); } catch (Exception e) { throw new IllegalArgumentException("Dữ liệu tiêu chí chấm không hợp lệ."); }
     }
     private Object parseJson(String value) {
         try { return json.readTree(value); } catch (Exception ignored) { return Map.of(); }
@@ -412,7 +412,7 @@ public class AiEvaluationService {
     private static void validateBand(BigDecimal band) {
         if (band == null || band.compareTo(BigDecimal.ZERO) < 0 || band.compareTo(BigDecimal.valueOf(9)) > 0
                 || band.multiply(BigDecimal.valueOf(2)).stripTrailingZeros().scale() > 0)
-            throw new IllegalArgumentException("Band must be between 0 and 9 in half-band steps");
+            throw new IllegalArgumentException("Điểm band phải nằm trong khoảng từ 0 đến 9 theo bước 0,5.");
     }
     private static String safeCode(Exception exception) {
         String value = exception.getMessage();

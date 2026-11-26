@@ -49,26 +49,26 @@ public class AssignCourseTestUseCase {
         var courseTopics = topics.stream().filter(topic -> topic.course() != null
                 && topic.course().courseId().equals(courseId)).toList();
         if (courseTopics.isEmpty()) {
-            throw new LearningRequestException(404, "COURSE_NOT_FOUND", "Course was not found");
+            throw new LearningRequestException(404, "COURSE_NOT_FOUND", "Không tìm thấy khóa học.");
         }
         var course = courseTopics.getFirst().course();
         if (!courseTopics.getFirst().hasCourseTest()) {
-            throw new LearningRequestException(409, "NO_COURSE_TEST", "This course has no final test");
+            throw new LearningRequestException(409, "NO_COURSE_TEST", "Khóa học này không có bài kiểm tra cuối khóa.");
         }
         // Every topic test taken opens the course test; the scores do not matter and neither do pending reviews.
         if (courseTopics.stream().anyMatch(topic -> topic.status() != TopicStatus.PASSED
                 && topic.status() != TopicStatus.COMPLETED)) {
-            throw new LearningRequestException(403, "COURSE_TEST_LOCKED", "Complete all course topics first");
+            throw new LearningRequestException(403, "COURSE_TEST_LOCKED", "Vui lòng hoàn thành tất cả các chủ đề trong khóa học trước.");
         }
         var courseProgress = progress.findAll(userId).get(courseId);
         if (courseProgress != null && courseProgress.passedAt() != null) {
-            throw new LearningRequestException(409, "COURSE_ALREADY_PASSED", "This course has already been passed");
+            throw new LearningRequestException(409, "COURSE_ALREADY_PASSED", "Bạn đã hoàn thành đạt yêu cầu khóa học này.");
         }
         // A retest follows the supplementary work: the reviews of the last course test must be finished first.
         if (outcomes.find(userId, courseId).filter(outcome -> !outcome.retestReady()
                 && outcome.status() == CourseOutcome.Status.REMEDIATION).isPresent()) {
             throw new LearningRequestException(409, "REMEDIATION_REQUIRED",
-                    "Finish the reviews from the course test before taking it again");
+                    "Vui lòng hoàn thành các bài ôn tập bổ sung từ bài kiểm tra khóa học trước khi thi lại.");
         }
         // The result of this test is applied by an event that cannot ask Content for the milestones, so a count must be
         // kept by now, including for a test that was assigned before counts were kept.
@@ -80,7 +80,7 @@ public class AssignCourseTestUseCase {
                         .map(pkg -> new PackageRotation.Candidate(pkg.packageId(), pkg.code())).toList(),
                         assignments.lastConsumedAt(userId, courseId))
                 .orElseThrow(() -> new LearningRequestException(409, "TEST_UNAVAILABLE",
-                        "No published course test is available"));
+                        "Hiện chưa có đề kiểm tra cuối khóa nào được xuất bản."));
         TestPackage chosen = packages.stream().filter(pkg -> pkg.packageId().equals(chosenId)).findFirst().orElseThrow();
         CourseTestAssignment assignment = CourseTestAssignment.assign(UUID.randomUUID(), userId, courseId,
                 chosen.packageId(), chosen.packageVersionId());

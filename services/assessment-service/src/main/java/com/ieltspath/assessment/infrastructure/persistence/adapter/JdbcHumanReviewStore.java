@@ -71,14 +71,14 @@ public class JdbcHumanReviewStore implements HumanReviewStore {
                 row.getString("rubric")));
         if (!byRequest.isEmpty()) {
             StoredRequest stored = byRequest.getFirst();
-            if (!same(stored, review)) throw new RevisionConflictException("requestId was already used for another review");
+            if (!same(stored, review)) throw new RevisionConflictException("Mã yêu cầu này đã được sử dụng cho một yêu cầu chấm bài khác.");
             return new Review(stored.requestId(), stored.id(), "PENDING");
         }
         boolean sourceExists = Boolean.TRUE.equals(jdbc.queryForObject("""
                 SELECT EXISTS(SELECT 1 FROM human_review_submissions WHERE source_submission_id=:sourceId)
                 """, new MapSqlParameterSource("sourceId", review.sourceSubmissionId()), Boolean.class));
-        if (sourceExists) throw new RevisionConflictException("Essay already has a human review request");
-        throw new RevisionConflictException("Human review request conflicts with existing data");
+        if (sourceExists) throw new RevisionConflictException("Bài viết này đã có yêu cầu chấm bởi giám khảo.");
+        throw new RevisionConflictException("Yêu cầu chấm bài xung đột với dữ liệu hiện có.");
     }
 
     private boolean same(StoredRequest stored, CreateReview request) {
@@ -143,16 +143,16 @@ public class JdbcHumanReviewStore implements HumanReviewStore {
                 row.getObject("human_review_submission_id", UUID.class),
                 row.getObject("assigned_examiner_id", UUID.class), row.getString("status"),
                 row.getObject("user_id", UUID.class), row.getString("skill")))
-                .stream().findFirst().orElseThrow(() -> new AssessmentNotFoundException("Human review job not found"));
-        if (job.submissionId() == null) throw new AssessmentNotFoundException("Standalone human review not found");
+                .stream().findFirst().orElseThrow(() -> new AssessmentNotFoundException("Không tìm thấy yêu cầu chấm bài."));
+        if (job.submissionId() == null) throw new AssessmentNotFoundException("Không tìm thấy bài viết cần giám khảo chấm.");
         if ("COMPLETED".equals(job.status())) {
             if (alreadyCompleted(job.submissionId(), band, criteria, errorCodes, feedback, annotations)) return Optional.empty();
-            throw new RevisionConflictException("Human review has already been completed");
+            throw new RevisionConflictException("Bài chấm này đã được hoàn thành trước đó.");
         }
         // The learner gave the job up while the examiner was still writing: nothing is graded after that.
-        if ("CANCELLED".equals(job.status())) throw new RevisionConflictException("The learner cancelled this request");
+        if ("CANCELLED".equals(job.status())) throw new RevisionConflictException("Học viên đã hủy yêu cầu chấm bài này.");
         if (!examinerId.equals(job.examinerId())) {
-            throw new AssessmentAccessDeniedException("Claim the human review before completing it");
+            throw new AssessmentAccessDeniedException("Vui lòng nhận bài chấm trước khi hoàn thành.");
         }
         int changed = jdbc.update("""
                 UPDATE human_review_submissions SET band=:band,criteria=CAST(:criteria AS jsonb),
@@ -163,7 +163,7 @@ public class JdbcHumanReviewStore implements HumanReviewStore {
                 .addValue("codes", stringArray(errorCodes)).addValue("feedback", feedback)
                 .addValue("annotations", annotations == null ? null : annotations.toString(), Types.VARCHAR)
                 .addValue("id", job.submissionId()));
-        if (changed != 1) throw new RevisionConflictException("Human review has already been completed");
+        if (changed != 1) throw new RevisionConflictException("Bài chấm này đã được hoàn thành trước đó.");
         jdbc.update("UPDATE grading_jobs SET status='COMPLETED',completed_at=CURRENT_TIMESTAMP WHERE id=:id",
                 new MapSqlParameterSource("id", jobId));
         // A completed review keeps no draft: the draft goes in the same statement that sets COMPLETED.
@@ -245,12 +245,12 @@ public class JdbcHumanReviewStore implements HumanReviewStore {
                 SELECT status FROM grading_jobs
                 WHERE id=:id AND grading_mode='HUMAN' AND human_review_submission_id IS NOT NULL
                 """, new MapSqlParameterSource("id", jobId), (row, index) -> row.getString("status"));
-        if (states.isEmpty()) return new AssessmentNotFoundException("Standalone human review not found");
+        if (states.isEmpty()) return new AssessmentNotFoundException("Không tìm thấy bài viết cần giám khảo chấm.");
         if ("COMPLETED".equals(states.getFirst())) {
-            return new RevisionConflictException("Human review has already been completed");
+            return new RevisionConflictException("Bài chấm này đã được hoàn thành trước đó.");
         }
-        if ("CANCELLED".equals(states.getFirst())) return new RevisionConflictException("The learner cancelled this request");
-        return new AssessmentAccessDeniedException("Claim the human review before " + action);
+        if ("CANCELLED".equals(states.getFirst())) return new RevisionConflictException("Học viên đã hủy yêu cầu chấm bài này.");
+        return new AssessmentAccessDeniedException("Vui lòng nhận bài chấm trước khi thực hiện thao tác này.");
     }
 
     @Override

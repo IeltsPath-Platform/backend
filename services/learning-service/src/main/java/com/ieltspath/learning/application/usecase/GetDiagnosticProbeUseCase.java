@@ -82,7 +82,7 @@ public class GetDiagnosticProbeUseCase {
                     ownedProbe, preparedVersion, staleSet, replacement));
             if (!read.retry()) return render(sessionId, probeId, read.probe(), read.version());
         }
-        throw new LearningRequestException(409, "PROBE_CLOSED", "Probe changed while it was being opened");
+        throw new LearningRequestException(409, "PROBE_CLOSED", "Câu hỏi kiểm tra chẩn đoán đã thay đổi trong lúc mở.");
     }
 
     private ProbeRead readUnderLock(UUID userId, UUID sessionId, UUID probeId, DiagnosticProbe preparedProbe,
@@ -149,6 +149,6 @@ public class GetDiagnosticProbeUseCase {
     }
 
     private static LearningRequestException notFound() {
-        return new LearningRequestException(404, "NOT_FOUND", "Diagnostic probe was not found");
+        return new LearningRequestException(404, "NOT_FOUND", "Không tìm thấy câu hỏi kiểm tra chẩn đoán.");
     }
 }

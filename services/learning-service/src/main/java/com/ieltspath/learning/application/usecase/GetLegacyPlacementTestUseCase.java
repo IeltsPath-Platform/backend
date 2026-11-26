@@ -31,11 +31,11 @@ public class GetLegacyPlacementTestUseCase {
 
     public PlacementTestResult execute(UUID userId) {
         if (placements.find(userId).isPresent()) {
-            throw new LearningRequestException(409, "PLACEMENT_ALREADY_DONE", "The placement test was already taken");
+            throw new LearningRequestException(409, "PLACEMENT_ALREADY_DONE", "Bạn đã hoàn thành bài kiểm tra đầu vào.");
         }
         var packages = catalog.packages(PlacementPool.BAND_5_9);
         if (packages.isEmpty()) {
-            throw new LearningRequestException(404, "NO_PLACEMENT_TEST", "No placement test is published");
+            throw new LearningRequestException(404, "NO_PLACEMENT_TEST", "Hiện chưa có bài kiểm tra đầu vào nào được xuất bản.");
         }
         var chosen = packages.get(picker.choose(packages.size()));
         return new PlacementTestResult(chosen.packageId(), chosen.packageVersionId());

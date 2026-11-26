@@ -66,7 +66,7 @@ public class AssignTopicTestUseCase {
             topic = curriculum.topic(topicId);
         }
         if (topic.isPresent() && !topic.get().hasTopicTest()) {
-            throw new LearningRequestException(409, "NO_TOPIC_TEST", "This topic has no final test");
+            throw new LearningRequestException(409, "NO_TOPIC_TEST", "Chủ đề này không có bài kiểm tra cuối chủ đề.");
         }
         Set<LearningSkill> skills = topic.map(TopicProgress::skills).orElse(Set.of());
         var topicLessons = content.getTopicLessons(topicId);
@@ -84,14 +84,14 @@ public class AssignTopicTestUseCase {
         List<UUID> missing = topicLessons.stream().map(LearningContentClient.LessonSummary::lessonId)
                 .filter(id -> practiceStates.get(id).status() == PracticeStatus.REQUIRED).toList();
         if (!missing.isEmpty()) {
-            throw new LearningRequestException(409, "PRACTICE_REQUIRED", "Complete practice for these lessons",
+            throw new LearningRequestException(409, "PRACTICE_REQUIRED", "Vui lòng hoàn thành phần luyện tập của các bài học này trước.",
                     null, missing);
         }
         TopicStatus status = curriculum.status(topicId);
         // A topic tested below 70% can be tested again; the first test already counted as its mid-course score.
         if ((status != TopicStatus.IN_PROGRESS && status != TopicStatus.COMPLETED) || topicLessons.isEmpty()
                 || completed.values().stream().anyMatch(value -> !value)) {
-            throw new LearningRequestException(403, "TEST_LOCKED", "Complete the topic lessons first");
+            throw new LearningRequestException(403, "TEST_LOCKED", "Vui lòng hoàn thành các bài học trong chủ đề trước.");
         }
         var open = assignments.findOpen(userId, topicId);
         if (open.isPresent()) return result(open.get());
@@ -100,7 +100,7 @@ public class AssignTopicTestUseCase {
                         .map(p -> new PackageRotation.Candidate(p.packageId(), p.code())).toList(),
                         assignments.lastConsumedAt(userId, topicId))
                 .orElseThrow(() -> new LearningRequestException(409, "TEST_UNAVAILABLE",
-                        "No published test code is available"));
+                        "Hiện chưa có đề kiểm tra chủ đề nào được xuất bản."));
         TestPackage chosen = packages.stream().filter(p -> p.packageId().equals(chosenId)).findFirst().orElseThrow();
         TopicTestAssignment assignment = TopicTestAssignment.assign(UUID.randomUUID(), userId, topicId,
                 chosen.packageId(), chosen.packageVersionId());

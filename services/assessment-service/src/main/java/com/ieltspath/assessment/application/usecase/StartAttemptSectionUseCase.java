@@ -29,13 +29,13 @@ public class StartAttemptSectionUseCase {
     @Transactional
     public void execute(UUID userId, UUID attemptId, UUID sectionId) {
         var attempt = attempts.findByIdAndUserId(attemptId, userId)
-                .orElseThrow(() -> new AssessmentNotFoundException("Assessment attempt not found"));
+                .orElseThrow(() -> new AssessmentNotFoundException("Không tìm thấy lượt làm bài thi. Vui lòng kiểm tra lại."));
         AttemptSection section = sections.findById(sectionId)
                 .filter(candidate -> candidate.attemptId().equals(attemptId))
-                .orElseThrow(() -> new AssessmentNotFoundException("Attempt section not found"));
+                .orElseThrow(() -> new AssessmentNotFoundException("Không tìm thấy phần thi trong lượt làm bài này."));
         if (section.startedAt() != null || section.completed()) return;
         if (attempt.getStatus() != AttemptStatus.IN_PROGRESS) {
-            throw new InvalidAssessmentStateException("Only in-progress attempts can start a section");
+            throw new InvalidAssessmentStateException("Chỉ có thể bắt đầu phần thi khi lượt làm bài đang diễn ra.");
         }
         sections.save(section.start(Instant.now()));
     }

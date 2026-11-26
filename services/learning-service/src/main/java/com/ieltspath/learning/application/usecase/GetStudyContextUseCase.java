@@ -35,7 +35,7 @@ public class GetStudyContextUseCase {
     @Transactional
     public StudyContextResult execute(UUID userId, String sourceType, UUID sourceId) {
         if (!java.util.Set.of("LESSON", "PRACTICE", "REVIEW").contains(sourceType))
-            throw new LearningRequestException(400, "INVALID_SOURCE", "Unsupported study source");
+            throw new LearningRequestException(400, "INVALID_SOURCE", "Loại nguồn học không được hỗ trợ.");
         lock.lock(userId);
         LearningContentClient.Lesson lesson;
         switch (sourceType) {
@@ -59,9 +59,9 @@ public class GetStudyContextUseCase {
     }
 
     private static LearningRequestException notFound() {
-        return new LearningRequestException(404, "NOT_FOUND", "Study source was not found");
+        return new LearningRequestException(404, "NOT_FOUND", "Không tìm thấy nguồn học.");
     }
     private static LearningRequestException inactive() {
-        return new LearningRequestException(409, "STUDY_SOURCE_INACTIVE", "Study source is no longer active");
+        return new LearningRequestException(409, "STUDY_SOURCE_INACTIVE", "Nguồn học này không còn hoạt động.");
     }
 }

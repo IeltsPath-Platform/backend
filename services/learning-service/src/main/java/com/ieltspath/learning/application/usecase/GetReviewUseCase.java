@@ -102,7 +102,7 @@ public class GetReviewUseCase {
             ReadResult read = transaction.execute(status -> readUnderLock(userId, reviewId, prepared));
             if (!read.retry()) return read.result();
         }
-        throw new LearningRequestException(409, "REVIEW_SET_CLOSED", "Review changed while it was being opened");
+        throw new LearningRequestException(409, "REVIEW_SET_CLOSED", "Bài ôn tập đã thay đổi trong lúc mở.");
     }
 
     private Prepared prepare(UUID userId, ReviewItem review, List<PracticeSet> preparedCandidates) {
@@ -313,7 +313,7 @@ public class GetReviewUseCase {
 
     private ReviewItem ownedReview(UUID userId, UUID reviewId) {
         return reviews.findOwned(userId, reviewId)
-                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Review was not found"));
+                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Không tìm thấy bài ôn tập."));
     }
 
     /** Only a package whose answers the learner has not seen and that no earlier set gave can be assigned. */

@@ -42,7 +42,7 @@ public class GetBandHistoryUseCase {
         ZoneId zone = validateRange(from, to, timezone);
         if (limit < 1 || limit > 100 || kind == null || !SERIES_KINDS.contains(kind)
                 || skill == null || !SKILLS.contains(skill)) {
-            throw new IllegalArgumentException("Invalid band range, series, skill or page size");
+            throw new IllegalArgumentException("Khoảng band, chuỗi dữ liệu, kỹ năng hoặc kích thước trang không hợp lệ.");
         }
         var position = decode(cursor);
         if ("PLACEMENT".equals(kind) && Set.of("SPEAKING", "OVERALL").contains(skill)) {
@@ -73,10 +73,10 @@ public class GetBandHistoryUseCase {
 
     private ZoneId validateRange(LocalDate from, LocalDate to, String timezone) {
         if (from == null || to == null || from.isAfter(to) || ChronoUnit.DAYS.between(from, to) > 365) {
-            throw new IllegalArgumentException("Invalid band range");
+            throw new IllegalArgumentException("Khoảng điểm band không hợp lệ.");
         }
         if (timezone == null || !ZoneId.getAvailableZoneIds().contains(timezone)) {
-            throw new IllegalArgumentException("Invalid IANA timezone");
+            throw new IllegalArgumentException("Múi giờ IANA không hợp lệ.");
         }
         return ZoneId.of(timezone);
     }
@@ -86,7 +86,7 @@ public class GetBandHistoryUseCase {
             return null;
         }
         if (value.isBlank() || value.length() > 200) {
-            throw new IllegalArgumentException("Invalid cursor");
+            throw new IllegalArgumentException("Con trỏ phân trang không hợp lệ.");
         }
         try {
             var parts = new String(Base64.getUrlDecoder().decode(value), StandardCharsets.UTF_8).split("\\|", -1);
@@ -95,7 +95,7 @@ public class GetBandHistoryUseCase {
             }
             return new BandStatisticsStore.Cursor(Instant.parse(parts[0]), UUID.fromString(parts[1]));
         } catch (RuntimeException e) {
-            throw new IllegalArgumentException("Invalid cursor");
+            throw new IllegalArgumentException("Con trỏ phân trang không hợp lệ.");
         }
     }
 
@@ -107,13 +107,13 @@ public class GetBandHistoryUseCase {
     @Transactional(readOnly = true)
     public StudyContext context(UUID user, String sourceType, UUID sourceId) {
         if (!"ASSESSMENT".equals(sourceType)) {
-            throw new IllegalArgumentException("Invalid source type");
+            throw new IllegalArgumentException("Loại nguồn bài đánh giá không hợp lệ.");
         }
         var attempt = attempts.findByIdAndUserId(sourceId, user)
-                .orElseThrow(() -> new AssessmentNotFoundException("Assessment not found"));
+                .orElseThrow(() -> new AssessmentNotFoundException("Không tìm thấy bài đánh giá."));
         if (attempt.getStatus() != AttemptStatus.IN_PROGRESS
                 || attempt.getExpiresAt() != null && !Instant.now().isBefore(attempt.getExpiresAt())) {
-            throw new AssessmentNotFoundException("Active assessment not found");
+            throw new AssessmentNotFoundException("Không tìm thấy bài đánh giá đang hoạt động.");
         }
         return new StudyContext(sourceId, null);
     }

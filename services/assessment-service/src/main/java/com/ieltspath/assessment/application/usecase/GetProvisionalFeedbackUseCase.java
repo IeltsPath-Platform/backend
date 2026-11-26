@@ -23,8 +23,8 @@ public class GetProvisionalFeedbackUseCase {
     }
     @Transactional(readOnly=true)
     public Feedback execute(UUID user,UUID attemptId) {
-        var attempt=attempts.findByIdAndUserId(attemptId,user).orElseThrow(()->new AssessmentNotFoundException("Assessment attempt not found"));
-        if (attempt.getAttemptType()!=AttemptType.COURSE_GATE) throw new AssessmentNotFoundException("Provisional course feedback not found");
+        var attempt=attempts.findByIdAndUserId(attemptId,user).orElseThrow(()->new AssessmentNotFoundException("Không tìm thấy lượt làm bài thi. Vui lòng kiểm tra lại."));
+        if (attempt.getAttemptType()!=AttemptType.COURSE_GATE) throw new AssessmentNotFoundException("Không tìm thấy nhận xét tạm thời cho bài thi khóa học.");
         boolean pending=results.findLatestByAttemptId(attemptId).map(r->!r.isCompleted()).orElse(true);
         List<EssayFeedback> feedback=new ArrayList<>();
         for (var job:jobs.aiJobs(attemptId)) {

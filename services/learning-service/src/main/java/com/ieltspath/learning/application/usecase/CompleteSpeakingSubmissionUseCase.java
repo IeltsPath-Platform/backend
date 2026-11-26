@@ -57,7 +57,7 @@ public class CompleteSpeakingSubmissionUseCase {
     public SpeakingSubmissionResult execute(UUID userId, UUID submissionId) {
         SpeakingSubmission existing = submissions.findOwned(submissionId, userId)
                 .orElseThrow(() -> new LearningRequestException(404, "SPEAKING_SUBMISSION_NOT_FOUND",
-                        "Speaking submission not found"));
+                        "Không tìm thấy bài nộp Speaking."));
         Map<String, Object> rubricSnapshot = null;
         String gradingContext = null;
         if (existing.status() == SpeakingSubmissionStatus.UPLOADING && existing.hasAllRecordings()
@@ -79,7 +79,7 @@ public class CompleteSpeakingSubmissionUseCase {
             if (submission.status() == SpeakingSubmissionStatus.UPLOADING) {
                 if (!submission.hasAllRecordings()) {
                     throw new LearningRequestException(422, "SPEAKING_RECORDINGS_MISSING",
-                            submission.missingRecordings() + " question(s) have no recording yet", submissionId);
+                            "Còn " + submission.missingRecordings() + " câu hỏi chưa có bản ghi âm.", submissionId);
                 }
                 if (snapshot != null) submission.saveRubricSnapshot(snapshot);
                 if (context != null) submissions.saveGradingContext(submissionId, context);
@@ -87,7 +87,7 @@ public class CompleteSpeakingSubmissionUseCase {
                 submissions.save(submission);
             } else if (submission.status() == SpeakingSubmissionStatus.ABANDONED) {
                 throw new LearningRequestException(409, "SPEAKING_SUBMISSION_ABANDONED",
-                        "This upload was given up; start a new submission", submissionId);
+                        "Lượt tải lên này đã bị hủy; vui lòng tạo bài nộp mới.", submissionId);
             }
             return SpeakingSubmissionResult.from(submission);
         });

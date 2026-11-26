@@ -28,7 +28,7 @@ public class GetSpeakingRecordingUrlUseCase {
 
     public RecordingUrlResult execute(UUID submissionId, UUID callerId) {
         var recording = recordings.findById(submissionId)
-                .orElseThrow(() -> new AssessmentNotFoundException("Speaking recording not found"));
+                .orElseThrow(() -> new AssessmentNotFoundException("Không tìm thấy bản ghi âm Speaking."));
         if (!recording.userId().equals(callerId) && !recordings.isAssignedExaminer(submissionId, callerId)) {
             throw new AssessmentAccessDeniedException();
         }

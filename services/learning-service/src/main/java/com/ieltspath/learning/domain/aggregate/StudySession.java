@@ -46,7 +46,7 @@ public record StudySession(UUID id, UUID userId, UUID clientSessionId, String so
         if (!status.equals("OPEN")) throw new StudyTrackingException("SESSION_CLOSED");
         if (!now.isBefore(leaseExpiresAt)) throw new StudyTrackingException("LEASE_EXPIRED");
         if (suppliedSequence != sequence + 1) throw new StudyTrackingException("INVALID_SEQUENCE");
-        if (intervals == null || intervals.size() > 16) throw new IllegalArgumentException("At most 16 intervals are allowed");
+        if (intervals == null || intervals.size() > 16) throw new IllegalArgumentException("Chỉ cho phép tối đa 16 khoảng thời gian hoạt động.");
         long elapsed = Duration.between(startedAt, now).toMillis();
         long previousEnd = -1, nextWatermark = watermarkMs, accepted = 0;
         var segments = new ArrayList<Segment>();

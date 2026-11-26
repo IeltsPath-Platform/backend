@@ -38,7 +38,7 @@ public class SubmitAssessmentAttemptUseCase {
     @Transactional(noRollbackFor = AttemptExpiredException.class)
     public AssessmentAttemptResult execute(SubmitAssessmentAttemptCommand c) {
         var attempt = repository.findByIdAndUserId(c.attemptId(), c.userId())
-                .orElseThrow(() -> new AssessmentNotFoundException("Assessment attempt not found"));
+                .orElseThrow(() -> new AssessmentNotFoundException("Không tìm thấy lượt làm bài thi. Vui lòng kiểm tra lại."));
         if (attempt.getStatus() == AttemptStatus.SUBMITTED) {
             return AssessmentAttemptResult.from(attempt);
         }

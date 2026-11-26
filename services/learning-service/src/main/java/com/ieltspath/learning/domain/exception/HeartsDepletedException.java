@@ -8,7 +8,7 @@ public class HeartsDepletedException extends RuntimeException {
     private final int refillCost;
 
     public HeartsDepletedException(Instant nextHeartAt, int refillCost) {
-        super("No hearts left; wait for the next heart or refill with points");
+        super("Bạn đã hết tim. Vui lòng chờ hồi tim hoặc dùng điểm để nạp thêm.");
         this.nextHeartAt = nextHeartAt;
         this.refillCost = refillCost;
     }

@@ -18,12 +18,12 @@ import java.time.Instant; import java.util.UUID;
             com.ieltspath.assessment.application.service.ExaminerAssignmentService assignments,
             com.ieltspath.assessment.application.service.GradingRequestAnnouncer announcer){this.jobs=jobs;this.submissions=submissions;this.assignments=assignments;this.announcer=announcer;}
     @Transactional public GradingJobResult execute(CreateGradingJobCommand c){
-        var submission=submissions.findById(c.submissionId()).orElseThrow(()->new AssessmentNotFoundException("Learner submission not found"));
-        if(!submission.userId().equals(c.userId())) throw new AssessmentAccessDeniedException("Submission does not belong to current user");
-        if(c.skill()!=Skill.WRITING&&c.skill()!=Skill.SPEAKING) throw new InvalidAssessmentStateException("Only writing or speaking submissions can be graded");
-        if(c.gradingMode()==GradingMode.AI&&c.pointCostSnapshot()==null) throw new InvalidAssessmentStateException("AI grading requires a point cost snapshot");
-        if(c.gradingMode()==GradingMode.HUMAN&&c.examinerId()==null) throw new InvalidAssessmentStateException("Human grading requires the examiner the learner chose");
-        if(c.gradingMode()==GradingMode.AI&&c.examinerId()!=null) throw new InvalidAssessmentStateException("AI grading has no examiner");
+        var submission=submissions.findById(c.submissionId()).orElseThrow(()->new AssessmentNotFoundException("Không tìm thấy bài nộp của học viên."));
+        if(!submission.userId().equals(c.userId())) throw new AssessmentAccessDeniedException("Bài nộp này không thuộc về tài khoản hiện tại.");
+        if(c.skill()!=Skill.WRITING&&c.skill()!=Skill.SPEAKING) throw new InvalidAssessmentStateException("Chỉ hỗ trợ chấm bài kỹ năng Writing hoặc Speaking.");
+        if(c.gradingMode()==GradingMode.AI&&c.pointCostSnapshot()==null) throw new InvalidAssessmentStateException("Chấm bằng AI yêu cầu thông tin mức điểm quy đổi.");
+        if(c.gradingMode()==GradingMode.HUMAN&&c.examinerId()==null) throw new InvalidAssessmentStateException("Vui lòng chọn giám khảo trước khi gửi chấm.");
+        if(c.gradingMode()==GradingMode.AI&&c.examinerId()!=null) throw new InvalidAssessmentStateException("Chế độ chấm AI không hỗ trợ chọn giám khảo.");
         if(c.gradingMode()==GradingMode.HUMAN) assignments.requireAvailable(c.examinerId(),1);
         var now=Instant.now();
         var saved=jobs.save(new GradingJob(UUID.randomUUID(),c.submissionId(),c.userId(),c.skill(),c.gradingMode(),GradingJobStatus.QUEUED,c.pointCostSnapshot(),c.idempotencyKey(),now,null,

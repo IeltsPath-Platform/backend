@@ -21,7 +21,7 @@ public class ExaminerQaService {
     public ExaminerQaService(ExaminerQaRepository repository, UserDirectory users,
                              @Value("${assessment.qa.sample-rate:0.10}") double sampleRate) {
         if (sampleRate < 0 || sampleRate > 1 || Double.isNaN(sampleRate)) {
-            throw new IllegalArgumentException("assessment.qa.sample-rate must be between 0 and 1");
+            throw new IllegalArgumentException("Tỷ lệ lấy mẫu kiểm tra chất lượng phải nằm trong khoảng từ 0 đến 1.");
         }
         this.repository = repository;
         this.users = users;
@@ -42,7 +42,7 @@ public class ExaminerQaService {
     public void submitReview(UUID gradingJobId, UUID reviewerId, BigDecimal band, String criteria, String note) {
         if (band == null || band.signum() < 0 || band.compareTo(BigDecimal.valueOf(9)) > 0
                 || band.multiply(BigDecimal.valueOf(2)).stripTrailingZeros().scale() > 0) {
-            throw new InvalidAssessmentStateException("Reviewer band must be from 0 to 9 in half bands");
+            throw new InvalidAssessmentStateException("Điểm band đánh giá lại phải từ 0 đến 9 theo bước 0,5.");
         }
         if (criteria == null || criteria.isBlank()) {
             throw new InvalidAssessmentStateException("Reviewer criteria are required");

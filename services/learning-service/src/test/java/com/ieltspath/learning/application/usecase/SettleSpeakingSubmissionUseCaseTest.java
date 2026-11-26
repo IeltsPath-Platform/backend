@@ -111,7 +111,7 @@ class SettleSpeakingSubmissionUseCaseTest {
         when(submissions.findOwned(SUBMISSION, stranger)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> useCase.execute(stranger, SUBMISSION))
-                .isInstanceOf(LearningRequestException.class).hasMessageContaining("not found");
+                .isInstanceOf(LearningRequestException.class).hasMessageContaining("Không tìm thấy");
         verify(points, never()).debit(any(), anyInt(), any(), any(), any(), any());
     }
 }

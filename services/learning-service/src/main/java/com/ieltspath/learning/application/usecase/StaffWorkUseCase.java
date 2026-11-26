@@ -74,7 +74,7 @@ public class StaffWorkUseCase {
 
     private List<WorkItem> listItems(Set<Queue> allowed, Queue requested, WorkStatus status, WorkKind kind) {
         if (requested != null && !allowed.contains(requested)) {
-            throw new LearningRequestException(403, "QUEUE_NOT_ALLOWED", "This queue is not yours to see");
+            throw new LearningRequestException(403, "QUEUE_NOT_ALLOWED", "Bạn không có quyền xem hàng chờ này.");
         }
         sync.sync();
         return insight.workItems(requested == null ? allowed : Set.of(requested), status, kind);
@@ -84,17 +84,17 @@ public class StaffWorkUseCase {
     @Transactional
     public WorkItem update(Set<Queue> allowed, UUID staffId, UUID itemId, UpdateWork change) {
         WorkItem item = insight.findWorkItem(itemId).filter(found -> allowed.contains(found.queue()))
-                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Work item was not found"));
+                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Không tìm thấy đầu việc."));
         WorkStatus status = change.status() == null ? item.status() : change.status();
         UUID assignee = status == WorkStatus.OPEN ? null : item.assigneeId() != null ? item.assigneeId() : staffId;
         boolean visible = change.noteVisibleToLearner() == null ? item.noteVisibleToLearner()
                 : change.noteVisibleToLearner();
         String note = change.note() == null ? item.note() : change.note();
         if (visible && (note == null || note.isBlank())) {
-            throw new LearningRequestException(422, "NOTE_REQUIRED", "A note shown to the learner cannot be empty");
+            throw new LearningRequestException(422, "NOTE_REQUIRED", "Ghi chú hiển thị cho học viên không được để trống.");
         }
         if (visible && item.subjectUserId() == null) {
-            throw new LearningRequestException(422, "NO_LEARNER", "This item has no learner to show a note to");
+            throw new LearningRequestException(422, "NO_LEARNER", "Đầu việc này không có học viên để gửi ghi chú.");
         }
         insight.updateWorkItem(itemId, status, assignee, change.action() == null ? item.action() : change.action(),
                 change.result() == null ? item.result() : change.result(), note, visible);
@@ -105,9 +105,9 @@ public class StaffWorkUseCase {
     @Transactional
     public LearnerFlag reviewFlag(UUID staffId, UUID flagId, FlagStatus status, String note) {
         if (status == FlagStatus.OPEN) {
-            throw new LearningRequestException(422, "INVALID_FLAG_STATUS", "A flag is confirmed or dismissed");
+            throw new LearningRequestException(422, "INVALID_FLAG_STATUS", "Trạng thái cờ chỉ có thể là xác nhận hoặc bác bỏ.");
         }
-        insight.findFlag(flagId).orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Flag was not found"));
+        insight.findFlag(flagId).orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Không tìm thấy cờ cảnh báo."));
         insight.reviewFlag(flagId, status, staffId, note);
         return insight.findFlag(flagId).orElseThrow();
     }

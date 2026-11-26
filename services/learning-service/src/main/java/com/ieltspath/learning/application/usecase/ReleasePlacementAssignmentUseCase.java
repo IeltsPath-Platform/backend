@@ -28,7 +28,7 @@ public class ReleasePlacementAssignmentUseCase {
     public void execute(UUID userId, UUID assignmentId) {
         lock.lock(userId);
         var assignment = assignments.findOwnedOpen(userId, assignmentId).orElseThrow(() ->
-                new LearningRequestException(404, "PLACEMENT_ASSIGNMENT_NOT_FOUND", "Placement assignment not found"));
+                new LearningRequestException(404, "PLACEMENT_ASSIGNMENT_NOT_FOUND", "Không tìm thấy lượt giao bài kiểm tra đầu vào."));
         assignment.release(clock.instant());
         assignments.save(assignment);
     }

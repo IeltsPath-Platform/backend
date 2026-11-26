@@ -143,12 +143,12 @@ class LearningSecurityWebMvcTest {
     void oversizedProgressScopeReturnsUnprocessableEntityWithClearCode() throws Exception {
         when(currentUser.requireUserId()).thenReturn(userId);
         when(statistics.execute(userId, null, 0, 4)).thenThrow(new LearningRequestException(422,
-                "PROGRESS_SCOPE_TOO_LARGE", "Progress statistics support at most 100 started courses"));
+                "PROGRESS_SCOPE_TOO_LARGE", "Thống kê tiến độ hỗ trợ tối đa 100 khóa học đã bắt đầu."));
 
         mockMvc.perform(get("/api/learning/statistics/progress"))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("PROGRESS_SCOPE_TOO_LARGE"))
-                .andExpect(jsonPath("$.detail").value("Progress statistics support at most 100 started courses"));
+                .andExpect(jsonPath("$.detail").value("Thống kê tiến độ hỗ trợ tối đa 100 khóa học đã bắt đầu."));
     }
 
     @Test

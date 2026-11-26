@@ -32,7 +32,7 @@ public class GetAttemptStructureUseCase {
     @Transactional(readOnly = true)
     public AttemptStructureResult execute(UUID userId, UUID attemptId) {
         attempts.findByIdAndUserId(attemptId, userId)
-                .orElseThrow(() -> new AssessmentNotFoundException("Assessment attempt not found"));
+                .orElseThrow(() -> new AssessmentNotFoundException("Không tìm thấy lượt làm bài thi. Vui lòng kiểm tra lại."));
 
         Map<UUID, List<AttemptItem>> grouped = new HashMap<>();
         items.findByAttemptId(attemptId).forEach(item ->

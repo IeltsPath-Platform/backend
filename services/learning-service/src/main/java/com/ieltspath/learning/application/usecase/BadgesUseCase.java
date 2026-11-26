@@ -60,7 +60,7 @@ public class BadgesUseCase {
     @Transactional
     public Badge setActive(String code, boolean active) {
         if (!badges.setActive(code, active)) {
-            throw new LearningRequestException(404, "BADGE_NOT_FOUND", "No badge with this code");
+            throw new LearningRequestException(404, "BADGE_NOT_FOUND", "Không tìm thấy huy hiệu với mã này.");
         }
         return badges.find(code).orElseThrow();
     }

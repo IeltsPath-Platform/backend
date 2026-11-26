@@ -32,10 +32,10 @@ public class CreateLearnerSubmissionUseCase {
     }
     @Transactional
     public LearnerSubmissionResult execute(CreateLearnerSubmissionCommand c) {
-        if (c.skill() != com.ieltspath.assessment.domain.vo.Skill.WRITING && c.skill() != com.ieltspath.assessment.domain.vo.Skill.SPEAKING) throw new InvalidAssessmentStateException("Only writing or speaking submissions are supported");
+        if (c.skill() != com.ieltspath.assessment.domain.vo.Skill.WRITING && c.skill() != com.ieltspath.assessment.domain.vo.Skill.SPEAKING) throw new InvalidAssessmentStateException("Chỉ hỗ trợ nộp bài kỹ năng Writing hoặc Speaking.");
         if (c.skill() == com.ieltspath.assessment.domain.vo.Skill.SPEAKING
                 && (c.audioReference() == null || c.textPayload() != null)) throw invalidRecording();
-        if ((c.textPayload() == null) == (c.audioReference() == null)) throw new InvalidAssessmentStateException("Exactly one text or audio payload is required");
+        if ((c.textPayload() == null) == (c.audioReference() == null)) throw new InvalidAssessmentStateException("Cần cung cấp đúng một nội dung bài viết hoặc tệp ghi âm.");
         if (c.skill() == com.ieltspath.assessment.domain.vo.Skill.SPEAKING) {
             String reference = c.audioReference();
             if (reference.startsWith("local-recording:")) throw invalidRecording();
@@ -47,9 +47,9 @@ public class CreateLearnerSubmissionUseCase {
             if (!storage.exists(speakingRecordings.getBucket(), reference)) throw invalidRecording();
         }
         if (c.attemptItemId() != null) {
-            var item=items.findById(c.attemptItemId()).orElseThrow(()->new AssessmentNotFoundException("Attempt item not found"));
-            var section=sections.findById(item.attemptSectionId()).orElseThrow(()->new AssessmentNotFoundException("Attempt section not found"));
-            attempts.findByIdAndUserId(section.attemptId(),c.userId()).orElseThrow(()->new AssessmentAccessDeniedException("Attempt item does not belong to current user"));
+            var item=items.findById(c.attemptItemId()).orElseThrow(()->new AssessmentNotFoundException("Không tìm thấy câu hỏi trong lượt làm bài."));
+            var section=sections.findById(item.attemptSectionId()).orElseThrow(()->new AssessmentNotFoundException("Không tìm thấy phần thi trong lượt làm bài."));
+            attempts.findByIdAndUserId(section.attemptId(),c.userId()).orElseThrow(()->new AssessmentAccessDeniedException("Câu hỏi này không thuộc lượt làm bài của bạn."));
         }
         var existing=submissions.findByUserIdAndSubmissionKey(c.userId(),c.submissionKey());
         var s=existing.orElseGet(()->submissions.save(new LearnerSubmission(UUID.randomUUID(),c.userId(),c.attemptItemId(),c.promptSnapshot(),c.skill(),c.textPayload(),c.audioReference(),SubmissionStatus.SUBMITTED,c.submissionKey(),Instant.now())));
@@ -57,6 +57,6 @@ public class CreateLearnerSubmissionUseCase {
     }
 
     private static InvalidAssessmentStateException invalidRecording() {
-        return new InvalidAssessmentStateException("Speaking recording is invalid or unavailable");
+        return new InvalidAssessmentStateException("Bản ghi âm Speaking không hợp lệ hoặc không khả dụng.");
     }
 }

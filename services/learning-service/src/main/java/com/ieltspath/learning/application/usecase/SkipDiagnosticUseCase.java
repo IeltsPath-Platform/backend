@@ -48,7 +48,7 @@ public class SkipDiagnosticUseCase {
                     .anyMatch(probe -> probe.status() == DiagnosticProbe.Status.ANSWERED);
             if (!answered) {
                 throw new LearningRequestException(409, "DIAGNOSIS_PROBE_REQUIRED",
-                        "Answer at least one diagnostic probe before skipping");
+                        "Vui lòng trả lời ít nhất một câu hỏi kiểm tra chẩn đoán trước khi bỏ qua.");
             }
             flow.skip(session, described.directory());
         });
@@ -56,6 +56,6 @@ public class SkipDiagnosticUseCase {
     }
 
     private static LearningRequestException notFound() {
-        return new LearningRequestException(404, "NOT_FOUND", "Diagnosis was not found");
+        return new LearningRequestException(404, "NOT_FOUND", "Không tìm thấy phiên chẩn đoán.");
     }
 }

@@ -109,7 +109,7 @@ class LearningStatisticsTest {
                     .isInstanceOfSatisfying(LearningRequestException.class, e -> {
                         assertThat(e.getStatus()).isEqualTo(422);
                         assertThat(e.getCode()).isEqualTo("PROGRESS_SCOPE_TOO_LARGE");
-                        assertThat(e.getMessage()).contains("100 started courses");
+                        assertThat(e.getMessage()).contains("100 khóa học");
                     });
         }
         verifyNoInteractions(content);

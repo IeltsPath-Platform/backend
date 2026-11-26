@@ -24,7 +24,7 @@ public final class PlacementBandCalculator {
      */
     public static double bandForCorrect(Skill skill, int correct, int total) {
         if (skill != Skill.LISTENING && skill != Skill.READING) {
-            throw new IllegalArgumentException("Only Listening and Reading are converted from correct answers");
+            throw new IllegalArgumentException("Chỉ kỹ năng Listening và Reading được quy đổi từ số câu trả lời đúng.");
         }
         if (correct <= 0 || total <= 0) {
             return 0.0;
@@ -50,7 +50,7 @@ public final class PlacementBandCalculator {
     /** Mean of the skill bands, rounded to the nearest half band (a tie rounds up). */
     public static double overallBand(Collection<Double> skillBands) {
         if (skillBands == null || skillBands.isEmpty()) {
-            throw new IllegalArgumentException("At least one skill band is required");
+            throw new IllegalArgumentException("Cần ít nhất một điểm band kỹ năng để tính điểm tổng.");
         }
         double mean = skillBands.stream().mapToDouble(Double::doubleValue).average().orElseThrow();
         return Math.floor(mean * 2 + 0.5) / 2;

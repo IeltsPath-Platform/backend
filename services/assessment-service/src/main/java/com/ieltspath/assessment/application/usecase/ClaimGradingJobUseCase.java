@@ -14,7 +14,7 @@ public class ClaimGradingJobUseCase {
     public ClaimGradingJobUseCase(ExaminerQueueStore store) { this.store=store; }
     @Transactional
     public ExaminerQueueStore.QueueEntry execute(UUID examiner,UUID jobId) {
-        var job=store.find(jobId).orElseThrow(()->new AssessmentNotFoundException("Grading job not found"));
+        var job=store.find(jobId).orElseThrow(()->new AssessmentNotFoundException("Không tìm thấy yêu cầu chấm bài."));
         if (job.attemptId()!=null && !"QA_SAMPLE".equals(job.reason())) {
             var siblings=store.lockAttempt(job.attemptId());
             if (siblings.stream().filter(j -> !"QA_SAMPLE".equals(j.reason())).anyMatch(j -> !"COMPLETED".equals(j.status()) && j.assignedExaminerId()!=null

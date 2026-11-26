@@ -78,13 +78,13 @@ public class AiEvaluationReadService {
 
     private static void requireTask(String task) {
         if (task != null && !TASKS.contains(task)) {
-            throw new IllegalArgumentException("task must be TASK_1 or TASK_2");
+            throw new IllegalArgumentException("Loại bài viết phải là TASK_1 hoặc TASK_2.");
         }
     }
 
     private static void requirePage(int page, int size) {
         if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
-            throw new IllegalArgumentException("Invalid pagination (size 1.." + MAX_PAGE_SIZE + ")");
+            throw new IllegalArgumentException("Thông số phân trang không hợp lệ (kích thước từ 1 đến " + MAX_PAGE_SIZE + ").");
         }
     }
 
