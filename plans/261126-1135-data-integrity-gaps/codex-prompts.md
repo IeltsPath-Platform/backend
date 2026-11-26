@@ -1,4 +1,4 @@
-# Codex prompts for the data integrity phases
+﻿# Codex prompts for the data integrity phases
 
 Paste one prompt per Codex session. Each phase has its own worktree and branch, already created from `main` (830023b4).
 
@@ -13,7 +13,7 @@ Paste one prompt per Codex session. Each phase has its own worktree and branch, 
 
 Wave 1 phases touch different services and files, so they can run at the same time. Phase 5 changes the enums that phase 1
 also touches, so it starts after phase 1 is on `main`. Plan files are in
-`C:\Users\Admin\OneDrive\Desktop\capstone-fall26\backend\plans\261126-1135-data-integrity-gaps\`.
+`C:\Users\Admin\wt\backend-plans\plans\261126-1135-data-integrity-gaps\`.
 
 ## Common rules (already included in each prompt below)
 
@@ -33,7 +33,7 @@ Working rules
 
 ```
 Worktree: C:\Users\Admin\wt\backend-one-active-subscription   Branch: fix/one-active-subscription
-Plan: C:\Users\Admin\OneDrive\Desktop\capstone-fall26\backend\plans\261126-1135-data-integrity-gaps\phase-01-one-active-subscription.md
+Plan: C:\Users\Admin\wt\backend-plans\plans\261126-1135-data-integrity-gaps\phase-01-one-active-subscription.md
 (and plan.md in the same folder for the background)
 
 Task: make the database guarantee at most one ACTIVE subscription per user, and make lapsed subscriptions really EXPIRED.
@@ -53,7 +53,7 @@ Common working rules: see the block above (no push, no PR, local commit).
 
 ```
 Worktree: C:\Users\Admin\wt\backend-email-lower-unique   Branch: fix/email-lower-unique
-Plan: C:\Users\Admin\OneDrive\Desktop\capstone-fall26\backend\plans\261126-1135-data-integrity-gaps\phase-02-email-case-insensitive.md
+Plan: C:\Users\Admin\wt\backend-plans\plans\261126-1135-data-integrity-gaps\phase-02-email-case-insensitive.md
 
 Task: add a case-insensitive unique index on users e-mail and confirm every write path normalises.
 Facts already checked: the Email value object trims and lower-cases, and registration, login, forgot password, verification and admin create use it.
@@ -70,7 +70,7 @@ Common working rules: see the block above (no push, no PR, local commit).
 
 ```
 Worktree: C:\Users\Admin\wt\backend-wallet-reconciliation   Branch: feat/wallet-ledger-reconciliation
-Plan: C:\Users\Admin\OneDrive\Desktop\capstone-fall26\backend\plans\261126-1135-data-integrity-gaps\phase-03-wallet-ledger-reconciliation.md
+Plan: C:\Users\Admin\wt\backend-plans\plans\261126-1135-data-integrity-gaps\phase-03-wallet-ledger-reconciliation.md
 
 Task: a scheduled, read-only check that compares each point wallet with its ledger. It only reports; it never changes a balance.
 
@@ -86,7 +86,7 @@ Common working rules: see the block above (no push, no PR, local commit).
 
 ```
 Worktree: C:\Users\Admin\wt\backend-lock-published   Branch: fix/lock-published-versions
-Plan: C:\Users\Admin\OneDrive\Desktop\capstone-fall26\backend\plans\261126-1135-data-integrity-gaps\phase-04-published-content-lock.md
+Plan: C:\Users\Admin\wt\backend-plans\plans\261126-1135-data-integrity-gaps\phase-04-published-content-lock.md
 
 Task: the database must refuse changes to the content of a PUBLISHED question version or package version.
 Do the audit FIRST and write it into your report: every save, saveAll and native UPDATE that touches question_versions or content_package_versions (repositories, import, AI draft approval, scheduled publish, seed code). If a path edits a PUBLISHED row, that is a bug: fix it so it creates a new version, and tell me.
@@ -102,7 +102,7 @@ Common working rules: see the block above (no push, no PR, local commit).
 
 ```
 Worktree: C:\Users\Admin\wt\backend-retention   Branch: feat/retention-purge
-Plan: C:\Users\Admin\OneDrive\Desktop\capstone-fall26\backend\plans\261126-1135-data-integrity-gaps\phase-06-retention-and-deletion.md
+Plan: C:\Users\Admin\wt\backend-plans\plans\261126-1135-data-integrity-gaps\phase-06-retention-and-deletion.md
 
 Task, three parts:
 6a (assessment-service): prove that placement Speaking recordings are covered by the 90-day purge (PurgeExpiredSpeakingRecordingsUseCase, SpeakingRecordingRetentionScheduler; recordings are learner_submissions rows with skill = 'SPEAKING'). Add a test: a placement attempt's recording older than 90 days is deleted from storage and marked recording_deleted_at, and the placement result keeps its band and feedback. Change production code only if the test shows a gap.
@@ -117,7 +117,7 @@ Common working rules: see the block above (no push, no PR, local commit).
 ```
 Worktree: C:\Users\Admin\wt\backend-status-transitions   Branch: refactor/status-transitions
 First run: git merge origin/main (phase 1 must be in it; Subscription.expire() should exist).
-Plan: C:\Users\Admin\OneDrive\Desktop\capstone-fall26\backend\plans\261126-1135-data-integrity-gaps\phase-05-status-transitions.md
+Plan: C:\Users\Admin\wt\backend-plans\plans\261126-1135-data-integrity-gaps\phase-05-status-transitions.md
 
 Task: give each status enum canMoveTo(next) and make the domain methods use it, so a final state can never be left (for example EXPIRED back to ACTIVE).
 Enums: access SubscriptionStatus and KeyStatus; assessment GradingJobStatus, the human review status and SubmissionStatus.
@@ -126,3 +126,4 @@ Then: add canMoveTo with the allowed moves in the enum, use it in the aggregates
 Tests: a table-driven test per enum covering every pair of statuses; one test per refused move showing the invalid-state error; existing tests still pass.
 Common working rules: see the block above (no push, no PR, local commit).
 ```
+
