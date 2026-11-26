@@ -17,8 +17,6 @@ import com.ieltspath.content.application.usecase.CreateQuestionUseCase;
 import com.ieltspath.content.application.usecase.SectionMediaUseCases;
 import com.ieltspath.content.domain.aggregate.Question;
 import com.ieltspath.content.domain.entity.QuestionVersion;
-import com.ieltspath.content.domain.exception.InvalidPackageLessonException;
-import com.ieltspath.content.domain.repository.ContentPackageRepository;
 import com.ieltspath.content.domain.repository.QuestionRepository;
 import com.ieltspath.content.domain.vo.CourseDraftStructure.OptionPlan;
 import com.ieltspath.content.domain.vo.CourseDraftStructure.PracticeSetPlan;
@@ -58,9 +56,8 @@ class PracticeSetMaterializerTest {
     private final AddQuestionVersionUseCase addVersion = mock(AddQuestionVersionUseCase.class);
     private final AddSectionQuestionUseCase addSectionQuestion = mock(AddSectionQuestionUseCase.class);
     private final QuestionRepository questions = mock(QuestionRepository.class);
-    private final ContentPackageRepository packages = mock(ContentPackageRepository.class);
     private final PracticeSetMaterializer materializer = new PracticeSetMaterializer(codeSettings, createVersion,
-            createSection, media, createQuestion, addVersion, addSectionQuestion, questions, packages);
+            createSection, media, createQuestion, addVersion, addSectionQuestion, questions);
 
     private final UUID lesson = UUID.randomUUID();
     private final UUID point = UUID.randomUUID();
@@ -100,11 +97,10 @@ class PracticeSetMaterializerTest {
             created.add(result);
         }
         when(createQuestion.execute(any())).thenReturn(created.get(0), created.subList(1, created.size()).toArray(QuestionResult[]::new));
-        when(packages.attachPracticeSetToLesson(packageId, lesson)).thenReturn(true);
     }
 
     @Test
-    void createsADraftPackageSectionPassageAndQuestionsThenAttachesItToTheLesson() {
+    void createsADraftPackageOnTheLessonWithItsSectionPassageAndQuestions() {
         UUID firstVersion = UUID.randomUUID();
         UUID secondVersion = UUID.randomUUID();
         stubCreation(List.of(firstVersion, secondVersion));
@@ -119,16 +115,16 @@ class PracticeSetMaterializerTest {
         assertNull(packageCommand.getValue().code());
         assertEquals("Set title", packageCommand.getValue().title());
         assertEquals(PackageType.PRACTICE_SET, packageCommand.getValue().packageType());
+        assertEquals(lesson, packageCommand.getValue().lessonId());
         ArgumentCaptor<SaveContentSectionCommand> sectionCommand = ArgumentCaptor.forClass(SaveContentSectionCommand.class);
         verify(createSection).execute(sectionCommand.capture());
         assertEquals(Skill.READING, sectionCommand.getValue().skill());
         assertEquals(null, sectionCommand.getValue().instructions());
-        InOrder order = inOrder(codeSettings, createVersion, createSection, media, packages);
+        InOrder order = inOrder(codeSettings, createVersion, createSection, media);
         order.verify(codeSettings).createGeneratedPackage(any(), eq("PS-LESSON_01-1"));
         order.verify(createVersion).execute(packageId, null);
         order.verify(createSection).execute(any());
         order.verify(media).setPassage(packageId, versionId, sectionId, "A. The passage.");
-        order.verify(packages).attachPracticeSetToLesson(packageId, lesson);
     }
 
     @Test
@@ -187,16 +183,6 @@ class PracticeSetMaterializerTest {
         ArgumentCaptor<AddQuestionVersionCommand> versionCommand = ArgumentCaptor.forClass(AddQuestionVersionCommand.class);
         verify(addVersion).execute(versionCommand.capture());
         assertEquals(QuestionDifficulty.MEDIUM, versionCommand.getValue().difficulty());
-    }
-
-    @Test
-    void aSetThatCannotJoinTheLessonFailsTheWholeApproval() {
-        stubCreation(List.of(UUID.randomUUID()));
-        when(packages.attachPracticeSetToLesson(packageId, lesson)).thenReturn(false);
-        PracticeSetPlan single = new PracticeSetPlan("Set", null, "A. Text.", QuestionType.MULTIPLE_CHOICE, List.of(point),
-                List.of(plan().questions().get(0)));
-
-        assertThrows(InvalidPackageLessonException.class, () -> materializer.create(lesson, "L1", 1, single));
     }
 
     @Test

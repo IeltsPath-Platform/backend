@@ -15,8 +15,6 @@ import com.ieltspath.content.application.usecase.CreateContentSectionUseCase;
 import com.ieltspath.content.application.usecase.CreateDraftPackageVersionUseCase;
 import com.ieltspath.content.application.usecase.CreateQuestionUseCase;
 import com.ieltspath.content.application.usecase.SectionMediaUseCases;
-import com.ieltspath.content.domain.exception.InvalidPackageLessonException;
-import com.ieltspath.content.domain.repository.ContentPackageRepository;
 import com.ieltspath.content.domain.repository.QuestionRepository;
 import com.ieltspath.content.domain.vo.CourseDraftStructure.OptionPlan;
 import com.ieltspath.content.domain.vo.CourseDraftStructure.PracticeSetPlan;
@@ -53,14 +51,12 @@ public class PracticeSetMaterializer {
     private final AddQuestionVersionUseCase addQuestionVersion;
     private final AddSectionQuestionUseCase addSectionQuestion;
     private final QuestionRepository questions;
-    private final ContentPackageRepository packages;
 
     public PracticeSetMaterializer(CodeSettingsUseCases codeSettings,
                                    CreateDraftPackageVersionUseCase createVersion,
                                    CreateContentSectionUseCase createSection, SectionMediaUseCases media,
                                    CreateQuestionUseCase createQuestion, AddQuestionVersionUseCase addQuestionVersion,
-                                   AddSectionQuestionUseCase addSectionQuestion, QuestionRepository questions,
-                                   ContentPackageRepository packages) {
+                                   AddSectionQuestionUseCase addSectionQuestion, QuestionRepository questions) {
         this.codeSettings = codeSettings;
         this.createVersion = createVersion;
         this.createSection = createSection;
@@ -69,7 +65,6 @@ public class PracticeSetMaterializer {
         this.addQuestionVersion = addQuestionVersion;
         this.addSectionQuestion = addSectionQuestion;
         this.questions = questions;
-        this.packages = packages;
     }
 
     /**
@@ -88,9 +83,6 @@ public class PracticeSetMaterializer {
         for (QuestionPlan question : plan.questions()) {
             UUID questionVersion = createQuestion(plan, question);
             addSectionQuestion.execute(pkg.id(), version.id(), section.id(), questionVersion, BigDecimal.ONE);
-        }
-        if (!packages.attachPracticeSetToLesson(pkg.id(), lessonId)) {
-            throw new InvalidPackageLessonException("Gói " + pkg.id() + " không phải là bộ luyện tập còn trống để gắn vào bài học");
         }
         return pkg.id();
     }
