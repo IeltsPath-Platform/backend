@@ -1,7 +1,7 @@
 ---
 title: "Tự xóa tài khoản người dùng (Google Play Account Deletion)"
 description: "Cho phép người dùng tự xóa tài khoản qua DELETE /api/users/me (xác thực mật khẩu hoặc Google ID token), thu hồi phiên/token, phát user.deleted.v1 qua outbox và dọn dữ liệu/file ở các service."
-status: needs_context
+status: done
 priority: P1
 branch: "feat/account-deletion"
 tags: [user-service, api-gateway, common-events, rabbitmq, storage, gdpr, google-play]
@@ -12,7 +12,7 @@ updated: "2026-11-26T12:05:00+07:00"
 # Plan: Tự xóa tài khoản người dùng (Google Play)
 
 ## Trạng thái
-- **Status:** `IN_PROGRESS` (đã duyệt 2026-11-26).
+- **Status:** `DONE` (đã duyệt 2026-11-26, hoàn thành triển khai).
 - **Nhánh:** `feat/account-deletion` (đã xác nhận).
 - **URL web ngoài phạm vi backend:** Trang web yêu cầu xóa tài khoản thuộc repo frontend (ví dụ `https://<domain>/account/delete` hoặc `/settings/delete-account`), gọi `DELETE /api/users/me` qua API Gateway.
 
