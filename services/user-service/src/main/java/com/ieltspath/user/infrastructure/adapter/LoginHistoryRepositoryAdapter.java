@@ -11,6 +11,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -35,8 +36,14 @@ public class LoginHistoryRepositoryAdapter implements LoginHistoryRepository {
     }
 
     @Override
-    public int deleteOlderThan(LocalDateTime cutoff) {
-        return loginHistoryJpaRepository.deleteOlderThan(cutoff);
+    @Transactional
+    public int deleteOlderThan(LocalDateTime cutoff, int limit) {
+        return loginHistoryJpaRepository.deleteOlderThan(cutoff, limit);
+    }
+
+    @Override
+    public long countOlderThan(LocalDateTime cutoff) {
+        return loginHistoryJpaRepository.countOlderThan(cutoff);
     }
 
     private LoginAttempt toDomain(LoginHistoryJpaEntity entity) {

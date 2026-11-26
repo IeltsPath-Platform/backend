@@ -259,3 +259,9 @@ Khi chạy qua docker-compose, user-service không nên expose trực tiếp cho
 - Runtime configuration: `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, and optional `USER_AVATAR_BUCKET` (defaults to
   `avatars`). Keep the secret key only in the ignored root `.env`. The bucket must allow public reads for returned
   avatar URLs; uploads/deletes remain server-side.
+
+Login history retention uses `user.login-history.retention-days` (default `180`),
+`user.login-history.batch-size` (default `1000`), and `user.login-history.interval`
+(default `PT24H`). Expired rows are deleted; set `user.login-history.dry-run` to `true`
+to only count them. This job deletes only `login_history`;
+`auth_audit_events` has a separate retention policy and is not touched by this scheduler.
