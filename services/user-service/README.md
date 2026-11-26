@@ -262,6 +262,6 @@ Khi chạy qua docker-compose, user-service không nên expose trực tiếp cho
 
 Login history retention uses `user.login-history.retention-days` (default `180`),
 `user.login-history.batch-size` (default `1000`), and `user.login-history.interval`
-(default `PT24H`). `user.login-history.dry-run` defaults to `true`; set it to `false`
-only after reviewing the reported eligible-row count. This job deletes only `login_history`;
+(default `PT24H`). Expired rows are deleted; set `user.login-history.dry-run` to `true`
+to only count them. This job deletes only `login_history`;
 `auth_audit_events` has a separate retention policy and is not touched by this scheduler.

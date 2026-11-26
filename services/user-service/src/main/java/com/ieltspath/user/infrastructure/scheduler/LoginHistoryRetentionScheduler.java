@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 
-/** Deletes expired sign-in history in bounded batches; deletion is dry-run by default. */
+/** Deletes expired sign-in history in bounded batches. With dry-run on it only counts what would be deleted. */
 @Slf4j
 @Component
 public class LoginHistoryRetentionScheduler {
@@ -21,7 +21,7 @@ public class LoginHistoryRetentionScheduler {
             LoginHistoryRetentionUseCase retentionUseCase,
             @Value("${user.login-history.retention-days:180}") int retentionDays,
             @Value("${user.login-history.batch-size:1000}") int batchSize,
-            @Value("${user.login-history.dry-run:true}") boolean dryRun
+            @Value("${user.login-history.dry-run:false}") boolean dryRun
     ) {
         this.retentionUseCase = retentionUseCase;
         this.retentionDays = retentionDays;
