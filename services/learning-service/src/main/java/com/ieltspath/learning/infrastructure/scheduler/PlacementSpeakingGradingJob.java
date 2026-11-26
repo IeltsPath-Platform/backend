@@ -21,6 +21,7 @@ import com.ieltspath.learning.domain.vo.TranscriptQuality;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -49,7 +50,7 @@ public class PlacementSpeakingGradingJob {
     private final int batchSize;
     private final int retrySeconds;
 
-    public PlacementSpeakingGradingJob(PlacementSpeakingJobStore jobs, ObjectStorage storage,
+    public PlacementSpeakingGradingJob(PlacementSpeakingJobStore jobs, @Lazy ObjectStorage storage,
                                       SpeechAnalysisClient speech, LearningContentClient content,
                                       SpeakingGrader grader, SpeakingPracticeSettings settings, ObjectMapper json,
                                       @Value("${learning.speaking-grading.max-attempts:3}") int maxAttempts,
