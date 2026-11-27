@@ -59,6 +59,7 @@ public class CommunityController {
     private final RemoveCommentReactionUseCase removeCommentReactionUseCase;
     private final CommunityQueriesUseCase queries;
     private final ManageSocialUseCase social;
+    private final ManageBlocksUseCase blocks;
     private final PublicProfileClient profiles;
     private final SubmitContentReportUseCase submitContentReportUseCase;
     private final ListPendingContentReportsUseCase listPendingContentReportsUseCase;
@@ -74,9 +75,21 @@ public class CommunityController {
 
     @GetMapping("/admin/reports")
     public PageResponse<ContentReportQueueItemResponse> pendingReports(
+            @RequestParam(name = "status", required = false) String status,
             @RequestParam(name = "page", defaultValue = "0") int page,
             @RequestParam(name = "size", defaultValue = "20") int size) {
-        var result = listPendingContentReportsUseCase.execute(administrator(), new PageQuery(page, size));
+        boolean allStatuses = "ALL".equalsIgnoreCase(status != null ? status.trim() : "");
+        com.ieltspath.community.domain.vo.ReportStatus parsedStatus = com.ieltspath.community.domain.vo.ReportStatus.PENDING;
+        if (status != null && !status.isBlank() && !allStatuses) {
+            try {
+                parsedStatus = com.ieltspath.community.domain.vo.ReportStatus.valueOf(status.trim().toUpperCase());
+            } catch (IllegalArgumentException invalid) {
+                throw new com.ieltspath.community.domain.exception.CommunityException("Trạng thái báo cáo không hợp lệ");
+            }
+        }
+        var result = (status == null || status.isBlank())
+                ? listPendingContentReportsUseCase.execute(administrator(), new PageQuery(page, size))
+                : listPendingContentReportsUseCase.execute(administrator(), parsedStatus, allStatuses, new PageQuery(page, size));
         return new PageResponse<>(result.content().stream().map(ContentReportQueueItemResponse::from).toList(),
                 result.page(), result.size(), result.totalElements(), result.totalPages(), "createdAt,asc;id,asc");
     }
@@ -121,11 +134,12 @@ public class CommunityController {
             throw new com.ieltspath.community.domain.exception.CommunityException("Search requires cursor pagination");
         }
         if (scope == FeedScope.FOLLOWING) throw new com.ieltspath.community.domain.exception.CommunityException("Following feed requires cursor pagination");
+        var currentActor = actor();
         var query = new PageQuery(page, pageSize);
         PageResult<PostResult> result = category == null
-                ? listPostsUseCase.execute(query)
-                : listPostsUseCase.execute(query, category);
-        var enrichedPosts = queries.enrichPosts(actor(), result.content());
+                ? listPostsUseCase.execute(currentActor, query)
+                : listPostsUseCase.execute(currentActor, query, category);
+        var enrichedPosts = queries.enrichPosts(currentActor, result.content());
         return ResponseEntity.ok(new PageResponse<>(
                 enrichedPosts.stream().map(PostResponse::from).toList(),
                 result.page(), result.size(), result.totalElements(), result.totalPages(),
@@ -180,8 +194,7 @@ public class CommunityController {
         var normalized = query == null ? "" : query.trim();
         if (normalized.length() < 2 || normalized.length() > 80)
             throw new com.ieltspath.community.domain.exception.CommunityException("Mention search must contain 2 to 80 characters");
-        return profiles.searchProfiles(actor.userId(), normalized, 8).stream()
-                .filter(profile -> !profile.id().equals(actor.userId())).toList();
+        return queries.mentionSuggestions(actor, normalized);
     }
 
     @GetMapping("/posts/{postId}/comments")
@@ -257,7 +270,7 @@ public class CommunityController {
             @RequestParam(name = "size", defaultValue = "10") int size) {
         var currentActor = actor();
         queries.requireVisibleUser(currentActor, userId);
-        var result = queries.follows(userId, true, cursor, size);
+        var result = queries.follows(currentActor, userId, true, cursor, size);
         return new CursorResponse<>(result.content(), result.nextCursor(), result.hasNext(), result.size());
     }
 
@@ -268,8 +281,29 @@ public class CommunityController {
             @RequestParam(name = "size", defaultValue = "10") int size) {
         var currentActor = actor();
         queries.requireVisibleUser(currentActor, userId);
-        var result = queries.follows(userId, false, cursor, size);
+        var result = queries.follows(currentActor, userId, false, cursor, size);
         return new CursorResponse<>(result.content(), result.nextCursor(), result.hasNext(), result.size());
+    }
+
+    @PostMapping("/blocks/{userId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void block(@PathVariable("userId") UUID userId) {
+        blocks.block(actor(), userId);
+    }
+
+    @DeleteMapping("/blocks/{userId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void unblock(@PathVariable("userId") UUID userId) {
+        blocks.unblock(actor(), userId);
+    }
+
+    @GetMapping("/blocks")
+    public PageResponse<com.ieltspath.community.application.result.PublicProfile> blockedUsers(
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "20") int size) {
+        var result = blocks.listBlocked(actor(), new PageQuery(page, size));
+        return new PageResponse<>(result.content(), result.page(), result.size(),
+                result.totalElements(), result.totalPages(), "createdAt,desc;blockedId,desc");
     }
 
     @GetMapping("/users/{userId}/relationship")

@@ -41,4 +41,11 @@ public class CommentRepositoryAdapter implements CommentRepository {
         var result = repository.findByPostIdAndStatus(postId, status, PageRequest.of(page, size, sort));
         return new CommunityPage<>(result.getContent().stream().map(mapper::toDomain).toList(), result.getTotalElements());
     }
+
+    @Override
+    public CommunityPage<Comment> findByPostIdAndStatusVisibleTo(UUID postId, ContentStatus status, UUID viewerId, int page, int size) {
+        var sort = Sort.by(Sort.Direction.ASC, "created_at").and(Sort.by(Sort.Direction.ASC, "id"));
+        var result = repository.findByPostIdAndStatusVisibleTo(postId, status.name(), viewerId, PageRequest.of(page, size, sort));
+        return new CommunityPage<>(result.getContent().stream().map(mapper::toDomain).toList(), result.getTotalElements());
+    }
 }

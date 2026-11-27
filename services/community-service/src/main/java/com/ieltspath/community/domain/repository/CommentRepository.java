@@ -15,4 +15,6 @@ public interface CommentRepository {
     Optional<Comment> findByIdForUpdate(UUID id);
 
     CommunityPage<Comment> findByPostIdAndStatus(UUID postId, ContentStatus status, int page, int size);
+
+    CommunityPage<Comment> findByPostIdAndStatusVisibleTo(UUID postId, ContentStatus status, UUID viewerId, int page, int size);
 }

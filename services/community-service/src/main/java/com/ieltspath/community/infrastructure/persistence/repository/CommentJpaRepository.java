@@ -16,6 +16,35 @@ import java.util.UUID;
 public interface CommentJpaRepository extends JpaRepository<CommentJpaEntity, UUID> {
     Page<CommentJpaEntity> findByPostIdAndStatus(UUID postId, ContentStatus status, Pageable pageable);
 
+    @Query(
+            value = """
+                    SELECT * FROM comments c
+                    WHERE c.post_id = :postId
+                      AND c.status = :status
+                      AND NOT EXISTS (
+                          SELECT 1 FROM user_blocks ub
+                          WHERE (ub.blocker_id = :viewer AND ub.blocked_id = c.author_id)
+                             OR (ub.blocker_id = c.author_id AND ub.blocked_id = :viewer)
+                      )
+                    """,
+            countQuery = """
+                    SELECT count(*) FROM comments c
+                    WHERE c.post_id = :postId
+                      AND c.status = :status
+                      AND NOT EXISTS (
+                          SELECT 1 FROM user_blocks ub
+                          WHERE (ub.blocker_id = :viewer AND ub.blocked_id = c.author_id)
+                             OR (ub.blocker_id = c.author_id AND ub.blocked_id = :viewer)
+                      )
+                    """,
+            nativeQuery = true
+    )
+    Page<CommentJpaEntity> findByPostIdAndStatusVisibleTo(
+            @Param("postId") UUID postId,
+            @Param("status") String status,
+            @Param("viewer") UUID viewer,
+            Pageable pageable);
+
     @Lock(LockModeType.PESSIMISTIC_READ)
     @Query("select c from CommentJpaEntity c where c.id=:id")
     Optional<CommentJpaEntity> findByIdForUpdate(@Param("id") UUID id);

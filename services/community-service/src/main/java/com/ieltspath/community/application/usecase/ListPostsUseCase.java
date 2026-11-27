@@ -1,5 +1,6 @@
 package com.ieltspath.community.application.usecase;
 
+import com.ieltspath.community.application.CommunityActor;
 import com.ieltspath.community.application.query.PageQuery;
 import com.ieltspath.community.application.result.PageResult;
 import com.ieltspath.community.application.result.PostResult;
@@ -21,6 +22,22 @@ import java.util.stream.Collectors;
 public class ListPostsUseCase {
     private final PostRepository posts;
     private final ReactionRepository reactions;
+
+    @Transactional(readOnly = true)
+    public PageResult<PostResult> execute(CommunityActor actor, PageQuery query) {
+        return execute(actor, query, null);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResult<PostResult> execute(CommunityActor actor, PageQuery query, PostCategory category) {
+        var page = category == null
+                ? posts.findByStatusVisibleTo(ContentStatus.ACTIVE, actor.userId(), query.page(), query.size())
+                : posts.findByStatusAndCategoryVisibleTo(ContentStatus.ACTIVE, category, actor.userId(), query.page(), query.size());
+        var postIds = page.items().stream().map(post -> post.getId()).collect(Collectors.toSet());
+        Map<UUID, Map<ReactionType, Long>> counts = reactions.counts(postIds);
+        return PageResult.from(page, query.page(), query.size(), post ->
+                PostResult.from(post, counts.getOrDefault(post.getId(), Map.of())));
+    }
 
     @Transactional(readOnly = true)
     public PageResult<PostResult> execute(PageQuery query) {

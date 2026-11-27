@@ -458,11 +458,12 @@ class PostAndCommentUseCaseRulesTest {
     @Test
     void commentListAsksForActiveCommentsOnly() {
         Post p = post(UUID.randomUUID());
+        UUID viewer = UUID.randomUUID();
         when(posts.findById(p.getId())).thenReturn(Optional.of(p));
-        when(comments.findByPostIdAndStatus(p.getId(), ContentStatus.ACTIVE, 0, 20)).thenReturn(new CommunityPage<Comment>(List.of(), 0));
+        when(comments.findByPostIdAndStatusVisibleTo(p.getId(), ContentStatus.ACTIVE, viewer, 0, 20)).thenReturn(new CommunityPage<Comment>(List.of(), 0));
 
-        new ListCommentsUseCase(posts, comments).execute(user(UUID.randomUUID()), p.getId(), new PageQuery(0, 20));
+        new ListCommentsUseCase(posts, comments).execute(user(viewer), p.getId(), new PageQuery(0, 20));
 
-        verify(comments).findByPostIdAndStatus(p.getId(), ContentStatus.ACTIVE, 0, 20);
+        verify(comments).findByPostIdAndStatusVisibleTo(p.getId(), ContentStatus.ACTIVE, viewer, 0, 20);
     }
 }
