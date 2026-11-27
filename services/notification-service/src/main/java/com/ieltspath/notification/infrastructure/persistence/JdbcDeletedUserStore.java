@@ -45,6 +45,13 @@ public class JdbcDeletedUserStore implements DeletedUserStore {
     public record Job(UUID eventId, UUID userId, int attempts) { }
 
     public List<Job> claimPendingJobs(int limit, long leaseSeconds, int maxAttempts) {
+        // A job that crashed on its last attempt would stay PROCESSING for ever; once its lease is over it is FAILED.
+        jdbc.update("""
+                UPDATE user_deletion_jobs
+                SET status = 'FAILED', completed_at = CURRENT_TIMESTAMP, last_error = COALESCE(last_error, 'LEASE_EXPIRED')
+                WHERE status = 'PROCESSING' AND attempts >= ?
+                  AND claimed_at < CURRENT_TIMESTAMP - make_interval(secs => ?)
+                """, maxAttempts, leaseSeconds);
         return jdbc.query("""
                 UPDATE user_deletion_jobs
                 SET status = 'PROCESSING',
@@ -68,7 +75,13 @@ public class JdbcDeletedUserStore implements DeletedUserStore {
     }
 
     public void deleteUserNotificationsAndDevices(UUID userId) {
-        jdbc.update("DELETE FROM notification_push_deliveries WHERE recipient_id = ?", userId);
+        // A phone keeps its installation when another account signs in on it, so the device row moves to the new
+        // user while deliveries of the previous user still point at it (device_id is ON DELETE RESTRICT).
+        jdbc.update("""
+                DELETE FROM notification_push_deliveries
+                WHERE recipient_id = ?
+                   OR device_id IN (SELECT id FROM notification_devices WHERE user_id = ?)
+                """, userId, userId);
         jdbc.update("DELETE FROM notification_devices WHERE user_id = ?", userId);
         jdbc.update("DELETE FROM notification_preferences WHERE recipient_id = ?", userId);
         jdbc.update("DELETE FROM notifications WHERE recipient_id = ?", userId);

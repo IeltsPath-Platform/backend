@@ -46,10 +46,9 @@ public class AssignRoleUseCase {
     @Transactional
     public User execute(AssignRoleCommand command) {
         var activeAdminIds = userRepository.lockActiveAdminUserIds();
+        // Lock before the first read; a copy read earlier stays cached and could overwrite a concurrent deletion.
+        userLock.lock(command.userId());
         User user = userRepository.findById(command.userId())
-                .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng: " + command.userId()));
-        userLock.lock(user.getId());
-        user = userRepository.findById(command.userId())
                 .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng: " + command.userId()));
         if (command.roles() == null || command.roles().isEmpty()) {
             throw new RoleNotFoundException("Cần chọn ít nhất một vai trò");

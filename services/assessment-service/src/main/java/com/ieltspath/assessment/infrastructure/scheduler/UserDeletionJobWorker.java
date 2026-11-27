@@ -74,25 +74,41 @@ public class UserDeletionJobWorker {
             if (batch.isEmpty()) return;
 
             ObjectStorage storage = storageProvider.getIfAvailable();
-            if (storage == null) {
+            boolean needsStorage = batch.stream().anyMatch(ref -> JdbcDeletedUserStore.isStoredRecording(ref.mediaReference()));
+            if (storage == null && needsStorage) {
                 throw new IllegalStateException("STORAGE_UNAVAILABLE");
             }
             List<UUID> clearedIds = new ArrayList<>();
             RuntimeException firstFailure = null;
             for (var ref : batch) {
-                if (deleteObjectOrNotFound(storage, recordingProperties.getBucket(), ref.mediaReference(), userId)) {
+                // A reference outside the bucket has no object of ours to remove; the row goes with the rest.
+                if (!JdbcDeletedUserStore.isStoredRecording(ref.mediaReference())
+                        || deleteObjectOrNotFound(storage, recordingProperties.getBucket(), ref.mediaReference(), userId)) {
                     clearedIds.add(ref.id());
                 } else if (firstFailure == null) {
                     firstFailure = new IllegalStateException("STORAGE_DELETE_FAILED");
                 }
             }
             if (!clearedIds.isEmpty()) {
-                transaction.executeWithoutResult(status -> store.clearMediaReferenceByIds(clearedIds));
+                transaction.executeWithoutResult(status -> store.markRecordingsDeleted(clearedIds));
             }
             if (firstFailure != null) {
                 throw firstFailure;
             }
         }
+    }
+
+    private boolean confirmedGone(ObjectStorage storage, String bucket, String key, UUID userId) {
+        try {
+            if (!storage.exists(bucket, key)) return true;
+            log.warn("Speaking recording still present after a 404: userId={}", userId);
+        } catch (StorageException storageFailure) {
+            log.warn("Speaking recording deletion not confirmed: userId={}, errorCode={}", userId, storageFailure.reason());
+        } catch (RuntimeException failure) {
+            log.warn("Speaking recording deletion not confirmed: userId={}, errorCode={}",
+                    userId, failure.getClass().getSimpleName());
+        }
+        return false;
     }
 
     private boolean deleteObjectOrNotFound(ObjectStorage storage, String bucket, String key, UUID userId) {
@@ -101,7 +117,9 @@ public class UserDeletionJobWorker {
             return true;
         } catch (StorageException storageFailure) {
             if (storageFailure.reason() == StorageException.Reason.NOT_FOUND) {
-                return true;
+                // A wrong bucket or key also answers 404; only an existence check that first confirms the bucket
+                // is reachable may conclude the object is gone.
+                return confirmedGone(storage, bucket, key, userId);
             }
             log.warn("Speaking recording deletion failed: userId={}, errorCode={}", userId, storageFailure.reason());
             return false;

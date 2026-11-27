@@ -6,7 +6,6 @@ import com.ieltspath.user.application.exception.GoogleIdTokenInvalidException;
 import com.ieltspath.user.application.exception.ReauthAccountMismatchException;
 import com.ieltspath.user.application.port.AccessTokenRevocationStore;
 import com.ieltspath.user.application.port.AccountDeletionCleanupPort;
-import com.ieltspath.user.application.port.AvatarStoragePort;
 import com.ieltspath.user.application.port.GoogleIdTokenVerifier;
 import com.ieltspath.user.application.port.GoogleNonceStore;
 import com.ieltspath.user.application.port.UserLock;
@@ -30,7 +29,6 @@ import com.ieltspath.user.domain.vo.RoleName;
 import com.ieltspath.user.domain.vo.UserStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Instant;
@@ -63,10 +61,8 @@ class DeleteMyAccountUseCaseTest {
     private GoogleAuthProperties googleProperties;
     private AccountDeletionCleanupPort cleanupPort;
     private UserNoticeOutbox outbox;
-    private ObjectProvider<AvatarStoragePort> avatarStorageProvider;
     private DeleteMyAccountUseCase useCase;
 
-    @SuppressWarnings("unchecked")
     @BeforeEach
     void setUp() {
         users = mock(UserRepository.class);
@@ -81,14 +77,12 @@ class DeleteMyAccountUseCaseTest {
         googleProperties = new GoogleAuthProperties();
         cleanupPort = mock(AccountDeletionCleanupPort.class);
         outbox = mock(UserNoticeOutbox.class);
-        avatarStorageProvider = mock(ObjectProvider.class);
-        when(avatarStorageProvider.getIfAvailable()).thenReturn(null);
         when(users.lockActiveAdminUserIds()).thenReturn(List.of(UUID.randomUUID(), UUID.randomUUID()));
 
         useCase = new DeleteMyAccountUseCase(
                 users, userLock, refreshTokens, accessTokens, identities, encoder,
                 attemptsRepository, googleVerifier, nonceStore, googleProperties,
-                cleanupPort, outbox, avatarStorageProvider);
+                cleanupPort, outbox);
     }
 
     @Test
@@ -231,7 +225,8 @@ class DeleteMyAccountUseCaseTest {
         when(users.findById(adminId)).thenReturn(Optional.of(admin));
 
         assertThatThrownBy(() -> useCase.execute(adminId, "Secret123!", null))
-                .isInstanceOf(UserManagementRuleViolationException.class);
+                .isInstanceOf(UserManagementRuleViolationException.class)
+                .extracting("code").isEqualTo("STAFF_ACCOUNT_SELF_DELETION");
 
         UUID userId = UUID.randomUUID();
         User user = User.builder()
@@ -247,5 +242,50 @@ class DeleteMyAccountUseCaseTest {
 
         assertThatThrownBy(() -> useCase.execute(userId, "", null))
                 .isInstanceOf(AccountDeletionConfirmationException.class);
+    }
+
+    @Test
+    void refusesStaffAccountsWithAStableCode() {
+        UUID examinerId = UUID.randomUUID();
+        User examiner = User.builder()
+                .id(examinerId)
+                .email(new Email("examiner@example.com"))
+                .passwordHash("hashed")
+                .fullName("Examiner")
+                .status(UserStatus.ACTIVE)
+                .roles(Set.of(Role.builder().id(UUID.randomUUID()).name(RoleName.EXAMINER).build()))
+                .build();
+        when(users.findById(examinerId)).thenReturn(Optional.of(examiner));
+
+        assertThatThrownBy(() -> useCase.execute(examinerId, "Secret123!", null))
+                .isInstanceOf(UserManagementRuleViolationException.class)
+                .hasMessageContaining("Tài khoản nhân sự không tự xóa được")
+                .extracting("code").isEqualTo("STAFF_ACCOUNT_SELF_DELETION");
+        assertThat(examiner.getStatus()).isEqualTo(UserStatus.ACTIVE);
+        verifyNoInteractions(outbox, cleanupPort);
+    }
+
+    @Test
+    void queuesTheOwnedAvatarForDeletionInsteadOfDroppingIt() {
+        UUID userId = UUID.randomUUID();
+        User user = User.builder()
+                .id(userId)
+                .email(new Email("learner@example.com"))
+                .passwordHash("hashed")
+                .fullName("Learner")
+                .status(UserStatus.ACTIVE)
+                .roles(Set.of())
+                .build();
+        when(users.findById(userId)).thenReturn(Optional.of(user));
+        when(attemptsRepository.findByUserId(userId)).thenReturn(Optional.empty());
+        when(encoder.matches("Secret123!", "hashed")).thenReturn(true);
+        org.springframework.test.util.ReflectionTestUtils.setField(useCase, "projectUrl", "https://project.supabase.co");
+        String key = "images/" + userId + "/" + UUID.randomUUID() + ".png";
+        when(cleanupPort.anonymizeProfileAndDeleteIdentityData(userId))
+                .thenReturn(Optional.of("https://project.supabase.co/storage/v1/object/public/avatars/" + key));
+
+        useCase.execute(userId, "Secret123!", null);
+
+        verify(cleanupPort).queueAvatarDeletion(userId, key);
     }
 }

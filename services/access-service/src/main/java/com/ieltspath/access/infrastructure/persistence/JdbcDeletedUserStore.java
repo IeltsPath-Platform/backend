@@ -45,6 +45,13 @@ public class JdbcDeletedUserStore implements DeletedUserStore {
     public record Job(UUID eventId, UUID userId, int attempts) { }
 
     public List<Job> claimPendingJobs(int limit, long leaseSeconds, int maxAttempts) {
+        // A job that crashed on its last attempt would stay PROCESSING for ever; once its lease is over it is FAILED.
+        jdbc.update("""
+                UPDATE user_deletion_jobs
+                SET status = 'FAILED', completed_at = CURRENT_TIMESTAMP, last_error = COALESCE(last_error, 'LEASE_EXPIRED')
+                WHERE status = 'PROCESSING' AND attempts >= ?
+                  AND claimed_at < CURRENT_TIMESTAMP - make_interval(secs => ?)
+                """, maxAttempts, leaseSeconds);
         return jdbc.query("""
                 UPDATE user_deletion_jobs
                 SET status = 'PROCESSING',
@@ -72,15 +79,31 @@ public class JdbcDeletedUserStore implements DeletedUserStore {
      * zeroes wallet balance, and deletes email verification state.
      */
     public void applyAccountDeletion(UUID userId) {
+        // Expiry notices carry the user's email and name; no event about a deleted user needs to go out.
+        jdbc.update("DELETE FROM outbox_events WHERE payload->>'userId' = ?", userId.toString());
         jdbc.update("""
                 UPDATE subscriptions
                 SET status = 'CANCELLED', updated_at = CURRENT_TIMESTAMP
                 WHERE user_id = ? AND status = 'ACTIVE'
                 """, userId);
+        // The remaining balance is written off through the ledger, so the wallet and the ledger still add up.
+        // The key is fixed per user, so a retried job writes the entry once.
         jdbc.update("""
-                UPDATE point_wallets
-                SET balance = 0, updated_at = CURRENT_TIMESTAMP
-                WHERE user_id = ?
+                WITH closed AS (
+                    SELECT user_id, balance FROM point_wallets WHERE user_id = ? AND balance > 0 FOR UPDATE
+                ), entry AS (
+                    INSERT INTO point_ledger_entries (user_id, delta, balance_after, transaction_type, reference_type,
+                                                      reference_id, idempotency_key, description)
+                    SELECT user_id, -balance, 0, 'ADMIN_ADJUSTMENT', 'ACCOUNT_DELETION', user_id,
+                           'account-deletion:' || user_id, 'Xóa số dư khi người dùng xóa tài khoản'
+                    FROM closed
+                    ON CONFLICT (idempotency_key) DO NOTHING
+                    RETURNING user_id
+                )
+                UPDATE point_wallets w
+                SET balance = 0, total_debited = w.total_debited + c.balance, updated_at = CURRENT_TIMESTAMP
+                FROM closed c
+                WHERE w.user_id = c.user_id
                 """, userId);
         jdbc.update("DELETE FROM user_email_verification_state WHERE user_id = ?", userId);
     }

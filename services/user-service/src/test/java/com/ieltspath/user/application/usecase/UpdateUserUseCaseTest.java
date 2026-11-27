@@ -84,6 +84,20 @@ class UpdateUserUseCaseTest {
     }
 
     @Test
+    void readsTheAccountOnlyAfterTakingItsLockSoADeletionCannotBeOverwritten() {
+        UUID userId = UUID.randomUUID();
+        when(userRepository.findById(userId)).thenReturn(Optional.of(User.builder().id(userId)
+                .email(new Email("deleted+x@deleted.local")).fullName("Người dùng đã xóa").status(UserStatus.DELETED).build()));
+
+        assertThatThrownBy(() -> useCase.execute(new UpdateUserCommand(userId, "John Back", null)))
+                .isInstanceOf(com.ieltspath.user.domain.exception.UserManagementRuleViolationException.class);
+        var order = org.mockito.Mockito.inOrder(userLock, userRepository);
+        order.verify(userLock).lock(userId);
+        order.verify(userRepository).findById(userId);
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
     void rejectsAPhoneNumberUsedByAnotherAccount() {
         UUID userId = UUID.randomUUID();
         when(userRepository.findById(userId)).thenReturn(Optional.of(existingUser(userId)));

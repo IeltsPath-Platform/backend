@@ -27,4 +27,26 @@ class UserTest {
         assertThatThrownBy(() -> user.getRoles().clear())
                 .isInstanceOf(UnsupportedOperationException.class);
     }
+
+    @Test
+    void aDeletedAccountCannotBeReopenedEditedOrSetToDeletedByHand() {
+        User active = User.builder().id(java.util.UUID.randomUUID()).email(new Email("a@example.com")).fullName("A")
+                .status(UserStatus.ACTIVE).roles(new HashSet<>()).build();
+        assertThatThrownBy(() -> active.changeStatus(UserStatus.DELETED))
+                .isInstanceOf(com.ieltspath.user.domain.exception.UserManagementRuleViolationException.class)
+                .extracting("code").isEqualTo("DELETED_STATUS_RESERVED");
+
+        active.markDeleted(java.time.LocalDateTime.now());
+        for (Runnable change : java.util.List.<Runnable>of(
+                () -> active.changeStatus(UserStatus.ACTIVE),
+                active::deactivate,
+                () -> active.updateProfile("Back again", null),
+                () -> active.assignRoles(Set.of()))) {
+            assertThatThrownBy(change::run)
+                    .isInstanceOf(com.ieltspath.user.domain.exception.UserManagementRuleViolationException.class)
+                    .hasMessage("Tài khoản này đã bị xóa nên không thể thay đổi.")
+                    .extracting("code").isEqualTo("ACCOUNT_DELETED");
+        }
+        assertThat(active.getStatus()).isEqualTo(UserStatus.DELETED);
+    }
 }

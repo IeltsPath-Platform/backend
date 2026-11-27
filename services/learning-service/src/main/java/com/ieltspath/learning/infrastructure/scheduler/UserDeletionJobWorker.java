@@ -23,7 +23,8 @@ public class UserDeletionJobWorker {
     private static final Logger log = LoggerFactory.getLogger(UserDeletionJobWorker.class);
     private static final int BATCH_SIZE = 500;
     private static final int FILE_BATCH_SIZE = 100;
-    private static final List<String> USER_TABLES = List.of(
+    /** Tables with no rows pointing at them, emptied in batches after the linked records are gone. */
+    static final List<String> USER_TABLES = List.of(
             "kp_evidence",
             "question_attempt_events",
             "learning_activities",
@@ -32,10 +33,6 @@ public class UserDeletionJobWorker {
             "study_goal_history",
             "learning_goals",
             "lesson_exercise_submissions",
-            "lesson_writing_submissions",
-            "review_sets",
-            "review_theory_checks",
-            "review_items",
             "topic_test_assignments",
             "practice_test_assignments",
             "course_test_assignments",
@@ -43,16 +40,22 @@ public class UserDeletionJobWorker {
             "lesson_progress",
             "topic_progress",
             "course_progress",
+            "course_outcomes",
             "course_study_activity",
             "learner_course_unlocks",
             "kp_mastery_profiles",
             "assessment_result_versions",
             "remediation_flags",
+            "learner_flags",
             "learner_placements",
             "placement_assignments",
             "placement_speaking_jobs",
-            "human_review_outcomes",
             "xp_ledger",
+            "learner_xp",
+            "learner_hearts",
+            "learner_streaks",
+            "learner_settings",
+            "llm_daily_usage",
             "reward_grants",
             "learner_weekly_snapshots",
             "learner_monthly_snapshots",
@@ -62,6 +65,14 @@ public class UserDeletionJobWorker {
             "learner_badges"
     );
 
+    /** Tables removed by the linked-record, Speaking and study-session steps; listed for the coverage test. */
+    static final List<String> LINKED_TABLES = List.of(
+            "diagnostic_sessions", "review_sets", "review_theory_checks", "review_items",
+            "practice_sessions", "practice_attempts", "human_review_requests", "human_review_outcomes",
+            "lesson_writing_submissions", "speaking_submissions", "study_sessions");
+
+    /** Tables without a user column whose event payload names the learner; cleared with the linked records. */
+    static final List<String> PAYLOAD_TABLES = List.of("placement_speaking_outbox");
     private final JdbcDeletedUserRepository repository;
     private final ObjectProvider<ObjectStorage> storageProvider;
     private final SpeakingPracticeSettings speakingSettings;
@@ -102,8 +113,7 @@ public class UserDeletionJobWorker {
         deleteAllSpeakingRecordings(userId);
         transaction.executeWithoutResult(status -> {
             repository.deleteSpeakingRecordingsForUser(userId);
-            repository.deleteDiagnosticsForUser(userId);
-            repository.deletePracticeSessionsAndAttempts(userId);
+            repository.deleteLinkedLearningRecords(userId);
             repository.deleteStudyHeartbeatReceipts(userId);
         });
         for (String table : USER_TABLES) {
@@ -114,6 +124,13 @@ public class UserDeletionJobWorker {
                 deleted = count == null ? 0 : count;
             } while (deleted == BATCH_SIZE);
         }
+        // Work items name the learner they are about; staff-facing rows go with the learner.
+        int removed;
+        do {
+            Integer count = transaction.execute(status ->
+                    repository.deleteBatchByUserId("work_items", "subject_user_id", userId, BATCH_SIZE));
+            removed = count == null ? 0 : count;
+        } while (removed == BATCH_SIZE);
         transaction.executeWithoutResult(status -> repository.markJobDone(job.eventId()));
     }
 
@@ -127,22 +144,35 @@ public class UserDeletionJobWorker {
             if (storage == null) {
                 throw new IllegalStateException("STORAGE_UNAVAILABLE");
             }
-            List<UUID> deletedIds = new ArrayList<>();
+            List<JdbcDeletedUserRepository.SpeakingRecordingRef> deletedRefs = new ArrayList<>();
             RuntimeException firstFailure = null;
             for (var ref : batch) {
                 if (deleteObjectOrNotFound(storage, speakingSettings.bucket(), ref.objectKey(), userId)) {
-                    deletedIds.add(ref.id());
+                    deletedRefs.add(ref);
                 } else if (firstFailure == null) {
                     firstFailure = new IllegalStateException("STORAGE_DELETE_FAILED");
                 }
             }
-            if (!deletedIds.isEmpty()) {
-                transaction.executeWithoutResult(status -> repository.deleteSpeakingRecordingsByIds(deletedIds));
+            if (!deletedRefs.isEmpty()) {
+                transaction.executeWithoutResult(status -> repository.deleteSpeakingRecordings(deletedRefs));
             }
             if (firstFailure != null) {
                 throw firstFailure;
             }
         }
+    }
+
+    private boolean confirmedGone(ObjectStorage storage, String bucket, String key, UUID userId) {
+        try {
+            if (!storage.exists(bucket, key)) return true;
+            log.warn("Speaking recording still present after a 404: userId={}", userId);
+        } catch (StorageException storageFailure) {
+            log.warn("Speaking recording deletion not confirmed: userId={}, errorCode={}", userId, storageFailure.reason());
+        } catch (RuntimeException failure) {
+            log.warn("Speaking recording deletion not confirmed: userId={}, errorCode={}",
+                    userId, failure.getClass().getSimpleName());
+        }
+        return false;
     }
 
     private boolean deleteObjectOrNotFound(ObjectStorage storage, String bucket, String key, UUID userId) {
@@ -151,7 +181,9 @@ public class UserDeletionJobWorker {
             return true;
         } catch (StorageException storageFailure) {
             if (storageFailure.reason() == StorageException.Reason.NOT_FOUND) {
-                return true;
+                // A wrong bucket or key also answers 404; only an existence check that first confirms the bucket
+                // is reachable may conclude the object is gone.
+                return confirmedGone(storage, bucket, key, userId);
             }
             log.warn("Speaking recording deletion failed: userId={}, errorCode={}", userId, storageFailure.reason());
             return false;

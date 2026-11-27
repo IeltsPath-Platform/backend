@@ -47,6 +47,13 @@ public class JdbcDeletedUserStore implements DeletedUserStore {
     public record Job(UUID eventId, UUID userId, int attempts) { }
 
     public List<Job> claimPendingJobs(int limit, long leaseSeconds, int maxAttempts) {
+        // A job that crashed on its last attempt would stay PROCESSING for ever; once its lease is over it is FAILED.
+        jdbc.update("""
+                UPDATE user_deletion_jobs
+                SET status = 'FAILED', completed_at = CURRENT_TIMESTAMP, last_error = COALESCE(last_error, 'LEASE_EXPIRED')
+                WHERE status = 'PROCESSING' AND attempts >= ?
+                  AND claimed_at < CURRENT_TIMESTAMP - make_interval(secs => ?)
+                """, maxAttempts, leaseSeconds);
         return jdbc.query("""
                 UPDATE user_deletion_jobs
                 SET status = 'PROCESSING',
@@ -71,16 +78,26 @@ public class JdbcDeletedUserStore implements DeletedUserStore {
 
     /**
      * Anonymizes posts and comments to the deleted-author sentinel (keeping post content and images intact per policy)
-     * and deletes personal bookmarks, follows, reactions, and reporter links.
+     * anonymises the reporter of their reports, and deletes personal bookmarks, follows, reactions and blocks.
      */
     public void anonymizeAndDeleteCommunityData(UUID userId) {
+        // Notifications addressed to the deleted user have no one left to reach.
+        jdbc.update("DELETE FROM outbox_events WHERE payload->>'recipientId' = ?", userId.toString());
         jdbc.update("UPDATE posts SET author_id = ? WHERE author_id = ?", DELETED_AUTHOR_ID, userId);
         jdbc.update("UPDATE comments SET author_id = ? WHERE author_id = ?", DELETED_AUTHOR_ID, userId);
         jdbc.update("DELETE FROM post_bookmarks WHERE user_id = ?", userId);
         jdbc.update("DELETE FROM user_follows WHERE follower_id = ? OR followee_id = ?", userId, userId);
         jdbc.update("DELETE FROM post_reactions WHERE user_id = ?", userId);
         jdbc.update("DELETE FROM comment_reactions WHERE user_id = ?", userId);
-        jdbc.update("DELETE FROM community_reports WHERE reporter_id = ?", userId);
+        // Reports stay as moderation history with the reporter anonymised. A sentinel row already filed for the same
+        // content (an earlier deleted reporter) would break the one-report-per-reporter rule, so that duplicate goes.
+        jdbc.update("""
+                DELETE FROM community_reports r
+                WHERE r.reporter_id = ? AND EXISTS (
+                    SELECT 1 FROM community_reports s
+                    WHERE s.reporter_id = ? AND s.content_type = r.content_type AND s.content_id = r.content_id)
+                """, userId, DELETED_AUTHOR_ID);
+        jdbc.update("UPDATE community_reports SET reporter_id = ? WHERE reporter_id = ?", DELETED_AUTHOR_ID, userId);
         jdbc.update("DELETE FROM user_blocks WHERE blocker_id = ? OR blocked_id = ?", userId, userId);
     }
 

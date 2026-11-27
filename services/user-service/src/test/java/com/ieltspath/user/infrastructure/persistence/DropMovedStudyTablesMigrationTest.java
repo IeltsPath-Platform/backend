@@ -38,6 +38,6 @@ class DropMovedStudyTablesMigrationTest {
             assertTrue(!tables.contains(dropped), dropped + " must be gone");
         }
         assertTrue(tables.containsAll(KEPT), "tables that are still in use must remain");
-        assertEquals(13, tables.size()); // 12 tables plus flyway_schema_history
+        assertEquals(14, tables.size()); // 13 tables plus flyway_schema_history
     }
 }

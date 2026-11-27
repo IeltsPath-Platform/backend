@@ -47,6 +47,13 @@ public class JdbcDeletedUserStore implements DeletedUserStore {
     public record MediaRef(UUID id, String key) { }
 
     public List<Job> claimPendingJobs(int limit, long leaseSeconds, int maxAttempts) {
+        // A job that crashed on its last attempt would stay PROCESSING for ever; once its lease is over it is FAILED.
+        jdbc.update("""
+                UPDATE user_deletion_jobs
+                SET status = 'FAILED', completed_at = CURRENT_TIMESTAMP, last_error = COALESCE(last_error, 'LEASE_EXPIRED')
+                WHERE status = 'PROCESSING' AND attempts >= ?
+                  AND claimed_at < CURRENT_TIMESTAMP - make_interval(secs => ?)
+                """, maxAttempts, leaseSeconds);
         return jdbc.query("""
                 UPDATE user_deletion_jobs
                 SET status = 'PROCESSING',
@@ -106,6 +113,7 @@ public class JdbcDeletedUserStore implements DeletedUserStore {
     }
 
     public void deletePersonalLibraryData(UUID userId) {
+        jdbc.update("DELETE FROM outbox_events WHERE payload->>'userId' = ?", userId.toString());
         jdbc.update("""
                 DELETE FROM flashcard_deck_items
                 WHERE deck_id IN (SELECT id FROM flashcard_decks WHERE user_id = ?)

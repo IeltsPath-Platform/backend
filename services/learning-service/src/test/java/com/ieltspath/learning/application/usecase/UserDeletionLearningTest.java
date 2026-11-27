@@ -115,11 +115,12 @@ class UserDeletionLearningTest {
         UUID userId = UUID.randomUUID();
         UUID okId = UUID.randomUUID();
         UUID failId = UUID.randomUUID();
+        UUID questionId = UUID.randomUUID();
         var job = new com.ieltspath.learning.infrastructure.persistence.JdbcDeletedUserRepository.Job(eventId, userId, 10);
         when(repo.claimPendingJobs(5, 300L, 10)).thenReturn(List.of(job));
         when(repo.findSpeakingRecordingsBatch(userId, 100)).thenReturn(List.of(
-                new com.ieltspath.learning.infrastructure.persistence.JdbcDeletedUserRepository.SpeakingRecordingRef(okId, "practice/" + userId + "/ok.webm"),
-                new com.ieltspath.learning.infrastructure.persistence.JdbcDeletedUserRepository.SpeakingRecordingRef(failId, "practice/" + userId + "/fail.webm")));
+                new com.ieltspath.learning.infrastructure.persistence.JdbcDeletedUserRepository.SpeakingRecordingRef(okId, questionId, "practice/" + userId + "/ok.webm"),
+                new com.ieltspath.learning.infrastructure.persistence.JdbcDeletedUserRepository.SpeakingRecordingRef(failId, questionId, "practice/" + userId + "/fail.webm")));
         org.mockito.Mockito.doThrow(new com.ieltspath.commonstorage.StorageException(
                 "delete", com.ieltspath.commonstorage.StorageException.Reason.NOT_FOUND, 404, false, "ref1"))
                 .when(storage).delete("speaking-recordings", "practice/" + userId + "/ok.webm");
@@ -131,7 +132,8 @@ class UserDeletionLearningTest {
                 repo, provider, settings, txManager, 300L, 10);
         worker.processPending();
 
-        verify(repo).deleteSpeakingRecordingsByIds(List.of(okId));
+        verify(repo).deleteSpeakingRecordings(List.of(
+                new com.ieltspath.learning.infrastructure.persistence.JdbcDeletedUserRepository.SpeakingRecordingRef(okId, questionId, "practice/" + userId + "/ok.webm")));
         verify(repo, org.mockito.Mockito.never()).markJobDone(eventId);
         verify(repo).markJobFailed(eventId, "IllegalStateException");
     }
