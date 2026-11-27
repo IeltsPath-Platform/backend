@@ -48,7 +48,7 @@ public class AiGradingReportController {
     }
 
     @GetMapping("/admin/ai-grading-reports")
-    @PreAuthorize("hasAnyRole('ADMIN', 'EXAMINER')")
+    @PreAuthorize("hasRole('EXAMINER')")
     public AiGradingReportPageResponse list(
             @RequestParam(name = "status", required = false) String status,
             @RequestParam(name = "submissionType", required = false) String submissionType,
