@@ -1,7 +1,7 @@
 # AGENTS.md - Quy tắc bắt buộc cho AI Agent
 
 - Phiên bản: 2.3
-- Cập nhật lần cuối: 2026-11-26 (Learning topic catalog Redis cache; job dọn outbox chỉ xóa dòng đã phát quá `retention-days`, giữ pending và lỗi); 2026-11-18 (luật thang bài ôn, chẩn đoán dò ngược, giỏ ôn và nguồn điểm `ReviewReevaluation`; placement chia ba kho đề và cho làm lại, bỏ luật "chỉ làm một lần" ở §3.8); 2026-11-14 (bài ôn tiêu chí Writing ôn KP của mã lỗi gặp nhiều nhất); 2026-11-13 (khối `judgments` khi chấm Writing chỉ dùng KP của đề, `kpj3`); 2026-11-12 (ngoại lệ `chartFacts`: học viên nhận phát biểu đúng cho câu số liệu viết sai); 2026-11-11 (ghi chú gamification học từ vựng mobile ở §3.8; thêm common-llm); 2026-11-02 (thêm §3.9 và nhóm điều cấm "Pattern hệ thống" ở §5: resilience, outbox, idempotency, scheduler, storage; bổ sung Redis, Resilience4j, Micrometer/OpenTelemetry, Supabase vào stack và hai module shared mới); 2026-10-30 (Content gọi Library một chiều, Library không gọi Content; Notification đã có DB, listener và API; mặc định DB của config-repo là `localhost:5440`); 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); dữ kiện khác giữ mốc kiểm 2026-10-07 sau course path, placement recommendation và course gate
+- Cập nhật lần cuối: 2026-11-27 (thêm `shared/common-test`: đóng Spring context sau mỗi lớp test; CI chia 4 job song song); 2026-11-26 (Learning topic catalog Redis cache; job dọn outbox chỉ xóa dòng đã phát quá `retention-days`, giữ pending và lỗi); 2026-11-18 (luật thang bài ôn, chẩn đoán dò ngược, giỏ ôn và nguồn điểm `ReviewReevaluation`; placement chia ba kho đề và cho làm lại, bỏ luật "chỉ làm một lần" ở §3.8); 2026-11-14 (bài ôn tiêu chí Writing ôn KP của mã lỗi gặp nhiều nhất); 2026-11-13 (khối `judgments` khi chấm Writing chỉ dùng KP của đề, `kpj3`); 2026-11-12 (ngoại lệ `chartFacts`: học viên nhận phát biểu đúng cho câu số liệu viết sai); 2026-11-11 (ghi chú gamification học từ vựng mobile ở §3.8; thêm common-llm); 2026-11-02 (thêm §3.9 và nhóm điều cấm "Pattern hệ thống" ở §5: resilience, outbox, idempotency, scheduler, storage; bổ sung Redis, Resilience4j, Micrometer/OpenTelemetry, Supabase vào stack và hai module shared mới); 2026-10-30 (Content gọi Library một chiều, Library không gọi Content; Notification đã có DB, listener và API; mặc định DB của config-repo là `localhost:5440`); 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); dữ kiện khác giữ mốc kiểm 2026-10-07 sau course path, placement recommendation và course gate
 - Dự án: `IELTSPath` (Maven coordinates: `com.ieltspath:code-base:1.0-SNAPSHOT`)
 - Kiến trúc chi tiết (sơ đồ, flow, data ownership, quyết định): [`docs/system-architecture.md`](docs/system-architecture.md)
 
@@ -23,6 +23,7 @@ suy diễn khả năng nghiệp vụ ngoài các module dưới đây.
 | `shared/common-storage` | Thư viện lưu object dùng chung (`ObjectStorage`, client Supabase Storage, `ObjectKeys`, `UploadPolicy`); không deploy độc lập; service tự cấu hình bucket. |
 | `shared/common-resilience` | Thư viện `ResilientCall` (circuit breaker, retry, bulkhead bằng Resilience4j) cho lời gọi HTTP đồng bộ giữa service và tới LLM; không deploy độc lập. |
 | `shared/common-llm` | Client OpenAI-compatible dùng chung cho Learning, Assessment và Content; luật model, lỗi an toàn, metric thời gian/token; không chứa prompt hay parser nghiệp vụ. |
+| `shared/common-test` | Hỗ trợ test: đóng Spring context sau mỗi lớp test, trước khi Testcontainers dừng container (đăng ký bằng `META-INF/spring.factories`); chỉ dùng ở scope `test`. |
 | `shared/common-observability` | Thư viện `correlationId` (MDC, header HTTP, header AMQP), metric outbox và DLQ, trace context cho outbox; không deploy độc lập. |
 | `services/user-service` | Tài khoản, role, auth token, hồ sơ học viên (có múi giờ). Mục tiêu học, activity và thời gian học do learning-service giữ; streak cũng vậy. |
 | `services/content-service` | Curriculum: topic, knowledge point, câu hỏi, gói nội dung, asset. Khu author: soạn gói và đề cuối, tải audio, bản nháp AI (câu hỏi, bộ luyện tập), soạn course tay từ cây tri thức, import Excel. Nội dung AI luôn qua bản nháp (`ai_drafts`) và người duyệt; AI không dựng course. |
@@ -44,7 +45,7 @@ phần hạ tầng hoặc architectural pattern mới nếu chưa được phê 
 
 | Khu vực | Công nghệ đã được xác minh |
 | --- | --- |
-| Java build | Java 21; Maven multi-module (18 module trong reactor: 3 infra, 6 shared, 9 business); Maven Compiler Plugin 3.14.0; Surefire 3.5.3 ở module đã cấu hình. |
+| Java build | Java 21; Maven multi-module (19 module trong reactor: 3 infra, 7 shared, 9 business); Maven Compiler Plugin 3.14.0; Surefire 3.5.3 ở module đã cấu hình. |
 | Java framework | Spring Boot 3.5.14; Spring Cloud 2025.0.0 (Config, Netflix Eureka, Gateway Server WebFlux + Reactor). |
 | Persistence (Java) | Spring Data JPA, Hibernate, PostgreSQL JDBC, Flyway (chạy khi service khởi động). |
 | Bảo mật | Spring Security, OAuth2 Resource Server, Nimbus JWT, HMAC-SHA256 JWT, BCrypt. |
@@ -58,7 +59,7 @@ phần hạ tầng hoặc architectural pattern mới nếu chưa được phê 
 | API docs | springdoc-openapi 2.8.17 (duyệt 2026-10-02): `webmvc-api` ở user/access/assessment/learning, `webflux-ui` ở Gateway gom Swagger UI; chỉ route luồng chính, không `/internal/**`. |
 | Kiểm thử | JUnit Jupiter, Spring Boot Test, Mockito, Spring Security Test, Testcontainers PostgreSQL. |
 | Container | Docker Compose, `postgres:15-alpine`, `rabbitmq:3.13-management-alpine`, Eclipse Temurin 21. |
-| CI | GitHub Actions `.github/workflows/ci.yml`: mỗi PR và push vào `main` chạy `mvn -B -ntp verify` cả reactor (JDK 21, Testcontainers trên Docker của runner) và `docker compose config --quiet` với `.env` giả. `images.yml` build image lên GHCR; `deploy.yml` chạy tay qua SSH trong environment `production` (xem `docs/deployment.md`). |
+| CI | GitHub Actions `.github/workflows/ci.yml`: mỗi PR và push vào `main` chạy `mvn -B -ntp verify` trên 4 job song song `content`, `learning`, `assessment-library-community`, `others` (`others` gồm mọi module còn lại, kể cả module mới; JDK 21, Testcontainers trên Docker của runner), một job kiểm tra khai báo test và `docker compose config --quiet` với `.env` giả. `images.yml` build image lên GHCR; `deploy.yml` chạy tay qua SSH trong environment `production` (xem `docs/deployment.md`). |
 
 Repository **chưa có**: frontend, file OpenAPI được track,
 formatter, linter, coverage gate. Bổ sung các thành phần này là quyết định thiết kế, không phải mở rộng mặc định.
@@ -356,7 +357,7 @@ Gặp code cũ lệch pattern: giữ nguyên hành vi, không sửa lây trong t
 | Thêm route hoặc endpoint công khai ở Gateway | Gán tier rate limit (`auth`, `upload`, `ai`, `default`) trong `config-repo/api-gateway.yaml`; route thuộc tier `auth` thì cập nhật `AuthRouteConsistencyTest` | `docs/system-architecture.md` §9 |
 | Lưu hoặc phát file | Dùng `ObjectStorage`, `ObjectKeys`, `UploadPolicy` của `common-storage`; bucket theo bảng trong tài liệu kiến trúc; file trả phí phát bằng URL ký ngắn hạn, không lưu URL ký vào DB hoặc log | `docs/system-architecture.md` §3 |
 | Log, metric, trace | Giữ `X-Correlation-Id` (filter và client customizer của `common-observability`); id đi qua header, không qua payload event; metric dùng Micrometer; trace context của event lưu ở cột `trace_context` | §3.3 |
-| Thêm thư viện dùng chung | Module `shared/common-*` đăng ký bằng `AutoConfiguration.imports`, chỉ chứa technical concern | §3.5 |
+| Thêm thư viện dùng chung | Module `shared/common-*` đăng ký bằng `AutoConfiguration.imports`, chỉ chứa technical concern. Ngoại lệ: `common-test` chỉ dùng ở scope `test`, đăng ký `TestExecutionListener` bằng `META-INF/spring.factories` | §3.5 |
 | Đổi hợp đồng HTTP hoặc event | Sửa `docs/contracts/` trong cùng PR với code | §3.3, §3.5 |
 
 ## 4. Quy tắc đặt tên file và cấu trúc dự án
@@ -365,6 +366,7 @@ Gặp code cũ lệch pattern: giữ nguyên hành vi, không sửa lây trong t
 shared/common-security/                 thư viện security dùng chung
 shared/common-events/                   tên/hình dạng event và helper retry AMQP dùng chung; không deploy độc lập
 shared/common-storage/                  thư viện lưu object dùng chung (Supabase Storage)
+shared/common-test/                     hỗ trợ test dùng chung; chỉ dùng ở scope test
 infra/{api-gateway,config-server,eureka-server}/
 infra/config-server/config-repo/        YAML runtime tập trung
 services/<name>-service/                service Java: src/main/java/com/ieltspath/<package>/{api,application,domain,infrastructure}
@@ -464,7 +466,7 @@ graphify update .                       # sau khi sửa code; thêm --force khi 
    có, bị lỗi hoặc được yêu cầu. Không tự cài Graphify; không commit `.graphify-tools/` hay `graphify-out/`.
 
 4. Thêm test tập trung vào layer bị ảnh hưởng: Mockito cho use case, `@WebMvcTest` cho controller/security, Testcontainers
-   cho persistence (cần Docker).
+   cho persistence (cần Docker). Service có Spring test phải khai báo `shared/common-test` ở scope `test`; context bị đóng sau mỗi lớp test nên test không được dựa vào context của lớp khác.
 5. Chạy lệnh hẹp nhất trước, mở rộng khi shared contract thay đổi:
 
 ```powershell

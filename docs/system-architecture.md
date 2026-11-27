@@ -7,8 +7,8 @@
 
 ## 1. Tổng quan
 
-IELTSPath là backend microservices cho nền tảng học IELTS: 3 service hạ tầng Spring Cloud, 6 thư viện kỹ thuật dùng
-chung và 9 business service Java (Spring Boot, Maven reactor). Service học AI Learning viết bằng Python đã được thay bằng
+IELTSPath là backend microservices cho nền tảng học IELTS: 3 service hạ tầng Spring Cloud, 7 thư viện kỹ thuật dùng
+chung (một trong số đó chỉ dùng cho test) và 9 business service Java (Spring Boot, Maven reactor). Service học AI Learning viết bằng Python đã được thay bằng
 `learning-service` Java ngày 2026-10-01. Mỗi business service sở hữu database PostgreSQL riêng. Client chỉ gọi qua API Gateway.
 
 ```text

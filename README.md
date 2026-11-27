@@ -25,10 +25,10 @@ flowchart LR
 | Nhóm | Module | Vai trò |
 | :-- | :-- | :-- |
 | `infra/` | `api-gateway` :8080, `config-server` :8888, `eureka-server` :8761 | Ingress WebFlux, cấu hình tập trung (`config-repo/`), service registry |
-| `shared/` | `common-security`, `common-events`, `common-resilience`, `common-observability`, `common-storage`, `common-llm` | Thư viện dùng chung, tự cấu hình bằng Spring Boot auto-configuration, không deploy độc lập |
+| `shared/` | `common-security`, `common-events`, `common-resilience`, `common-observability`, `common-storage`, `common-llm`, `common-test` | Thư viện dùng chung, tự cấu hình bằng Spring Boot auto-configuration, không deploy độc lập. Riêng `common-test` chỉ dùng cho test: đóng Spring context sau mỗi lớp test |
 | `services/` | `user` :8085, `content` :8082, `library` :8081, `assessment` :8083, `access` :8084, `learning` :8086, `game` :8087, `notification` :8088, `community` :8089 | Business service, mỗi service một bounded context và một database |
 
-Reactor Maven gồm 18 module (3 infra, 6 shared, 9 business). Kiến trúc chi tiết, luồng nghiệp vụ và quyết định thiết kế: [`docs/system-architecture.md`](docs/system-architecture.md).
+Reactor Maven gồm 19 module (3 infra, 7 shared, 9 business). Kiến trúc chi tiết, luồng nghiệp vụ và quyết định thiết kế: [`docs/system-architecture.md`](docs/system-architecture.md).
 
 ---
 
