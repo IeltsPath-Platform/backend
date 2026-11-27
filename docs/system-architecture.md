@@ -411,7 +411,8 @@ Backend hiện có 40 phương thức `@Scheduled` trong 39 file. Cơ chế ch�
 | user | `LoginHistoryPurgeScheduler` | Xóa theo cutoff thời gian; chạy lặp an toàn | Không |
 | user | `AuthAuditPurgeScheduler` | Xóa từng lô bằng `FOR UPDATE SKIP LOCKED`; giữ dữ liệu 365 ngày theo mặc định | Không |
 | user | `RefreshTokenCleanupJob` | Xóa tối đa 1000 token hết hạn hoặc đã thu hồi quá 30 ngày bằng `FOR UPDATE SKIP LOCKED`; nhiều instance không giữ cùng hàng | Không |
-| learning, assessment, library, access, notification, game, community, content | `UserDeletionJobWorker` | Claim job từ `user_deletion_jobs` bằng `FOR UPDATE SKIP LOCKED`, xóa/ẩn danh theo lô | Xóa file Supabase Storage (`speaking-recordings`, `flashcards`) ngoài transaction |
+| learning, assessment, library, access, notification, game, community, content | `UserDeletionJobWorker` | Claim job từ `user_deletion_jobs` bằng `FOR UPDATE SKIP LOCKED` với lease, tối đa 10 lần rồi `FAILED`; job crash ở lần cuối thành `FAILED` khi hết lease; xóa/ẩn danh theo lô | Xóa file Supabase Storage (`speaking-recordings`, `flashcards`) ngoài transaction |
+| user | `AvatarDeletionJob` | Claim `pending_avatar_deletions` bằng `FOR UPDATE SKIP LOCKED` với lease; xóa hàng khi storage xác nhận, tối đa 10 lần rồi `FAILED` | Xóa ảnh đại diện trên Supabase Storage ngoài transaction |
 
 Game không cần thêm claim riêng: hàng trận được khóa trước khi cập nhật và trạng thái được kiểm lại. Relay dùng row claim để instance khác có thể xử lý các hàng còn lại. Việc đọc nguồn của `WorkItemSyncJob` có thể chạy đồng thời; phần ghi được tuần tự hóa và repository bỏ qua work item đã tồn tại.
 

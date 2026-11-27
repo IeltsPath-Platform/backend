@@ -1,7 +1,7 @@
 ---
 title: "Tự xóa tài khoản người dùng (Google Play Account Deletion)"
 description: "Cho phép người dùng tự xóa tài khoản qua DELETE /api/users/me (xác thực mật khẩu hoặc Google ID token), thu hồi phiên/token, phát user.deleted.v1 qua outbox và dọn dữ liệu/file ở các service."
-status: done
+status: in-progress
 priority: P1
 branch: "feat/account-deletion"
 tags: [user-service, api-gateway, common-events, rabbitmq, storage, gdpr, google-play]
@@ -12,7 +12,7 @@ updated: "2026-11-26T12:05:00+07:00"
 # Plan: Tự xóa tài khoản người dùng (Google Play)
 
 ## Trạng thái
-- **Status:** `DONE` (đã duyệt 2026-11-26, hoàn thành triển khai).
+- **Status:** `IN PROGRESS`. Code đã merge ở PR #230; review 2026-11-27 tìm thấy lỗi SQL và thứ tự xóa, đã sửa trên nhánh `fix/account-deletion-purge` (xem mục "Sửa sau review"). Còn thiếu kiểm thử E2E trên full Docker stack.
 - **Nhánh:** `feat/account-deletion` (đã xác nhận).
 - **URL web ngoài phạm vi backend:** Trang web yêu cầu xóa tài khoản thuộc repo frontend (ví dụ `https://<domain>/account/delete` hoặc `/settings/delete-account`), gọi `DELETE /api/users/me` qua API Gateway.
 
@@ -30,11 +30,11 @@ Thứ tự an toàn: **common-events & contract → consumers (tạo queue trư�
 
 | Phase | Nội dung | Phụ thuộc | Status |
 | --- | --- | --- | --- |
-| 1 | [Contract `user.deleted.v1` & `shared/common-events`](./phase-01-contracts-and-common-events.md) | Duyệt câu hỏi | Pending |
-| 2 | [Consumers: `learning-service` & `assessment-service` (kèm xóa lô & `speaking-recordings`)](./phase-03-consumers-core-and-learning-assessment.md) | Phase 1 | Pending |
-| 3 | [Consumers: `library`, `access`, `notification`, `game`, `community`, `content`](./phase-04-consumers-library-access-notification-game-community-content.md) | Phase 1 | Pending |
-| 4 | [Producer `user-service` (`DELETE /api/users/me`, soft delete, outbox) & `api-gateway`](./phase-02-user-service-and-gateway.md) | Phase 1, 2, 3 | Pending |
-| 5 | [Cập nhật `docs/system-architecture.md` & kiểm chứng E2E](./phase-05-docs-and-e2e-verification.md) | Phase 2, 3, 4 | Pending |
+| 1 | [Contract `user.deleted.v1` & `shared/common-events`](./phase-01-contracts-and-common-events.md) | Duyệt câu hỏi | Done |
+| 2 | [Consumers: `learning-service` & `assessment-service` (kèm xóa lô & `speaking-recordings`)](./phase-03-consumers-core-and-learning-assessment.md) | Phase 1 | Done |
+| 3 | [Consumers: `library`, `access`, `notification`, `game`, `community`, `content`](./phase-04-consumers-library-access-notification-game-community-content.md) | Phase 1 | Done |
+| 4 | [Producer `user-service` (`DELETE /api/users/me`, soft delete, outbox) & `api-gateway`](./phase-02-user-service-and-gateway.md) | Phase 1, 2, 3 | Done |
+| 5 | [Cập nhật `docs/system-architecture.md` & kiểm chứng E2E](./phase-05-docs-and-e2e-verification.md) | Phase 2, 3, 4 | Docs done; E2E chưa chạy |
 
 *(Lưu ý: đánh số file phase giữ `phase-01`..`phase-05` theo thứ tự logic; thứ tự deploy/merge bắt buộc đưa consumer lên trước producer.)*
 
@@ -52,3 +52,20 @@ Thứ tự an toàn: **common-events & contract → consumers (tạo queue trư�
 2. **Dữ liệu giữ lại ở `access-service` (thanh toán/điểm/key):** Giữ bản ghi lịch sử giao dịch (`subscriptions`, `key_activations`, `point_ledger_entries`, `human_grading_credit_consumptions`, `point_credit_requests`) để phục vụ đối soát kế toán/thuế (chỉ vô hiệu hóa `point_wallets` về 0 hoặc xóa ví, không xóa sổ cái), hay xóa toàn bộ? *(Khuyến nghị: giữ sổ cái/kích hoạt key theo luật kế toán tối thiểu, đóng/xóa số dư ví hiện tại và xóa `user_email_verification_state`.)*
 3. **Đăng ký lại cùng email / tài khoản Google:** Cho phép người dùng xóa tài khoản xong được đăng ký lại bằng chính email hoặc tài khoản Google đó (ẩn danh `email` thành `deleted+<userId>@deleted.local`, xóa `phone_number` và `oauth_identities`), hay chặn vĩnh viễn không cho đăng ký lại? *(Khuyến nghị: cho phép đăng ký lại như tài khoản mới hoàn toàn.)*
 4. **Thời gian ân hạn (grace period) trước khi xóa thật:** Xóa ngay lập tức khi gọi `DELETE /api/users/me` (user nhận xác nhận và bị đăng xuất ngay), hay có thời gian ân hạn (ví dụ 14–30 ngày cho phép khôi phục trước khi phát `user.deleted.v1`)? *(Khuyến nghị: xóa ngay lập tức để đáp ứng đơn giản, minh bạch yêu cầu Google Play mà không cần thêm luồng khôi phục tài khoản.)*
+
+## Sửa sau review (2026-11-27)
+
+Nguồn: review PR #230. Nhánh ix/account-deletion-purge.
+
+- [x] learning: xóa ghi âm theo khóa (submission_id, question_version_id); xóa theo thứ tự khóa ngoại; thêm 9 bảng bị sót.
+- [x] assessment: sửa tên cột; đánh dấu ecording_deleted_at thay vì xóa tham chiếu; xóa xaminer_qa_reviews, i_gold_essays và i_eval_items của bài học viên; giữ bản chấm của giám khảo bị xóa, trả bài đang chấm về hàng đợi.
+- [x] game: gỡ 5 cột gợi ý Wordly trước khi xóa lượt đoán; phòng do người dùng làm chủ giữ chủ phòng ẩn danh.
+- [x] user: tài khoản DELETED không đổi lại hay sửa được; admin DELETE bỏ qua tài khoản đã xóa; staff không tự xóa; xóa ảnh qua hàng chờ có thử lại; xóa dữ liệu xaminer_profiles.
+- [x] community: ẩn danh người báo cáo thay vì xóa báo cáo.
+- [x] notification: không ghi lại email, tùy chọn, digest cho người đã xóa khi sự kiện đến muộn.
+- [x] access: số dư về 0 qua một dòng sổ điểm.
+- [x] Mọi service: job crash ở lần thử cuối thành FAILED khi hết lease.
+- [x] Test PostgreSQL thật cho learning, assessment, game (gieo dữ liệu mọi bảng, kiểm dữ liệu người khác, chặn sót bảng), access, user.
+- [ ] E2E trên full Docker stack.
+- [ ] Gom UserDeletedListener lặp ở 8 service vào thư viện chung.
+- [ ] Chính sách quyền riêng tư liệt kê dữ liệu giữ lại.
