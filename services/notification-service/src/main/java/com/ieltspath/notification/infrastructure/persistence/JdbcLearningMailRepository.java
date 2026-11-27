@@ -20,14 +20,16 @@ public class JdbcLearningMailRepository implements LearningMailRepository {
         this.jdbc = jdbc;
     }
 
+    // Each write below is skipped for a deleted user, so a late event cannot bring their address or settings back.
     @Override
     public void upsertContact(UUID userId, String email, String displayName, Instant occurredAt) {
         jdbc.update("""
-                INSERT INTO user_contacts (user_id, email, display_name, occurred_at) VALUES (?, ?, ?, ?)
+                INSERT INTO user_contacts (user_id, email, display_name, occurred_at)
+                SELECT ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM deleted_users WHERE user_id = ?)
                 ON CONFLICT (user_id) DO UPDATE SET email = EXCLUDED.email, display_name = EXCLUDED.display_name,
                     occurred_at = EXCLUDED.occurred_at
                 WHERE user_contacts.occurred_at < EXCLUDED.occurred_at
-                """, userId, email, displayName, Timestamp.from(occurredAt));
+                """, userId, email, displayName, Timestamp.from(occurredAt), userId);
     }
 
     @Override
@@ -46,17 +48,19 @@ public class JdbcLearningMailRepository implements LearningMailRepository {
     @Override
     public void setLearningEnabled(UUID userId, boolean enabled, Instant changedAt) {
         jdbc.update("""
-                INSERT INTO mail_preferences (user_id, category, enabled, updated_at) VALUES (?, ?, ?, ?)
+                INSERT INTO mail_preferences (user_id, category, enabled, updated_at)
+                SELECT ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM deleted_users WHERE user_id = ?)
                 ON CONFLICT (user_id, category) DO UPDATE SET enabled = EXCLUDED.enabled, updated_at = EXCLUDED.updated_at
-                """, userId, LEARNING, enabled, Timestamp.from(changedAt));
+                """, userId, LEARNING, enabled, Timestamp.from(changedAt), userId);
     }
 
     @Override
     public void addPendingExaminerJob(UUID gradingJobId, UUID examinerId, Instant createdAt) {
         jdbc.update("""
-                INSERT INTO examiner_job_digest (grading_job_id, examiner_id, created_at) VALUES (?, ?, ?)
+                INSERT INTO examiner_job_digest (grading_job_id, examiner_id, created_at)
+                SELECT ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM deleted_users WHERE user_id = ?)
                 ON CONFLICT (grading_job_id) DO NOTHING
-                """, gradingJobId, examinerId, Timestamp.from(createdAt));
+                """, gradingJobId, examinerId, Timestamp.from(createdAt), examinerId);
     }
 
     @Override
