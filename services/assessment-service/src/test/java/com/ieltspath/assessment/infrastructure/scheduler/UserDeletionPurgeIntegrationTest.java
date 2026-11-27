@@ -3,6 +3,8 @@ package com.ieltspath.assessment.infrastructure.scheduler;
 import com.ieltspath.assessment.config.SpeakingRecordingProperties;
 import com.ieltspath.assessment.infrastructure.persistence.adapter.JdbcDeletedUserStore;
 import com.ieltspath.commonstorage.ObjectStorage;
+import com.ieltspath.events.assessment.AssessmentCompletedV2;
+import com.ieltspath.events.assessment.SpeakingGradingRequestedV1;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -85,9 +87,12 @@ class UserDeletionPurgeIntegrationTest {
         KEPT_TABLES.forEach(personTables::remove);
         Map<String, Integer> othersBefore = seeder.rowsMentioning(personTables, other);
         // Events about a learner carry their bands; the outbox has no user column.
-        outboxEvent("{\"learnerId\": \"" + deleted + "\", \"criteria\": [{\"band\": 6.5}]}");
-        outboxEvent("{\"data\": {\"userId\": \"" + deleted + "\", \"overallBand\": 6.0}}");
-        outboxEvent("{\"data\": {\"userId\": \"" + other + "\", \"overallBand\": 7.0}}");
+        outboxEvent(json(new com.ieltspath.events.assessment.GradingCompletedV1(UUID.randomUUID(),
+                com.ieltspath.events.assessment.GradingCompletedV1.EVENT_TYPE, Instant.now(), deleted, UUID.randomUUID(),
+                UUID.randomUUID(), "WRITING")));
+        outboxEvent(json(completed(deleted)));
+        outboxEvent(json(speakingRequested(deleted)));
+        outboxEvent(json(completed(other)));
 
         var store = new JdbcDeletedUserStore(jdbc);
         UUID eventId = UUID.randomUUID();
@@ -145,6 +150,27 @@ class UserDeletionPurgeIntegrationTest {
                 .isNotEqualTo("DONE");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM learner_submissions WHERE user_id = ?", Integer.class, deleted))
                 .as("the learner's answers stay until the recording is confirmed gone").isPositive();
+    }
+
+    // Payloads are serialised from the event records, so the stored field names are the ones the publisher writes.
+    private static String json(Object event) {
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules().writeValueAsString(event);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static AssessmentCompletedV2 completed(UUID learner) {
+        return new AssessmentCompletedV2(UUID.randomUUID(), AssessmentCompletedV2.EVENT_TYPE, Instant.now(), AssessmentCompletedV2.SOURCE,
+                new AssessmentCompletedV2.Data(learner, null, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), 1,
+                        "PLACEMENT", "COMPLETED", Instant.now(), new java.math.BigDecimal("6.0"), List.of()));
+    }
+
+    private static SpeakingGradingRequestedV1 speakingRequested(UUID learner) {
+        return new SpeakingGradingRequestedV1(UUID.randomUUID(), SpeakingGradingRequestedV1.EVENT_TYPE, Instant.now(),
+                SpeakingGradingRequestedV1.SOURCE, new SpeakingGradingRequestedV1.Data(UUID.randomUUID(), learner, List.of(
+                        new SpeakingGradingRequestedV1.Item(UUID.randomUUID(), 1, 1, "Describe your home", "speaking/" + learner + "/a.webm"))));
     }
 
     private static void outboxEvent(String payload) {

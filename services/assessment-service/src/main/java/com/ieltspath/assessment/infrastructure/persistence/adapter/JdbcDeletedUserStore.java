@@ -127,7 +127,7 @@ public class JdbcDeletedUserStore implements DeletedUserStore {
         // Events about the learner carry their scores and bands; the table has no user column, the payload names them.
         jdbc.update("""
                 DELETE FROM outbox_events
-                WHERE payload->>'learnerId' = ? OR payload #>> '{data,userId}' = ?
+                WHERE payload->>'learnerId' = ? OR payload #>> '{data,user_id}' = ?
                 """, userId.toString(), userId.toString());
         String submissions = "SELECT id FROM learner_submissions WHERE user_id = ?";
         String reviewSubmissions = "SELECT id FROM human_review_submissions WHERE learner_id = ?";

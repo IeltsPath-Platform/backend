@@ -1,6 +1,9 @@
 package com.ieltspath.learning.infrastructure.scheduler;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.commonstorage.ObjectStorage;
+import com.ieltspath.events.assessment.SpeakingGradingCompletedV1;
 import com.ieltspath.learning.application.service.SpeakingPracticeSettings;
 import com.ieltspath.learning.infrastructure.persistence.JdbcDeletedUserRepository;
 import org.flywaydb.core.Flyway;
@@ -107,7 +110,8 @@ class UserDeletionPurgeIntegrationTest {
         assertThat(seeder.rowsMentioning(userTables, other)).as("another learner's rows").isEqualTo(othersBefore);
         assertThat(jdbc.queryForObject("SELECT status FROM user_deletion_jobs WHERE event_id = ?", String.class, eventId))
                 .isEqualTo("DONE");
-        String placementResults = "SELECT count(*) FROM placement_speaking_outbox WHERE payload #>> '{data,userId}' = ?";
+        // Matches the ID anywhere in the payload, so the check does not share the purge's field path.
+        String placementResults = "SELECT count(*) FROM placement_speaking_outbox WHERE payload::text LIKE '%' || ? || '%'";
         assertThat(jdbc.queryForObject(placementResults, Integer.class, learner.toString()))
                 .as("placement Speaking results of the deleted learner").isZero();
         assertThat(jdbc.queryForObject(placementResults, Integer.class, other.toString()))
@@ -149,7 +153,19 @@ class UserDeletionPurgeIntegrationTest {
                 "content_type", "audio/wav", "size_bytes", 100));
 
         seeder.insert("work_items", Map.of("subject_user_id", learner));
-        seeder.insert("placement_speaking_outbox", Map.of("event_type", "speaking.grading.completed.v1",
-                "payload", "{\"data\": {\"userId\": \"" + learner + "\", \"summary\": \"Fluent answer\"}}"));
+        seeder.insert("placement_speaking_outbox", Map.of("event_type", SpeakingGradingCompletedV1.EVENT_TYPE,
+                "payload", placementResultPayload(learner)));
+    }
+
+    /** Serialised from the event record, so the stored field names are the ones the real publisher writes. */
+    private static String placementResultPayload(UUID learner) {
+        var event = new SpeakingGradingCompletedV1(UUID.randomUUID(), SpeakingGradingCompletedV1.EVENT_TYPE, Instant.now(),
+                SpeakingGradingCompletedV1.SOURCE, new SpeakingGradingCompletedV1.Data(UUID.randomUUID(), learner, "GRADED",
+                        new java.math.BigDecimal("6.5"), List.of(), "Fluent answer", "SPEAKING", 1, null));
+        try {
+            return new ObjectMapper().findAndRegisterModules().writeValueAsString(event);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException(e);
+        }
     }
 }
