@@ -14,6 +14,7 @@ the authenticated user identity and are described under Role and account rules.
 | PUT | `/api/users/{id}` | Update `fullName` and optional `phoneNumber`. |
 | PUT | `/api/users/{id}/roles` | Replace the user's roles with a non-empty `roles` set. |
 | PUT | `/api/users/{id}/status` | Change status to `ACTIVE`, `INACTIVE`, `LOCKED`, or `PENDING_VERIFY`. |
+| PUT | `/api/users/{id}/password` | Set a new password (`newPassword`) for another user. Returns 204. |
 | DELETE | `/api/users/{id}` | Deactivate the user by setting status to `INACTIVE`. |
 | GET | `/api/users/{id}/profile` | Read the learner profile. |
 | PUT | `/api/users/{id}/profile` | Update the learner profile. |
@@ -30,6 +31,19 @@ Compared with the previous contract, `GET /api/users` returned an array; it now 
 `page` is zero-based. `size` defaults to 25 and must be 1–100. Optional `role`, `status`, and `search` filters are applied in the database; `search` matches email or full name without case sensitivity. Results are ordered by creation time and then `id` for a stable page boundary. Invalid page parameters return HTTP 400 with a Vietnamese message.
 
 The system overview uses `GET /api/users/admin/all` to calculate totals across all accounts. This endpoint retains the existing user response fields and is restricted by the same `ADMIN` role.
+
+## Password reset by an administrator
+
+`PUT /api/users/{id}/password` with `{"newPassword": "..."}` is for a user who cannot sign in. The new password follows the
+rules above. In one transaction it replaces the password, revokes every refresh and access token of the user (reason
+`PASSWORD_RESET`), clears the wrong-password counter, cancels unused reset links, queues the `user.password-changed.v1`
+e-mail and records a `PASSWORD_RESET` audit event with `method=ADMIN` and `actorId`. Account status and e-mail
+verification do not change. A missing or deleted user returns 404, a weak password 400 `WEAK_PASSWORD`.
+
+| HTTP | `details.code` | Meaning |
+|---|---|---|
+| 409 | `SELF_PASSWORD_RESET` | The caller's own account; use Change Password, which asks for the current one. |
+| 409 | `PASSWORD_NOT_CONFIGURED` | The account has no password (it signs in with Google). |
 
 ## Role and account rules
 

@@ -1,6 +1,7 @@
 package com.ieltspath.user.api.controller;
 
 import com.ieltspath.commonsecurity.config.CommonSecurityAutoConfiguration;
+import com.ieltspath.user.application.command.AdminResetPasswordCommand;
 import com.ieltspath.user.application.command.AssignRoleCommand;
 import com.ieltspath.user.application.command.ChangeUserStatusCommand;
 import com.ieltspath.user.application.command.CreateUserCommand;
@@ -9,6 +10,7 @@ import com.ieltspath.user.application.command.UpdateUserCommand;
 import com.ieltspath.user.application.result.AccountActionTokenResult;
 import com.ieltspath.user.application.result.LearnerProfileResult;
 import com.ieltspath.user.application.result.OAuthIdentityResult;
+import com.ieltspath.user.application.usecase.AdminResetPasswordUseCase;
 import com.ieltspath.user.application.usecase.AssignRoleUseCase;
 import com.ieltspath.user.application.usecase.ChangeUserStatusUseCase;
 import com.ieltspath.user.application.usecase.CreateUserUseCase;
@@ -103,6 +105,8 @@ class UserManagementControllerSecurityTest {
     private ChangeUserStatusUseCase changeUserStatusUseCase;
     @MockBean
     private DeleteUserUseCase deleteUserUseCase;
+    @MockBean
+    private AdminResetPasswordUseCase adminResetPasswordUseCase;
 
     @MockBean
     private GetLearnerProfileUseCase getLearnerProfileUseCase;
@@ -156,6 +160,30 @@ class UserManagementControllerSecurityTest {
         mockMvc.perform(get("/api/users/{id}/action-tokens", userId)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + customerToken))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void onlyAnAdministratorResetsAPasswordAndTheActorComesFromTheToken() throws Exception {
+        UUID adminId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        String body = "{\"newPassword\":\"Moi-Matkhau-2026\"}";
+
+        mockMvc.perform(put("/api/users/{id}/password", userId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer "
+                                + signedToken(INTERNAL_SECRET, userId, INTERNAL_ISSUER, List.of("CUSTOMER")))
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isForbidden());
+        org.mockito.Mockito.verifyNoInteractions(adminResetPasswordUseCase);
+
+        String adminToken = "Bearer " + signedToken(INTERNAL_SECRET, adminId, INTERNAL_ISSUER, List.of("ADMIN"));
+        mockMvc.perform(put("/api/users/{id}/password", userId).header(HttpHeaders.AUTHORIZATION, adminToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"newPassword\":\"\"}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(put("/api/users/{id}/password", userId).header(HttpHeaders.AUTHORIZATION, adminToken)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isNoContent());
+
+        verify(adminResetPasswordUseCase).execute(new AdminResetPasswordCommand(adminId, userId, "Moi-Matkhau-2026"));
     }
 
     @Test

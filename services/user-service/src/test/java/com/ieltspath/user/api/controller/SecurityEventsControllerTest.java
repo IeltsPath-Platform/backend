@@ -65,6 +65,25 @@ class SecurityEventsControllerTest {
     }
 
     @Test
+    @WithMockUser
+    void hidesWhoResetThePasswordAndFromWhereFromTheAccountOwner() throws Exception {
+        UUID userId = UUID.randomUUID();
+        when(currentUser.requireUserId()).thenReturn(userId);
+        when(getEvents.execute(eq(userId), any(), isNull())).thenReturn(new PageResult<>(List.of(
+                new AuthAuditEventResult(UUID.randomUUID(), userId, "PASSWORD_RESET", "198.51.100.*", "Admin browser",
+                        "request-2", Map.of("method", "ADMIN", "actorId", UUID.randomUUID().toString()),
+                        LocalDateTime.now())), 0, 50, 1));
+
+        mvc.perform(get("/api/users/me/security-events"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].eventType").value("PASSWORD_RESET"))
+                .andExpect(jsonPath("$.items[0].detail.method").value("ADMIN"))
+                .andExpect(jsonPath("$.items[0].detail.actorId").doesNotExist())
+                .andExpect(jsonPath("$.items[0].ipAddress").isEmpty())
+                .andExpect(jsonPath("$.items[0].userAgent").isEmpty());
+    }
+
+    @Test
     @WithMockUser(roles = "USER")
     void deniesSecurityEventsForAnotherUserToNonAdministrators() throws Exception {
         mvc.perform(get("/api/users/{id}/auth-events", UUID.randomUUID()))

@@ -172,6 +172,7 @@ GET  /api/users/{id}
 PUT  /api/users/{id}
 PUT  /api/users/{id}/roles
 PUT  /api/users/{id}/status
+PUT  /api/users/{id}/password
 DELETE /api/users/{id}
 GET  /internal/users/{userId}/study-timezone
 POST /internal/users/display-names
@@ -182,13 +183,19 @@ Gateway. The study-timezone response is `{"timezone": "..."}`: the timezone of t
 when there is none. The display-name request accepts 1–50 IDs in one batch. It uses a learner profile's `displayName`
 when available, falls back to the account `fullName`, omits unknown IDs, and never returns email.
 
+`PUT /api/users/{id}/password` (`ADMIN`, body `{"newPassword": "..."}`, 204) sets a new password for another user who cannot
+sign in. It revokes that user's sessions, cancels unused reset links, e-mails the user and writes a `PASSWORD_RESET` audit
+event naming the administrator. It leaves the account status and e-mail verification unchanged. It refuses the
+administrator's own account (`409 SELF_PASSWORD_RESET`), an account without a password (`409 PASSWORD_NOT_CONFIGURED`),
+a deleted account (404) and a weak password (`400 WEAK_PASSWORD`).
+
 Google sign-in verifies an ID token and uses the same body and cookies as `/auth/login`. It accepts Gmail/Googlemail or
 Workspace email addresses whose `hd` claim matches the email domain, and creates `CUSTOMER` accounts only. Linking a
 password account clears its password and revokes active refresh tokens; the user can set a new password through the
 reset-email flow. Configure `GOOGLE_CLIENT_IDS` as a comma-separated list. An empty value leaves the service available
 but makes `/auth/google` return 503. See [`google-sign-in-v1.md`](../../docs/contracts/google-sign-in-v1.md).
 
-Goals (`/api/users/me/learning-goals/**`, `/api/users/{id}/learning-goals/**`), study time
+Goals (`/api/users/me/learning-goals/**`), study time
 (`/api/users/me/study-sessions/**`, `/api/users/me/statistics/study-time`) and learning activity
 (`/api/learning-support/activities/**`) are no longer served here: the Gateway rewrites those public paths to the
 Learning Service.

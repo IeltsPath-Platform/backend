@@ -1,6 +1,7 @@
 package com.ieltspath.user.api.controller;
 
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
+import com.ieltspath.user.api.dto.request.AdminResetPasswordRequest;
 import com.ieltspath.user.api.dto.request.AssignRoleRequest;
 import com.ieltspath.user.api.dto.request.ChangeUserStatusRequest;
 import com.ieltspath.user.api.dto.request.CreateUserRequest;
@@ -13,6 +14,7 @@ import com.ieltspath.user.api.dto.response.OAuthIdentityResponse;
 import com.ieltspath.user.api.dto.response.RoleResponse;
 import com.ieltspath.user.api.dto.response.UserResponse;
 import com.ieltspath.user.api.dto.response.UserPageResponse;
+import com.ieltspath.user.application.command.AdminResetPasswordCommand;
 import com.ieltspath.user.application.command.AssignRoleCommand;
 import com.ieltspath.user.application.command.ChangeUserStatusCommand;
 import com.ieltspath.user.application.command.CreateUserCommand;
@@ -21,6 +23,7 @@ import com.ieltspath.user.application.command.UpdateUserCommand;
 import com.ieltspath.user.application.result.AccountActionTokenResult;
 import com.ieltspath.user.application.result.LearnerProfileResult;
 import com.ieltspath.user.application.result.OAuthIdentityResult;
+import com.ieltspath.user.application.usecase.AdminResetPasswordUseCase;
 import com.ieltspath.user.application.usecase.AssignRoleUseCase;
 import com.ieltspath.user.application.usecase.ChangeUserStatusUseCase;
 import com.ieltspath.user.application.usecase.CreateUserUseCase;
@@ -73,6 +76,7 @@ public class UserManagementController {
     private final AssignRoleUseCase assignRoleUseCase;
     private final ChangeUserStatusUseCase changeUserStatusUseCase;
     private final DeleteUserUseCase deleteUserUseCase;
+    private final AdminResetPasswordUseCase adminResetPasswordUseCase;
 
     private final GetLearnerProfileUseCase getLearnerProfileUseCase;
     private final UpdateLearnerProfileUseCase updateLearnerProfileUseCase;
@@ -132,6 +136,13 @@ public class UserManagementController {
     @PutMapping("/{id}/status")
     public UserResponse changeStatus(@PathVariable("id") UUID id, @Valid @RequestBody ChangeUserStatusRequest request) {
         return toUserResponse(changeUserStatusUseCase.execute(new ChangeUserStatusCommand(id, request.status(), currentUserProvider.requireUserId())));
+    }
+
+    @PutMapping("/{id}/password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void resetPassword(@PathVariable("id") UUID id, @Valid @RequestBody AdminResetPasswordRequest request) {
+        adminResetPasswordUseCase.execute(new AdminResetPasswordCommand(currentUserProvider.requireUserId(), id,
+                request.newPassword()));
     }
 
     @DeleteMapping("/{id}")
