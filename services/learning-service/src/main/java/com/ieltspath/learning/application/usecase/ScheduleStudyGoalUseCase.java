@@ -17,7 +17,6 @@ public class ScheduleStudyGoalUseCase {
     private final LearningGoalRepository goals;
     private final Clock clock;
     public void lock(UUID userId) { sessions.lockUser(userId); }
-    public void lockGoalOwner(UUID goalId) { sessions.lockGoalOwner(goalId); }
     /**
      * The learner may have changed the timezone on their profile, which the User Service keeps. When the goal was last
      * scheduled in another timezone it is scheduled again, from the next local day. Callers hold the learner's lock.

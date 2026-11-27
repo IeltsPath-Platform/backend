@@ -1,6 +1,6 @@
 # "Premium subscription granted" notice (v1)
 
-When an administrator grants a learner a Premium subscription, Access tells Notification, which stores a notice for the
+When a learner redeems a Premium activation key, Access tells Notification, which stores a notice for the
 learner and pushes it to them.
 
 ## Event
@@ -21,22 +21,18 @@ routed it to a queue. The AMQP `message-id` is the `eventId`.
 }
 ```
 
-- `endsAt` is when the granted access ends. The notice carries no price and no payment detail.
-- The outbox row is written in the same transaction as the subscription. A grant that is rolled back is never announced.
-- Only grants made through the administrator endpoint are announced. Other outbox event types in Access (point debits, human
+- `endsAt` is when the access ends, after the redeemed days are added. The notice carries no price and no payment detail.
+- The outbox row is written in the same transaction as the activation. An activation that is rolled back is never announced.
+- Redeeming a points key sends no event. Other outbox event types in Access (point debits, human
   grading credits) are stored as `NOT_RELAYED` and never leave the service.
 
-## Granting: `Idempotency-Key`
+## Repeated requests
 
-`POST /api/access/admin/subscriptions/grant` requires an `Idempotency-Key` header of 1 to 100 characters. The key is what
-makes a retried grant safe.
+`POST /api/access/me/keys/activate` carries an `idempotencyKey` in its body.
 
-- Same key, same payload (user, plan, duration, grading credits): returns the first result. The subscription is not extended
-  again and no second event is written.
-- Same key, different payload: `409 Conflict`.
-- Missing, blank or longer than 100 characters: `400` with code `IDEMPOTENCY_KEY_REQUIRED`.
-- Two requests with the same key at the same time: the second waits for the first to commit, then returns the same result.
-  Neither fails.
+- Same learner, same key code, same `idempotencyKey`: returns the first result. The subscription is not extended again
+  and no second event is written.
+- The same `idempotencyKey` used for another learner or another key code: `409 Conflict`.
 
 ## Queue topology
 

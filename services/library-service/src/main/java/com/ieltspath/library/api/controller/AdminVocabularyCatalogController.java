@@ -51,7 +51,7 @@ import java.io.IOException;
 /** Author edits of the dictionary catalog. Rules live in the domain values the requests are mapped to. */
 @RestController
 @RequestMapping("/api/content/admin/vocabulary")
-@PreAuthorize("hasAnyRole('CONTENT_AUTHOR','ADMIN')")
+@PreAuthorize("hasRole('CONTENT_AUTHOR')")
 @RequiredArgsConstructor
 @Validated
 public class AdminVocabularyCatalogController {

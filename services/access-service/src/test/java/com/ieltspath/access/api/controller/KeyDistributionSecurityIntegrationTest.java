@@ -106,6 +106,39 @@ class KeyDistributionSecurityIntegrationTest {
     }
 
     @Test
+    void theSalesManagerCreatesPlansAndKeyProductsAndTheAdministratorCannot() throws Exception {
+        String asManager = "Bearer " + token(UUID.randomUUID(), "STAFF_MANAGER");
+        String asAdmin = "Bearer " + token(UUID.randomUUID(), "ADMIN");
+        String planCode = "PLAN-" + UUID.randomUUID();
+        String plan = "{\"code\":\"" + planCode + "\",\"name\":\"Premium tháng\"}";
+        String product = "{\"code\":\"KP-" + UUID.randomUUID() + "\",\"name\":\"Gói 50 point\","
+                + "\"keyType\":\"POINTS\",\"pointsAmount\":50}";
+
+        mvc.perform(post("/api/access/manager/plans").header("Authorization", asAdmin)
+                        .contentType(MediaType.APPLICATION_JSON).content(plan))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/api/access/manager/key-products").header("Authorization", asAdmin)
+                        .contentType(MediaType.APPLICATION_JSON).content(product))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/api/access/manager/plans").header("Authorization", asManager)
+                        .contentType(MediaType.APPLICATION_JSON).content(plan))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.code").value(planCode));
+        mvc.perform(post("/api/access/manager/key-products").header("Authorization", asManager)
+                        .contentType(MediaType.APPLICATION_JSON).content(product))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.pointsAmount").value(50));
+
+        for (String gone : List.of("/api/access/admin/plans", "/api/access/admin/key-products",
+                "/api/access/admin/subscriptions/grant", "/api/access/admin/keys/generate",
+                "/api/access/admin/keys/" + UUID.randomUUID() + "/revoke")) {
+            mvc.perform(post(gone).header("Authorization", asAdmin)
+                            .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                    .andExpect(status().isNotFound());
+        }
+    }
+
+    @Test
     void onlySalesStaffReachesTheSaleScreens() throws Exception {
         UUID sale = UUID.randomUUID();
         mvc.perform(get("/api/access/sale/stock").header("Authorization", "Bearer " + token(sale, "SALES_STAFF")))

@@ -107,11 +107,13 @@ class VocabularyCatalogSecurityTest {
         mvc.perform(get("/api/content/vocabulary/{id}", id)).andExpect(status().isNotFound());
     }
 
-    @Test void catalogAdminWriteRejectsCustomerRole() throws Exception {
-        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/content/admin/vocabulary/items/{id}",UUID.randomUUID())
-                        .header(HttpHeaders.AUTHORIZATION,"Bearer "+signedInternalToken("CUSTOMER"))
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"academicWordList\":false}"))
-                .andExpect(status().isForbidden());
+    @Test void catalogAdminWriteRejectsLearnersAndAdministrators() throws Exception {
+        for (String role : java.util.List.of("CUSTOMER", "ADMIN")) {
+            mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/content/admin/vocabulary/items/{id}",UUID.randomUUID())
+                            .header(HttpHeaders.AUTHORIZATION,"Bearer "+signedInternalToken(role))
+                            .contentType(MediaType.APPLICATION_JSON).content("{\"academicWordList\":false}"))
+                    .andExpect(status().isForbidden());
+        }
     }
 
     @Test void catalogCoverUploadReturnsStoredMediaReferenceForAuthors() throws Exception {

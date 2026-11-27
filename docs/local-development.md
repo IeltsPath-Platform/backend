@@ -139,6 +139,9 @@ thêm `DEMO_DATA_ENABLED=true` vào `.env`. Ghi một lần, khởi động lạ
 | `learner@ielts.demo` | `00000000-0000-0000-0000-000000000001` | `Demo@123` | CUSTOMER, ví 30 point (10 lần chấm Writing)                 |
 | `admin@ielts.demo`   | `00000000-0000-0000-0000-000000000002` | `Demo@123` | ADMIN, nạp point qua `POST /api/access/admin/points/adjust` |
 
+Muốn tài khoản demo có Premium thì kích hoạt một mã Premium: Sales Manager tạo đợt và phát mã (`/api/access/manager/**`),
+học viên gọi `POST /api/access/me/keys/activate`.
+
 Content seed các bài Reading, Listening, Writing, topic nhiều skill và đề placement `PLACEMENT-4SKILLS` qua các Flyway
 migration (V9–V25). Placement không bắt buộc: học viên học được mọi course khi chưa làm; kết quả chỉ dùng để gợi ý course.
 Học viên chọn pool qua `GET /api/learning/placement-test/options` và tạo assignment bằng

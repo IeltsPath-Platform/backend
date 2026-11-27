@@ -153,13 +153,12 @@ class InternalAccessControllerTest {
 
     @Test
     @WithMockUser(roles = "CUSTOMER")
-    void customerCannotRefundConsumeOrReadEntitlement() throws Exception {
+    void customerCannotRefundOrReadEntitlement() throws Exception {
         String refund = objectMapper.writeValueAsString(
                 new RefundPointsRequest(userId, 3, "LESSON_WRITING", UUID.randomUUID(), "idem-2", "Refund"));
 
         mockMvc.perform(post("/api/access/points/refund").contentType(MediaType.APPLICATION_JSON).content(refund))
                 .andExpect(status().isForbidden());
-        mockMvc.perform(post("/api/access/users/{id}/consume-human-grading", userId)).andExpect(status().isForbidden());
         mockMvc.perform(get("/api/access/users/{id}/entitlement", userId)).andExpect(status().isForbidden());
         verifyNoInteractions(refundPointsUseCase, consumeHumanGradingCreditUseCase, getUserEntitlementUseCase,
                 isUserPremiumUseCase);
@@ -179,16 +178,15 @@ class InternalAccessControllerTest {
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void adminKeepsEntitlementAndConsume() throws Exception {
+    void adminKeepsEntitlementButCannotSpendGradingCredits() throws Exception {
         when(getUserEntitlementUseCase.execute(userId)).thenReturn(
                 new UserEntitlementResult(userId, true, Instant.now().plusSeconds(3600), 5, 20L, List.of("PREMIUM_CONTENT")));
-        when(consumeHumanGradingCreditUseCase.execute(any())).thenReturn(4);
 
         mockMvc.perform(get("/api/access/users/{id}/entitlement", userId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.pointBalance").value(20));
         mockMvc.perform(post("/api/access/users/{id}/consume-human-grading", userId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.remainingCredits").value(4));
+                .andExpect(status().isNotFound());
+        verifyNoInteractions(consumeHumanGradingCreditUseCase);
     }
 }

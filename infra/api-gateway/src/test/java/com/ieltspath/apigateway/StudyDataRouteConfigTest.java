@@ -93,14 +93,6 @@ class StudyDataRouteConfigTest {
     }
 
     @Test
-    void goalsOfAnotherLearnerForStaffAreServedByLearning() throws IOException {
-        movesToLearning("/api/users/" + LEARNER + "/learning-goals",
-                "/api/learning/admin/users/" + LEARNER + "/goals");
-        movesToLearning("/api/users/" + LEARNER + "/learning-goals/" + GOAL + "/status",
-                "/api/learning/admin/users/" + LEARNER + "/goals/" + GOAL + "/status");
-    }
-
-    @Test
     void studySessionsAndStudyTimeStatisticsAreServedByLearning() throws IOException {
         movesToLearning("/api/users/me/study-sessions", "/api/learning/study-sessions");
         movesToLearning("/api/users/me/study-sessions/" + SESSION + "/heartbeats",

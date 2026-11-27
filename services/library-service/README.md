@@ -15,7 +15,7 @@ adds `outbox_events` for the daily vocabulary review reminder (see
 
 Gateway routes `/api/content/videos/**`, `/api/content/vocabulary/**` and `/api/content/admin/vocabulary/**` here.
 It also routes `/api/learning-support/{flashcards,decks,notes,video-progress,saved-segments}/**` here; the public
-paths and request/response shapes remain the same. Catalog writes require `ADMIN` or `CONTENT_AUTHOR`; personal
+paths and request/response shapes remain the same. Catalog writes require `CONTENT_AUTHOR`; personal
 library writes are owner-scoped.
 
 ## Flashcard images and review schedule

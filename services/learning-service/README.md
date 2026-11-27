@@ -113,7 +113,6 @@ calling the paths they always used; the Gateway rewrites them:
 | Public path | Learning path |
 | --- | --- |
 | `/api/users/me/learning-goals[/active\|/{id}/status]` | `/api/learning/goals[...]` |
-| `/api/users/{id}/learning-goals[/{goalId}/status]` (role `ADMIN`) | `/api/learning/admin/users/{id}/goals[...]` |
 | `/api/users/me/study-sessions[/{id}/heartbeats\|/{id}/close]` | `/api/learning/study-sessions[...]` |
 | `/api/learning/practice-sessions` | `/api/learning/practice-sessions` |
 | `/api/users/me/statistics/study-time` | `/api/learning/statistics/study-time` |

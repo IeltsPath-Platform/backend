@@ -41,10 +41,6 @@ public class StudySessionRepositoryAdapter implements StudySessionRepository {
     public Optional<StudySession> findByClient(UUID user, UUID client) {
         return jdbc.query("SELECT * FROM study_sessions WHERE user_id=? AND client_session_id=?", SESSION, user, client).stream().findFirst();
     }
-    public void lockGoalOwner(UUID goalId) {
-        var owners=jdbc.query("SELECT user_id FROM learning_goals WHERE id=?",(r,n)->r.getObject(1,UUID.class),goalId);
-        owners.stream().findFirst().ifPresent(this::lockUser);
-    }
     public Optional<StudySession> find(UUID user, UUID id) {
         return jdbc.query("SELECT * FROM study_sessions WHERE user_id=? AND id=?", SESSION, user, id).stream().findFirst();
     }

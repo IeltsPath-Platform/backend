@@ -22,13 +22,12 @@ credit instead of charging twice.
 The behavior is covered by `RequestHumanGradingUseCaseTest` and `HumanGradingRequestIntegrationTest`, including duplicate
 requests, failed job creation, uncertain job persistence, refund failure, and retry.
 
-## Admin subscription grant
+## Premium activation
 
-The Access grant endpoint requires `Idempotency-Key`. The key reserves one request hash and subscription ID in the same
-database transaction as the subscription and `SubscriptionGranted` outbox event. Repeating the same key and payload
-returns the saved subscription without extending it or writing another event. Reusing the key with a different payload
-returns conflict. A concurrent request that loses the unique-key reservation rolls back its subscription and outbox
-changes.
+`POST /api/access/me/keys/activate` carries an `idempotencyKey`. The activation, the subscription and the
+`SubscriptionGranted` outbox event are written in one database transaction. Repeating the request returns the stored
+result without extending the subscription or writing another event; reusing the key for another learner or activation
+key returns conflict. A concurrent duplicate fails on the unique constraints and rolls back its outbox row.
 
-`GrantSubscriptionIdempotencyTest` covers same-key replay, payload conflict, missing key, concurrent requests, and one
-outbox event for the replayed grant.
+`ConcurrentSubscriptionGrantIntegrationTest` covers concurrent activations of one learner and one event for a replayed
+request.

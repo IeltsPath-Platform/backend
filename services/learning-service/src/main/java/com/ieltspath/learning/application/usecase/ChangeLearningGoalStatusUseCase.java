@@ -21,12 +21,11 @@ public class ChangeLearningGoalStatusUseCase {
 
     @Transactional
     public LearningGoalResult execute(ChangeLearningGoalStatusCommand command) {
-        if (command.userId() != null) studyGoals.lock(command.userId());
-        else studyGoals.lockGoalOwner(command.goalId());
+        studyGoals.lock(command.userId());
         LearningGoal goal = learningGoalRepository.findById(command.goalId())
                 .orElseThrow(() -> new LearningGoalNotFoundException("Không tìm thấy mục tiêu học tập với id: " + command.goalId()));
 
-        if (command.userId() != null && !goal.getUserId().equals(command.userId())) {
+        if (!goal.getUserId().equals(command.userId())) {
             throw new AccessDeniedException("Bạn không có quyền chỉnh sửa mục tiêu học tập này");
         }
 

@@ -4,6 +4,7 @@ import com.ieltspath.access.application.command.ActivateKeyCommand;
 import com.ieltspath.access.application.result.ActivationResult;
 import com.ieltspath.access.domain.aggregate.ActivationKey;
 import com.ieltspath.access.domain.aggregate.KeyProduct;
+import com.ieltspath.access.domain.aggregate.Plan;
 import com.ieltspath.access.domain.aggregate.PointWallet;
 import com.ieltspath.access.domain.aggregate.Subscription;
 import com.ieltspath.access.domain.entity.KeyActivation;
@@ -13,12 +14,16 @@ import com.ieltspath.access.domain.exception.ActivationKeyNotFoundException;
 import com.ieltspath.access.domain.exception.DuplicateIdempotencyException;
 import com.ieltspath.access.domain.exception.KeyProductNotFoundException;
 import com.ieltspath.access.domain.exception.EmailNotVerifiedException;
+import com.ieltspath.access.domain.exception.PlanNotFoundException;
 import com.ieltspath.access.domain.repository.UserEmailVerificationRepository;
 import com.ieltspath.access.domain.repository.*;
 import com.ieltspath.access.domain.vo.ActivationKeyCode;
 import com.ieltspath.access.domain.vo.KeyType;
 import com.ieltspath.access.domain.vo.PointTransactionType;
 import com.ieltspath.access.domain.vo.SubscriptionSourceType;
+import com.ieltspath.events.access.SubscriptionGrantedV1;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +43,8 @@ public class ActivateKeyUseCase {
     private final SubscriptionRepository subscriptionRepository;
     private final OutboxEventRepository outboxEventRepository;
     private final UserEmailVerificationRepository userEmailVerificationRepository;
+    private final PlanRepository planRepository;
+    private final ObjectMapper objectMapper;
 
     public ActivateKeyUseCase(
             ActivationKeyRepository activationKeyRepository,
@@ -47,7 +54,9 @@ public class ActivateKeyUseCase {
             PointLedgerRepository pointLedgerRepository,
             SubscriptionRepository subscriptionRepository,
             OutboxEventRepository outboxEventRepository,
-            UserEmailVerificationRepository userEmailVerificationRepository
+            UserEmailVerificationRepository userEmailVerificationRepository,
+            PlanRepository planRepository,
+            ObjectMapper objectMapper
     ) {
         this.activationKeyRepository = activationKeyRepository;
         this.keyProductRepository = keyProductRepository;
@@ -57,6 +66,8 @@ public class ActivateKeyUseCase {
         this.subscriptionRepository = subscriptionRepository;
         this.outboxEventRepository = outboxEventRepository;
         this.userEmailVerificationRepository = userEmailVerificationRepository;
+        this.planRepository = planRepository;
+        this.objectMapper = objectMapper;
     }
 
     public ActivationResult execute(ActivateKeyCommand command) {
@@ -167,6 +178,7 @@ public class ActivateKeyUseCase {
                     String.format("{\"userId\":\"%s\",\"subscriptionId\":\"%s\",\"endsAt\":\"%s\",\"credits\":%d}",
                             command.userId(), subscription.getId(), subEndsAt, subscription.getRemainingCredits())
             ));
+            announcePremium(subscription);
         }
 
         activationKeyRepository.save(key);
@@ -178,5 +190,28 @@ public class ActivateKeyUseCase {
                 product.getHumanGradingCredits() != null ? product.getHumanGradingCredits() : 0,
                 Instant.now(), newBalance, subEndsAt
         );
+    }
+
+    /** Tells the learner about the Premium access; written with the activation, so a replayed request announces nothing. */
+    private void announcePremium(Subscription subscription) {
+        Plan plan = planRepository.findById(subscription.getPlanId())
+                .orElseThrow(() -> new PlanNotFoundException(subscription.getPlanId()));
+        UUID eventId = UUID.randomUUID();
+        SubscriptionGrantedV1 event = new SubscriptionGrantedV1(eventId, SubscriptionGrantedV1.EVENT_TYPE, Instant.now(),
+                subscription.getUserId(), subscription.getId(), plan.getCode(), databasePrecision(subscription.getEndsAt()));
+        try {
+            outboxEventRepository.save(OutboxEvent.create(eventId, "Subscription", subscription.getId(),
+                    "SubscriptionGranted", objectMapper.writeValueAsString(event)));
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Subscription granted event could not be serialized", exception);
+        }
+    }
+
+    /** PostgreSQL keeps microseconds, so the announced end matches what is read back from the database. */
+    private static Instant databasePrecision(Instant value) {
+        if (value == null) return null;
+        long micros = (value.getNano() + 500L) / 1_000L;
+        return Instant.ofEpochSecond(value.getEpochSecond() + micros / 1_000_000L,
+                (micros % 1_000_000L) * 1_000L);
     }
 }

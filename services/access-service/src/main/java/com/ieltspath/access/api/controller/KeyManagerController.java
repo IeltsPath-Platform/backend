@@ -1,6 +1,12 @@
 package com.ieltspath.access.api.controller;
 
+import com.ieltspath.access.api.dto.request.CreateKeyProductRequest;
+import com.ieltspath.access.api.dto.request.CreatePlanRequest;
 import com.ieltspath.access.api.dto.request.KeyDistributionRequests;
+import com.ieltspath.access.api.dto.response.KeyProductResponse;
+import com.ieltspath.access.api.dto.response.PlanResponse;
+import com.ieltspath.access.application.command.CreateKeyProductCommand;
+import com.ieltspath.access.application.command.CreatePlanCommand;
 import com.ieltspath.access.api.dto.response.KeyDistributionResponses.ActionResponse;
 import com.ieltspath.access.api.dto.response.KeyDistributionResponses.BatchResponse;
 import com.ieltspath.access.api.dto.response.KeyDistributionResponses.CodeResponse;
@@ -12,6 +18,8 @@ import com.ieltspath.access.api.dto.response.KeyDistributionResponses.PageRespon
 import com.ieltspath.access.api.dto.response.KeyDistributionResponses.SaleResponse;
 import com.ieltspath.access.application.port.KeyDistributionStore.Allocation;
 import com.ieltspath.access.application.port.KeyDistributionStore.State;
+import com.ieltspath.access.application.usecase.CreateKeyProductUseCase;
+import com.ieltspath.access.application.usecase.CreatePlanUseCase;
 import com.ieltspath.access.application.usecase.KeyBatchUseCases;
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import jakarta.validation.Valid;
@@ -36,7 +44,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
 
-/** The sales manager's side: batches, giving keys to sales, taking them back, revoking, handing out and exporting. */
+/** The sales manager's side: plans, key products, batches, giving keys to sales, taking them back, revoking, handing out and exporting. */
 @RestController
 @RequestMapping("/api/access/manager")
 @RequiredArgsConstructor
@@ -47,6 +55,28 @@ public class KeyManagerController {
 
     private final CurrentUserProvider currentUser;
     private final KeyBatchUseCases keys;
+    private final CreatePlanUseCase createPlanUseCase;
+    private final CreateKeyProductUseCase createKeyProductUseCase;
+
+    @PostMapping("/plans")
+    @ResponseStatus(HttpStatus.CREATED)
+    public PlanResponse createPlan(@Valid @RequestBody CreatePlanRequest request) {
+        return PlanResponse.from(createPlanUseCase.execute(new CreatePlanCommand(request.code(), request.name())));
+    }
+
+    @PostMapping("/key-products")
+    @ResponseStatus(HttpStatus.CREATED)
+    public KeyProductResponse createKeyProduct(@Valid @RequestBody CreateKeyProductRequest request) {
+        return KeyProductResponse.from(createKeyProductUseCase.execute(new CreateKeyProductCommand(
+                request.code(),
+                request.name(),
+                request.keyType(),
+                request.pointsAmount(),
+                request.planId(),
+                request.premiumDays(),
+                request.humanGradingCredits()
+        )));
+    }
 
     @PostMapping("/batches")
     @ResponseStatus(HttpStatus.CREATED)

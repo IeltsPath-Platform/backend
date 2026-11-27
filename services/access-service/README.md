@@ -9,10 +9,10 @@ Gói học, subscription, activation key và ví point. Cổng 8084, DB `access_
 | --- | --- | --- |
 | Catalog | `GET /api/access/plans`, `GET /api/access/key-products` | Người dùng đăng nhập |
 | Học viên | `GET /api/access/me/subscription`, `GET /api/access/me/points`, `GET /api/access/me/points/history`, `POST /api/access/me/keys/activate` | Người dùng đăng nhập, theo subject của token |
-| Admin | `/api/access/admin/**` | `ADMIN` |
-| Thao tác trên user khác | `GET /api/access/users/{userId}/entitlement`, `POST /api/access/users/{userId}/consume-human-grading`, `POST /api/access/points/refund` | Chỉ `ADMIN`; chưa service nào gọi |
+| Admin | `POST /api/access/admin/points/adjust` | `ADMIN` |
+| Thao tác trên user khác | `GET /api/access/users/{userId}/entitlement`, `POST /api/access/points/refund` | Chỉ `ADMIN`; chưa service nào gọi |
 | Nội bộ | `POST /internal/access/points/debit` | Service khác, mang bearer của học viên. Không có route cộng điểm: điểm chỉ được cộng qua message `points.grant.requested` (queue `access.points-grant`) |
-| Quản lý bán hàng | `/api/access/manager/**` (tạo đợt, giao, thu hồi, phát, xuất CSV) | `STAFF_MANAGER` (không có ADMIN) |
+| Quản lý bán hàng | `/api/access/manager/**` (tạo gói `plans`, loại mã `key-products`, tạo đợt, giao, thu hồi, phát, xuất CSV) | `STAFF_MANAGER` (không có ADMIN) |
 | Sale | `/api/access/sale/**` (kho của tôi, phát key, key đã phát) | `SALES_STAFF`, chỉ key của chính mình |
 
 Hợp đồng đầy đủ, trạng thái key và mã lỗi: `docs/contracts/key-distribution-v1.md`.
@@ -21,7 +21,7 @@ Hợp đồng đầy đủ, trạng thái key và mã lỗi: `docs/contracts/key
 
 - Đợt tối đa 1000 key, key mã hóa AES-256-GCM. Khóa `ACCESS_KEY_CODE_SECRET` (Base64 của 32 byte) chỉ đặt trong `.env`;
   thiếu thì không tạo được đợt, kích hoạt key vẫn chạy.
-- Key của đợt chỉ kích hoạt được sau khi đã phát (`issued_at`). Key sinh từ `/admin/keys/generate` không thuộc đợt, kích hoạt như cũ.
+- Key của đợt chỉ kích hoạt được sau khi đã phát (`issued_at`). Mã lẻ sinh trước đây không thuộc đợt, kích hoạt như cũ.
 - Mọi lần xem mã, xuất CSV, giao, cân lại, thu hồi, phát được ghi vào `key_audit_log` (V14). Nhật ký không chứa mã.
 - Danh sách sale lấy từ user-service qua `USER_SERVICE_URL` (`GET /internal/users/sales-staff`).
 
@@ -43,7 +43,10 @@ Hợp đồng đầy đủ, trạng thái key và mã lỗi: `docs/contracts/key
 ## Đổi route
 
 - `POST /api/access/points/debit` đã chuyển sang `POST /internal/access/points/debit` (path cũ trả 404).
-- Refund, consume-human-grading, entitlement giữ path cũ nhưng chỉ `ADMIN` (trước đây mọi người đăng nhập đều gọi được).
+- Refund, entitlement giữ path cũ nhưng chỉ `ADMIN` (trước đây mọi người đăng nhập đều gọi được).
+- Đã bỏ: `/api/access/admin/subscriptions/grant`, `/admin/keys/generate`, `/admin/keys/{id}/revoke` và
+  `/api/access/users/{userId}/consume-human-grading`. `/admin/plans`, `/admin/key-products` chuyển sang `/api/access/manager/**`.
+- Kích hoạt mã Premium phát `access.subscription-granted.v1` (`docs/contracts/subscription-granted-v1.md`).
 
 ## Test
 

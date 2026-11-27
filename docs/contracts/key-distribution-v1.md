@@ -19,13 +19,15 @@ Không lưu thành cột riêng; suy ra từ `activation_keys` (V12):
 Manager thấy thêm `GIVEN` = `READY` có sale giữ, hoặc `ISSUED`.
 
 Key của đợt (`batch_code` khác rỗng) **chỉ kích hoạt được sau khi đã phát** (`issued_at` có). Key chưa phát bị từ chối như
-mã không tồn tại (`KEY_NOT_FOUND`), không lộ rằng key có thật. Key không thuộc đợt (sinh từ `POST /api/access/admin/keys/generate`)
+mã không tồn tại (`KEY_NOT_FOUND`), không lộ rằng key có thật. Key không thuộc đợt (mã lẻ sinh trước đây, nay không còn API sinh)
 coi như đã phát và kích hoạt như cũ.
 
 ## Manager
 
 | Method, path | Body / query | Trả về |
 | --- | --- | --- |
+| `POST /plans` | `{code, name}` | 201 `PlanResponse` |
+| `POST /key-products` | `{code, name, keyType, pointsAmount?, planId?, premiumDays?, humanGradingCredits?}` | 201 `KeyProductResponse` |
 | `POST /batches` | `{productId, quantity 1..1000, expiresOn?: YYYY-MM-DD, label?}` | 201 `BatchResponse` |
 | `GET /batches` | `productId?`, `month?: YYYY-MM`, `page`, `size` (≤100) | `PageResponse<BatchResponse>` |
 | `GET /batches/{code}` | | `BatchResponse` |

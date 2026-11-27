@@ -5,8 +5,13 @@ import com.ieltspath.access.domain.entity.OutboxEvent;
 import com.ieltspath.access.domain.repository.OutboxEventRepository;
 import com.ieltspath.access.domain.aggregate.Plan;
 import com.ieltspath.access.domain.repository.PlanRepository;
-import com.ieltspath.access.application.command.GrantSubscriptionCommand;
-import com.ieltspath.access.application.usecase.GrantSubscriptionUseCase;
+import com.ieltspath.access.application.command.ActivateKeyCommand;
+import com.ieltspath.access.application.usecase.ActivateKeyUseCase;
+import com.ieltspath.access.domain.aggregate.ActivationKey;
+import com.ieltspath.access.domain.aggregate.KeyProduct;
+import com.ieltspath.access.domain.repository.ActivationKeyRepository;
+import com.ieltspath.access.domain.repository.KeyProductRepository;
+import com.ieltspath.access.domain.vo.ActivationKeyCode;
 import com.ieltspath.commonobservability.CorrelationIdFilter;
 import com.ieltspath.events.access.SubscriptionExpiryNoticeTopology;
 import com.ieltspath.events.access.SubscriptionGrantedTopology;
@@ -76,7 +81,9 @@ class AccessOutboxRelayIntegrationTest {
     @Autowired RabbitTemplate rabbit;
     @Autowired JdbcTemplate jdbc;
     @Autowired PlanRepository plans;
-    @Autowired GrantSubscriptionUseCase grantSubscription;
+    @Autowired ActivateKeyUseCase activateKey;
+    @Autowired KeyProductRepository products;
+    @Autowired ActivationKeyRepository keys;
     @Autowired PlatformTransactionManager transactionManager;
     @Autowired ObjectMapper json;
     @MockitoSpyBean AccessEventPublisher publisher;
@@ -228,11 +235,18 @@ class AccessOutboxRelayIntegrationTest {
     void rollbackLeavesNoOutboxRow() {
         UUID learner = UUID.randomUUID();
         Plan plan = plans.save(Plan.create("ROLLBACK-" + UUID.randomUUID(), "Rollback test plan"));
+        KeyProduct product = products.save(KeyProduct.createPremiumProduct(
+                "ROLLBACK-" + UUID.randomUUID(), "Rollback test product", plan.getId(), 30, 1));
+        String rawKey = ActivationKeyCode.generateRaw();
+        ActivationKeyCode code = ActivationKeyCode.fromRawKey(rawKey);
+        keys.save(ActivationKey.create(product.getId(), code.codeHash(), code.codeHint(), null, null));
+        jdbc.update("INSERT INTO user_email_verification_state (user_id, verified, occurred_at) "
+                + "VALUES (?, true, CURRENT_TIMESTAMP)", learner);
 
         assertThrows(IllegalStateException.class, () -> new TransactionTemplate(transactionManager)
                 .executeWithoutResult(status -> {
-                    grantSubscription.execute(new GrantSubscriptionCommand(learner, plan.getId(), 30, 0));
-                    throw new IllegalStateException("roll back the subscription grant");
+                    activateKey.execute(new ActivateKeyCommand(learner, rawKey, "rollback-" + learner));
+                    throw new IllegalStateException("roll back the activation");
                 }));
 
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM outbox_events WHERE event_type = ?",

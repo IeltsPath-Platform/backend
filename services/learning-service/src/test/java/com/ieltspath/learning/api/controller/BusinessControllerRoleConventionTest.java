@@ -22,10 +22,9 @@ class BusinessControllerRoleConventionTest {
 
         for (var candidate : scanner.findCandidateComponents("com.ieltspath.learning.api.controller")) {
             Class<?> controller = Class.forName(candidate.getBeanClassName());
-            // Administrators' own views: activity statistics, and a learner's goals as the User Service's admin API had them.
+            // Administrators' own views: activity statistics.
             // Dead-letter replay is an operator task on the message broker, not a business capability.
-            if (controller == ActivityStatsController.class || controller == AdminLearningGoalController.class
-                    || controller == DeadLetterAdminController.class) {
+            if (controller == ActivityStatsController.class || controller == DeadLetterAdminController.class) {
                 continue;
             }
             check(controller, controller, violations);
