@@ -17,6 +17,10 @@ public class JdbcAccountDeletionCleanupAdapter implements AccountDeletionCleanup
 
     @Override
     public Optional<String> anonymizeProfileAndDeleteIdentityData(UUID userId) {
+        // Mail events (reset and verification tokens, email, name) must not be sent or kept; the deletion event
+        // itself is written after this call and is kept.
+        jdbc.update("DELETE FROM outbox_events WHERE aggregate_id = ? AND event_type <> ?",
+                userId, com.ieltspath.events.user.UserDeletedV1.EVENT_TYPE);
         String oldAvatar = jdbc.query(
                 "SELECT avatar_reference FROM learner_profiles WHERE user_id = ?",
                 rs -> rs.next() ? rs.getString("avatar_reference") : null,

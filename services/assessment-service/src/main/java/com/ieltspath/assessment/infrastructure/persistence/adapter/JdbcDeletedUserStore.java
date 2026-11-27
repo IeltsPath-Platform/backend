@@ -124,6 +124,11 @@ public class JdbcDeletedUserStore implements DeletedUserStore {
      * go back to the queue. Statements run children first so every foreign key holds.
      */
     public void deleteUserAssessmentData(UUID userId) {
+        // Events about the learner carry their scores and bands; the table has no user column, the payload names them.
+        jdbc.update("""
+                DELETE FROM outbox_events
+                WHERE payload->>'learnerId' = ? OR payload #>> '{data,userId}' = ?
+                """, userId.toString(), userId.toString());
         String submissions = "SELECT id FROM learner_submissions WHERE user_id = ?";
         String reviewSubmissions = "SELECT id FROM human_review_submissions WHERE learner_id = ?";
         String jobs = "SELECT id FROM grading_jobs WHERE user_id = ? OR submission_id IN (" + submissions

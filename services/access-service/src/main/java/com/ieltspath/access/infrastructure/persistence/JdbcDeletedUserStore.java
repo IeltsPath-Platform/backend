@@ -79,6 +79,8 @@ public class JdbcDeletedUserStore implements DeletedUserStore {
      * zeroes wallet balance, and deletes email verification state.
      */
     public void applyAccountDeletion(UUID userId) {
+        // Expiry notices carry the user's email and name; no event about a deleted user needs to go out.
+        jdbc.update("DELETE FROM outbox_events WHERE payload->>'userId' = ?", userId.toString());
         jdbc.update("""
                 UPDATE subscriptions
                 SET status = 'CANCELLED', updated_at = CURRENT_TIMESTAMP

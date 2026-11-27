@@ -43,4 +43,19 @@ class AccountDeletionWalletIntegrationTest {
                 .containsExactly(-50L);
         assertThat(jdbc.queryForObject("SELECT balance FROM point_wallets WHERE user_id = ?", Long.class, other)).isEqualTo(30L);
     }
+
+    @Test
+    void dropsQueuedEventsThatCarryTheDeletedUsersEmail() {
+        UUID deleted = UUID.randomUUID();
+        UUID other = UUID.randomUUID();
+        String notice = "INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload) "
+                + "VALUES ('subscription', ?, 'subscription.expiry-notice.v1', CAST(? AS jsonb))";
+        jdbc.update(notice, UUID.randomUUID(), "{\"userId\": \"" + deleted + "\", \"email\": \"a@example.com\"}");
+        jdbc.update(notice, UUID.randomUUID(), "{\"userId\": \"" + other + "\", \"email\": \"b@example.com\"}");
+
+        new JdbcDeletedUserStore(jdbc).applyAccountDeletion(deleted);
+
+        assertThat(jdbc.queryForList("SELECT payload->>'userId' FROM outbox_events", String.class))
+                .containsExactly(other.toString());
+    }
 }

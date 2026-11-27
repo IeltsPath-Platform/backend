@@ -81,6 +81,8 @@ public class JdbcDeletedUserStore implements DeletedUserStore {
      * anonymises the reporter of their reports, and deletes personal bookmarks, follows, reactions and blocks.
      */
     public void anonymizeAndDeleteCommunityData(UUID userId) {
+        // Notifications addressed to the deleted user have no one left to reach.
+        jdbc.update("DELETE FROM outbox_events WHERE payload->>'recipientId' = ?", userId.toString());
         jdbc.update("UPDATE posts SET author_id = ? WHERE author_id = ?", DELETED_AUTHOR_ID, userId);
         jdbc.update("UPDATE comments SET author_id = ? WHERE author_id = ?", DELETED_AUTHOR_ID, userId);
         jdbc.update("DELETE FROM post_bookmarks WHERE user_id = ?", userId);

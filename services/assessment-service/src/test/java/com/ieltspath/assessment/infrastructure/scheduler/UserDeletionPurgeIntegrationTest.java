@@ -84,6 +84,10 @@ class UserDeletionPurgeIntegrationTest {
         Map<String, List<String>> personTables = seeder.userColumns(USER_COLUMNS);
         KEPT_TABLES.forEach(personTables::remove);
         Map<String, Integer> othersBefore = seeder.rowsMentioning(personTables, other);
+        // Events about a learner carry their bands; the outbox has no user column.
+        outboxEvent("{\"learnerId\": \"" + deleted + "\", \"criteria\": [{\"band\": 6.5}]}");
+        outboxEvent("{\"data\": {\"userId\": \"" + deleted + "\", \"overallBand\": 6.0}}");
+        outboxEvent("{\"data\": {\"userId\": \"" + other + "\", \"overallBand\": 7.0}}");
 
         var store = new JdbcDeletedUserStore(jdbc);
         UUID eventId = UUID.randomUUID();
@@ -102,6 +106,8 @@ class UserDeletionPurgeIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM learner_submissions WHERE id = ?", Integer.class, deletedSubmission))
                 .isZero();
         verify(storage).delete("speaking-recordings", "speaking/" + deleted + "/answer.webm");
+        assertThat(jdbc.queryForList("SELECT payload::text FROM outbox_events", String.class))
+                .as("only the other learner's event is left").singleElement().asString().contains(other.toString());
 
         // The unfinished review is back in the queue; the finished one keeps its grade without a grader.
         assertThat(jdbc.queryForMap("SELECT status, grader_user_id, draft_payload FROM human_reviews WHERE id = ?", openReview))
@@ -112,6 +118,38 @@ class UserDeletionPurgeIntegrationTest {
                 .containsEntry("status", "COMPLETED").containsEntry("grader_user_id", null);
         assertThat(jdbc.queryForObject("SELECT examiner_id FROM examiner_qa_reviews WHERE submission_id = ?", UUID.class, otherSubmission))
                 .isEqualTo(JdbcDeletedUserStore.DELETED_USER);
+    }
+
+    @Test
+    void aStorage404ThatCannotBeConfirmedKeepsTheJobOpen() {
+        UUID deleted = UUID.randomUUID();
+        seedLearner(deleted, UUID.randomUUID());
+        var store = new JdbcDeletedUserStore(jdbc);
+        UUID eventId = UUID.randomUUID();
+        store.recordDeletion(eventId, deleted, Instant.now());
+        ObjectStorage storage = mock(ObjectStorage.class);
+        String key = "speaking/" + deleted + "/answer.webm";
+        // A wrong bucket answers 404 to the delete, and the existence check then fails on the bucket.
+        org.mockito.Mockito.doThrow(new com.ieltspath.commonstorage.StorageException("delete",
+                com.ieltspath.commonstorage.StorageException.Reason.NOT_FOUND, 404, false, "ref"))
+                .when(storage).delete("speaking-recordings", key);
+        org.mockito.Mockito.when(storage.exists("speaking-recordings", key)).thenThrow(new com.ieltspath.commonstorage.StorageException(
+                "exists", com.ieltspath.commonstorage.StorageException.Reason.NOT_FOUND, 404, false, "ref"));
+        var worker = new UserDeletionJobWorker(store,
+                new StaticListableBeanFactory(Map.of("storage", storage)).getBeanProvider(ObjectStorage.class),
+                new SpeakingRecordingProperties(), new DataSourceTransactionManager(dataSource), 300, 10);
+
+        worker.processPending();
+
+        assertThat(jdbc.queryForObject("SELECT status FROM user_deletion_jobs WHERE event_id = ?", String.class, eventId))
+                .isNotEqualTo("DONE");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM learner_submissions WHERE user_id = ?", Integer.class, deleted))
+                .as("the learner's answers stay until the recording is confirmed gone").isPositive();
+    }
+
+    private static void outboxEvent(String payload) {
+        jdbc.update("INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload) VALUES ('test', ?, 'test.v1', CAST(? AS jsonb))",
+                UUID.randomUUID().toString(), payload);
     }
 
     /** A learner with a test attempt, a Speaking answer in it, its grading, comparison, gold-set copy and QA row. */

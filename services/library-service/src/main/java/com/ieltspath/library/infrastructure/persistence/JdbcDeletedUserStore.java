@@ -113,6 +113,7 @@ public class JdbcDeletedUserStore implements DeletedUserStore {
     }
 
     public void deletePersonalLibraryData(UUID userId) {
+        jdbc.update("DELETE FROM outbox_events WHERE payload->>'userId' = ?", userId.toString());
         jdbc.update("""
                 DELETE FROM flashcard_deck_items
                 WHERE deck_id IN (SELECT id FROM flashcard_decks WHERE user_id = ?)
