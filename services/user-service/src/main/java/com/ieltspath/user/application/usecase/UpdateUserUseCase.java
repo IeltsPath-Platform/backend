@@ -19,10 +19,10 @@ public class UpdateUserUseCase {
 
     @Transactional
     public User execute(UpdateUserCommand command) {
+        // Lock before the first read: a copy loaded earlier stays cached in this transaction, and saving it after a
+        // concurrent account deletion would write the old email, password and status back.
+        userLock.lock(command.userId());
         User user = userRepository.findById(command.userId())
-                .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng: " + command.userId()));
-        userLock.lock(user.getId());
-        user = userRepository.findById(command.userId())
                 .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng: " + command.userId()));
         PhoneNumber phoneNumber = PhoneNumber.parse(command.phoneNumber());
         if (phoneNumber.value() != null && userRepository.existsByPhoneNumberAndIdNot(phoneNumber.value(), command.userId())) {

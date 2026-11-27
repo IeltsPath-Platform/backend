@@ -41,10 +41,9 @@ public class ChangeUserStatusUseCase {
             throw new InvalidUserStatusException("Trạng thái người dùng không được để trống");
         }
         var activeAdminIds = userRepository.lockActiveAdminUserIds();
+        // Lock before the first read; a copy read earlier stays cached and could overwrite a concurrent deletion.
+        userLock.lock(command.userId());
         User user = userRepository.findById(command.userId())
-                .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng: " + command.userId()));
-        userLock.lock(user.getId());
-        user = userRepository.findById(command.userId())
                 .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng: " + command.userId()));
         if (command.userId().equals(command.actorId()) && command.status() != UserStatus.ACTIVE) {
             throw new UserManagementRuleViolationException(

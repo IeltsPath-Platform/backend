@@ -68,7 +68,7 @@ public class User {
     }
 
     /** A deleted account keeps its row only as an anonymous tombstone, so nothing may bring it back or refill it. */
-    private void requireNotDeleted() {
+    public void requireNotDeleted() {
         if (this.status == UserStatus.DELETED) {
             throw new UserManagementRuleViolationException("ACCOUNT_DELETED",
                     "Tài khoản này đã bị xóa nên không thể thay đổi.");

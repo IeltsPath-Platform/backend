@@ -23,13 +23,12 @@ public class UpdateLearnerProfileUseCase {
     @Transactional
     public LearnerProfileResult execute(UpdateLearnerProfileCommand command) {
         userLock.lock(command.userId());
+        // Account deletion takes the same lock, so a deleted account is seen here and its profile is never refilled.
+        userRepository.findById(command.userId())
+                .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng với id: " + command.userId()))
+                .requireNotDeleted();
         LearnerProfile profile = learnerProfileRepository.findByUserId(command.userId())
-                .orElseGet(() -> {
-                    if (userRepository.findById(command.userId()).isEmpty()) {
-                        throw new UserNotFoundException("Không tìm thấy người dùng với id: " + command.userId());
-                    }
-                    return LearnerProfile.createDefault(command.userId(), command.displayName());
-                });
+                .orElseGet(() -> LearnerProfile.createDefault(command.userId(), command.displayName()));
 
         profile.updateDetails(
                 command.displayName(),

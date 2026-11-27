@@ -28,10 +28,9 @@ public class DeleteUserUseCase {
     @Transactional
     public User execute(UUID id, UUID actorId) {
         var activeAdminIds = userRepository.lockActiveAdminUserIds();
+        // Lock before the first read; a copy read earlier stays cached and could overwrite a concurrent deletion.
+        userLock.lock(id);
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng: " + id));
-        userLock.lock(user.getId());
-        user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng: " + id));
         // A self-deleted account is already gone; turning it into INACTIVE would undo the deletion.
         if (user.getStatus() == UserStatus.DELETED) {

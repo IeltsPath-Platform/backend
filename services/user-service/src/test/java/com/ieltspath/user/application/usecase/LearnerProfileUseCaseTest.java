@@ -47,6 +47,26 @@ class LearnerProfileUseCaseTest {
         updateLearnerProfileUseCase = new UpdateLearnerProfileUseCase(learnerProfileRepository, userRepository,
                 userLock);
         deleteLearnerProfileUseCase = new DeleteLearnerProfileUseCase(learnerProfileRepository);
+        // Updates read the account first; tests that need another answer stub it themselves.
+        org.mockito.Mockito.lenient().when(userRepository.findById(any())).thenAnswer(inv -> Optional.of(
+                User.builder().id(inv.getArgument(0)).email(new Email("a@example.com")).fullName("A")
+                        .status(UserStatus.ACTIVE).build()));
+    }
+
+    @Test
+    void aDeletedAccountsProfileCannotBeRefilled() {
+        UUID userId = UUID.randomUUID();
+        when(userRepository.findById(userId)).thenReturn(Optional.of(User.builder().id(userId)
+                .email(new Email("deleted@deleted.local")).fullName("Người dùng đã xóa").status(UserStatus.DELETED).build()));
+
+        var refused = assertThrows(com.ieltspath.user.domain.exception.UserManagementRuleViolationException.class,
+                () -> updateLearnerProfileUseCase.execute(new UpdateLearnerProfileCommand(userId, "Back", "New bio", null, "UTC", null)));
+
+        assertEquals("ACCOUNT_DELETED", refused.getCode());
+        verify(learnerProfileRepository, org.mockito.Mockito.never()).save(any());
+        var order = inOrder(userLock, userRepository);
+        order.verify(userLock).lock(userId);
+        order.verify(userRepository).findById(userId);
     }
 
     @Test

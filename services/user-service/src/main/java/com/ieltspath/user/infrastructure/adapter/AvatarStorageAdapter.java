@@ -32,4 +32,5 @@ public class AvatarStorageAdapter implements AvatarStoragePort {
 
     @Override public String publicUrl(String key) { return storage.publicUrl(bucket, key); }
     @Override public void delete(String key) { storage.delete(bucket, key); }
+    @Override public boolean exists(String key) { return storage.exists(bucket, key); }
 }

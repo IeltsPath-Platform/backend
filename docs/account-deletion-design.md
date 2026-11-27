@@ -16,11 +16,21 @@ to 10 times, then marked `FAILED` and logged. A job that crashed on its last att
 expires. Storage objects are deleted outside any transaction, and a row is removed only after its object is gone.
 
 Only `CUSTOMER` accounts may delete themselves. Any staff role gets `STAFF_ACCOUNT_SELF_DELETION`; an administrator
-closes staff accounts so that grading queues, sales keys and content can be handed over first.
+closes staff accounts so that grading queues, sales keys and content can be handed over first. The admin delete
+endpoint only deactivates an account; it does not erase data. When a staff member asks for their data to be erased:
 
-A `DELETED` account cannot change status, be edited, get roles, or be set back to another status. Nobody can set
+1. An administrator hands over their open work (grading queue, sales keys, drafts).
+2. The administrator sets their roles to `CUSTOMER` only (`PUT /api/users/{id}/roles`).
+3. The staff member deletes their account from the app, with their password or Google account, like any learner.
+
+Grading and QA they did as an examiner is kept without their name, as described below.
+
+A `DELETED` account cannot change status, be edited, get roles, or be set back to another status, and its learner
+profile and avatar cannot be changed by the user or an administrator (`ACCOUNT_DELETED`, HTTP 409). Nobody can set
 `DELETED` through the status API (`DELETED_STATUS_RESERVED`); the admin delete endpoint leaves an already deleted
-account as it is.
+account as it is. Every write to an account takes the account lock before its first read, the same lock deletion
+takes, so a request running at the same time as a deletion sees the deleted account instead of saving an older copy
+over it. An avatar uploaded while the account is being deleted is queued for removal instead of being attached.
 
 The same email or Google account can register again, as a new account with a new user ID. No sign-up bonus exists, so
 this cannot be used to farm points.
@@ -30,10 +40,10 @@ this cannot be used to farm points.
 | Data | Action |
 |---|---|
 | Name, email, phone, password, Google link, profile text | Cleared or replaced at once in user-service (`deleted+<id>@deleted.local`, "Người dùng đã xóa"). |
-| Avatar | Queued in `pending_avatar_deletions` in the same transaction; `AvatarDeletionJob` deletes the object and retries until storage confirms. |
+| Avatar | Queued in `pending_avatar_deletions` in the same transaction; `AvatarDeletionJob` deletes the object and never gives up: a failure waits twice as long as the last (up to 6 hours) and is logged as an error from the 10th attempt. A 404 counts as deleted only when an existence check confirms the bucket is reachable, so a wrong bucket or key is not mistaken for success. |
 | Examiner profile (band, certificates) | Cleared; `accepting_submissions = false`. |
-| Notes, flashcards, decks, notifications, devices, mail contacts and preferences | Deleted, including storage objects. |
-| Learning: essays, Speaking recordings, answers, practice, reviews, diagnostics, progress, XP, hearts, streaks, badges, leagues, flags, settings, LLM usage, work items about the learner | Deleted. Every table with a `user_id` (or `subject_user_id`) column is covered; a test fails if a new one is not. |
+| Notes, flashcards, decks, notifications, devices, mail contacts and preferences | Deleted, including storage objects. A phone that was signed in to another account before keeps that account's push history pointing at the device; those deliveries are deleted with the device. |
+| Learning: essays, Speaking recordings, answers, practice, reviews, diagnostics, progress, XP, hearts, streaks, badges, leagues, flags, settings, LLM usage, work items about the learner, placement Speaking results in `placement_speaking_outbox` | Deleted. Every table with a `user_id` (or `subject_user_id`) column is covered, and every event table whose JSON `payload` names the learner; a test fails if a new one is not. |
 | Assessment: attempts, answers, results, essays, Speaking recordings, grading jobs and reviews of the learner's work, comparisons, QA rows, gold-set copies of the learner's essays and their eval items | Deleted. |
 | Assessment work the user did as an examiner | Finished reviews keep their grade without a grader; unfinished ones go back to the queue; QA rows keep a placeholder ID. |
 | Game | Player rows, guesses, hints, receipts, sessions removed; a room they hosted keeps a placeholder host. |

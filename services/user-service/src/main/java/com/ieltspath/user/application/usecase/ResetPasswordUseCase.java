@@ -64,10 +64,9 @@ public class ResetPasswordUseCase {
             throw new InvalidActionTokenException("Mã token đã hết hạn hoặc đã được sử dụng");
         }
 
+        // Lock before the first read; a copy read earlier stays cached and could overwrite a concurrent deletion.
+        userLock.lock(actionToken.getUserId());
         User user = userRepository.findById(actionToken.getUserId())
-                .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng sở hữu token này"));
-        userLock.lock(user.getId());
-        user = userRepository.findById(user.getId())
                 .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng sở hữu token này"));
         if (user.getStatus() != UserStatus.ACTIVE) {
             throw new InvalidActionTokenException("Không thể đặt lại mật khẩu cho tài khoản không hoạt động");
