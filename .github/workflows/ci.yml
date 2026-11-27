@@ -40,7 +40,15 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-          cache: maven
+
+      # One cache per group: the groups download different dependencies, and with a shared key only the first job to
+      # finish saves, so the others fetch theirs from Maven Central on every run until it answers 429.
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: maven-${{ matrix.group }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: maven-${{ matrix.group }}-
 
       # Testcontainers tests are skipped when Docker is missing; fail fast instead of passing without them.
       - name: Check Docker for Testcontainers
