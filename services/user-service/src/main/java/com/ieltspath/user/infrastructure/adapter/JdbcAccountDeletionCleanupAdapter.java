@@ -34,6 +34,21 @@ public class JdbcAccountDeletionCleanupAdapter implements AccountDeletionCleanup
         jdbc.update("DELETE FROM account_action_tokens WHERE user_id = ?", userId);
         jdbc.update("DELETE FROM password_change_attempts WHERE user_id = ?", userId);
         jdbc.update("DELETE FROM login_history WHERE user_id = ?", userId);
+        // An examiner's band and certificates are personal; the row stays for the staff screens but says nothing.
+        jdbc.update("""
+                UPDATE examiner_profiles
+                SET ielts_band = NULL, certificates = '[]'::jsonb, accepting_submissions = FALSE,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE user_id = ?
+                """, userId);
         return Optional.ofNullable(oldAvatar);
+    }
+
+    @Override
+    public void queueAvatarDeletion(UUID userId, String objectKey) {
+        jdbc.update("""
+                INSERT INTO pending_avatar_deletions (object_key, user_id) VALUES (?, ?)
+                ON CONFLICT (object_key) DO NOTHING
+                """, objectKey, userId);
     }
 }

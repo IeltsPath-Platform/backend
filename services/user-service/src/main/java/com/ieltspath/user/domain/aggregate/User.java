@@ -1,5 +1,6 @@
 package com.ieltspath.user.domain.aggregate;
 
+import com.ieltspath.user.domain.exception.UserManagementRuleViolationException;
 import com.ieltspath.user.domain.vo.Email;
 import com.ieltspath.user.domain.vo.FullName;
 import com.ieltspath.user.domain.vo.PhoneNumber;
@@ -35,12 +36,14 @@ public class User {
     private LocalDateTime deletedAt;
 
     public void updateProfile(String fullName, PhoneNumber phoneNumber) {
+        requireNotDeleted();
         this.fullName = new FullName(fullName).value();
         this.phoneNumber = phoneNumber;
         touch();
     }
 
     public void assignRoles(Set<Role> roles) {
+        requireNotDeleted();
         this.roles = roles == null ? new HashSet<>() : new HashSet<>(roles);
         touch();
     }
@@ -49,13 +52,27 @@ public class User {
         if (status == null) {
             throw new IllegalArgumentException("Trạng thái người dùng không được để trống");
         }
+        requireNotDeleted();
+        if (status == UserStatus.DELETED) {
+            throw new UserManagementRuleViolationException("DELETED_STATUS_RESERVED",
+                    "Không thể đặt trạng thái Đã xóa ở đây. Tài khoản chỉ bị xóa qua chức năng xóa tài khoản.");
+        }
         this.status = status;
         touch();
     }
 
     public void deactivate() {
+        requireNotDeleted();
         this.status = UserStatus.INACTIVE;
         touch();
+    }
+
+    /** A deleted account keeps its row only as an anonymous tombstone, so nothing may bring it back or refill it. */
+    private void requireNotDeleted() {
+        if (this.status == UserStatus.DELETED) {
+            throw new UserManagementRuleViolationException("ACCOUNT_DELETED",
+                    "Tài khoản này đã bị xóa nên không thể thay đổi.");
+        }
     }
 
     public void markDeleted(LocalDateTime now) {

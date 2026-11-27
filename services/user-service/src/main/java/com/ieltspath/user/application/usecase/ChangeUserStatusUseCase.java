@@ -48,13 +48,13 @@ public class ChangeUserStatusUseCase {
                 .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng: " + command.userId()));
         if (command.userId().equals(command.actorId()) && command.status() != UserStatus.ACTIVE) {
             throw new UserManagementRuleViolationException(
-                    "SELF_ACCOUNT_CHANGE", "An administrator cannot change their own status away from ACTIVE");
+                    "SELF_ACCOUNT_CHANGE", "Quản trị viên không thể tự đổi trạng thái tài khoản của mình.");
         }
         boolean activeAdmin = user.getStatus() == UserStatus.ACTIVE
                 && user.getRoles().stream().anyMatch(role -> role.getName() == RoleName.ADMIN);
         boolean disablesAdmin = command.status() == UserStatus.LOCKED || command.status() == UserStatus.INACTIVE;
         if (activeAdmin && disablesAdmin && activeAdminIds.size() <= 1) {
-            throw new UserManagementRuleViolationException("LAST_ADMIN", "The last active administrator cannot be deactivated");
+            throw new UserManagementRuleViolationException("LAST_ADMIN", "Không thể vô hiệu hóa quản trị viên đang hoạt động cuối cùng.");
         }
         user.changeStatus(command.status());
         User saved = userRepository.save(user);

@@ -7,7 +7,6 @@ import com.ieltspath.user.application.exception.GoogleSignInUnavailableException
 import com.ieltspath.user.application.exception.ReauthAccountMismatchException;
 import com.ieltspath.user.application.port.AccessTokenRevocationStore;
 import com.ieltspath.user.application.port.AccountDeletionCleanupPort;
-import com.ieltspath.user.application.port.AvatarStoragePort;
 import com.ieltspath.user.application.port.GoogleIdTokenVerifier;
 import com.ieltspath.user.application.port.GoogleNonceStore;
 import com.ieltspath.user.application.port.UserLock;
@@ -26,14 +25,11 @@ import com.ieltspath.user.domain.vo.OAuthProvider;
 import com.ieltspath.user.domain.vo.RoleName;
 import com.ieltspath.user.domain.vo.UserStatus;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -55,7 +51,6 @@ public class DeleteMyAccountUseCase {
     private final GoogleAuthProperties googleProperties;
     private final AccountDeletionCleanupPort cleanupPort;
     private final UserNoticeOutbox outbox;
-    private final ObjectProvider<AvatarStoragePort> avatarStorageProvider;
 
     @Value("${app.user.avatar.bucket:avatars}")
     private String avatarBucket = "avatars";
@@ -77,6 +72,11 @@ public class DeleteMyAccountUseCase {
                 .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng"));
         if (user.getStatus() == UserStatus.DELETED) {
             return;
+        }
+        // Staff accounts hold work for others (grading queues, keys, content); an administrator closes them instead.
+        if (user.getRoles().stream().anyMatch(role -> role.getName() != RoleName.CUSTOMER)) {
+            throw new UserManagementRuleViolationException("STAFF_ACCOUNT_SELF_DELETION",
+                    "Tài khoản nhân sự không tự xóa được. Vui lòng liên hệ quản trị viên để chuyển giao công việc và xóa tài khoản.");
         }
         boolean activeAdmin = user.getStatus() == UserStatus.ACTIVE
                 && user.getRoles().stream().anyMatch(role -> role.getName() == RoleName.ADMIN);
@@ -106,7 +106,7 @@ public class DeleteMyAccountUseCase {
         outbox.enqueue(UUID.randomUUID(), userId, UserDeletedV1.EVENT_TYPE,
                 new UserDeletedV1(UUID.randomUUID(), UserDeletedV1.EVENT_TYPE, occurredAt, userId));
         accessTokens.revokeUser(userId, occurredAt);
-        deleteAvatarAfterCommit(userId, oldAvatarRef);
+        queueAvatarDeletion(userId, oldAvatarRef);
     }
 
     private void verifyPassword(User user, String currentPassword, LocalDateTime now) {
@@ -163,28 +163,11 @@ public class DeleteMyAccountUseCase {
         }
     }
 
-    private void deleteAvatarAfterCommit(UUID userId, String oldAvatarRef) {
+    /** Queued in this transaction and removed by {@code AvatarDeletionJob}, which retries until storage confirms. */
+    private void queueAvatarDeletion(UUID userId, String oldAvatarRef) {
         if (oldAvatarRef == null) return;
-        AvatarStoragePort storage = avatarStorageProvider.getIfAvailable();
-        if (storage == null) return;
-        AvatarReferences.ownedKey(oldAvatarRef, projectUrl, avatarBucket, userId).ifPresent(key -> {
-            Runnable deleteOp = () -> {
-                try {
-                    storage.delete(key);
-                } catch (RuntimeException ignored) {
-                }
-            };
-            if (TransactionSynchronizationManager.isSynchronizationActive()) {
-                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                    @Override
-                    public void afterCommit() {
-                        deleteOp.run();
-                    }
-                });
-            } else {
-                deleteOp.run();
-            }
-        });
+        AvatarReferences.ownedKey(oldAvatarRef, projectUrl, avatarBucket, userId)
+                .ifPresent(key -> cleanupPort.queueAvatarDeletion(userId, key));
     }
 
     private static boolean blank(String value) {

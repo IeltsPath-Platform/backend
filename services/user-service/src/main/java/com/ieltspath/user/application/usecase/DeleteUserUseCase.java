@@ -33,14 +33,18 @@ public class DeleteUserUseCase {
         userLock.lock(user.getId());
         user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng: " + id));
+        // A self-deleted account is already gone; turning it into INACTIVE would undo the deletion.
+        if (user.getStatus() == UserStatus.DELETED) {
+            return user;
+        }
         if (id.equals(actorId)) {
             throw new UserManagementRuleViolationException(
-                    "SELF_ACCOUNT_CHANGE", "An administrator cannot deactivate their own account");
+                    "SELF_ACCOUNT_CHANGE", "Quản trị viên không thể tự vô hiệu hóa tài khoản của mình.");
         }
         boolean activeAdmin = user.getStatus() == UserStatus.ACTIVE
                 && user.getRoles().stream().anyMatch(role -> role.getName() == RoleName.ADMIN);
         if (activeAdmin && activeAdminIds.size() <= 1) {
-            throw new UserManagementRuleViolationException("LAST_ADMIN", "The last active administrator cannot be deactivated");
+            throw new UserManagementRuleViolationException("LAST_ADMIN", "Không thể vô hiệu hóa quản trị viên đang hoạt động cuối cùng.");
         }
         user.deactivate();
         User saved = userRepository.save(user);
