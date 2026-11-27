@@ -44,9 +44,17 @@ public class JdbcDeletedUserRepository implements DeletedUserRepository {
 
     public record Job(UUID eventId, UUID userId, int attempts) { }
 
-    public record SpeakingRecordingRef(UUID id, String objectKey) { }
+    /** A recording is keyed by its submission and question; the table has no id of its own. */
+    public record SpeakingRecordingRef(UUID submissionId, UUID questionVersionId, String objectKey) { }
 
     public List<Job> claimPendingJobs(int limit, long leaseSeconds, int maxAttempts) {
+        // A job that crashed on its last attempt would stay PROCESSING for ever; once its lease is over it is FAILED.
+        jdbc.update("""
+                UPDATE user_deletion_jobs
+                SET status = 'FAILED', completed_at = CURRENT_TIMESTAMP, last_error = COALESCE(last_error, 'LEASE_EXPIRED')
+                WHERE status = 'PROCESSING' AND attempts >= ?
+                  AND claimed_at < CURRENT_TIMESTAMP - make_interval(secs => ?)
+                """, maxAttempts, leaseSeconds);
         return jdbc.query("""
                 UPDATE user_deletion_jobs
                 SET status = 'PROCESSING',
@@ -71,24 +79,25 @@ public class JdbcDeletedUserRepository implements DeletedUserRepository {
 
     public List<SpeakingRecordingRef> findSpeakingRecordingsBatch(UUID userId, int limit) {
         return jdbc.query("""
-                SELECT r.id, r.object_key
+                SELECT r.submission_id, r.question_version_id, r.object_key
                 FROM speaking_recordings r
                 JOIN speaking_submissions s ON s.id = r.submission_id
                 WHERE s.user_id = ? AND r.object_key IS NOT NULL
-                ORDER BY r.id ASC
+                ORDER BY r.submission_id, r.question_version_id
                 LIMIT ?
                 """, (rs, rowNum) -> new SpeakingRecordingRef(
-                UUID.fromString(rs.getString("id")),
+                UUID.fromString(rs.getString("submission_id")),
+                UUID.fromString(rs.getString("question_version_id")),
                 rs.getString("object_key")), userId, limit);
     }
 
-    public void deleteSpeakingRecordingsByIds(List<UUID> ids) {
-        if (ids.isEmpty()) return;
-        for (UUID id : ids) {
-            jdbc.update("DELETE FROM speaking_recordings WHERE id = ?", id);
+    /** Drops recording rows whose object is gone, so a retried job does not try them again. */
+    public void deleteSpeakingRecordings(List<SpeakingRecordingRef> refs) {
+        for (SpeakingRecordingRef ref : refs) {
+            jdbc.update("DELETE FROM speaking_recordings WHERE submission_id = ? AND question_version_id = ?",
+                    ref.submissionId(), ref.questionVersionId());
         }
     }
-
     public int deleteBatchByUserId(String tableName, String userColumn, UUID userId, int limit) {
         String sql = "DELETE FROM " + tableName + " WHERE ctid IN (SELECT ctid FROM " + tableName
                 + " WHERE " + userColumn + " = ? LIMIT ?)";
@@ -111,19 +120,27 @@ public class JdbcDeletedUserRepository implements DeletedUserRepository {
         jdbc.update("DELETE FROM speaking_submissions WHERE user_id = ?", userId);
     }
 
-    public void deleteDiagnosticsForUser(UUID userId) {
+    /**
+     * Rows that other rows of the same learner point at, removed children first in one go: diagnostics point at review
+     * items, review items at practice attempts, and human reviews and later revisions at Writing submissions. The
+     * Writing submissions go in one statement because a revision points at the one before it.
+     */
+    public void deleteLinkedLearningRecords(UUID userId) {
         jdbc.update("""
                 DELETE FROM diagnostic_probes
                 WHERE session_id IN (SELECT id FROM diagnostic_sessions WHERE user_id = ?)
                 """, userId);
         jdbc.update("DELETE FROM diagnostic_sessions WHERE user_id = ?", userId);
-    }
-
-    public void deletePracticeSessionsAndAttempts(UUID userId) {
+        jdbc.update("DELETE FROM review_sets WHERE user_id = ?", userId);
+        jdbc.update("DELETE FROM review_theory_checks WHERE user_id = ?", userId);
+        jdbc.update("DELETE FROM review_items WHERE user_id = ?", userId);
         jdbc.update("DELETE FROM practice_sessions WHERE user_id = ?", userId);
         jdbc.update("DELETE FROM practice_attempts WHERE user_id = ?", userId);
+        String essays = "SELECT id FROM lesson_writing_submissions WHERE user_id = ?";
+        jdbc.update("DELETE FROM human_review_requests WHERE user_id = ? OR submission_id IN (" + essays + ")", userId, userId);
+        jdbc.update("DELETE FROM human_review_outcomes WHERE user_id = ? OR submission_id IN (" + essays + ")", userId, userId);
+        jdbc.update("DELETE FROM lesson_writing_submissions WHERE user_id = ?", userId);
     }
-
     public void deleteStudyHeartbeatReceipts(UUID userId) {
         jdbc.update("""
                 DELETE FROM study_heartbeat_receipts
