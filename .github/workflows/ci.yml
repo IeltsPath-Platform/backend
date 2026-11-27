@@ -16,9 +16,23 @@ concurrency:
 
 jobs:
   build:
-    name: Build and test (Maven reactor)
+    name: Build and test (${{ matrix.group }})
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - group: content
+            projects: '-pl services/content-service -am'
+          - group: learning
+            projects: '-pl services/learning-service -am'
+          - group: assessment-library-community
+            projects: '-pl services/assessment-service,services/library-service,services/community-service -am'
+          # Every module except the five services above, so a new module is tested without editing this file. The shared
+          # libraries run here and again in each group above through -am. A module excluded here must be named in a group.
+          - group: others
+            projects: '-pl !services/content-service,!services/learning-service,!services/assessment-service,!services/library-service,!services/community-service'
     steps:
       - uses: actions/checkout@v4
 
@@ -33,15 +47,39 @@ jobs:
         run: docker info --format 'Docker {{.ServerVersion}}'
 
       - name: Build and test
-        run: mvn -B -ntp verify
+        run: mvn -B -ntp verify ${{ matrix.projects }}
 
+      # cancelled() covers a job that hit its timeout, which is when the reports are needed most.
       - name: Upload test reports
-        if: failure()
+        if: failure() || cancelled()
         uses: actions/upload-artifact@v4
         with:
-          name: surefire-reports
+          name: surefire-reports-${{ matrix.group }}-${{ github.run_attempt }}
           path: '**/target/surefire-reports/'
           retention-days: 7
+
+  wiring:
+    name: Check test wiring
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      # A service without common-test keeps Spring contexts alive after their containers stop.
+      - name: Every service closes its test contexts
+        run: |
+          for pom in services/*/pom.xml; do
+            grep -q '<artifactId>common-test</artifactId>' "$pom" || { echo "$pom lacks common-test"; exit 1; }
+          done
+
+      # A module excluded from the "others" group but named by no other group would never be tested.
+      - name: Every excluded module has a group
+        run: |
+          excluded=$(grep -E "^[[:space:]]*projects: '-pl !" .github/workflows/ci.yml | grep -o "![^,' ]*" | tr -d '!')
+          test -n "$excluded" || { echo "no exclusion list found"; exit 1; }
+          for module in $excluded; do
+            grep -Eq "^[[:space:]]*projects: '-pl ([^!']*,)?$module[ ,']" .github/workflows/ci.yml || { echo "$module is excluded but in no group"; exit 1; }
+          done
 
   compose:
     name: Validate docker-compose.yml

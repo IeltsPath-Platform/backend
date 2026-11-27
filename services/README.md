@@ -101,6 +101,13 @@ Ví dụ chạy `user-service` từ thư mục gốc:
 mvn -pl services/user-service spring-boot:run
 ```
 
+Lệnh trên cần các thư viện `shared/` đã có trong Maven local, kể cả `common-test` dù chỉ dùng cho test. Lần đầu, hoặc sau khi
+pull về một module `shared/` mới, chạy một lần:
+
+```powershell
+mvn -q -DskipTests install
+```
+
 ## Tài liệu chi tiết
 
 - [User Service](user-service/README.md)

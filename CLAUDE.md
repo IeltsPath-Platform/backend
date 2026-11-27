@@ -1,6 +1,6 @@
 # CLAUDE.md — IELTSPath backend
 
-- Cập nhật lần cuối: 2026-11-11 (thêm common-llm); 2026-11-02 (thêm hai module shared, trỏ tới pattern bắt buộc ở `AGENTS.md` §3.9, sửa trạng thái relay outbox); 2026-10-30 (Content gọi Library một chiều, Library không gọi Content; Notification đã có DB, listener và API; mặc định DB của config-repo là `localhost:5440`); 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); thay đổi URL service giữ mốc 2026-10-15; dữ kiện kiến trúc khác đã kiểm ngày 2026-10-07 sau course path, placement recommendation và course gate. Về dữ kiện, code là nguồn đúng khi tài
+- Cập nhật lần cuối: 2026-11-27 (thêm `common-test`; CI chia 4 job song song); 2026-11-11 (thêm common-llm); 2026-11-02 (thêm hai module shared, trỏ tới pattern bắt buộc ở `AGENTS.md` §3.9, sửa trạng thái relay outbox); 2026-10-30 (Content gọi Library một chiều, Library không gọi Content; Notification đã có DB, listener và API; mặc định DB của config-repo là `localhost:5440`); 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); thay đổi URL service giữ mốc 2026-10-15; dữ kiện kiến trúc khác đã kiểm ngày 2026-10-07 sau course path, placement recommendation và course gate. Về dữ kiện, code là nguồn đúng khi tài
   liệu lệch; về quy tắc, xem thứ tự ưu tiên đầu `AGENTS.md`.
 - Quy tắc bắt buộc (stack, layer, bảo mật, điều cấm, quy trình) nằm trong `AGENTS.md`, được nạp ngay dưới đây.
 - Kiến trúc, flow, quyết định: `docs/system-architecture.md`.
@@ -18,7 +18,7 @@ và DLQ). Mỗi service sở hữu một PostgreSQL DB.
 
 ## 2. Module
 
-Reactor gồm 18 module: 3 infra, 6 shared, 9 business. Sáu module shared là thư viện, không deploy độc lập.
+Reactor gồm 19 module: 3 infra, 7 shared, 9 business. Bảy module shared là thư viện, không deploy độc lập.
 
 | Module | Ngôn ngữ | Cổng | DB (nơi chạy) | Route Gateway |
 | --- | --- | --- | --- | --- |
@@ -29,6 +29,7 @@ Reactor gồm 18 module: 3 infra, 6 shared, 9 business. Sáu module shared là t
 | `shared/common-events` | Java lib (tên/hình dạng event, `MessageRetry`, `RetryTopology`) | — | — | — |
 | `shared/common-storage` | Java lib | — | — | — |
 | `shared/common-llm` | Java lib (client LLM, metric thời gian/token) | — | — | — |
+| `shared/common-test` | Java lib chỉ cho test (đóng Spring context sau mỗi lớp test) | — | — | — |
 | `shared/common-resilience` | Java lib (`ResilientCall`: circuit breaker, retry, bulkhead) | — | — | — |
 | `shared/common-observability` | Java lib (`correlationId`, metric outbox/DLQ, trace context) | — | — | — |
 | `services/user-service` | Java | 8085 | `user_db` (Compose PostgreSQL host 5440) | `/auth/**`, `/api/users/**` (trừ goal và study-time đã chuyển sang learning) |
@@ -98,7 +99,7 @@ Không kiểm tĩnh được: HTTP/LLM có nằm ngoài transaction và khóa kh
 
 Test service học: `mvn -q -pl services/learning-service -am test` (Testcontainers cần Docker).
 
-CI (`.github/workflows/ci.yml`) chạy `mvn -B -ntp verify` cả reactor và `docker compose config --quiet` cho mọi PR vào
+CI (`.github/workflows/ci.yml`) chạy `mvn -B -ntp verify` trên 4 job song song và `docker compose config --quiet` cho mọi PR vào
 `main`. Test Testcontainers tự bỏ qua khi máy không có Docker, nên xanh ở local chưa chắc xanh trên CI.
 
 ## 5. Cạm bẫy đã biết
