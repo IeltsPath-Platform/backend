@@ -121,6 +121,18 @@ public class JdbcDeletedUserStore implements DeletedUserStore {
                 """, userId);
         jdbc.update("DELETE FROM game_sessions WHERE user_id = ?", userId);
         jdbc.update("DELETE FROM game_match_players WHERE user_id = ?", userId);
+        // A room cannot be loaded without a HOST member, so a room they host closes as if the host had left, and the
+        // host row stays with a placeholder user, no name and status LEFT. Their other memberships are removed.
+        jdbc.update("""
+                UPDATE game_rooms SET status = 'CLOSED', updated_at = CURRENT_TIMESTAMP
+                WHERE host_user_id = ? AND status IN ('WAITING', 'IN_MATCH')
+                """, userId);
+        jdbc.update("""
+                UPDATE game_room_members
+                SET user_id = ?, display_name = NULL, status = 'LEFT', left_at = COALESCE(left_at, CURRENT_TIMESTAMP),
+                    ready_at = NULL, last_seen_at = NULL, reconnect_deadline_at = NULL
+                WHERE user_id = ? AND member_role = 'HOST'
+                """, DELETED_USER, userId);
         jdbc.update("DELETE FROM game_room_members WHERE user_id = ?", userId);
         jdbc.update("UPDATE game_rooms SET host_user_id = ? WHERE host_user_id = ?", DELETED_USER, userId);
     }
