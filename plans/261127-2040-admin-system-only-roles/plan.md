@@ -1,17 +1,19 @@
 ---
-title: "Admin chỉ quản lý hệ thống và người dùng"
-description: "Bỏ các thao tác nghiệp vụ khỏi vai trò ADMIN, chuyển gói và loại mã sang Sales Manager, giữ thông báo Premium khi học viên kích hoạt mã."
+title: "Admin chỉ quản lý hệ thống và người dùng, thêm đặt lại mật khẩu"
+description: "Bỏ các thao tác nghiệp vụ khỏi vai trò ADMIN, chuyển gói và loại mã sang Sales Manager, giữ thông báo Premium khi học viên kích hoạt mã, thêm chức năng Admin đặt lại mật khẩu người dùng."
 status: pending
 priority: P1
 branch: "docs/plan-admin-system-only-roles"
-tags: [access-service, library-service, learning-service, api-gateway, frontend, rbac]
+tags: [user-service, access-service, library-service, learning-service, api-gateway, frontend, rbac]
 created: "2026-11-27T20:40:00+07:00"
-updated: "2026-11-27T20:40:00+07:00"
+updated: "2026-11-27T20:45:00+07:00"
 ---
 
 # Plan: Admin chỉ quản lý hệ thống và người dùng
 
 Nhóm chốt ngày 27/11/2026: Admin không tham gia nghiệp vụ IELTS và bán mã. Báo cáo 3 và 4 đã mô tả theo quyết định này, code cần làm theo.
+
+Cùng đợt này làm luôn chức năng Admin đặt lại mật khẩu cho người dùng (UC-96 của Báo cáo 3, chưa có trong code).
 
 ## Quyền sau khi sửa
 
@@ -25,6 +27,8 @@ Nhóm chốt ngày 27/11/2026: Admin không tham gia nghiệp vụ IELTS và bá
 | Tạo gói, tạo loại mã | ADMIN | STAFF_MANAGER |
 | Sửa kho từ vựng | CONTENT_AUTHOR, ADMIN | CONTENT_AUTHOR |
 | Xem, đổi mục tiêu học của học viên | ADMIN | Bỏ |
+| Trừ lượt giám khảo chấm của học viên (`consume-human-grading`) | ADMIN | Bỏ |
+| Đặt lại mật khẩu người dùng | Chưa có | ADMIN (làm mới) |
 
 ## Điểm phải để ý
 
@@ -37,9 +41,10 @@ Sự kiện `access.subscription-granted.v1` (thông báo và e-mail "đã có P
 | 1 | [access-service: bỏ cấp gói và sinh mã, chuyển gói/loại mã, phát sự kiện khi kích hoạt](phase-01-access-service.md) | backend | |
 | 2 | [library, learning, gateway](phase-02-library-learning-gateway.md) | backend | |
 | 3 | [Web: bỏ nút và route của Admin](phase-03-frontend.md) | frontend | |
-| 4 | [Tài liệu code và test case Report 5](phase-04-docs-and-test-cases.md) | backend, report | 1, 2, 3 |
+| 4 | [user-service: Admin đặt lại mật khẩu](phase-04-admin-password-reset.md) | backend | |
+| 5 | [Tài liệu code và test case Report 5](phase-05-docs-and-test-cases.md) | backend, report | 1, 2, 3, 4 |
 
-Merge web trước hoặc cùng lúc với backend, để Admin không còn nút gọi vào API đã bỏ. Mobile không phải sửa.
+Phần bỏ quyền: merge web trước hoặc cùng lúc với backend, để Admin không còn nút gọi vào API đã bỏ. Phần đặt lại mật khẩu thì ngược lại: merge backend trước rồi mới tới nút trên web. Mobile không phải sửa.
 
 ## Tiêu chí nghiệm thu
 
@@ -49,14 +54,18 @@ Merge web trước hoặc cùng lúc với backend, để Admin không còn nút
 - [ ] Hai request đồng thời vẫn không tạo được hai subscription Active cho một người.
 - [ ] Content Author vẫn quản lý từ vựng như trước.
 - [ ] Web không còn mục "Cấp gói Premium" và trang từ vựng cho Admin.
+- [ ] Admin đặt lại mật khẩu được cho người dùng khác: mật khẩu mới đăng nhập được, phiên cũ bị đăng xuất, người dùng nhận e-mail báo.
+- [ ] Không còn đường `consume-human-grading`.
 - [ ] Test của các module đã sửa và test web đều qua.
 
 ## Không làm trong plan này
 
 - Không đổi dữ liệu cũ: subscription có `source_type = 'ADMIN'` và bảng `admin_grant_requests` giữ nguyên, không có migration.
 - Không đổi quyền điểm và kiểm duyệt.
+- Không bắt người dùng đổi mật khẩu ở lần đăng nhập sau (Báo cáo 3 không yêu cầu).
 
-## Câu hỏi còn mở
+## Đã chốt (27/11/2026)
 
-1. `POST /api/access/users/{userId}/consume-human-grading` (chỉ ADMIN, README ghi chưa service nào gọi) là thao tác nghiệp vụ. Đề xuất bỏ luôn trong phase 1.
-2. Bảng `admin_grant_requests` không còn ai ghi sau phase 1. Có xoá sau này không? Nếu xoá phải sửa lại danh sách bảng và ERD của Report 4 (242 còn 241).
+- Bỏ `consume-human-grading`.
+- Giữ bảng `admin_grant_requests`, nên Report 4 vẫn là 242 bảng.
+- Làm thêm Admin đặt lại mật khẩu, trong cùng plan.

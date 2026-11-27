@@ -36,7 +36,8 @@ Gốc: `services/access-service/src/main/java/com/ieltspath/access`
 ### 4. `InternalAccessController`
 
 - Giữ `entitlement` (chỉ đọc) và `points/refund` (điểm vẫn thuộc Admin).
-- `consume-human-grading`: theo câu hỏi mở 1 trong [plan.md](plan.md). Nếu bỏ thì giữ `ConsumeHumanGradingCreditUseCase` vì luồng chấm bài còn dùng.
+- Bỏ `POST /api/access/users/{userId}/consume-human-grading` (chưa service nào gọi). Giữ `ConsumeHumanGradingCreditUseCase` vì luồng chấm bài còn dùng qua `InternalHumanGradingController`.
+- Sửa `InternalAccessControllerTest`.
 
 ## Test
 
