@@ -379,7 +379,8 @@ Backend hiện có 40 phương thức `@Scheduled` trong 39 file. Cơ chế ch�
 | assessment | `OutboxRelayScheduler` | `FOR UPDATE SKIP LOCKED`; publish broker trong transaction ngắn để giữ claim tới khi gửi xong | Broker trong transaction ngắn |
 | access | `AccessOutboxRelayScheduler` | `FOR UPDATE SKIP LOCKED`; publish broker trong transaction ngắn | Broker trong transaction ngắn |
 | user | `UserOutboxRelayScheduler` | `FOR UPDATE SKIP LOCKED`; publish broker trong transaction ngắn | Broker trong transaction ngắn |
-| access | `SubscriptionExpiryNoticeScheduler` | Mỗi cặp (subscription, stage) được giành bằng `INSERT ... ON CONFLICT DO NOTHING` trước khi phát event; hai lịch trùng chỉ phát một lần | Không |
+| access | `SubscriptionExpiryNoticeScheduler` | Mỗi bộ (subscription, stage, ngày hết hạn) được giành bằng `INSERT ... ON CONFLICT DO NOTHING` trước khi phát event; hai lịch trùng chỉ phát một lần, gia hạn thì được báo lại cho hạn mới | Không |
+| access | `SubscriptionLapseScheduler` | Một câu cập nhật theo lô chuyển subscription `ACTIVE` đã quá hạn sang `EXPIRED`; chạy lặp vẫn an toàn | Không |
 | library | `VocabularyReviewDueScheduler` | Event id cố định theo (học viên, ngày) và `INSERT ... ON CONFLICT DO NOTHING` vào outbox; hai instance cùng chạy chỉ ghi một dòng | Không |
 | library | `LibraryOutboxRelayScheduler` | Giành dòng bằng `FOR UPDATE SKIP LOCKED`; publish có confirm, at-least-once | Không |
 | notification | `LearningMailScheduler` | Mỗi giám khảo được nhận job bằng một lệnh `DELETE ... RETURNING`; hai instance không nhận cùng job, job đến sau nằm cho lần sau | SMTP ngoài claim; job bị giữ lại nếu gửi lỗi hoặc chạm giới hạn ngày |

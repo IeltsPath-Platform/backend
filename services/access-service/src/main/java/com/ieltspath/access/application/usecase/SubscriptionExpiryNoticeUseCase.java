@@ -23,10 +23,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Queues the Premium expiry notices. Each stage is claimed before it is queued, so it goes out once. Only the most urgent
- * due stage is sent; the earlier stages that also fell due are marked as claimed without a mail, so a short subscription
- * does not produce a 7-day and a 1-day notice at the same time. Access rules are not changed: a subscription stays
- * ACTIVE and expiry is still derived from its end time.
+ * Queues the Premium expiry notices. Each stage is claimed for the end date before it is queued, so it goes out once per
+ * end date: a renewed or extended subscription is announced again. Only the most urgent due stage is sent; the earlier
+ * stages that also fell due are marked as claimed without a mail, so a short subscription does not produce a 7-day and a
+ * 1-day notice at the same time. Access rules are not changed: expiry is derived from the end time, whether or not the
+ * subscription has already been marked as expired.
  */
 @Service
 @RequiredArgsConstructor
@@ -51,7 +52,8 @@ public class SubscriptionExpiryNoticeUseCase {
     public int scan(Instant now) {
         int queued = 0;
         int withoutContact = 0;
-        for (DueSubscription due : notices.findActiveEndingBefore(now.plus(WEEK))) {
+        // A subscription that lapsed more than a week ago is too old to announce.
+        for (DueSubscription due : notices.findDueForNotice(now.plus(WEEK), now.minus(WEEK))) {
             Optional<Contact> contact = contacts.findContact(due.userId());
             if (contact.isEmpty()) {
                 withoutContact++;
@@ -61,7 +63,7 @@ public class SubscriptionExpiryNoticeUseCase {
             if (stages.isEmpty()) continue;
             String urgent = stages.get(0);
             for (String stage : stages) {
-                boolean claimed = notices.claim(due.subscriptionId(), stage, now);
+                boolean claimed = notices.claim(due.subscriptionId(), stage, due.endsAt(), now);
                 if (claimed && stage.equals(urgent)) {
                     enqueue(due, stage, contact.get(), now);
                     queued++;

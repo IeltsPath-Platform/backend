@@ -18,6 +18,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class SendAccountNoticeMailUseCaseTest {
@@ -163,6 +164,21 @@ class SendAccountNoticeMailUseCaseTest {
 
         verify(renderer).render(eq(MailTemplate.SUBSCRIPTION_EXPIRING), any());
         verify(renderer).render(eq(MailTemplate.SUBSCRIPTION_EXPIRED), any());
+    }
+
+    @Test
+    void subscriptionExpiryNoticeThatWaitedTooLongIsNotSent() {
+        ReflectionTestUtils.setField(useCase, "subscriptionExpiringEnabled", true);
+        ReflectionTestUtils.setField(useCase, "subscriptionExpiredEnabled", true);
+
+        useCase.subscriptionExpiry(new com.ieltspath.events.access.SubscriptionExpiryNoticeV1(UUID.randomUUID(),
+                com.ieltspath.events.access.SubscriptionExpiryNoticeV1.EVENT_TYPE, Instant.now(), UUID.randomUUID(),
+                UUID.randomUUID(), "ONE_DAY", Instant.now().minusSeconds(60), "learner@example.test", "An"));
+        useCase.subscriptionExpiry(new com.ieltspath.events.access.SubscriptionExpiryNoticeV1(UUID.randomUUID(),
+                com.ieltspath.events.access.SubscriptionExpiryNoticeV1.EVENT_TYPE, Instant.now(), UUID.randomUUID(),
+                UUID.randomUUID(), "EXPIRED", Instant.now().minusSeconds(8 * 86_400L), "learner@example.test", "An"));
+
+        verifyNoInteractions(renderer, sender);
     }
 
     private PasswordChangedV1 passwordChanged(UUID eventId, String displayName) {

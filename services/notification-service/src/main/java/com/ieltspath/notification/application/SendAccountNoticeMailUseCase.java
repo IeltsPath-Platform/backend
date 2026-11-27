@@ -117,7 +117,10 @@ public class SendAccountNoticeMailUseCase {
         if (!ended && !aboutToEnd) throw new IllegalArgumentException("Unknown subscription expiry stage");
         MailTemplate template = ended ? MailTemplate.SUBSCRIPTION_EXPIRED : MailTemplate.SUBSCRIPTION_EXPIRING;
         boolean enabled = ended ? subscriptionExpiredEnabled : subscriptionExpiringEnabled;
-        if (!enabled) return;
+        // With mail switched off, or after an outage, a notice can wait in the queue until it is no longer true.
+        Instant now = Instant.now();
+        boolean outdated = ended ? event.endsAt().isBefore(now.minus(Duration.ofDays(7))) : !event.endsAt().isAfter(now);
+        if (!enabled || outdated) return;
         send(template, event.eventId(), event.email(), Map.of(
                 "displayName", name(event.displayName()),
                 "endsAt", CHANGED_AT.format(event.endsAt())));
