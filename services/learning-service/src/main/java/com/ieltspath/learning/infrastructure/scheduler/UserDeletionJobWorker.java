@@ -59,7 +59,8 @@ public class UserDeletionJobWorker {
             "league_members",
             "learner_league",
             "daily_quests",
-            "learner_badges"
+            "learner_badges",
+            "ai_grading_reports"
     );
 
     private final JdbcDeletedUserRepository repository;

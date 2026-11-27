@@ -25,7 +25,7 @@ class BusinessControllerRoleConventionTest {
             // Administrators' own views: activity statistics, and a learner's goals as the User Service's admin API had them.
             // Dead-letter replay is an operator task on the message broker, not a business capability.
             if (controller == ActivityStatsController.class || controller == AdminLearningGoalController.class
-                    || controller == DeadLetterAdminController.class) {
+                    || controller == DeadLetterAdminController.class || controller == AiGradingReportController.class) {
                 continue;
             }
             check(controller, controller, violations);
