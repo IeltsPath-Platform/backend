@@ -13,7 +13,9 @@ event ID, the user ID and the time.
 Each consumer records the user in a `deleted_users` tombstone and a `user_deletion_jobs` row in one transaction, then a
 `UserDeletionJobWorker` purges the data in batches. Jobs are claimed with a lease under `FOR UPDATE SKIP LOCKED`, tried up
 to 10 times, then marked `FAILED` and logged. A job that crashed on its last attempt is marked `FAILED` once its lease
-expires. Storage objects are deleted outside any transaction, and a row is removed only after its object is gone.
+expires. Storage objects are deleted outside any transaction, and a row is removed only after its object is gone. Storage
+also answers 404 for a wrong bucket or key, so a 404 counts as "gone" only when an existence check, which first
+confirms the bucket is reachable, finds no object.
 
 Only `CUSTOMER` accounts may delete themselves. Any staff role gets `STAFF_ACCOUNT_SELF_DELETION`; an administrator
 closes staff accounts so that grading queues, sales keys and content can be handed over first. The admin delete
@@ -49,11 +51,22 @@ this cannot be used to farm points.
 | Game | Player rows, guesses, hints, receipts, sessions removed; a room they hosted keeps a placeholder host. |
 | Community posts and comments | Kept with the author shown as "Người dùng đã xóa". Bookmarks, follows, reactions and blocks are deleted. Reports they filed stay with the reporter anonymised. |
 | Point ledger, key activations, subscriptions | Kept for reconciliation. The active subscription is cancelled; the remaining balance is written off through one ledger entry (`ACCOUNT_DELETION`), so wallet and ledger agree. |
+| Outbox events about the user | Deleted, published or not, so no mail or result is sent for a deleted account: user-service mail events (email, name, reset and verification tokens), access expiry notices, assessment results and Mentor reviews of the learner, library review reminders, community notifications addressed to them, Learning placement Speaking results. The `user.deleted.v1` event itself is kept until it is published. |
 | Security logs | `login_history` deleted at once; `auth_audit_events` purged after 365 days by its own job. |
 | `users` row | Kept as an anonymous tombstone with status `DELETED`. |
 
 Data kept for a legitimate reason (ledger, audit log, anonymous community content) must be listed, with its reason and
-time limit, in the privacy policy, as Google Play requires.
+time limit, in the privacy policy, as Google Play requires. The policy must say plainly that community posts and
+comments stay after deletion with the author removed, and that their text may still contain personal details the
+user wrote into them.
+
+## Decisions confirmed (2026-11-27)
+
+1. Only learners delete their own account. Staff (examiner, sales, content author, admin) ask an administrator, who
+   hands over open work, sets their role to `CUSTOMER`, and the person then deletes the account themselves.
+2. Gold-set copies of a learner's essays and their evaluation items are deleted; the smaller evaluation set is accepted.
+3. Community posts and comments are kept and anonymised so discussions stay intact; the privacy policy says so.
+4. The first version (#230) was never deployed, so no `FAILED` job needs to be reset.
 
 ## Events that arrive after the deletion
 
@@ -72,5 +85,4 @@ because the access token is revoked at once.
 
 ## Open decisions
 
-1. Whether learners may also choose to delete their community posts instead of anonymising them.
-2. Whether a deletion status endpoint (`pending` / `completed` / `needs_attention`) is still wanted; it is not built.
+1. Whether a deletion status endpoint (`pending` / `completed` / `needs_attention`) is still wanted; it is not built.
