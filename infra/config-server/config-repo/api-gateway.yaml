@@ -60,13 +60,6 @@ spring:
               filters:
                 - RewritePath=/api/users/me/statistics/study-time, /api/learning/statistics/study-time
 
-            - id: learning-study-goals-admin
-              uri: lb://learning-service
-              predicates:
-                - Path=/api/users/{id:[0-9a-fA-F-]{36}}/learning-goals/**
-              filters:
-                - RewritePath=/api/users/(?<id>[^/]+)/learning-goals(?<segment>/?.*), /api/learning/admin/users/$\{id}/goals$\{segment}
-
             - id: learning-study-activities
               uri: lb://learning-service
               predicates:

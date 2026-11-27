@@ -2,7 +2,9 @@
 
 ## Learner security history
 
-`GET /api/users/me/security-events?page=0` returns up to 50 newest events for the authenticated user only.
+`GET /api/users/me/security-events?page=0` returns up to 50 newest events for the authenticated user only. For an event
+that someone else caused (its detail has `actorId`, such as a password reset by an administrator), `ipAddress` and
+`userAgent` are null and `actorId` is left out; the administrator history keeps all three.
 
 ## Administrator event history
 
@@ -14,6 +16,8 @@ Both endpoints return `{items,page,size,total}`. Each item contains `id`, `event
 `correlationId`, allowlisted `detail`, and `createdAt`. The final IPv4 octet is hidden; IPv6 addresses have their final
 segment hidden. Audit details never contain passwords, refresh/access tokens, Google ID tokens, nonce values, or full email
 addresses.
+
+A `PASSWORD_RESET` made by an administrator has `method=ADMIN` and `actorId` (the administrator) in `detail`.
 
 Supported events: `PASSWORD_CHANGED`, `PASSWORD_RESET`, `PASSWORD_SET`, `GOOGLE_LINKED`, `GOOGLE_UNLINKED`,
 `GOOGLE_PASSWORD_CLEARED`, `SESSION_REVOKED`, `SESSIONS_REVOKED_ALL`, `REFRESH_REUSE_DETECTED`, `REAUTH_SUCCEEDED`,

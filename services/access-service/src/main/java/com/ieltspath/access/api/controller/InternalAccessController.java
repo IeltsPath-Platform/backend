@@ -3,9 +3,7 @@ package com.ieltspath.access.api.controller;
 import com.ieltspath.access.api.dto.request.RefundPointsRequest;
 import com.ieltspath.access.api.dto.response.PointLedgerResponse;
 import com.ieltspath.access.api.dto.response.UserEntitlementResponse;
-import com.ieltspath.access.application.command.ConsumeHumanGradingCreditCommand;
 import com.ieltspath.access.application.command.RefundPointsCommand;
-import com.ieltspath.access.application.usecase.ConsumeHumanGradingCreditUseCase;
 import com.ieltspath.access.application.usecase.GetUserEntitlementUseCase;
 import com.ieltspath.access.application.usecase.RefundPointsUseCase;
 import jakarta.validation.Valid;
@@ -13,7 +11,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -28,7 +25,6 @@ public class InternalAccessController {
 
     private final GetUserEntitlementUseCase getUserEntitlementUseCase;
     private final RefundPointsUseCase refundPointsUseCase;
-    private final ConsumeHumanGradingCreditUseCase consumeHumanGradingCreditUseCase;
 
     @GetMapping("/users/{userId}/entitlement")
     public UserEntitlementResponse getUserEntitlement(@PathVariable("userId") UUID userId) {
@@ -45,14 +41,5 @@ public class InternalAccessController {
                 request.idempotencyKey(),
                 request.description()
         )));
-    }
-
-    @PostMapping("/users/{userId}/consume-human-grading")
-    public Map<String, Object> consumeHumanGrading(@PathVariable("userId") UUID userId) {
-        int remaining = consumeHumanGradingCreditUseCase.execute(new ConsumeHumanGradingCreditCommand(userId));
-        return Map.of(
-                "userId", userId,
-                "remainingCredits", remaining
-        );
     }
 }

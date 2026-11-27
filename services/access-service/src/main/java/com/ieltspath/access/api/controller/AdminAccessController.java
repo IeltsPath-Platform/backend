@@ -1,21 +1,16 @@
 package com.ieltspath.access.api.controller;
 
-import com.ieltspath.access.api.dto.request.*;
-import com.ieltspath.access.api.dto.response.*;
-import com.ieltspath.access.application.command.*;
-import com.ieltspath.access.application.usecase.*;
-import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
+import com.ieltspath.access.api.dto.request.AdjustPointsRequest;
+import com.ieltspath.access.api.dto.response.PointLedgerResponse;
+import com.ieltspath.access.application.command.AdjustPointsCommand;
+import com.ieltspath.access.application.usecase.AdjustPointsUseCase;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
-
-import java.util.List;
-import java.util.UUID;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/access/admin")
@@ -23,52 +18,7 @@ import java.util.UUID;
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminAccessController {
 
-    private final CurrentUserProvider currentUserProvider;
-    private final GenerateActivationKeysUseCase generateActivationKeysUseCase;
-    private final RevokeActivationKeyUseCase revokeActivationKeyUseCase;
-    private final CreatePlanUseCase createPlanUseCase;
-    private final CreateKeyProductUseCase createKeyProductUseCase;
     private final AdjustPointsUseCase adjustPointsUseCase;
-    private final GrantSubscriptionUseCase grantSubscriptionUseCase;
-
-    @PostMapping("/keys/generate")
-    public List<GeneratedKeyResponse> generateKeys(@Valid @RequestBody GenerateKeysRequest request) {
-        UUID adminId = currentUserProvider.currentUser()
-                .map(com.ieltspath.commonsecurity.currentuser.CurrentUser::id)
-                .orElse(null);
-        return generateActivationKeysUseCase.execute(new GenerateActivationKeysCommand(
-                request.productId(),
-                request.count(),
-                request.expiresAt(),
-                adminId
-        )).stream().map(GeneratedKeyResponse::from).toList();
-    }
-
-    @PostMapping("/keys/{id}/revoke")
-    public ResponseEntity<Void> revokeKey(@PathVariable("id") UUID id) {
-        revokeActivationKeyUseCase.execute(id);
-        return ResponseEntity.noContent().build();
-    }
-
-    @PostMapping("/plans")
-    @ResponseStatus(HttpStatus.CREATED)
-    public PlanResponse createPlan(@Valid @RequestBody CreatePlanRequest request) {
-        return PlanResponse.from(createPlanUseCase.execute(new CreatePlanCommand(request.code(), request.name())));
-    }
-
-    @PostMapping("/key-products")
-    @ResponseStatus(HttpStatus.CREATED)
-    public KeyProductResponse createKeyProduct(@Valid @RequestBody CreateKeyProductRequest request) {
-        return KeyProductResponse.from(createKeyProductUseCase.execute(new CreateKeyProductCommand(
-                request.code(),
-                request.name(),
-                request.keyType(),
-                request.pointsAmount(),
-                request.planId(),
-                request.premiumDays(),
-                request.humanGradingCredits()
-        )));
-    }
 
     @PostMapping("/points/adjust")
     public PointLedgerResponse adjustPoints(@Valid @RequestBody AdjustPointsRequest request) {
@@ -77,22 +27,6 @@ public class AdminAccessController {
                 request.delta(),
                 request.reason(),
                 request.idempotencyKey()
-        )));
-    }
-
-    @PostMapping("/subscriptions/grant")
-    @ResponseStatus(HttpStatus.CREATED)
-    public SubscriptionResponse grantSubscription(
-            @Parameter(in = ParameterIn.HEADER, name = "Idempotency-Key", required = true,
-                    description = "UUID mới cho mỗi lần cấp; gửi lại cùng khóa khi thử lại")
-            @RequestHeader("Idempotency-Key") String idempotencyKey,
-            @Valid @RequestBody GrantSubscriptionRequest request) {
-        return SubscriptionResponse.from(grantSubscriptionUseCase.execute(new GrantSubscriptionCommand(
-                request.userId(),
-                request.planId(),
-                request.durationDays(),
-                request.humanGradingCredits(),
-                idempotencyKey
         )));
     }
 }

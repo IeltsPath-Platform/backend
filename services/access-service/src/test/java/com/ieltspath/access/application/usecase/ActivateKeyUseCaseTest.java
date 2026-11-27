@@ -13,6 +13,11 @@ import com.ieltspath.access.application.command.ActivateKeyCommand;
 import com.ieltspath.access.application.result.ActivationResult;
 import com.ieltspath.access.domain.aggregate.ActivationKey;
 import com.ieltspath.access.domain.aggregate.KeyProduct;
+import com.ieltspath.access.domain.aggregate.Plan;
+import com.ieltspath.access.domain.entity.OutboxEvent;
+import com.ieltspath.events.access.SubscriptionGrantedV1;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.mockito.Spy;
 import com.ieltspath.access.domain.aggregate.PointWallet;
 import com.ieltspath.access.domain.aggregate.Subscription;
 import com.ieltspath.access.domain.entity.KeyActivation;
@@ -58,6 +63,10 @@ class ActivateKeyUseCaseTest {
 
     @Mock
     UserEmailVerificationRepository userEmailVerificationRepository;
+    @Mock
+    private PlanRepository planRepository;
+    @Spy
+    private ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
     @InjectMocks
     private ActivateKeyUseCase activateKeyUseCase;
@@ -107,7 +116,10 @@ class ActivateKeyUseCaseTest {
         verify(pointLedgerRepository).save(any());
         verify(keyActivationRepository).save(any(KeyActivation.class));
         verify(activationKeyRepository).save(key);
-        verify(outboxEventRepository).save(any());
+        // Only the wallet event: a points key announces no Premium access.
+        ArgumentCaptor<OutboxEvent> event = ArgumentCaptor.forClass(OutboxEvent.class);
+        verify(outboxEventRepository).save(event.capture());
+        assertThat(event.getValue().getEventType()).isEqualTo("PointCredited");
     }
 
     @Test
@@ -122,6 +134,7 @@ class ActivateKeyUseCaseTest {
         when(activationKeyRepository.findByCodeHash(keyCode.codeHash())).thenReturn(Optional.of(key));
         when(keyProductRepository.findById(productId)).thenReturn(Optional.of(product));
         when(subscriptionRepository.findActiveByUserId(userId)).thenReturn(Optional.empty());
+        when(planRepository.findById(planId)).thenReturn(Optional.of(Plan.create("PREMIUM_MONTHLY", "Premium tháng")));
 
         ActivationResult result = activateKeyUseCase.execute(new ActivateKeyCommand(userId, rawKey, "idem-2"));
 
@@ -136,6 +149,13 @@ class ActivateKeyUseCaseTest {
         verify(subscriptionRepository).expireLapsed(eq(userId), any(Instant.class));
         verify(keyActivationRepository).save(any(KeyActivation.class));
         verify(activationKeyRepository).save(key);
+
+        ArgumentCaptor<OutboxEvent> events = ArgumentCaptor.forClass(OutboxEvent.class);
+        verify(outboxEventRepository, times(2)).save(events.capture());
+        OutboxEvent notice = events.getAllValues().stream()
+                .filter(event -> event.getEventType().equals("SubscriptionGranted")).findFirst().orElseThrow();
+        assertThat(notice.getPayload())
+                .contains(SubscriptionGrantedV1.EVENT_TYPE, "PREMIUM_MONTHLY", userId.toString(), notice.getId().toString());
     }
 
     @Test
@@ -152,6 +172,7 @@ class ActivateKeyUseCaseTest {
         assertThat(result.activationId()).isEqualTo(existing.getId());
         assertThat(result.pointsGranted()).isEqualTo(50);
         verify(activationKeyRepository, never()).save(any());
+        verifyNoInteractions(outboxEventRepository);
     }
 
     @Test
@@ -249,6 +270,7 @@ class ActivateKeyUseCaseTest {
         when(activationKeyRepository.findByCodeHash(keyCode.codeHash())).thenReturn(Optional.of(key));
         when(keyProductRepository.findById(productId)).thenReturn(Optional.of(KeyProduct.createPremiumProduct("PREMIUM_30D", "30 Days Premium", planId, 30, 4)));
         when(subscriptionRepository.findActiveByUserId(userId)).thenReturn(Optional.of(active));
+        when(planRepository.findById(planId)).thenReturn(Optional.of(Plan.create("PREMIUM_MONTHLY", "Premium tháng")));
 
         ActivationResult result = activateKeyUseCase.execute(new ActivateKeyCommand(userId, rawKey, "idem-6"));
 

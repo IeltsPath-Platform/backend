@@ -10,7 +10,6 @@ public interface StudySessionRepository {
     record Daily(LocalDate date, String timezone, long milliseconds) {}
     record Goal(LocalDate effectiveDate, Integer minutes) {}
     void lockUser(UUID userId);
-    void lockGoalOwner(UUID goalId);
     /** The timezone of the learner's most recent study session or goal schedule, if there is one. */
     Optional<String> latestTimezone(UUID userId);
     /** The timezone the learner's current goal schedule was made in. */

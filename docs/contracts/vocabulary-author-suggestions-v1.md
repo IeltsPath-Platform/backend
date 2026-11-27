@@ -3,7 +3,7 @@
 Updated: 2026-11-04
 
 `GET /api/content/admin/vocabulary/suggestions?q=poll&page=0&size=20` is authenticated and requires
-`CONTENT_AUTHOR` or `ADMIN`. Library owns the data. Gateway already routes this path to Library with internal JWT
+`CONTENT_AUTHOR`. Library owns the data. Gateway already routes this path to Library with internal JWT
 exchange and the default rate-limit tier (20 requests/second, burst 40, per authenticated subject).
 The public `/api/content/vocabulary/suggestions` and existing `/search` contracts are unchanged.
 

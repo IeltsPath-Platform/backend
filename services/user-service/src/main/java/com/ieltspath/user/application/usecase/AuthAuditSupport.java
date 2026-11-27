@@ -18,7 +18,7 @@ import java.util.UUID;
 @Component
 @RequiredArgsConstructor
 public class AuthAuditSupport {
-    private static final Set<String> SAFE_DETAIL_KEYS = Set.of("sessionId", "reason", "method", "code", "provider");
+    private static final Set<String> SAFE_DETAIL_KEYS = Set.of("sessionId", "reason", "method", "code", "provider", "actorId");
     private final AuthAuditRecorder recorder;
     private final AuthAuditContextProvider contextProvider;
 

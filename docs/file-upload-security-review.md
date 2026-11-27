@@ -42,7 +42,7 @@ Không thấy lỗ hổng cho phép thực thi mã, path traversal, ghi đè fil
 | `POST /api/content/admin/media/audio` | `CONTENT_AUTHOR` | 25 MB | mpeg, mp4, wav, ogg | `media` hoặc `media-premium` | không | `upload` |
 | `POST /api/content/admin/media/image` | `CONTENT_AUTHOR` | 2 MB | png, jpeg, webp | `media` | không | `upload` |
 | `POST /api/content/admin/media/document` | `CONTENT_AUTHOR` | 20 MB | pdf | `media-premium` (riêng tư) | không | `upload` |
-| `POST /api/content/admin/vocabulary/{covers,sense-images,pronunciation}` | `CONTENT_AUTHOR`, `ADMIN` | 2 MB | ảnh; audio | `flashcards`, `media` | không | mặc định (xem F-04) |
+| `POST /api/content/admin/vocabulary/{covers,sense-images,pronunciation}` | `CONTENT_AUTHOR` | 2 MB | ảnh; audio | `flashcards`, `media` | không | mặc định (xem F-04) |
 | `POST /api/content/admin/course-import[/validate]` | `CONTENT_AUTHOR` | 5 MB | xlsx | không lưu file | không | mặc định (xem F-04) |
 
 Controller của avatar, ảnh cộng đồng và ảnh flashcard không có `@PreAuthorize` theo vai trò: bất kỳ tài khoản đăng nhập nào
@@ -138,7 +138,7 @@ assessment (189) và ảnh cộng đồng (248) có `tier: upload`. Không có r
 `/api/content/admin/vocabulary/{covers,sense-images,pronunciation}` và `/api/content/admin/course-import`; chúng rơi vào tier
 mặc định (20 yêu cầu/giây, burst 40).
 
-Hệ quả thấp vì chỉ `CONTENT_AUTHOR` và `ADMIN` gọi được, nhưng một tài khoản author bị chiếm sẽ upload nhanh hơn tier
+Hệ quả thấp vì chỉ `CONTENT_AUTHOR` gọi được, nhưng một tài khoản author bị chiếm sẽ upload nhanh hơn tier
 `upload` cho phép, và import Excel (tốn CPU khi phân tích) cũng nằm ngoài hạn mức nghiêm. Khai báo thêm route với `tier:
 upload` (hoặc `ai` cho import nếu coi là nặng) theo `AGENTS.md` §3.9.
 

@@ -1,7 +1,6 @@
 package com.ieltspath.learning.api.exception;
 
 import com.ieltspath.commonsecurity.error.VietnameseErrorMessages;
-import com.ieltspath.learning.api.controller.AdminLearningGoalController;
 import com.ieltspath.learning.api.controller.LearningActivityController;
 import com.ieltspath.learning.api.controller.LearningGoalController;
 import com.ieltspath.learning.api.controller.StudySessionController;
@@ -36,7 +35,7 @@ import java.util.Map;
  */
 @Slf4j
 @Order(Ordered.HIGHEST_PRECEDENCE)
-@RestControllerAdvice(assignableTypes = {LearningGoalController.class, AdminLearningGoalController.class,
+@RestControllerAdvice(assignableTypes = {LearningGoalController.class,
         LearningActivityController.class, StudySessionController.class, PracticeSessionController.class})
 public class StudyDataExceptionHandler {
     private static final String INVALID = "Dữ liệu không hợp lệ";

@@ -116,7 +116,7 @@ The frontend no longer uses the mindmap endpoint from 2026-11; the endpoint rema
 
 ### Authenticated vocabulary author API
 
-These paths require `CONTENT_AUTHOR` or `ADMIN`; missing/invalid authentication returns 401 and other roles return 403. All writes use the normal `ErrorResponse` handler and do not log submitted text.
+These paths require `CONTENT_AUTHOR`; missing/invalid authentication returns 401 and other roles return 403. All writes use the normal `ErrorResponse` handler and do not log submitted text.
 
 | Method and path | Request | Success |
 | --- | --- | --- |

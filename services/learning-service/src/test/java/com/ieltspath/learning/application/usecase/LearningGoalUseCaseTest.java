@@ -230,20 +230,6 @@ class LearningGoalUseCaseTest {
     }
 
     @Test
-    void anAdminChangeLocksTheGoalOwnerAndSkipsTheOwnerCheck() {
-        LearningGoal goal = goal(UUID.randomUUID(), GoalStatus.ACTIVE);
-        when(learningGoalRepository.findById(goal.getId())).thenReturn(Optional.of(goal));
-        when(learningGoalRepository.save(any(LearningGoal.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        LearningGoalResult result = changeLearningGoalStatusUseCase.execute(
-                new ChangeLearningGoalStatusCommand(goal.getId(), null, "PAUSED"));
-
-        assertEquals("PAUSED", result.status());
-        verify(studyGoals).lockGoalOwner(goal.getId());
-        verify(studyGoals, never()).lock(any());
-    }
-
-    @Test
     void theGoalHistoryOfALearnerListsEveryGoal() {
         UUID userId = UUID.randomUUID();
         LearningGoal old = goal(userId, GoalStatus.ABANDONED);
