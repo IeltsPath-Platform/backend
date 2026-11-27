@@ -45,6 +45,13 @@ public class JdbcDeletedUserStore implements DeletedUserStore {
     public record Job(UUID eventId, UUID userId, int attempts) { }
 
     public List<Job> claimPendingJobs(int limit, long leaseSeconds, int maxAttempts) {
+        // A job that crashed on its last attempt would stay PROCESSING for ever; once its lease is over it is FAILED.
+        jdbc.update("""
+                UPDATE user_deletion_jobs
+                SET status = 'FAILED', completed_at = CURRENT_TIMESTAMP, last_error = COALESCE(last_error, 'LEASE_EXPIRED')
+                WHERE status = 'PROCESSING' AND attempts >= ?
+                  AND claimed_at < CURRENT_TIMESTAMP - make_interval(secs => ?)
+                """, maxAttempts, leaseSeconds);
         return jdbc.query("""
                 UPDATE user_deletion_jobs
                 SET status = 'PROCESSING',
@@ -67,8 +74,27 @@ public class JdbcDeletedUserStore implements DeletedUserStore {
                 rs.getInt("attempts")), leaseSeconds, maxAttempts, limit);
     }
 
+    /** Every table with a user column that {@link #deleteUserGameData} handles; checked against the schema by a test. */
+    public static final java.util.Set<String> HANDLED_TABLES = java.util.Set.of(
+            "game_guess_receipts", "game_sessions", "game_match_players", "game_room_members", "game_rooms");
+
+    /** Stands in for a deleted host, because a room must keep one. */
+    public static final UUID DELETED_USER = new UUID(0L, 0L);
+
     public void deleteUserGameData(UUID userId) {
         jdbc.update("DELETE FROM game_guess_receipts WHERE user_id = ?", userId);
+        // A Wordly hint names the guess it came from; the five hint columns are set or cleared together.
+        jdbc.update("""
+                UPDATE game_player_words
+                SET hint_request_id = NULL, hint_source_guess_id = NULL, hint_column = NULL, hint_letter = NULL,
+                    hint_used_at = NULL
+                WHERE hint_source_guess_id IN (
+                    SELECT g.id FROM game_guesses g
+                    JOIN game_player_words pw ON pw.id = g.player_word_id
+                    JOIN game_match_players mp ON mp.id = pw.match_player_id
+                    WHERE mp.user_id = ?
+                )
+                """, userId);
         jdbc.update("""
                 DELETE FROM game_guesses
                 WHERE player_word_id IN (
@@ -96,6 +122,7 @@ public class JdbcDeletedUserStore implements DeletedUserStore {
         jdbc.update("DELETE FROM game_sessions WHERE user_id = ?", userId);
         jdbc.update("DELETE FROM game_match_players WHERE user_id = ?", userId);
         jdbc.update("DELETE FROM game_room_members WHERE user_id = ?", userId);
+        jdbc.update("UPDATE game_rooms SET host_user_id = ? WHERE host_user_id = ?", DELETED_USER, userId);
     }
 
     public void markJobDone(UUID eventId) {
