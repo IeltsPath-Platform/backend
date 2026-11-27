@@ -75,7 +75,13 @@ public class JdbcDeletedUserStore implements DeletedUserStore {
     }
 
     public void deleteUserNotificationsAndDevices(UUID userId) {
-        jdbc.update("DELETE FROM notification_push_deliveries WHERE recipient_id = ?", userId);
+        // A phone keeps its installation when another account signs in on it, so the device row moves to the new
+        // user while deliveries of the previous user still point at it (device_id is ON DELETE RESTRICT).
+        jdbc.update("""
+                DELETE FROM notification_push_deliveries
+                WHERE recipient_id = ?
+                   OR device_id IN (SELECT id FROM notification_devices WHERE user_id = ?)
+                """, userId, userId);
         jdbc.update("DELETE FROM notification_devices WHERE user_id = ?", userId);
         jdbc.update("DELETE FROM notification_preferences WHERE recipient_id = ?", userId);
         jdbc.update("DELETE FROM notifications WHERE recipient_id = ?", userId);
