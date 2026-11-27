@@ -37,7 +37,7 @@ public class JdbcPlacementSpeakingGradeStore implements PlacementSpeakingGradeSt
     public List<RecordingItem> recordings(UUID attemptId, UUID userId) {
         return jdbc.query("""
                 SELECT DISTINCT ON (ai.id) ai.id AS item_id,
-                       COALESCE((ase.snapshot->>'partNo')::integer, ase.sort_order + 1) AS part_no,
+                       COALESCE((ase.section_snapshot->>'partNo')::integer, ase.sort_order + 1) AS part_no,
                        ai.sort_order + 1 AS question_no,
                        COALESCE(ls.prompt_snapshot->>'stem', ai.question_snapshot->>'stem', ai.question_snapshot->>'prompt', '') AS question,
                        ls.audio_reference AS object_key
@@ -46,7 +46,7 @@ public class JdbcPlacementSpeakingGradeStore implements PlacementSpeakingGradeSt
                 JOIN learner_submissions ls ON ls.attempt_item_id = ai.id
                 JOIN assessment_attempts aa ON aa.id = ase.attempt_id
                 WHERE aa.id = ? AND aa.user_id = ? AND aa.attempt_type = 'PLACEMENT'
-                  AND upper(ase.snapshot->>'skill') = 'SPEAKING'
+                  AND upper(ase.section_snapshot->>'skill') = 'SPEAKING'
                   AND ls.user_id = aa.user_id AND ls.skill = 'SPEAKING' AND ls.status = 'SUBMITTED'
                   AND ls.audio_reference IS NOT NULL AND ls.text_payload IS NULL
                 ORDER BY ai.id, ls.submitted_at DESC, ls.id DESC
