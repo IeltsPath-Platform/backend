@@ -12,6 +12,10 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+    # Renumbered migrations: db/callback/beforeValidate.sql moves their history rows, and the numbers that were never
+    # run on an older developer database then have to be applied out of order.
+    out-of-order: true
+    locations: classpath:db/migration,classpath:db/callback
   servlet:
     multipart:
       # Audio upload for authors: 25 MB file, a little headroom for the multipart envelope.
