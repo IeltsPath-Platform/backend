@@ -67,6 +67,18 @@ class UserDeletionPurgeIntegrationTest {
     }
 
     @Test
+    void everyEventPayloadTableWithoutALearnerColumnIsPurged() {
+        Set<String> payloadTables = new TreeSet<>(jdbc.queryForList("""
+                SELECT table_name FROM information_schema.columns
+                WHERE table_schema = 'public' AND column_name = 'payload' AND data_type = 'jsonb'
+                """, String.class));
+        payloadTables.removeAll(seeder.userColumns(USER_COLUMNS).keySet());
+        payloadTables.removeAll(UserDeletionJobWorker.PAYLOAD_TABLES);
+
+        assertThat(payloadTables).as("event tables that may carry a learner's data in their payload").isEmpty();
+    }
+
+    @Test
     void purgeRemovesEveryRowOfTheLearnerAndLeavesOthersAlone() {
         UUID learner = UUID.randomUUID();
         UUID other = UUID.randomUUID();
@@ -95,6 +107,11 @@ class UserDeletionPurgeIntegrationTest {
         assertThat(seeder.rowsMentioning(userTables, other)).as("another learner's rows").isEqualTo(othersBefore);
         assertThat(jdbc.queryForObject("SELECT status FROM user_deletion_jobs WHERE event_id = ?", String.class, eventId))
                 .isEqualTo("DONE");
+        String placementResults = "SELECT count(*) FROM placement_speaking_outbox WHERE payload #>> '{data,userId}' = ?";
+        assertThat(jdbc.queryForObject(placementResults, Integer.class, learner.toString()))
+                .as("placement Speaking results of the deleted learner").isZero();
+        assertThat(jdbc.queryForObject(placementResults, Integer.class, other.toString()))
+                .as("another learner's placement Speaking result").isEqualTo(1);
         verify(storage).delete("speaking-recordings", "practice/" + learner + "/answer.wav");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM speaking_recordings r JOIN speaking_submissions s ON s.id = r.submission_id",
                 Integer.class)).isEqualTo(1);
@@ -132,5 +149,7 @@ class UserDeletionPurgeIntegrationTest {
                 "content_type", "audio/wav", "size_bytes", 100));
 
         seeder.insert("work_items", Map.of("subject_user_id", learner));
+        seeder.insert("placement_speaking_outbox", Map.of("event_type", "speaking.grading.completed.v1",
+                "payload", "{\"data\": {\"userId\": \"" + learner + "\", \"summary\": \"Fluent answer\"}}"));
     }
 }

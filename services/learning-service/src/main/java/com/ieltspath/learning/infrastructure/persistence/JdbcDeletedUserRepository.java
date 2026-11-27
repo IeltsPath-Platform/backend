@@ -131,6 +131,9 @@ public class JdbcDeletedUserRepository implements DeletedUserRepository {
                 WHERE session_id IN (SELECT id FROM diagnostic_sessions WHERE user_id = ?)
                 """, userId);
         jdbc.update("DELETE FROM diagnostic_sessions WHERE user_id = ?", userId);
+        // Placement Speaking results waiting to be published (or already published) carry the learner's band, comments
+        // and summary inside the event; the table has no user column, so the event's userId is the key.
+        jdbc.update("DELETE FROM placement_speaking_outbox WHERE payload #>> '{data,userId}' = ?", userId.toString());
         jdbc.update("DELETE FROM review_sets WHERE user_id = ?", userId);
         jdbc.update("DELETE FROM review_theory_checks WHERE user_id = ?", userId);
         jdbc.update("DELETE FROM review_items WHERE user_id = ?", userId);

@@ -70,6 +70,9 @@ public class UserDeletionJobWorker {
             "diagnostic_sessions", "review_sets", "review_theory_checks", "review_items",
             "practice_sessions", "practice_attempts", "human_review_requests", "human_review_outcomes",
             "lesson_writing_submissions", "speaking_submissions", "study_sessions");
+
+    /** Tables without a user column whose event payload names the learner; cleared with the linked records. */
+    static final List<String> PAYLOAD_TABLES = List.of("placement_speaking_outbox");
     private final JdbcDeletedUserRepository repository;
     private final ObjectProvider<ObjectStorage> storageProvider;
     private final SpeakingPracticeSettings speakingSettings;
