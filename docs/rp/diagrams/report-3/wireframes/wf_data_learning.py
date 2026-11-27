@@ -5,7 +5,6 @@ MENU = ['Courses', 'Review basket', 'Overview', 'Practice']
 
 SCREENS = [
     dict(name='Course List', shell='site', menu=MENU, ucs='View Courses',
-         note='The mobile Courses tab shows the same cards in one column and has no placement button.',
          items=[
              ('title', 'IELTS path by target band', 'Heading of the page.'),
              ('panel', 'Not sure where to start?', 'Offers the free placement test to find the current band. The button "Take placement test" opens Placement Test. When a retake is left it shows "Retake placement test" and the number of retakes.', [('button', 'Take placement test', '')]),
@@ -47,7 +46,6 @@ SCREENS = [
              ('panel', 'Topic test', 'States: "Passed"; "No test for this stage yet"; "Practise more before the test: <knowledge points>"; "The test is not open. Finish the lessons, more practice and the review if any."', [('button', 'Take topic test', '')]),
          ]),
     dict(name='Lesson', shell='site', menu=MENU, ucs='Study a Lesson, Answer Lesson Exercises, Write Essay in a Lesson',
-         note='On the mobile app the lesson is studied in the Lesson Session screen.',
          items=[
              ('text', 'Home > Course > Topic > Lesson', 'Breadcrumb path.'),
              ('tabs', ['Content', 'Vocabulary', 'Exercises'], 'The content of the lesson, its words and its exercises.'),
@@ -56,14 +54,6 @@ SCREENS = [
              ('button', 'Do exercises', 'Starts the exercises. A lesson without exercises shows "Press Complete lesson to record your progress".'),
              ('button2', 'Practise this lesson', 'Opens the practice of the lesson once it is available.'),
              ('text', 'Study time recorder', 'Shows that study time is being recorded, or "Could not record study time. You can still go on."'),
-         ]),
-    dict(name='Lesson Session', shell='mobile', tabs=[], ucs='Study a Lesson, Answer Lesson Exercises',
-         items=[
-             ('steps', ['1', '2', '3', '4'], 'Progress through the blocks of the lesson.'),
-             ('panel', 'Block', 'Text, video, slide or an exercise question. One block at a time.', [('text', 'Content', '')]),
-             ('chips', ['A', 'B', 'C', 'D'], 'Answer choices of an exercise question.'),
-             ('button', 'Check', 'Grades the answer. A wrong answer costs one heart and shows the hint.'),
-             ('button2', 'Next', 'Goes to the next block; the last one finishes the lesson.'),
          ]),
     dict(name='No Hearts window', shell='modal', ucs='Refill Hearts with Points',
          items=[
@@ -98,7 +88,6 @@ SCREENS = [
              ('button2', 'Back to course', 'Returns to the course. "View course list" goes to the list.'),
          ]),
     dict(name='Review', shell='site', menu=MENU, ucs='Review a Weak Skill',
-         note='The mobile app has the same steps in a single column.',
          items=[
              ('title', 'Review · Knowledge point', 'Heading of the review.'),
              ('panel', 'Theory to remember', 'Short theory summary.', [('button2', 'Confirm theory read', '')]),

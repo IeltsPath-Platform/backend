@@ -5,7 +5,7 @@ MENU = ['Dictionary', 'Notebook', 'Flashcards', 'Map']
 
 VOCAB = [
     dict(name='Vocabulary', shell='site', menu=MENU, ucs='Browse Vocabulary, Save Word to Notebook',
-         note='On mobile the Home tab lists vocabulary topics, and a topic opens a learning path of lessons (screen Vocabulary topic).',
+         note='On mobile only the dictionary search is available, inside the Flashcards tab.',
          items=[
              ('title', 'IELTSPath dictionary: vocabulary by topic', 'Heading. Link "My notebook" (or "Sign in to save words" for a Guest).'),
              ('field', 'Look up a word', 'English to Vietnamese or Vietnamese to English; a switch changes the direction. Typing with Vietnamese accents searches by Vietnamese meaning.', 'sustainable / bền vững'),
@@ -125,7 +125,7 @@ VOCAB = [
              ('button2', 'Not remembered (1) / Remembered (2)', 'Grades the card and sets when it is due again.'),
              ('text', 'No more due cards', 'End message with "Review more" and "Back".'),
          ]),
-    dict(name='Flashcard Progress', shell='mobile', tabs=['Home', 'Learn', 'Practice', 'Account'], ucs='Study Flashcards',
+    dict(name='Flashcard Progress', shell='mobile', tabs=['Today', 'Cards', 'Games', 'Community', 'Notices', 'Profile'], ucs='Study Flashcards',
          items=[
              ('title', 'Vocabulary progress', 'Heading with the link "Add a set".'),
              ('stats', ['Saved', 'Mastered', 'Needs review'], 'Counts of the Learner\'s words.'),

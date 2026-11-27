@@ -10,7 +10,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 const here = dirname(fileURLToPath(import.meta.url))
 const edge = ['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
   'C:/Program Files/Microsoft/Edge/Application/msedge.exe'].find((path) => existsSync(path))
-const screens = JSON.parse(readFileSync(join(here, 'wf_index.json'), 'utf8'))
+// Screens in mockup/applied.json are drawn from the real frontend (mockup/run.mjs) and are not shot again here.
+const applied = existsSync(join(here, 'mockup', 'applied.json')) ? JSON.parse(readFileSync(join(here, 'mockup', 'applied.json'), 'utf8')) : []
+const screens = JSON.parse(readFileSync(join(here, 'wf_index.json'), 'utf8')).filter((screen) => !applied.includes(screen.file))
 const profile = mkdtempSync(join(tmpdir(), 'wf-edge-'))
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 

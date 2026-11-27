@@ -5,18 +5,18 @@ FEATURE = 'Authentication'
 
 SCREENS = [
     dict(name='Sign In', shell='site', ucs='Sign In with Password, Sign In with Google',
-         note='On the mobile app the first field is E-mail only and the screen has no navigation bar.',
+         note='The mobile screen has no navigation bar.',
          items=[
              ('tabs', ['Sign In', 'Sign Up'], 'Switch between signing in and registering. The active tab is highlighted.'),
              ('title', 'Sign in to start your journey!', 'Heading of the form.'),
-             ('field', 'E-mail or phone number', 'Required, at most 255 characters. The server accepts the e-mail address only. A message in red appears under the field when it is empty.', 'Enter your e-mail'),
+             ('field', 'E-mail', 'Required, at most 255 characters. A message in red appears under the field when it is empty.', 'Enter your e-mail'),
              ('field', 'Password', 'Required. The text is hidden and can be shown with a button.', 'Enter your password'),
              ('link', 'Forgot password?', 'Opens Forgot Password.'),
              ('button', 'Sign In', 'Checks the form, then signs in (UC Sign In with Password). A wrong e-mail or password, an inactive account and a wait after many failures each show a message and the form shakes.'),
              ('button2', 'Continue with Google', 'Signs in with a Google account (UC Sign In with Google). A failure shows "Cannot sign in with Google. Please try again."'),
          ]),
     dict(name='Register', shell='site', ucs='Sign Up',
-         note='The mobile screen also has an optional phone number field and shows a hint of at least 6 characters, while the server needs at least 8.',
+         note='The mobile screen also has an optional phone number field.',
          items=[
              ('tabs', ['Sign In', 'Sign Up'], 'Switch between signing in and registering.', 1),
              ('title', 'Create an account to start your journey', 'Heading of the form.'),
@@ -27,7 +27,7 @@ SCREENS = [
              ('button', 'Create account', 'Creates the Learner account and sends the verification e-mail (UC Sign Up).'),
              ('button2', 'Continue with Google', 'Registers or signs in with Google (UC Sign In with Google).'),
          ]),
-    dict(name='Verify E-mail', shell='site', ucs='Verify E-mail Address',
+    dict(name='Verify E-mail', shell='site', note='On mobile the learner types the verification code of the e-mail and can ask for a new one.', ucs='Verify E-mail Address',
          items=[
              ('title', 'Verify e-mail', 'Heading.'),
              ('text', 'Verifying…', 'Shown while the link in the e-mail is being checked.'),
@@ -59,7 +59,7 @@ SCREENS = [
              ('button', 'Get started', 'Opens Onboarding for a new user.'),
              ('button2', 'I already have an account', 'Opens Sign In.'),
          ]),
-    dict(name='Onboarding', shell='mobile', tabs=[], ucs='Set Learning Goal, Sign Up',
+    dict(name='Onboarding', shell='mobile', tabs=[], ucs='Sign Up',
          items=[
              ('steps', ['1', '2', '3', '4', '5', '6'], 'Progress bar and step counter, for example 2/6. The back arrow returns to the earlier question.'),
              ('title', 'Target band?', 'One question at a time: target band (5.5 to 7.5+), the first skill to improve, daily minutes (5 to 20), why the user studies IELTS, earlier exams, and when to remind.'),

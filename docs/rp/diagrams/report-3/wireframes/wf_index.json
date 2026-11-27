@@ -6,7 +6,7 @@
   "width": 760,
   "height": 414,
   "ucs": "Sign In with Password, Sign In with Google",
-  "note": "On the mobile app the first field is E-mail only and the screen has no navigation bar.",
+  "note": "The mobile screen has no navigation bar.",
   "shell": "site",
   "elements": [
    [
@@ -21,8 +21,8 @@
    ],
    [
     3,
-    "E-mail or phone number",
-    "Required, at most 255 characters. The server accepts the e-mail address only. A message in red appears under the field when it is empty."
+    "E-mail",
+    "Required, at most 255 characters. A message in red appears under the field when it is empty."
    ],
    [
     4,
@@ -54,7 +54,7 @@
   "width": 760,
   "height": 506,
   "ucs": "Sign Up",
-  "note": "The mobile screen also has an optional phone number field and shows a hint of at least 6 characters, while the server needs at least 8.",
+  "note": "The mobile screen also has an optional phone number field.",
   "shell": "site",
   "elements": [
    [
@@ -107,7 +107,7 @@
   "width": 760,
   "height": 264,
   "ucs": "Verify E-mail Address",
-  "note": "",
+  "note": "On mobile the learner types the verification code of the e-mail and can ask for a new one.",
   "shell": "site",
   "elements": [
    [
@@ -258,7 +258,7 @@
   "name": "Onboarding",
   "width": 330,
   "height": 420,
-  "ucs": "Set Learning Goal, Sign Up",
+  "ucs": "Sign Up",
   "note": "",
   "shell": "mobile",
   "elements": [
@@ -336,7 +336,7 @@
    [
     1,
     "Set up your game",
-    "Heading. A box \"How to play\": one meaning, three planets; a wrong answer or time out costs a life."
+    "Heading \"Play at your own pace\". The box \"How to play\": guess the English word from its meaning; a word of N letters gives N+1 guesses; from the third word in a row each word earns 50 extra points."
    ],
    [
     2,
@@ -346,12 +346,12 @@
    [
     3,
     "Time for each word",
-    "180 seconds or no limit."
+    "Playing alone: 180 seconds or no limit. A room uses a fixed time for each word."
    ],
    [
     4,
-    "Lives for each player",
-    "From 3 to 6 lives. A wrong answer or a time out costs one life."
+    "My lives",
+    "From 3 to 6 lives. A life is lost only when the rows or the time run out."
    ],
    [
     5,
@@ -383,23 +383,23 @@
    ],
    [
     2,
-    "Number of words in the game",
-    "At least 5."
+    "Number of words",
+    "3, 5, 6, 8 or 10 words."
    ],
    [
     3,
-    "Time for each question",
-    "Seconds for each question."
+    "Seconds per word",
+    "Each word has 15 seconds; a fast answer earns more points."
    ],
    [
     4,
-    "Lives for each player",
-    "Lives for each player."
+    "Lives",
+    "Four lives; a wrong answer or a time out costs one."
    ],
    [
     5,
-    "Sample data in use (10 sample words, not connected to the server).",
-    "Notice shown when the app runs without the server."
+    "Level and Topic",
+    "CEFR level and topics of the words; with no choice all of them are used."
    ],
    [
     6,
@@ -447,7 +447,7 @@
    [
     6,
     "Leave room",
-    "Leaves the room; \"Back to games\"."
+    "Button at the top. Leaves the room."
    ]
   ],
   "source": "wf_data_games"
@@ -464,8 +464,8 @@
   "elements": [
    [
     1,
-    "GUESS THE MEANING WORD",
-    "Heading with the meaning of the word to guess."
+    "Guess the word from its meaning",
+    "Heading, with the meaning of the word to guess."
    ],
    [
     2,
@@ -475,12 +475,12 @@
    [
     3,
     "Letter keyboard",
-    "On-screen keyboard that follows the colours; keys: letters, Submit, Delete."
+    "On-screen keyboard that follows the colours, with a Delete key; the Submit button under it sends the guess."
    ],
    [
     4,
-    "Score, Correct words, Lives",
-    "Score, words guessed and lives left. In a room a match ranking is shown."
+    "Lives, Time, Score, Streak, Word",
+    "Status bar of the match. In a room a match ranking is also shown."
    ],
    [
     5,
@@ -507,8 +507,8 @@
   "elements": [
    [
     1,
-    "Question, time left, correct and wrong counts",
-    "Header of the match."
+    "Meaning, lives, question and score",
+    "Header of the match: the meaning to find, the lives left, the question number and the score."
    ],
    [
     2,
@@ -528,7 +528,7 @@
    [
     5,
     "Exit game",
-    "Leaves with confirmation."
+    "The back arrow leaves the game after a confirmation."
    ]
   ],
   "source": "wf_data_games"
@@ -545,8 +545,8 @@
   "elements": [
    [
     1,
-    "Official result: GAMES / WORDLY",
-    "Heading."
+    "Match summary",
+    "Heading of the result."
    ],
    [
     2,
@@ -555,13 +555,13 @@
    ],
    [
     3,
-    "Rank, Player, Score, Lives",
-    "Ranking of the players with the time to the right answer."
+    "Rank, Player, Score, Correct words, Solving time",
+    "Final ranking by total score; a tie is decided by the solving time."
    ],
    [
     4,
     "Choose a game",
-    "Opens the game catalogue. \"Back to home\" goes home. \"Back to the match\" returns while the result can still be loaded."
+    "Opens the game catalogue. \"Back to the room\" returns to the room and \"Back to home\" goes home."
    ]
   ],
   "source": "wf_data_games"
@@ -578,8 +578,8 @@
   "elements": [
    [
     1,
-    "Practise and improve together with the IELTSPath community",
-    "Heading \"IELTSPATH COMMUNITY\"."
+    "Improve together",
+    "Heading of the community."
    ],
    [
     2,
@@ -588,8 +588,8 @@
    ],
    [
     3,
-    "Feed / Saved / Following / Report queue",
-    "Feed, saved posts, posts of people followed, and (for staff) the queue of reports. Posts, Followers and Following lists belong to the profile."
+    "Feed / Saved / Following",
+    "The side menu opens the feed and the saved posts; the tab Following shows the posts of people followed. Administrators also see the queue of reports."
    ],
    [
     4,
@@ -604,7 +604,7 @@
    [
     6,
     "Post",
-    "Each post shows the author, text, pictures or video, reactions, comments and a menu to report. \"Load more\" loads more. Empty states: \"No post found. Try other keywords\", \"You have no posts from people you follow\", \"The feed is waiting for the first story\"."
+    "Each post shows the author, text, pictures or video, reactions, comments and the actions Like, Comment, Save and Report. More posts load as the reader scrolls. Empty states: \"No post found. Try other keywords\", \"You have no posts from people you follow\", \"The feed is waiting for the first story\"."
    ]
   ],
   "source": "wf_data_games"
@@ -632,7 +632,7 @@
    [
     3,
     "Comment",
-    "Comments in order; the author can edit or delete their own; others can report it. With none: \"No comments yet. Be the first to share your thoughts.\""
+    "Comments in order, shown after Comment is pressed; the author can edit or delete their own and others can report them. With none: \"No comments yet. Be the first to share your thoughts.\""
    ],
    [
     4,
@@ -655,12 +655,12 @@
    [
     1,
     "Avatar and display name",
-    "The public profile of a Learner. \"Follow\" or \"Edit profile\" (for the owner)."
+    "The public profile of a Learner, with the button Follow."
    ],
    [
     2,
-    "Posts, Followers, Following",
-    "Counts; the lists open under the tabs."
+    "Target, Streak, Followers, Following",
+    "Figures of the Learner."
    ],
    [
     3,
@@ -669,8 +669,8 @@
    ],
    [
     4,
-    "Write the first post",
-    "Shown to the owner when there is no post."
+    "Create post",
+    "Shown to the owner when there is no post yet."
    ]
   ],
   "source": "wf_data_games"
@@ -875,7 +875,7 @@
    [
     6,
     "Request a consultation",
-    "A form with full name and phone number, button \"Send request\". It checks the fields and shows \"Consultation request sent! An adviser will contact you within 24 hours.\", but the request is not sent anywhere yet (screen only)."
+    "A form with full name and phone number and the button \"Send request\". It checks both fields and then confirms that an adviser will contact the person within 24 hours."
    ]
   ],
   "source": "wf_data_home"
@@ -887,13 +887,13 @@
   "width": 760,
   "height": 362,
   "ucs": "Activate Key",
-  "note": "The window opens over the Home page, the plan page and the overview.",
+  "note": "The window opens over the Home page, the practice test catalogue and the screens that ask for a plan.",
   "shell": "modal",
   "elements": [
    [
     1,
     "Enter the full code you were given, with the prefix IP- if there is one. You do not pay here.",
-    "Explanation under the title \"Activate plan / Top up key\"."
+    "Explanation under the key field."
    ],
    [
     2,
@@ -931,7 +931,7 @@
    [
     2,
     "Experts, Highest band, Certificates, Taking work",
-    "Figures about the examiner team."
+    "Figures about the examiner team. A featured Examiner is shown above the list."
    ],
    [
     3,
@@ -983,7 +983,7 @@
    ],
    [
     3,
-    "Certified band, Essays graded, 5-star ratings",
+    "Certified band, Certificates, Essays graded, 5-star ratings",
     "Figures of the Examiner."
    ],
    [
@@ -1009,20 +1009,45 @@
   "feature": "Home and public pages",
   "name": "Home tab",
   "width": 330,
-  "height": 420,
-  "ucs": "Browse Vocabulary",
+  "height": 582,
+  "ucs": "Browse Practice Tests, View Submission History",
   "note": "",
   "shell": "mobile",
   "elements": [
    [
     1,
-    "Today",
-    "Heading of the tab."
+    "Hello <name>!",
+    "Greeting with the question what to practise today. A Guest is greeted without a name. A button beside it opens the history of attempts."
    ],
    [
     2,
-    "Vocabulary topic",
-    "The published vocabulary topics. While loading: \"Loading topics\u2026\". With none: \"No vocabulary topics yet. Topics appear after they are published.\" On error: \"Could not load vocabulary topics. Check the connection to the server and try again.\" and a Retry button."
+    "Target band 6.5, Tried 2/4 skills",
+    "Shown to a signed-in Learner who has a band or has tried a skill."
+   ],
+   [
+    3,
+    "Continue or suggested test",
+    "One card: sign in, resume the unfinished attempt, or start a suggested test."
+   ],
+   [
+    4,
+    "IELTS skill",
+    "Listening, Reading, Writing and Speaking, each with the latest result; opens the test catalogue of the skill (UC Browse Practice Tests)."
+   ],
+   [
+    5,
+    "Quick practice",
+    "Short tests of one part, with the minutes they take and the one worth practising most."
+   ],
+   [
+    6,
+    "Waiting for a grade, State",
+    "Essays and recordings still being graded; a row opens the result."
+   ],
+   [
+    7,
+    "Tip of the day",
+    "A short tip for one of the four skills."
    ]
   ],
   "source": "wf_data_home"
@@ -1049,18 +1074,18 @@
    ],
    [
     3,
-    "Choose course",
-    "Shows the progress of the chosen course and the start, current and target band."
+    "Course banner",
+    "The course being studied, its start date, its progress and the start, current and target band."
    ],
    [
     4,
-    "Course progress, Streak, Study time",
-    "Course progress, the study streak with the record, and the time learned this week."
+    "Days studied this week",
+    "The study streak with the record, the days of the week and the time studied."
    ],
    [
     5,
-    "Skill, Band, Priority",
-    "Skills of the course: the band of each skill and which one to improve first. With none graded: \"No skill has been graded in this course yet.\""
+    "Skills of the course",
+    "The mastery of each skill in percent and which one to improve first. With none graded: \"No skill has been graded in this course yet.\""
    ],
    [
     6,
@@ -1083,7 +1108,7 @@
    [
     1,
     "Let us look at your detailed data again!",
-    "Heading: every learning step is recorded."
+    "Heading: every learning step is recorded. Under it are the progress of the four skills and the Writing progress."
    ],
    [
     2,
@@ -1092,13 +1117,13 @@
    ],
    [
     3,
-    "Listening, Reading, Writing, Speaking",
-    "Legend and filter of the band chart."
+    "Overall, Listening, Reading, Writing, Speaking",
+    "Choose the line of the band chart; a list chooses the kind of test."
    ],
    [
     4,
     "Band of each attempt",
-    "Chart and table of the band of each eligible attempt: date, source and version, with the change from the earlier one. A grade that is being regraded is marked."
+    "Chart of the band of each eligible attempt, with the date and the source of each point and the change from the earlier one. A grade that is being regraded is marked."
    ],
    [
     5,
@@ -1115,7 +1140,7 @@
   "width": 760,
   "height": 544,
   "ucs": "View Overview and Achievements",
-  "note": "The mobile screen is called Learning progress and shows the same blocks in one column.",
+  "note": "The mobile screen is called Badges and shows the badges in one column.",
   "shell": "site",
   "elements": [
    [
@@ -1257,7 +1282,7 @@
    [
     2,
     "Notification preferences",
-    "You can turn each kind of notice on or off. All are on by default."
+    "You can turn each kind of notice on or off. All are on by default. At the bottom a switch turns learning e-mails on or off; security and payment e-mails are always sent."
    ],
    [
     3,
@@ -1266,12 +1291,12 @@
    ],
    [
     4,
-    "Premium activated / Premium ending / Result ready / Words due for review",
+    "Premium activated / Premium ending / Result ready / Words due for review / Overdue / Grade ready",
     "Account and learning notices for the learner."
    ],
    [
     5,
-    "Essay to grade / Due soon / Overdue / Grade ready",
+    "Essay to grade / Due soon",
     "Notices that go to Examiners, in their own group."
    ]
   ],
@@ -1282,53 +1307,63 @@
   "feature": "Account and overview",
   "name": "Account / Profile tab",
   "width": 330,
-  "height": 490,
+  "height": 558,
   "ucs": "Edit Profile, Sign Out",
   "note": "",
   "shell": "mobile",
   "elements": [
    [
     1,
-    "Account",
-    "Shows the user name and e-mail. A Guest sees \"Sign in to sync the profile\" with a Sign In button."
+    "Profile summary",
+    "Picture, name, e-mail, band and followers. A Guest sees a Sign In button instead."
    ],
    [
     2,
-    "Change password",
-    "Opens Change Password."
+    "Verify e-mail",
+    "Shown while the e-mail address is not verified; verification is needed to buy a plan and to change the password."
    ],
    [
     3,
-    "Learning progress",
-    "Opens the progress screen."
+    "Achievements",
+    "Badges earned; opens the full list."
    ],
    [
     4,
-    "Notification settings",
-    "Opens the notification preferences."
+    "Appearance",
+    "Colour theme of the app."
    ],
    [
     5,
-    "Daily goal (XP)",
-    "Choose the XP goal for each day."
+    "Sound, notifications and text size",
+    "Opens in place: community notifications, lesson sound, background music and text size."
    ],
    [
     6,
-    "Study reminder / Streak reminder / Background music",
-    "Switches on the device."
+    "Change password",
+    "Opens Change Password; it reads \"Create password\" for an account that has none."
    ],
    [
     7,
-    "Font size / Appearance",
-    "Display options."
+    "Login devices",
+    "Opens Login Devices."
    ],
    [
     8,
-    "Help / Clear temporary data",
-    "Help and clearing the cache; clearing asks for confirmation."
+    "Unlink Google",
+    "Shown when a Google account is linked."
    ],
    [
     9,
+    "Help and support",
+    "Writes an e-mail to the support address."
+   ],
+   [
+    10,
+    "Clear temporary data",
+    "Clears the cache after a confirmation."
+   ],
+   [
+    11,
     "Sign Out",
     "Closes the session on the phone (UC Sign Out)."
    ]
@@ -1405,7 +1440,7 @@
   "width": 330,
   "height": 420,
   "ucs": "Change Password",
-  "note": "The hint says at least 6 characters, but the server requires at least 8 and refuses weak passwords.",
+  "note": "",
   "shell": "mobile",
   "elements": [
    [
@@ -1416,7 +1451,7 @@
    [
     2,
     "New password",
-    "Hint \"At least 6 characters\"."
+    "At least 8 characters; the hint shows \"8 to 72 characters\"."
    ],
    [
     3,
@@ -1465,13 +1500,41 @@
   "source": "wf_data_home"
  },
  {
+  "file": "account-and-overview-login-devices",
+  "feature": "Account and overview",
+  "name": "Login Devices",
+  "width": 330,
+  "height": 420,
+  "ucs": "Sign Out",
+  "note": "",
+  "shell": "mobile",
+  "elements": [
+   [
+    1,
+    "Login devices",
+    "Back arrow and heading."
+   ],
+   [
+    2,
+    "Device",
+    "One card for each session: device and browser, when it signed in, last activity and IP address. The current one reads \"This device\"."
+   ],
+   [
+    3,
+    "Sign out all other devices",
+    "Asks for confirmation and keeps only this phone signed in. With no session: \"No sign-in session yet.\" If the list cannot be read: a message and a Retry button."
+   ]
+  ],
+  "source": "wf_data_home"
+ },
+ {
   "file": "learning-path-course-list",
   "feature": "Learning path",
   "name": "Course List",
   "width": 760,
   "height": 406,
   "ucs": "View Courses",
-  "note": "The mobile Courses tab shows the same cards in one column and has no placement button.",
+  "note": "",
   "shell": "site",
   "elements": [
    [
@@ -1666,7 +1729,7 @@
   "width": 760,
   "height": 430,
   "ucs": "Study a Lesson, Answer Lesson Exercises, Write Essay in a Lesson",
-  "note": "On the mobile app the lesson is studied in the Lesson Session screen.",
+  "note": "",
   "shell": "site",
   "elements": [
    [
@@ -1676,8 +1739,8 @@
    ],
    [
     2,
-    "Content / Vocabulary / Exercises",
-    "The content of the lesson, its words and its exercises."
+    "Lesson content menu",
+    "Lesson slides, summary, documents, vocabulary, exercises and practice."
    ],
    [
     3,
@@ -1687,60 +1750,22 @@
    [
     4,
     "Required review",
-    "Shown when a review is waiting: \"You need to strengthen <knowledge point> before going on. The review has a short theory summary and a few questions.\" Button \"Take review\"."
+    "Shown when a review is waiting: \"You need to strengthen <knowledge point> before going on. The review has a short theory summary and a few questions.\" The review is opened from the lesson list."
    ],
    [
     5,
-    "Do exercises",
-    "Starts the exercises. A lesson without exercises shows \"Press Complete lesson to record your progress\"."
+    "Exercises",
+    "Opens the exercises. A lesson without exercises shows \"Press Complete lesson to record your progress\"."
    ],
    [
     6,
-    "Practise this lesson",
+    "Practice",
     "Opens the practice of the lesson once it is available."
    ],
    [
     7,
     "Study time recorder",
-    "Shows that study time is being recorded, or \"Could not record study time. You can still go on.\""
-   ]
-  ],
-  "source": "wf_data_learning"
- },
- {
-  "file": "learning-path-lesson-session",
-  "feature": "Learning path",
-  "name": "Lesson Session",
-  "width": 330,
-  "height": 420,
-  "ucs": "Study a Lesson, Answer Lesson Exercises",
-  "note": "",
-  "shell": "mobile",
-  "elements": [
-   [
-    1,
-    "1 > 2 > 3 > 4",
-    "Progress through the blocks of the lesson."
-   ],
-   [
-    2,
-    "Block",
-    "Text, video, slide or an exercise question. One block at a time."
-   ],
-   [
-    3,
-    "A, B, C, D",
-    "Answer choices of an exercise question."
-   ],
-   [
-    4,
-    "Check",
-    "Grades the answer. A wrong answer costs one heart and shows the hint."
-   ],
-   [
-    5,
-    "Next",
-    "Goes to the next block; the last one finishes the lesson."
+    "A message while study time is being connected or when it cannot be recorded; the learner can go on."
    ]
   ],
   "source": "wf_data_learning"
@@ -1758,7 +1783,7 @@
    [
     1,
     "You have run out of hearts.",
-    "Title of the window. Explains that one heart comes back every 5 hours."
+    "Title of the window. A wrong answer costs one heart; reviews can still be done."
    ],
    [
     2,
@@ -1790,7 +1815,7 @@
   "elements": [
    [
     1,
-    "Home > Course > Lesson > Practice",
+    "Home > Course > Lesson",
     "Breadcrumb path."
    ],
    [
@@ -1812,11 +1837,6 @@
     5,
     "After submitting",
     "Shows the score, the answers and explanations under each question, \"Level up! Hearts refilled\", \"+XP\", hearts lost, and \"Daily XP cap reached: the excess is not counted, tomorrow it counts again\". A set whose answers were shown before does not count."
-   ],
-   [
-    6,
-    "Start over",
-    "Starts the set again."
    ]
   ],
   "source": "wf_data_learning"
@@ -1876,13 +1896,13 @@
    ],
    [
     2,
-    "Score, Passed or Completed, Time",
+    "Passed or Completed, Correct, Percentage",
     "Result of the test. The first attempt counts for the course process score."
    ],
    [
     3,
-    "Question, Your answer, Result",
-    "Each question with the answer and the explanation."
+    "Each question",
+    "Each question with its answer and explanation."
    ],
    [
     4,
@@ -1904,7 +1924,7 @@
   "width": 760,
   "height": 484,
   "ucs": "Review a Weak Skill",
-  "note": "The mobile app has the same steps in a single column.",
+  "note": "",
   "shell": "site",
   "elements": [
    [
@@ -2029,7 +2049,7 @@
    [
     3,
     "Not done, Done",
-    "Filter by status of the learner. A select limits the list to a question type."
+    "Filter by status of the learner. Check boxes limit the list to question types."
    ],
    [
     4,
@@ -2038,8 +2058,8 @@
    ],
    [
     5,
-    "Are you ready?",
-    "Opens when a test is chosen: information about the part and the choice of the look: \"Practice look\" with highlight and notes, or \"Real exam look\" like the IELTS computer test. A test already done offers \"View result\" or \"Redo\"."
+    "Choose the test look",
+    "Opens when a test is chosen: \"Practice look\" with highlight and notes, or \"Real exam look\" like the IELTS computer test. A test already done offers \"View result\" or \"Redo\"."
    ],
    [
     6,
@@ -2061,8 +2081,8 @@
   "elements": [
    [
     1,
-    "Timer, test name and the button Exit",
-    "Header of the test; \"Exit\" leaves the attempt."
+    "Exit, Timer, Settings",
+    "Header of the test: leave the attempt, the time left and the display settings."
    ],
    [
     2,
@@ -2104,13 +2124,13 @@
   "elements": [
    [
     1,
-    "Timer, test name and the button Exit",
+    "Exit, Timer, Settings",
     "Header of the test."
    ],
    [
     2,
     "Audio",
-    "Audio player of the section. \"This section has no recording\" appears when none exists."
+    "The recording of the section with its playing status. \"This section has no recording\" appears when none exists."
    ],
    [
     3,
@@ -2147,13 +2167,13 @@
    ],
    [
     2,
-    "Correct, Band, Time",
-    "Score of the attempt in practice or full-test mode."
+    "Share correct, Time, Correct, Wrong, Skipped",
+    "Score of the attempt; a full test also shows the estimated band."
    ],
    [
     3,
-    "Question, Your answer, Correct answer",
-    "Each question with the result."
+    "Question type table",
+    "For each question type: questions, correct, wrong, skipped, share correct, rating and suggestion."
    ],
    [
     4,
@@ -2350,8 +2370,8 @@
    ],
    [
     2,
-    "Listening, Reading, Writing, Speaking",
-    "Chooses the skill."
+    "All / Graded / Waiting",
+    "Filter by the state of the review."
    ],
    [
     3,
@@ -2360,7 +2380,7 @@
    ],
    [
     4,
-    "Essay, Examiner, Status",
+    "Essay, Status, Action",
     "Reviews the Learner asked for. With none: \"You have not submitted any <skill> yet\"."
    ]
   ],
@@ -2426,8 +2446,8 @@
    ],
    [
     4,
-    "Submit for grading",
-    "Uploads and submits (UC Submit Speaking for Grading). Refusals: grading off, no consent, daily limit, not enough points, another submission waiting."
+    "Continue, then Submit for grading",
+    "\"Continue\" opens the confirm window; \"Submit for grading\" uploads and submits (UC Submit Speaking for Grading). Refusals: grading off, no consent, daily limit, not enough points, another submission waiting."
    ],
    [
     5,
@@ -2470,7 +2490,7 @@
    [
     5,
     "The AI score is for reference only.",
-    "Footer note. States when a result is missing: \"Result not received\", \"The grading system has an error\", \"Submission stopped\"."
+    "Note at the top of the result. States when a result is missing: \"Result not received\", \"The grading system has an error\", \"Submission stopped\"."
    ],
    [
     6,
@@ -2530,13 +2550,13 @@
    ],
    [
     2,
-    "Content coverage",
-    "Coverage by skill and by CEFR level; depth of questions. Message when empty: \"Nothing to handle yet\"."
+    "Content",
+    "Question coverage, knowledge points by skill and by CEFR level, question depth and a coverage matrix."
    ],
    [
     3,
-    "To do for R&D",
-    "Questions with a wrong difficulty, knowledge points with only one question, and points with no skill or no question. \"View all\" opens the full list."
+    "R&D to-do",
+    "Work items such as a knowledge point that lacks practice, a question that is too easy or too hard and a doubtful prerequisite. \"View all\" opens the full list."
    ]
   ],
   "source": "wf_data_staff"
@@ -2596,13 +2616,13 @@
    ],
    [
     3,
-    "Type, Skill, Purpose, FREE / PREMIUM, Status",
-    "Filters, with search by code."
+    "Question code, Skill, Purpose, Status",
+    "Search and filters."
    ],
    [
     4,
-    "No., Code, Type, Updated, Actions",
-    "Questions. \"View detail\" opens Question Detail. Deleting asks \"Delete the question?\"; it is archived, not erased."
+    "No., Code, Type, Status, Updated, Actions",
+    "Questions. The actions of a row open its details. Deleting asks \"Delete the question?\"; the question is archived, not erased."
    ]
   ],
   "source": "wf_data_staff"
@@ -2635,7 +2655,7 @@
    [
     4,
     "Version form",
-    "Question text, options, answer, explanation and hint; a picture can be chosen, replaced or removed (the original stays in storage)."
+    "Beside the versions: question text, options, answer, explanation and hint. The picture of a Writing question is chosen, replaced or removed on its version card."
    ]
   ],
   "source": "wf_data_staff"
@@ -2728,13 +2748,13 @@
    ],
    [
     2,
-    "Level 3.0, Level 5.0, Level 9.0",
+    "Band 0\u20133, Band 3\u20135, Band 5\u20139",
     "Level of the test; every placement package must have a level before it is published."
    ],
    [
     3,
-    "Code and title, Level, Status",
-    "Placement packages. Created and published like other packages."
+    "Code and title, Band level, Status",
+    "Placement packages with their sections, questions, attempts and average band."
    ],
    [
     4,
@@ -2761,7 +2781,7 @@
    ],
    [
     2,
-    "Listening / Reading / Writing / Speaking",
+    "All / Reading / Listening / Writing / Speaking",
     "Skill of the tests."
    ],
    [
@@ -2771,7 +2791,7 @@
    ],
    [
     4,
-    "Code, Title, Access, Status",
+    "Code and title, Part, Questions, Source, Access, Status",
     "Practice tests. \"Hide from the library?\" asks to confirm. \"Edit info\" changes the test."
    ],
    [
@@ -2809,8 +2829,8 @@
    ],
    [
     4,
-    "Word, Part of speech, Actions",
-    "Words with their senses. Topics have a name, a cover picture and edit and delete; sets can be ordered and edited."
+    "Word list",
+    "Each word with its number of senses, and the editor of the chosen word. Topics have a name, a cover picture and edit and delete; sets can be ordered and edited."
    ]
   ],
   "source": "wf_data_staff"
@@ -2932,12 +2952,12 @@
    [
     2,
     "Code structure",
-    "Settings tab."
+    "The pattern of the code, for example COURSE_{BAND}_{SEQ:3}."
    ],
    [
     3,
     "Starting number",
-    "Minimum number of digits."
+    "The first number of the sequence."
    ],
    [
     4,
@@ -3132,12 +3152,12 @@
    [
     4,
     "Run evaluation",
-    "Compares the AI with the reference set."
+    "On the tab \"Evaluation runs\": compares the AI with the reference set."
    ],
    [
     5,
-    "Task, Examiner band, Source, Added",
-    "The reference set (\"Add a reference essay\", \"Import from essays graded by both AI and Examiner\") and the runs (status, number of essays, share within 0.5 band)."
+    "Task, Examiner band, Source, Essay start, Added",
+    "The reference set (\"Add a reference essay\", \"Import essays graded by both AI and Examiner\"). The runs, with their status and share within 0.5 band, are on the tab \"Evaluation runs\"."
    ]
   ],
   "source": "wf_data_staff"
@@ -3230,13 +3250,13 @@
    ],
    [
     2,
-    "Choose list",
-    "Essays to regrade, or the summary by Examiner."
+    "Essays waiting / My essays / Summary by Examiner",
+    "Chooses the list."
    ],
    [
     3,
     "No., Task, Source, Waiting, Over 48 h",
-    "Essays waiting. \"Take\" claims one; \"Continue grading\" resumes."
+    "Essays waiting. \"Take\" claims one; \"Continue grading\" on \"My essays\" resumes it."
    ],
    [
     4,
@@ -3274,11 +3294,11 @@
    [
     4,
     "Rubric and grade",
-    "Reference rubric, the total band and a note (up to 4,000 characters)."
+    "The reference rubric, a band for each criterion, the total band and a note (up to 4,000 characters)."
    ],
    [
     5,
-    "Save grade",
+    "Save regrade",
     "Saves the regrade."
    ]
   ],
@@ -3296,8 +3316,8 @@
   "elements": [
    [
     1,
-    "Grading overview",
-    "Work to do now and figures."
+    "Queue",
+    "Work to do now and figures, with the button \"Open the queue\"."
    ],
    [
     2,
@@ -3334,7 +3354,7 @@
    ],
    [
     2,
-    "Waiting / Graded",
+    "All / Waiting / Grading / Due soon / Late / Graded",
     "Choose the list. A finished essay moves to \"Graded\" and can be seen again at any time."
    ],
    [
@@ -3349,8 +3369,8 @@
    ],
    [
     5,
-    "Essay, Band graded, Graded at, Status, Action",
-    "Jobs with pages. A job that cannot be graded here is shown as not supported."
+    "Essay code, Essay, Skill, Source, Deadline, Status, Action",
+    "Jobs with pages. The Graded list shows the band and the time of grading."
    ]
   ],
   "source": "wf_data_staff"
@@ -3443,7 +3463,7 @@
   "width": 760,
   "height": 384,
   "ucs": "Grade Speaking Submission",
-  "note": "The page shows \"Speaking grading is not open yet\" when the feature is not on.",
+  "note": "",
   "shell": "staff",
   "elements": [
    [
@@ -3553,17 +3573,17 @@
    [
     2,
     "New staff account",
-    "Opens the form: e-mail, full name, phone (optional), temporary password (6-72 characters in the form; the server needs at least 8) and roles."
+    "Opens the form: e-mail, full name, phone (optional), temporary password (8 to 72 characters) and roles."
    ],
    [
     3,
     "All roles, All statuses",
-    "Filters; search by name or e-mail. With none: \"No user found. Try another keyword or filter.\""
+    "Filters; the search box of the top bar finds a name or an e-mail address. With none: \"No user found. Try another keyword or filter.\""
    ],
    [
     4,
     "User, Roles, Status, Actions",
-    "Users. A menu per row opens the User actions window."
+    "Users. The menu of a row opens the actions: details, edit, permissions, lock, passwords and login history."
    ]
   ],
   "source": "wf_data_staff"
@@ -3586,7 +3606,7 @@
    [
     2,
     "Roles",
-    "Assign roles; \"Save roles\". An Administrator account cannot also be Content Author or Examiner."
+    "Assigned in the Permissions window, opened from the same row menu. An Administrator account cannot also be a Content Author or an Examiner."
    ],
    [
     3,
@@ -3595,13 +3615,13 @@
    ],
    [
     4,
-    "New password",
-    "Sets a new password for the user (UC Reset User Password)."
+    "Reset password / Change password",
+    "Items of the same row menu (UC Reset User Password)."
    ],
    [
     5,
     "Delete account",
-    "Deactivates the account after confirmation. Rules protect the last Administrator."
+    "Deletes the account after a confirmation (DR-47). Rules protect the last Administrator."
    ]
   ],
   "source": "wf_data_staff"
@@ -3623,13 +3643,13 @@
    ],
    [
     2,
-    "Time, Result, Reason, Device",
-    "Each attempt, success or failure, with the reason and the device and address."
+    "Time, Result, IP address, Device",
+    "Each attempt; a failed one shows why in the Result column."
    ],
    [
     3,
     "Close",
-    "Closes the window."
+    "The X button closes the window."
    ]
   ],
   "source": "wf_data_staff"
@@ -3656,8 +3676,8 @@
    ],
    [
     3,
-    "No activity data yet.",
-    "Empty message."
+    "No data message",
+    "Shown when there is no activity data."
    ]
   ],
   "source": "wf_data_staff"
@@ -3707,13 +3727,13 @@
    ],
    [
     2,
-    "From date",
-    "Start of the range."
+    "7, 30, 90 days, From date, To date",
+    "Range of the statistics."
    ],
    [
     3,
-    "DAU chart",
-    "Bar chart of active learners by day."
+    "DAU, WAU, MAU",
+    "Active learners of the day, the week and the month, and a chart of active learners by day."
    ],
    [
     4,
@@ -3745,13 +3765,13 @@
    ],
    [
     3,
-    "Period",
-    "Time range of the chart. \"Legend\" and \"View as table\" switch the display."
+    "Time",
+    "Time range of the chart. \"View as table\" shows the same figures as a table."
    ],
    [
     4,
-    "Keys by batch / by Sales Staff",
-    "Bar chart with a tab for each view. With none in the range: \"No batch in this period.\""
+    "Keys by batch / By Sales Staff",
+    "Bar chart of the keys of each batch and a card with the keys of each Sales Staff member. With none in the range: \"No batch in this period.\""
    ],
    [
     5,
@@ -3788,8 +3808,8 @@
    ],
    [
     4,
-    "Batch code, Keys, Progress, Expires, Action",
-    "Batches with a legend of the states and paging (\"Previous\", \"Next\")."
+    "Batch code, Keys, Expires, Action",
+    "Batches with paging (\"Previous\", \"Next\")."
    ]
   ],
   "source": "wf_data_staff"
@@ -3908,7 +3928,7 @@
    [
     5,
     "Key, Status, Sales Staff, Issued at, Activated at, Action",
-    "Keys with a tick box. Per key: View, Reassign, Take back to stock, Revoke\u2026. With none: \"No key matches the filter.\""
+    "Keys with a tick box and the action View. Ticked keys can be reassigned, taken back to stock or revoked. With none: \"No key matches the filter.\""
    ]
   ],
   "source": "wf_data_staff"
@@ -3931,7 +3951,7 @@
    [
     2,
     "Product",
-    "Choose the key product."
+    "One card for each key product, with what it gives and its button."
    ],
    [
     3,
@@ -3987,7 +4007,7 @@
    [
     2,
     "Product",
-    "Plan to show."
+    "Plan to show, with the filters All, Waiting to activate, Activated and Expired."
    ],
    [
     3,
@@ -4004,7 +4024,7 @@
   "width": 760,
   "height": 518,
   "ucs": "Browse Vocabulary, Save Word to Notebook",
-  "note": "On mobile the Home tab lists vocabulary topics, and a topic opens a learning path of lessons (screen Vocabulary topic).",
+  "note": "On mobile only the dictionary search is available, inside the Flashcards tab.",
   "shell": "site",
   "elements": [
    [
@@ -4106,7 +4126,7 @@
    [
     2,
     "Set name",
-    "With the button \"Continue the learning path\" or \"Start learning now\"."
+    "With the buttons \"Continue the learning path\" and \"Start learning now\"."
    ],
    [
     3,
@@ -4115,7 +4135,7 @@
    ],
    [
     4,
-    "Overview / Topics / Progress",
+    "Overview / Topics / All words / Progress",
     "Sections of the set."
    ],
    [
@@ -4235,7 +4255,7 @@
    [
     4,
     "Review due cards (R)",
-    "Opens Notebook Review for the words due today."
+    "Starts the review of the cards that are due today."
    ],
    [
     5,
@@ -4328,8 +4348,8 @@
    ],
    [
     4,
-    "Term, Definition, Actions",
-    "Cards of the deck. An empty deck shows \"The deck has no cards\"."
+    "Cards",
+    "A card viewer that flips, with \"Mark as known\", and the list of all cards. An empty deck shows \"The deck has no cards\"."
    ]
   ],
   "source": "wf_data_vocab"
@@ -4371,8 +4391,8 @@
    ],
    [
     6,
-    "Save",
-    "Creates or updates the deck. Cancel leaves without saving."
+    "Save / Save and study",
+    "Creates or updates the deck. The back link leaves without saving."
    ]
   ],
   "source": "wf_data_vocab"
@@ -4666,12 +4686,12 @@
    [
     4,
     "Check",
-    "Checks the typed sentence and moves on."
+    "Checks the typed sentence. \"Skip\" goes on without checking."
    ],
    [
     5,
-    "Replay / Next sentence",
-    "Plays the sentence again or goes to the next one. A video with no sentence shows \"This video has no sentence to practise\"."
+    "Replay sentence",
+    "Plays the sentence again. After a check, \"Next sentence\" goes on. A video with no sentence shows \"This video has no sentence to practise\"."
    ]
   ],
   "source": "wf_data_vocab"

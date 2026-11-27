@@ -8,6 +8,8 @@ Every item except text/title helpers gets a number; render() returns the svg and
 """
 from xml.sax.saxutils import escape
 
+QUOTE = {'"': '&quot;'}
+
 INK, GREY, LIGHT, LINE, MARK, DARK = '#333333', '#8a8a8a', '#f2f2f2', '#b5b5b5', '#c0392b', '#555555'
 FONT = 'Segoe UI, Arial, sans-serif'
 NUMBERED = {'title', 'field', 'select', 'textarea', 'check', 'button', 'button2', 'link', 'tabs', 'table', 'cards',
@@ -19,21 +21,26 @@ class Canvas:
         self.parts = []
         self.count = 0
         self.elements = []
+        self.shapes = []  # the same drawing as primitives, for the draw.io file
 
     def rect(self, x, y, w, h, fill='#ffffff', stroke=LINE, r=4, dash=''):
         d = f' stroke-dasharray="{dash}"' if dash else ''
+        self.shapes.append(('rect', x, y, w, h, fill, stroke, r, dash))
         self.parts.append(f'<rect x="{x:.1f}" y="{y:.1f}" width="{w:.1f}" height="{h:.1f}" rx="{r}" fill="{fill}" '
                           f'stroke="{stroke}" stroke-width="1.2"{d}/>')
 
     def line(self, x1, y1, x2, y2, colour=LINE):
+        self.shapes.append(('line', x1, y1, x2, y2, colour))
         self.parts.append(f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" stroke="{colour}"/>')
 
     def text(self, x, y, value, size=12, weight=400, colour=INK, anchor='start'):
+        self.shapes.append(('text', x, y, str(value), size, weight, colour, anchor))
         self.parts.append(f'<text x="{x:.1f}" y="{y:.1f}" font-family="{FONT}" font-size="{size}" font-weight="{weight}" '
                           f'fill="{colour}" text-anchor="{anchor}">{escape(str(value))}</text>')
 
     def marker(self, x, y, label, description):
         self.count += 1
+        self.shapes.append(('circle', x, y, 9.5, MARK))
         self.parts.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="9.5" fill="{MARK}"/>')
         self.text(x, y + 4, self.count, 11, 700, '#ffffff', 'middle')
         self.elements.append((self.count, label, description))
@@ -179,8 +186,8 @@ def lay(canvas, items, x, y, width, mark_x, scale=1.0):
     return y
 
 
-def render(screen):
-    """Return (svg, width, height, elements)."""
+def draw(screen):
+    """Return (canvas, width, height)."""
     canvas = Canvas()
     shell = screen.get('shell', 'site')
     area = screen.get('area', 'IELTSPath')
@@ -234,6 +241,47 @@ def render(screen):
             for i, entry in enumerate(screen.get('menu', ['Home', 'Courses', 'Practice', 'Vocabulary'])):
                 canvas.text(250 + i * 90, 55, clip(entry, 12), 11.5, 400, GREY)
     lay(canvas, screen['items'], x0, y0, cw, mark_x)
+    return canvas, width, height
+
+
+def render(screen):
+    """Return (svg, width, height, elements)."""
+    canvas, width, height = draw(screen)
     svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">'
            + ''.join(canvas.parts) + '</svg>')
     return svg, width, height, canvas.elements
+
+
+def drawio(screen):
+    """The same wireframe as an editable draw.io file."""
+    canvas, width, height = draw(screen)
+    cells = []
+
+    def vertex(style, x, y, w, h, value=''):
+        cells.append(f'<mxCell id="c{len(cells)}" value="{escape(value, QUOTE)}" style="{style}" vertex="1" parent="1">'
+                     f'<mxGeometry x="{x:.1f}" y="{y:.1f}" width="{w:.1f}" height="{h:.1f}" as="geometry"/></mxCell>')
+
+    for shape in canvas.shapes:
+        kind = shape[0]
+        if kind == 'rect':
+            _, x, y, w, h, fill, stroke, r, dash = shape
+            round_ = f'rounded=1;absoluteArcSize=1;arcSize={2 * r};' if r else 'rounded=0;'
+            vertex(f'{round_}fillColor={fill};strokeColor={stroke};' + ('dashed=1;' if dash else ''), x, y, w, h)
+        elif kind == 'line':
+            _, x1, y1, x2, y2, colour = shape
+            cells.append(f'<mxCell id="c{len(cells)}" style="endArrow=none;strokeColor={colour};" edge="1" parent="1">'
+                         f'<mxGeometry relative="1" as="geometry"><mxPoint x="{x1:.1f}" y="{y1:.1f}" as="sourcePoint"/>'
+                         f'<mxPoint x="{x2:.1f}" y="{y2:.1f}" as="targetPoint"/></mxGeometry></mxCell>')
+        elif kind == 'circle':
+            _, cx, cy, r, fill = shape
+            vertex(f'ellipse;fillColor={fill};strokeColor=none;', cx - r, cy - r, 2 * r, 2 * r)
+        else:
+            _, x, y, value, size, weight, colour, anchor = shape
+            w = len(value) * size * 0.62 + 12
+            left, align = {'start': (x, 'left'), 'middle': (x - w / 2, 'center'), 'end': (x - w, 'right')}[anchor]
+            vertex(f'text;html=0;spacing=0;fontFamily=Segoe UI;fontSize={size};fontColor={colour};align={align};'
+                   f'verticalAlign=middle;fontStyle={1 if weight >= 600 else 0};', left, y - size, w, size * 1.35, value)
+    name = escape(screen['name'], QUOTE)
+    return (f'<mxfile host="app.diagrams.net"><diagram id="wireframe" name="{name}">'
+            f'<mxGraphModel dx="800" dy="600" grid="0" page="1" pageWidth="{width}" pageHeight="{height}"><root>'
+            '<mxCell id="0"/><mxCell id="1" parent="0"/>' + ''.join(cells) + '</root></mxGraphModel></diagram></mxfile>')

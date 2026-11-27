@@ -208,7 +208,6 @@ EXAMINER = [
              ('chips', ['Two columns', 'Wider essay', 'Balanced', 'Wider grading'], 'Layout of the page; the divider can be dragged.'),
          ]),
     dict(name='Speaking Grading', ucs='Grade Speaking Submission', **EX,
-         note='The page shows "Speaking grading is not open yet" when the feature is not on.',
          items=[
              ('title', 'Grade Speaking', 'Listen to the answers of the Learner and grade by four criteria.'),
              ('panel', 'Recordings', 'A player for each answer, with the transcript and scores where they exist.', [('text', 'Player', '')]),
@@ -235,7 +234,7 @@ ADMIN = [
     dict(name='Users', ucs='Manage Users, Reset User Password', **AD,
          items=[
              ('title', 'Users', 'Create staff accounts and manage roles and status.'),
-             ('button', 'New staff account', 'Opens the form: e-mail, full name, phone (optional), temporary password (6-72 characters in the form; the server needs at least 8) and roles.'),
+             ('button', 'New staff account', 'Opens the form: e-mail, full name, phone (optional), temporary password (8 to 72 characters) and roles.'),
              ('chips', ['All roles', 'All statuses'], 'Filters; search by name or e-mail. With none: "No user found. Try another keyword or filter."'),
              ('table', ['User', 'Roles', 'Status', 'Actions'], 'Users. A menu per row opens the User actions window.'),
          ]),
