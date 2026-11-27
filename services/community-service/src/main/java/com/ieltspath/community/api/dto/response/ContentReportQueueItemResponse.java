@@ -11,10 +11,10 @@ public record ContentReportQueueItemResponse(UUID id, UUID reporterId, String re
                                              ReportContentType contentType, UUID contentId,
                                              UUID contentAuthorId, String contentAuthorDisplayName,
                                              String contentPreview, String reason,
-                                             ReportStatus status, Instant createdAt) {
+                                             ReportStatus status, Instant createdAt, Instant decidedAt) {
     public static ContentReportQueueItemResponse from(com.ieltspath.community.application.result.ContentReportQueueItemResult entry) {
         return new ContentReportQueueItemResponse(entry.id(), entry.reporterId(), entry.reporterDisplayName(),
                 entry.contentType(), entry.contentId(), entry.contentAuthorId(), entry.contentAuthorDisplayName(),
-                entry.contentPreview(), entry.reason(), entry.status(), entry.createdAt());
+                entry.contentPreview(), entry.reason(), entry.status(), entry.createdAt(), entry.decidedAt());
     }
 }

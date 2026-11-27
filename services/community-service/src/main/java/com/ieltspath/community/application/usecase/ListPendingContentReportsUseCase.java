@@ -6,6 +6,7 @@ import com.ieltspath.community.application.query.PageQuery;
 import com.ieltspath.community.application.result.ContentReportQueueItemResult;
 import com.ieltspath.community.application.result.PageResult;
 import com.ieltspath.community.domain.repository.ContentReportRepository;
+import com.ieltspath.community.domain.vo.ReportStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,8 +24,18 @@ public class ListPendingContentReportsUseCase {
 
     @Transactional(readOnly = true)
     public PageResult<ContentReportQueueItemResult> execute(CommunityActor actor, PageQuery query) {
+        return execute(actor, ReportStatus.PENDING, false, query);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResult<ContentReportQueueItemResult> execute(CommunityActor actor, ReportStatus status,
+                                                            boolean allStatuses, PageQuery query) {
         CommunityApplicationSupport.requireAdministrator(actor);
-        var page = reports.findPending(query.page(), query.size());
+        var page = allStatuses
+                ? reports.findByStatus(null, query.page(), query.size())
+                : (status == ReportStatus.PENDING
+                        ? reports.findPending(query.page(), query.size())
+                        : reports.findByStatus(status, query.page(), query.size()));
         var ids = new LinkedHashSet<UUID>();
         page.items().forEach(entry -> {
             ids.add(entry.reporterId());
