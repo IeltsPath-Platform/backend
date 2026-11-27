@@ -19,7 +19,7 @@ class DropGradingPointCostsMigrationTest {
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:15-alpine");
 
     private static final Set<String> DROPPED = Set.of("grading_point_costs");
-    private static final Set<String> KEPT = Set.of("assessment_attempts", "assessment_results", "grading_jobs", "learner_submissions", "outbox_events", "flyway_schema_history");
+    private static final Set<String> KEPT = Set.of("assessment_attempts", "assessment_results", "grading_jobs", "learner_submissions", "outbox_events", "deleted_users", "user_deletion_jobs", "flyway_schema_history");
 
     @Test
     void removesTheUnusedTablesAndKeepsTheRest() throws Exception {
@@ -38,6 +38,6 @@ class DropGradingPointCostsMigrationTest {
             assertTrue(!tables.contains(dropped), dropped + " must be gone");
         }
         assertTrue(tables.containsAll(KEPT), "tables that are still in use must remain");
-        assertEquals(27, tables.size()); // 26 tables plus flyway_schema_history
+        assertEquals(29, tables.size()); // 28 tables plus flyway_schema_history
     }
 }
