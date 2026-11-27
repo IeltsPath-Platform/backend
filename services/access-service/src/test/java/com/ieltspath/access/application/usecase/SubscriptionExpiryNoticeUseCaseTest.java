@@ -49,15 +49,15 @@ class SubscriptionExpiryNoticeUseCaseTest {
     void queuesOnlyTheMostUrgentStageAndMarksTheEarlierOnesAsClaimed() {
         UUID subscriptionId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
-        when(notices.findActiveEndingBefore(any())).thenReturn(List.of(
+        when(notices.findDueForNotice(NOW.plus(Duration.ofDays(7)), NOW.minus(Duration.ofDays(7)))).thenReturn(List.of(
                 new DueSubscription(subscriptionId, userId, NOW.plusSeconds(3600))));
         when(contacts.findContact(userId)).thenReturn(Optional.of(new Contact("learner@example.test", "An")));
-        when(notices.claim(eq(subscriptionId), anyString(), eq(NOW))).thenReturn(true);
+        when(notices.claim(eq(subscriptionId), anyString(), eq(NOW.plusSeconds(3600)), eq(NOW))).thenReturn(true);
 
         assertEquals(1, useCase.scan(NOW));
 
-        verify(notices).claim(subscriptionId, "ONE_DAY", NOW);
-        verify(notices).claim(subscriptionId, "SEVEN_DAYS", NOW);
+        verify(notices).claim(subscriptionId, "ONE_DAY", NOW.plusSeconds(3600), NOW);
+        verify(notices).claim(subscriptionId, "SEVEN_DAYS", NOW.plusSeconds(3600), NOW);
         ArgumentCaptor<OutboxEvent> queued = ArgumentCaptor.forClass(OutboxEvent.class);
         verify(outbox).save(queued.capture());
         assertEquals("SubscriptionExpiryNotice", queued.getValue().getEventType());
@@ -69,10 +69,10 @@ class SubscriptionExpiryNoticeUseCaseTest {
     void aStageClaimedBeforeIsNotQueuedAgain() {
         UUID subscriptionId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
-        when(notices.findActiveEndingBefore(any())).thenReturn(List.of(
+        when(notices.findDueForNotice(any(), any())).thenReturn(List.of(
                 new DueSubscription(subscriptionId, userId, NOW.minusSeconds(60))));
         when(contacts.findContact(userId)).thenReturn(Optional.of(new Contact("learner@example.test", "An")));
-        when(notices.claim(any(), anyString(), any())).thenReturn(false);
+        when(notices.claim(any(), anyString(), any(), any())).thenReturn(false);
 
         assertEquals(0, useCase.scan(NOW));
         verify(outbox, never()).save(any());
@@ -82,12 +82,12 @@ class SubscriptionExpiryNoticeUseCaseTest {
     void aSubscriptionWithoutAKnownAddressIsSkippedAndNotClaimed() {
         UUID subscriptionId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
-        when(notices.findActiveEndingBefore(any())).thenReturn(List.of(
+        when(notices.findDueForNotice(any(), any())).thenReturn(List.of(
                 new DueSubscription(subscriptionId, userId, NOW.minusSeconds(60))));
         when(contacts.findContact(userId)).thenReturn(Optional.empty());
 
         assertEquals(0, useCase.scan(NOW));
-        verify(notices, never()).claim(any(), anyString(), any());
+        verify(notices, never()).claim(any(), anyString(), any(), any());
         verify(outbox, never()).save(any());
     }
 }

@@ -8,6 +8,7 @@ import com.ieltspath.access.domain.repository.PlanRepository;
 import com.ieltspath.access.application.command.GrantSubscriptionCommand;
 import com.ieltspath.access.application.usecase.GrantSubscriptionUseCase;
 import com.ieltspath.commonobservability.CorrelationIdFilter;
+import com.ieltspath.events.access.SubscriptionExpiryNoticeTopology;
 import com.ieltspath.events.access.SubscriptionGrantedTopology;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -135,6 +136,18 @@ class AccessOutboxRelayIntegrationTest {
                 json.readTree(new String(message.getBody(), StandardCharsets.UTF_8)));
         assertEquals("PUBLISHED", status(eventId));
         assertNull(jdbc.queryForObject("SELECT last_error FROM outbox_events WHERE id = ?", String.class, eventId));
+    }
+
+    @Test
+    void anExpiryNoticeIsRoutedEvenWhenNoNotificationServiceHasStarted() {
+        UUID eventId = UUID.randomUUID();
+        outbox.save(OutboxEvent.create(eventId, "Subscription", UUID.randomUUID(), "SubscriptionExpiryNotice",
+                payload(eventId)));
+
+        assertEquals(1, relay.publishPendingBatch());
+
+        assertNotNull(rabbit.receive(SubscriptionExpiryNoticeTopology.QUEUE, 10_000), "Access declares the queue itself");
+        assertEquals("PUBLISHED", status(eventId));
     }
 
     @Test

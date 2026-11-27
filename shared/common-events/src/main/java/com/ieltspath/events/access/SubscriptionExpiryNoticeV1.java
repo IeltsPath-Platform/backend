@@ -5,7 +5,8 @@ import java.util.UUID;
 
 /**
  * A Premium subscription is about to end ({@code SEVEN_DAYS}, {@code ONE_DAY}) or has ended ({@code EXPIRED}). Carries the
- * address and name to write to, so Notification does not call Access or User. Emitted once per subscription and stage.
+ * address and name to write to, so Notification does not call Access or User. Emitted once per subscription, stage and end
+ * date.
  */
 public record SubscriptionExpiryNoticeV1(UUID eventId, String eventType, Instant occurredAt, UUID userId,
                                          UUID subscriptionId, String stage, Instant endsAt,
