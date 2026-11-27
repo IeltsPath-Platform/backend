@@ -34,6 +34,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({CommunityForbiddenException.class, AccessDeniedException.class})
     ResponseEntity<ErrorResponse> forbidden(Exception e, HttpServletRequest r) {
+        if (e instanceof CommunityForbiddenException cfe && cfe.getCode() != null) {
+            String message = com.ieltspath.commonsecurity.error.VietnameseErrorMessages.userFacing(
+                    HttpStatus.FORBIDDEN.value(), cfe.getMessage());
+            return error(HttpStatus.FORBIDDEN, message, r, Map.of("code", cfe.getCode()));
+        }
         return error(HttpStatus.FORBIDDEN, "Forbidden", r, null);
     }
 

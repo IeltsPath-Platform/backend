@@ -35,6 +35,7 @@ class CommunityQueriesUseCaseTest {
     @Mock PostRepository posts;
     @Mock CommentRepository comments;
     @Mock com.ieltspath.community.domain.repository.CommentReactionRepository commentReactions;
+    @Mock com.ieltspath.community.domain.repository.UserBlockRepository blocks;
     @InjectMocks CommunityQueriesUseCase queries;
 
     @Test
@@ -47,7 +48,7 @@ class CommunityQueriesUseCaseTest {
                 .collect(java.util.stream.Collectors.toSet());
         UUID reacted = content.getFirst().id();
         when(profiles.findProfiles(Set.of(author))).thenReturn(Map.of());
-        when(reads.replyCounts(ids)).thenReturn(Map.of(reacted, 3L));
+        when(reads.replyCounts(ids, viewer)).thenReturn(Map.of(reacted, 3L));
         when(commentReactions.interactions(ids, viewer)).thenReturn(Map.of(reacted,
                 new com.ieltspath.community.domain.vo.CommentInteractions(Map.of(
                         com.ieltspath.community.domain.vo.ReactionType.LIKE, 2L),
@@ -83,10 +84,10 @@ class CommunityQueriesUseCaseTest {
         Comment reply = Comment.create(post.getId(), viewer, root.getId(), "reply");
         when(posts.findById(post.getId())).thenReturn(java.util.Optional.of(post));
         when(comments.findById(root.getId())).thenReturn(java.util.Optional.of(root));
-        when(reads.thread(post.getId(), null, 0, 20)).thenReturn(new com.ieltspath.community.domain.vo.CommunityPage<>(List.of(root), 1));
-        when(reads.thread(post.getId(), root.getId(), 0, 20)).thenReturn(new com.ieltspath.community.domain.vo.CommunityPage<>(List.of(reply), 1));
+        when(reads.thread(viewer, post.getId(), null, 0, 20)).thenReturn(new com.ieltspath.community.domain.vo.CommunityPage<>(List.of(root), 1));
+        when(reads.thread(viewer, post.getId(), root.getId(), 0, 20)).thenReturn(new com.ieltspath.community.domain.vo.CommunityPage<>(List.of(reply), 1));
         when(profiles.findProfiles(anySet())).thenReturn(Map.of());
-        when(reads.replyCounts(anySet())).thenReturn(Map.of());
+        when(reads.replyCounts(anySet(), eq(viewer))).thenReturn(Map.of());
         when(commentReactions.interactions(anySet(), eq(viewer))).thenAnswer(invocation -> {
             Set<UUID> ids = invocation.getArgument(0);
             return ids.stream().collect(java.util.stream.Collectors.toMap(id -> id, id ->

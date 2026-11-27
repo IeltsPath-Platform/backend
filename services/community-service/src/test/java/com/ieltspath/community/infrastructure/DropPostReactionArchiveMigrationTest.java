@@ -38,6 +38,6 @@ class DropPostReactionArchiveMigrationTest {
             assertTrue(!tables.contains(dropped), dropped + " must be gone");
         }
         assertTrue(tables.containsAll(KEPT), "tables that are still in use must remain");
-        assertEquals(11, tables.size()); // 10 tables plus flyway_schema_history
+        assertEquals(12, tables.size()); // 11 tables (incl. user_blocks) plus flyway_schema_history
     }
 }

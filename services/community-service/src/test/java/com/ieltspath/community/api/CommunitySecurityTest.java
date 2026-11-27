@@ -94,6 +94,8 @@ class CommunitySecurityTest {
     @MockitoBean
     ManageSocialUseCase social;
     @MockitoBean
+    ManageBlocksUseCase blocks;
+    @MockitoBean
     PublicProfileClient profiles;
     @MockitoBean SubmitContentReportUseCase submitContentReportUseCase;
     @MockitoBean ListPendingContentReportsUseCase listPendingContentReportsUseCase;
@@ -330,7 +332,7 @@ class CommunitySecurityTest {
     void paginationParametersReachListUseCase() throws Exception {
         when(currentUserProvider.requireCurrentUser())
                 .thenReturn(new CurrentUser(UUID.randomUUID(), Set.of(CanonicalRoles.CUSTOMER)));
-        when(listPostsUseCase.execute(any())).thenReturn(new PageResult<>(List.of(), 2, 5, 0, 0));
+        when(listPostsUseCase.execute(any(CommunityActor.class), any(PageQuery.class))).thenReturn(new PageResult<>(List.of(), 2, 5, 0, 0));
         when(queries.enrichPosts(any(), any())).thenAnswer(invocation -> invocation.getArgument(1));
 
         mvc.perform(get("/api/community/posts?page=2&size=5")
@@ -342,7 +344,7 @@ class CommunitySecurityTest {
                 .andExpect(jsonPath("$.totalElements").value(0))
                 .andExpect(jsonPath("$.sort").value("createdAt,desc;id,desc"));
 
-        verify(listPostsUseCase).execute(eq(new PageQuery(2, 5)));
+        verify(listPostsUseCase).execute(any(CommunityActor.class), eq(new PageQuery(2, 5)));
     }
 
     @Test
@@ -534,7 +536,7 @@ class CommunitySecurityTest {
         UUID userId = UUID.randomUUID();
         when(currentUserProvider.requireCurrentUser())
                 .thenReturn(new CurrentUser(userId, Set.of(CanonicalRoles.CUSTOMER)));
-        when(listPostsUseCase.execute(any())).thenReturn(new PageResult<>(List.of(), 0, 20, 0, 0));
+        when(listPostsUseCase.execute(any(CommunityActor.class), any(PageQuery.class))).thenReturn(new PageResult<>(List.of(), 0, 20, 0, 0));
         mvc.perform(get("/api/community/posts")
                         .with(jwt().jwt(token -> token.subject(userId.toString()).claim("roles", List.of("CUSTOMER"))))
                         .accept("application/xml"))
