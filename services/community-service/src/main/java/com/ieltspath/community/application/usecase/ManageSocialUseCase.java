@@ -17,16 +17,22 @@ public class ManageSocialUseCase {
  private final PostRepository posts;
  private final PublicProfileClient profiles;
  private final CommunityEventOutbox outbox;
+ private final UserBlockRepository blocks;
  private final TransactionTemplate transaction;
  public void follow(CommunityActor actor,UUID target) {
  if(actor.userId().equals(target))throw new CommunityException("Cannot follow yourself");
  // The remote profile check runs before the transaction so a slow user-service never holds a connection.
  if(!profiles.findProfiles(Set.of(target)).containsKey(target))throw new CommunityNotFoundException("Không tìm thấy người dùng");
+ if(blocks.isBlockedEitherWay(actor.userId(),target))throw new CommunityForbiddenException("Không thể theo dõi người dùng này do có thiết lập chặn","USER_BLOCKED");
  transaction.executeWithoutResult(status -> {
  if(social.follow(actor.userId(),target))outbox.record(CommunityEventTypes.USER_FOLLOWED,actor.userId(),target,null,null);
  });
  }
  @Transactional public void unfollow(CommunityActor actor,UUID target){social.unfollow(actor.userId(),target);}
- @Transactional public void bookmark(CommunityActor actor,UUID post){CommunityApplicationSupport.requireVisiblePost(posts,post,actor);social.bookmark(actor.userId(),post);}
+ @Transactional public void bookmark(CommunityActor actor,UUID post){
+  var found=CommunityApplicationSupport.requireVisiblePost(posts,post,actor);
+  if(blocks.isBlockedEitherWay(actor.userId(),found.getAuthorId()))throw new CommunityNotFoundException("Không tìm thấy bài viết");
+  social.bookmark(actor.userId(),post);
+ }
  @Transactional public void unbookmark(CommunityActor actor,UUID post){social.unbookmark(actor.userId(),post);}
 }

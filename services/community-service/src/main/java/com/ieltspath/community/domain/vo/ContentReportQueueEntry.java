@@ -5,4 +5,10 @@ import java.util.UUID;
 
 public record ContentReportQueueEntry(UUID id, UUID reporterId, ReportContentType contentType, UUID contentId,
                                       UUID contentAuthorId, String contentPreview, String reason,
-                                      ReportStatus status, Instant createdAt) { }
+                                      ReportStatus status, Instant createdAt, Instant decidedAt) {
+    public ContentReportQueueEntry(UUID id, UUID reporterId, ReportContentType contentType, UUID contentId,
+                                   UUID contentAuthorId, String contentPreview, String reason,
+                                   ReportStatus status, Instant createdAt) {
+        this(id, reporterId, contentType, contentId, contentAuthorId, contentPreview, reason, status, createdAt, null);
+    }
+}

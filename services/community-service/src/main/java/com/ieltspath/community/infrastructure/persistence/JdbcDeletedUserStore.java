@@ -81,6 +81,7 @@ public class JdbcDeletedUserStore implements DeletedUserStore {
         jdbc.update("DELETE FROM post_reactions WHERE user_id = ?", userId);
         jdbc.update("DELETE FROM comment_reactions WHERE user_id = ?", userId);
         jdbc.update("DELETE FROM community_reports WHERE reporter_id = ?", userId);
+        jdbc.update("DELETE FROM user_blocks WHERE blocker_id = ? OR blocked_id = ?", userId, userId);
     }
 
     public void markJobDone(UUID eventId) {

@@ -16,4 +16,8 @@ public interface PostRepository {
     CommunityPage<Post> findByStatus(ContentStatus status, int page, int size);
 
     CommunityPage<Post> findByStatusAndCategory(ContentStatus status, PostCategory category, int page, int size);
+
+    CommunityPage<Post> findByStatusVisibleTo(ContentStatus status, UUID viewerId, int page, int size);
+
+    CommunityPage<Post> findByStatusAndCategoryVisibleTo(ContentStatus status, PostCategory category, UUID viewerId, int page, int size);
 }

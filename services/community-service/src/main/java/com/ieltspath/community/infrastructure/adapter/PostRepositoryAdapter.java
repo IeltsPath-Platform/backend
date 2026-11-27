@@ -44,4 +44,18 @@ public class PostRepositoryAdapter implements PostRepository {
         var result = repository.findByStatusAndCategory(status, category, PageRequest.of(page, size, sort));
         return new CommunityPage<>(result.getContent().stream().map(mapper::toDomain).toList(), result.getTotalElements());
     }
+
+    @Override
+    public CommunityPage<Post> findByStatusVisibleTo(ContentStatus status, UUID viewerId, int page, int size) {
+        var sort = Sort.by(Sort.Direction.DESC, "created_at").and(Sort.by(Sort.Direction.DESC, "id"));
+        var result = repository.findByStatusVisibleTo(status.name(), viewerId, PageRequest.of(page, size, sort));
+        return new CommunityPage<>(result.getContent().stream().map(mapper::toDomain).toList(), result.getTotalElements());
+    }
+
+    @Override
+    public CommunityPage<Post> findByStatusAndCategoryVisibleTo(ContentStatus status, PostCategory category, UUID viewerId, int page, int size) {
+        var sort = Sort.by(Sort.Direction.DESC, "created_at").and(Sort.by(Sort.Direction.DESC, "id"));
+        var result = repository.findByStatusAndCategoryVisibleTo(status.name(), category.name(), viewerId, PageRequest.of(page, size, sort));
+        return new CommunityPage<>(result.getContent().stream().map(mapper::toDomain).toList(), result.getTotalElements());
+    }
 }

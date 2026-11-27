@@ -11,11 +11,20 @@ public record ContentReportQueueItemResult(UUID id, UUID reporterId, String repo
                                            ReportContentType contentType, UUID contentId,
                                            UUID contentAuthorId, String contentAuthorDisplayName,
                                            String contentPreview, String reason, ReportStatus status,
-                                           Instant createdAt) {
+                                           Instant createdAt, Instant decidedAt) {
+    public ContentReportQueueItemResult(UUID id, UUID reporterId, String reporterDisplayName,
+                                        ReportContentType contentType, UUID contentId,
+                                        UUID contentAuthorId, String contentAuthorDisplayName,
+                                        String contentPreview, String reason, ReportStatus status,
+                                        Instant createdAt) {
+        this(id, reporterId, reporterDisplayName, contentType, contentId, contentAuthorId, contentAuthorDisplayName,
+                contentPreview, reason, status, createdAt, null);
+    }
+
     public static ContentReportQueueItemResult from(ContentReportQueueEntry entry, String reporterDisplayName,
                                                     String contentAuthorDisplayName) {
         return new ContentReportQueueItemResult(entry.id(), entry.reporterId(), reporterDisplayName,
                 entry.contentType(), entry.contentId(), entry.contentAuthorId(), contentAuthorDisplayName,
-                entry.contentPreview(), entry.reason(), entry.status(), entry.createdAt());
+                entry.contentPreview(), entry.reason(), entry.status(), entry.createdAt(), entry.decidedAt());
     }
 }

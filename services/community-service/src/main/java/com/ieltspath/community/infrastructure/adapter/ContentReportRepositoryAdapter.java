@@ -85,23 +85,39 @@ public class ContentReportRepositoryAdapter implements ContentReportRepository {
 
     @Override
     public CommunityPage<ContentReportQueueEntry> findPending(int page, int size) {
-        long total = jdbc.queryForObject("SELECT count(*) FROM community_reports WHERE status='PENDING'", Long.class);
-        var entries = jdbc.query("""
-                SELECT r.id,r.reporter_id,r.content_type,r.content_id,r.reason,r.status,r.created_at,
+        return findByStatus(ReportStatus.PENDING, page, size);
+    }
+
+    @Override
+    public CommunityPage<ContentReportQueueEntry> findByStatus(ReportStatus status, int page, int size) {
+        long total = status == null
+                ? jdbc.queryForObject("SELECT count(*) FROM community_reports", Long.class)
+                : jdbc.queryForObject("SELECT count(*) FROM community_reports WHERE status=?", Long.class, status.name());
+        String where = status == null ? "" : "WHERE r.status=? ";
+        String sql = """
+                SELECT r.id,r.reporter_id,r.content_type,r.content_id,r.reason,r.status,r.created_at,r.reviewed_at,
                        CASE WHEN r.content_type='POST' THEN p.author_id ELSE c.author_id END AS content_author_id,
                        CASE WHEN r.content_type='POST' THEN left(coalesce(nullif(p.title,''),p.body),300)
                             ELSE left(c.body,300) END AS content_preview
                 FROM community_reports r
                 LEFT JOIN posts p ON r.content_type='POST' AND p.id=r.content_id
                 LEFT JOIN comments c ON r.content_type='COMMENT' AND c.id=r.content_id
-                WHERE r.status='PENDING'
+                """ + where + """
                 ORDER BY r.created_at ASC,r.id ASC
                 LIMIT ? OFFSET ?
-                """, (rs, row) -> new ContentReportQueueEntry(rs.getObject("id", UUID.class),
-                rs.getObject("reporter_id", UUID.class), ReportContentType.valueOf(rs.getString("content_type")),
-                rs.getObject("content_id", UUID.class), rs.getObject("content_author_id", UUID.class),
-                rs.getString("content_preview"), rs.getString("reason"), ReportStatus.valueOf(rs.getString("status")),
-                rs.getTimestamp("created_at").toInstant()), size, (long) page * size);
+                """;
+        var mapper = (org.springframework.jdbc.core.RowMapper<ContentReportQueueEntry>) (rs, row) -> {
+            Timestamp reviewedAt = rs.getTimestamp("reviewed_at");
+            return new ContentReportQueueEntry(rs.getObject("id", UUID.class),
+                    rs.getObject("reporter_id", UUID.class), ReportContentType.valueOf(rs.getString("content_type")),
+                    rs.getObject("content_id", UUID.class), rs.getObject("content_author_id", UUID.class),
+                    rs.getString("content_preview"), rs.getString("reason"), ReportStatus.valueOf(rs.getString("status")),
+                    rs.getTimestamp("created_at").toInstant(),
+                    reviewedAt == null ? null : reviewedAt.toInstant());
+        };
+        var entries = status == null
+                ? jdbc.query(sql, mapper, size, (long) page * size)
+                : jdbc.query(sql, mapper, status.name(), size, (long) page * size);
         return new CommunityPage<>(entries, total);
     }
 

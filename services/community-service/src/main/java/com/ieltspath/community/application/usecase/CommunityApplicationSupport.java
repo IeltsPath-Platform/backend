@@ -7,12 +7,28 @@ import com.ieltspath.community.domain.exception.CommunityForbiddenException;
 import com.ieltspath.community.domain.exception.CommunityNotFoundException;
 import com.ieltspath.community.domain.repository.PostRepository;
 import com.ieltspath.community.domain.repository.CommentRepository;
+import com.ieltspath.community.domain.repository.UserBlockRepository;
+import com.ieltspath.community.domain.vo.CommunityPage;
 import com.ieltspath.community.domain.vo.ContentStatus;
 
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 final class CommunityApplicationSupport {
+    private static final UserBlockRepository NO_OP_BLOCKS = new UserBlockRepository() {
+        @Override public boolean block(UUID blockerId, UUID blockedId) { return false; }
+        @Override public void unblock(UUID blockerId, UUID blockedId) {}
+        @Override public boolean isBlockedEitherWay(UUID userA, UUID userB) { return false; }
+        @Override public Set<UUID> findBlockedEitherWayUserIds(UUID viewerId) { return Set.of(); }
+        @Override public CommunityPage<UUID> findBlockedUsers(UUID blockerId, int page, int size) { return new CommunityPage<>(List.of(), 0L); }
+    };
+
     private CommunityApplicationSupport() {
+    }
+
+    static UserBlockRepository noOpBlocks() {
+        return NO_OP_BLOCKS;
     }
 
     static Post requireVisiblePost(PostRepository posts, UUID postId, CommunityActor actor) {
