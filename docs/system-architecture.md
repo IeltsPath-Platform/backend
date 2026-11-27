@@ -173,6 +173,7 @@ Luồng `SubscriptionGranted` của Access thông báo cho người dùng khi ad
 | Library `QueueVocabularyReviewDueUseCase` (lịch hằng ngày 08:00 giờ Việt Nam) ghi `VocabularyReviewDue` vào `outbox_events`, mỗi học viên một dòng mỗi ngày; `LibraryOutboxRelay` publish có confirm tới exchange `library.events`, routing key `library.vocabulary-review-due.v1` | Notification `VocabularyReviewDueListener` gọi `RecordVocabularyReviewDueUseCase`; `eventId` chống ghi thông báo trùng | `notification.vocabulary-review-due.v1`; retry `notification.vocabulary-review-due.v1.retry`; DLQ `notification.vocabulary-review-due.v1.dlq` | [`vocabulary-review-due-v1.md`](contracts/vocabulary-review-due-v1.md) |
 | Assessment ghi `SpeakingGradingRequested.v1` vào `outbox_events` cùng giao dịch submit khi cờ bật; Learning lưu job theo event/attempt, chấm qua storage/Azure/LLM rồi ghi `SpeakingGradingCompleted.v1` vào `placement_speaking_outbox`; Assessment áp kết quả idempotent | Learning `learning.placement-speaking-grading.requested.v1` (retry/DLQ); Assessment `assessment.placement-speaking-grading.completed.v1` (retry/DLQ) | Hai consumer ACK sau commit; timeout Speaking 10 phút hoàn tất placement dạng partial | [`speaking-grading-requested-v1.md`](contracts/speaking-grading-requested-v1.md), [`speaking-grading-completed-v1.md`](contracts/speaking-grading-completed-v1.md) |
 | User `ForgotPasswordUseCase` ghi token hash và `PasswordResetRequestedV1` trong cùng transaction; `UserOutboxRelay` publish có confirm, sau đó xóa payload | Notification `PasswordResetRequestedListener` gửi SMTP và deduplicates bằng `eventId` | `notification.password-reset-requested.v1` (+ retry, DLQ) | [`password-reset-requested-v1.md`](contracts/password-reset-requested-v1.md) |
+| User `DeleteMyAccountUseCase` đánh dấu `DELETED`, ẩn danh PII, thu hồi refresh/access token và ghi `UserDeletedV1` vào `outbox_events` cùng transaction; `UserOutboxRelay` phát tới `user.events` (`user.deleted.v1`) | Mỗi service consumer ghi tombstone `deleted_users`, xóa/ẩn danh dữ liệu theo lô (và file Supabase Storage ngoài transaction) | `<svc>.user-deleted.v1` (+ retry, DLQ) cho `learning`, `assessment`, `library`, `access`, `notification`, `game`, `community`, `content` | [`user-deleted-v1.md`](contracts/user-deleted-v1.md) |
 
 Lỗi xử lý tạm thời được chuyển qua retry queue; lỗi payload hoặc vi phạm contract được dead-letter. Retry queue trả message về đúng exchange nguồn với routing key ban đầu, nên consumer nhận lại đúng contract (`RetryTopologyTest`). Khi Community park message vào DLQ, consumer ghi routing key gốc vào header `x-original-routing-key`, vì routing key của dead-letter là tên DLQ; replay đọc header này để gửi lại đúng đường. Content và Game không có outbox: bảng đã bị xóa vì không có service nào đọc event của hai bên.
 
@@ -410,6 +411,7 @@ Backend hiện có 40 phương thức `@Scheduled` trong 39 file. Cơ chế ch�
 | user | `LoginHistoryPurgeScheduler` | Xóa theo cutoff thời gian; chạy lặp an toàn | Không |
 | user | `AuthAuditPurgeScheduler` | Xóa từng lô bằng `FOR UPDATE SKIP LOCKED`; giữ dữ liệu 365 ngày theo mặc định | Không |
 | user | `RefreshTokenCleanupJob` | Xóa tối đa 1000 token hết hạn hoặc đã thu hồi quá 30 ngày bằng `FOR UPDATE SKIP LOCKED`; nhiều instance không giữ cùng hàng | Không |
+| learning, assessment, library, access, notification, game, community, content | `UserDeletionJobWorker` | Claim job từ `user_deletion_jobs` bằng `FOR UPDATE SKIP LOCKED`, xóa/ẩn danh theo lô | Xóa file Supabase Storage (`speaking-recordings`, `flashcards`) ngoài transaction |
 
 Game không cần thêm claim riêng: hàng trận được khóa trước khi cập nhật và trạng thái được kiểm lại. Relay dùng row claim để instance khác có thể xử lý các hàng còn lại. Việc đọc nguồn của `WorkItemSyncJob` có thể chạy đồng thời; phần ghi được tuần tự hóa và repository bỏ qua work item đã tồn tại.
 
@@ -490,8 +492,8 @@ Rate limit được cấu hình trong `infra/config-server/config-repo/api-gatew
 khóa theo subject của JWT; request ẩn danh dùng IP, chỉ tin `X-Forwarded-For` từ proxy thuộc
 `gateway.rate-limit.trusted-proxies`. Với header được tin, gateway duyệt các hop từ phải sang trái, bỏ qua proxy
 được tin cậy và chọn IP đầu tiên không thuộc danh sách; nếu không còn IP phù hợp thì dùng remote address.
-Tier `auth` áp dụng cho `/auth/login`, `/auth/refresh`, `/auth/forgot-password`, `/auth/reset-password`, `/auth/google` và
-`/api/users/register`; `/auth/logout` thuộc tier `default`. Redis dùng chung trạng thái giữa các gateway instance. Khi Redis lỗi,
+Tier `auth` áp dụng cho `/auth/login`, `/auth/refresh`, `/auth/forgot-password`, `/auth/reset-password`, `/auth/google`,
+`/api/users/register`, `/api/users/me/reauth` và `DELETE /api/users/me`; `/auth/logout` thuộc tier `default`. Redis dùng chung trạng thái giữa các gateway instance. Khi Redis lỗi,
 gateway cho request thường đi tiếp và ghi metric cảnh báo; login bị fail-closed với HTTP 503 để tránh bỏ qua
 giới hạn đăng nhập. Upload avatar, media và ảnh community dùng Redis limiter riêng theo user, với mức lần
 lượt 10, 30 và 30 upload mỗi giờ; lỗi Redis ở các limiter upload được fail-open để lỗi hạ tầng không chặn

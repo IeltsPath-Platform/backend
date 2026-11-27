@@ -23,6 +23,12 @@ public class UserEmailVerificationListener {
     private final ObjectMapper objectMapper;
     private final RecordUserEmailVerificationUseCase record;
     private final MessageRetry retry;
+    private com.ieltspath.access.application.port.DeletedUserStore deletedUsers;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setDeletedUsers(com.ieltspath.access.application.port.DeletedUserStore deletedUsers) {
+        this.deletedUsers = deletedUsers;
+    }
 
     public UserEmailVerificationListener(ObjectMapper objectMapper, RecordUserEmailVerificationUseCase record,
                                          @Qualifier(UserEmailVerificationMessagingConfig.RETRY) MessageRetry retry) {
@@ -41,6 +47,9 @@ public class UserEmailVerificationListener {
             throw new AmqpRejectAndDontRequeueException("Unreadable email verification state event", malformed);
         }
         try {
+            if (deletedUsers != null && deletedUsers.isDeleted(event.userId())) {
+                return;
+            }
             record.execute(event);
         } catch (IllegalArgumentException invalidContract) {
             throw new AmqpRejectAndDontRequeueException("Email verification state breaks its contract", invalidContract);

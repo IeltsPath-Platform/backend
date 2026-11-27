@@ -101,6 +101,16 @@ spring:
                   args:
                     tier: auth
 
+            - id: user-delete-account-limited
+              uri: lb://USER-SERVICE
+              predicates:
+                - Path=/api/users/me
+                - Method=DELETE
+              filters:
+                - name: ClientRateLimit
+                  args:
+                    tier: auth
+
             - id: user-avatar-upload-limited
               uri: lb://USER-SERVICE
               predicates:

@@ -81,6 +81,12 @@ public class ApplyHumanReviewResultUseCase {
     private final TransactionTemplate transaction;
     private final HumanReviewEvidenceRule rule = new HumanReviewEvidenceRule();
     private final int limit;
+    private com.ieltspath.learning.domain.repository.DeletedUserRepository deletedUsers;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setDeletedUsers(com.ieltspath.learning.domain.repository.DeletedUserRepository deletedUsers) {
+        this.deletedUsers = deletedUsers;
+    }
 
     public ApplyHumanReviewResultUseCase(LearnerLock lock, WritingSubmissionRepository essays,
                                          HumanReviewRequestRepository requests, PracticeAttemptRepository attempts,
@@ -116,6 +122,9 @@ public class ApplyHumanReviewResultUseCase {
      *                                  event is then refused rather than retried
      */
     public void execute(HumanReviewResult result) {
+        if (deletedUsers != null && deletedUsers.isDeleted(result.learnerId())) {
+            return;
+        }
         // Applied before: nothing to read and nothing to write, so a redelivered event makes no Content call at all.
         if (outcomes.studyPointsOf(result.sourceSubmissionId()).isPresent()) return;
         Reads reads = readContent(result);

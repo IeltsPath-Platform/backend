@@ -18,6 +18,7 @@ import com.ieltspath.user.domain.exception.UserManagementRuleViolationException;
 import com.ieltspath.user.domain.exception.PasswordChangeException;
 import com.ieltspath.user.domain.exception.PasswordNotConfiguredException;
 import com.ieltspath.user.domain.exception.WeakPasswordException;
+import com.ieltspath.user.application.exception.AccountDeletionConfirmationException;
 import com.ieltspath.user.application.exception.AvatarUploadRateLimitException;
 import com.ieltspath.user.application.exception.LoginLimiterUnavailableException;
 import com.ieltspath.user.application.exception.LoginRateLimitedException;
@@ -81,10 +82,20 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.CONFLICT, exception.getMessage(), request, null);
     }
 
+    @ExceptionHandler(AccountDeletionConfirmationException.class)
+    ResponseEntity<ErrorResponse> handleAccountDeletionConfirmation(AccountDeletionConfirmationException exception,
+                                                                      HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(errorBody(HttpStatus.BAD_REQUEST, exception.getMessage(), request,
+                        Map.of("code", exception.getCode()), exception.getCode()));
+    }
+
     @ExceptionHandler(PasswordChangeException.class)
     ResponseEntity<ErrorResponse> handlePasswordChange(PasswordChangeException exception, HttpServletRequest request) {
         HttpStatus status = exception.isRateLimited() ? HttpStatus.TOO_MANY_REQUESTS : HttpStatus.BAD_REQUEST;
-        return error(status, exception.getMessage(), request, Map.of("code", exception.getCode()));
+        return ResponseEntity.status(status)
+                .body(errorBody(status, exception.getMessage(), request,
+                        Map.of("code", exception.getCode()), exception.getCode()));
     }
 
     @ExceptionHandler(WeakPasswordException.class)

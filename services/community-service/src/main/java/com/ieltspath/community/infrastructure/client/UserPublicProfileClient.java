@@ -56,14 +56,31 @@ public class UserPublicProfileClient implements PublicProfileClient {
     public Map<UUID, PublicProfile> findProfiles(Set<UUID> ids) {
         if (ids.isEmpty()) return Map.of();
         if (ids.size() > 100) throw new IllegalArgumentException("At most 100 public profiles per batch");
+        UUID deletedId = com.ieltspath.community.infrastructure.persistence.JdbcDeletedUserStore.DELETED_AUTHOR_ID;
+        boolean hasDeleted = ids.contains(deletedId);
+        Set<UUID> lookupIds = hasDeleted
+                ? ids.stream().filter(id -> !deletedId.equals(id)).collect(Collectors.toSet())
+                : ids;
+        Map<UUID, PublicProfile> result = new HashMap<>();
+        if (hasDeleted) {
+            result.put(deletedId, PublicProfile.deleted(deletedId));
+        }
+        if (lookupIds.isEmpty()) {
+            return result;
+        }
         try {
             var response = resilientCall.call("user", CallKind.READ, () -> client.post()
                     .uri("/internal/users/public-profiles").headers(ForwardedRequestHeaders::copy)
-                    .body(Map.of("userIds", ids)).retrieve().body(Batch.class));
-            Map<UUID, PublicProfile> result = new HashMap<>();
+                    .body(Map.of("userIds", lookupIds)).retrieve().body(Batch.class));
             if (response != null && response.profiles() != null)
-                response.profiles().forEach(profile -> { if (ids.contains(profile.id())) result.put(profile.id(), profile); });
-            return withStreaks(result.values()).stream().collect(Collectors.toMap(PublicProfile::id, profile -> profile));
+                response.profiles().forEach(profile -> { if (lookupIds.contains(profile.id())) result.put(profile.id(), profile); });
+            Map<UUID, PublicProfile> resolved = new HashMap<>();
+            if (hasDeleted) {
+                resolved.put(deletedId, PublicProfile.deleted(deletedId));
+            }
+            withStreaks(result.values().stream().filter(p -> !deletedId.equals(p.id())).toList())
+                    .forEach(profile -> resolved.put(profile.id(), profile));
+            return resolved;
         } catch (DownstreamUnavailableException exception) {
             throw new CommunityUnavailableException("Hồ sơ công khai tạm thời không tải được. Vui lòng thử lại sau.");
         } catch (org.springframework.web.client.RestClientException exception) {

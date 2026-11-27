@@ -38,9 +38,10 @@ class GameSchemaPostgresTest {
                     "game_match_players", "game_events", "flyway_schema_history",
                     "game_match_words", "game_player_words", "game_guesses", "game_match_word_pool", "game_guess_receipts",
                     "game_wordly_dictionaries", "game_wordly_dictionary_words",
-                    "game_rocket_rounds", "game_rocket_answers"
+                    "game_rocket_rounds", "game_rocket_answers",
+                    "deleted_users", "user_deletion_jobs"
             )));
-            assertEquals(17, tables.size());
+            assertEquals(19, tables.size());
             assertTrue(tables.stream().noneMatch(name -> name.startsWith("quiz_") || name.startsWith("leaderboard_")));
             assertFalse(tables.contains("outbox_events"));
         }

@@ -40,6 +40,12 @@ public class LearningPointsGrantListener {
     private final CreditPointsUseCase creditPoints;
     private final RabbitTemplate rabbitTemplate;
     private final MessageRetry retry;
+    private com.ieltspath.access.application.port.DeletedUserStore deletedUsers;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setDeletedUsers(com.ieltspath.access.application.port.DeletedUserStore deletedUsers) {
+        this.deletedUsers = deletedUsers;
+    }
 
     public LearningPointsGrantListener(ObjectMapper objectMapper,
                                        CreditPointsUseCase creditPoints,
@@ -73,6 +79,10 @@ public class LearningPointsGrantListener {
             return;
         }
 
+        if (deletedUsers != null && deletedUsers.isDeleted(request.userId())) {
+            log.info("Points grant skipped for deleted user: grantId={}, userId={}", request.grantId(), request.userId());
+            return;
+        }
         PointCreditResult result;
         try {
             result = creditPoints.executeLearningReward(request.grantId(), request.userId(), request.amount(),

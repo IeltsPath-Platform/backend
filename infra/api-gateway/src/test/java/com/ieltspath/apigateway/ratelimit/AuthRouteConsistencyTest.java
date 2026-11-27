@@ -71,6 +71,17 @@ class AuthRouteConsistencyTest {
     }
 
     @Test
+    void authenticatedDeleteAccountEndpointUsesTheAuthRateLimitTier() throws IOException {
+        Map<String, Object> config = loadConfig();
+        List<Map<String, Object>> routes = nested(config, "spring", "cloud", "gateway", "server", "webflux", "routes");
+        Map<String, Object> route = routes.stream().filter(item -> "user-delete-account-limited".equals(item.get("id")))
+                .findFirst().orElseThrow();
+        assertThat(routePaths(route)).containsExactly("/api/users/me");
+        assertThat(castList(route.get("predicates"))).contains("Method=DELETE");
+        assertThat(route.toString()).contains("tier=auth");
+    }
+
+    @Test
     void refreshUsesTheSeparateLargerBurstTier() throws IOException {
         Map<String, Object> config = loadConfig();
         List<Map<String, Object>> routes = nested(config, "spring", "cloud", "gateway", "server", "webflux", "routes");

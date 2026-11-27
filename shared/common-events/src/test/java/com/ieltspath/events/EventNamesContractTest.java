@@ -29,6 +29,9 @@ class EventNamesContractTest {
         assertEquals("assessment.grading-completed.v1", AssessmentMessaging.GRADING_COMPLETED_ROUTING_KEY);
         assertEquals("assessment.grading-completed.v1", com.ieltspath.events.assessment.GradingCompletedV1.EVENT_TYPE);
         assertEquals("community.events", CommunityMessaging.EXCHANGE);
+        assertEquals("user.events", com.ieltspath.events.user.UserMessaging.EXCHANGE);
+        assertEquals("user.deleted.v1", com.ieltspath.events.user.UserMessaging.USER_DELETED_ROUTING_KEY);
+        assertEquals("user.deleted.v1", com.ieltspath.events.user.UserDeletedV1.EVENT_TYPE);
         assertEquals("x-retry-count", MessageHeaders.RETRY_COUNT);
         assertEquals(30_000L, PointsGrantMessaging.RETRY_DELAY_MS);
         assertEquals(5, PointsGrantMessaging.MAX_RETRIES);

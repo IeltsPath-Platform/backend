@@ -19,7 +19,7 @@ class DropPostReactionArchiveMigrationTest {
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:15-alpine");
 
     private static final Set<String> DROPPED = Set.of("post_reaction_archive");
-    private static final Set<String> KEPT = Set.of("posts", "comments", "post_reactions", "comment_reactions", "outbox_events", "flyway_schema_history");
+    private static final Set<String> KEPT = Set.of("posts", "comments", "post_reactions", "comment_reactions", "outbox_events", "deleted_users", "user_deletion_jobs", "flyway_schema_history");
 
     @Test
     void removesTheUnusedTablesAndKeepsTheRest() throws Exception {
@@ -38,6 +38,6 @@ class DropPostReactionArchiveMigrationTest {
             assertTrue(!tables.contains(dropped), dropped + " must be gone");
         }
         assertTrue(tables.containsAll(KEPT), "tables that are still in use must remain");
-        assertEquals(9, tables.size()); // 8 tables plus flyway_schema_history
+        assertEquals(11, tables.size()); // 10 tables plus flyway_schema_history
     }
 }

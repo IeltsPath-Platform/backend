@@ -1,0 +1,6 @@
+ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
+
+ALTER TABLE users DROP CONSTRAINT IF EXISTS chk_users_status;
+ALTER TABLE users
+    ADD CONSTRAINT chk_users_status
+        CHECK (status IN ('ACTIVE', 'INACTIVE', 'LOCKED', 'PENDING_VERIFY', 'DELETED'));
