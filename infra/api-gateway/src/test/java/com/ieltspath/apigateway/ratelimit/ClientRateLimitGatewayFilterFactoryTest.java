@@ -178,8 +178,10 @@ class ClientRateLimitGatewayFilterFactoryTest {
                 .getContentAsString(StandardCharsets.UTF_8);
         RedisScript<List<Long>> script = new DefaultRedisScript<>(source, (Class<List<Long>>) (Class<?>) List.class);
         RedisRateLimiter redisRateLimiter = new RedisRateLimiter(redis, script, (ConfigurationService) null);
+        // Five requests fit the bucket, and one more would take a minute to refill, so a slow machine cannot let the
+        // sixth through.
         redisRateLimiter.getConfig().put("auth", new RedisRateLimiter.Config()
-                .setReplenishRate(1).setBurstCapacity(5));
+                .setReplenishRate(1).setBurstCapacity(300).setRequestedTokens(60));
         StaticApplicationContext applicationContext = new StaticApplicationContext();
         applicationContext.getBeanFactory().registerSingleton("reactiveStringRedisTemplate", redis);
         applicationContext.getBeanFactory().registerSingleton("redisRequestRateLimiterScript", script);
