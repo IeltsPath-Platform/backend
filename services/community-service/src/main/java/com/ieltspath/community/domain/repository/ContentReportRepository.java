@@ -4,6 +4,7 @@ import com.ieltspath.community.domain.aggregate.ContentReport;
 import com.ieltspath.community.domain.vo.CommunityPage;
 import com.ieltspath.community.domain.vo.ContentReportQueueEntry;
 import com.ieltspath.community.domain.vo.ReportContentType;
+import com.ieltspath.community.domain.vo.ReportStatus;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -18,4 +19,7 @@ public interface ContentReportRepository {
     int actionPendingForContent(ReportContentType contentType, UUID contentId, UUID adminId, Instant reviewedAt);
     ContentReport update(ContentReport report);
     CommunityPage<ContentReportQueueEntry> findPending(int page, int size);
+    default CommunityPage<ContentReportQueueEntry> findByStatus(ReportStatus status, int page, int size) {
+        return findPending(page, size);
+    }
 }
