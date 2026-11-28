@@ -1,6 +1,6 @@
 # Placement assignment and retake v1
 
-Updated: 2026-11-18. This contract covers Learning's pool-based exam assignment and Assessment's independent started-attempt limit. Placement is optional: it informs the learner's diagnostic band and course recommendation but does not gate courses, topics or lessons.
+Updated: 2026-11-28 (placement history); 2026-11-18. This contract covers Learning's pool-based exam assignment and Assessment's independent started-attempt limit. Placement is optional: it informs the learner's diagnostic band and course recommendation but does not gate courses, topics or lessons.
 
 ## Learning routes
 
@@ -53,6 +53,23 @@ Listening and Reading convert objective correct-answer counts to their existing 
 Assessment averages the available skill bands, rounds to the nearest half band, then applies the pool ceiling: `BAND_0_3` → 3.0, `BAND_3_5` → 5.0, and `BAND_5_9` → 9.0. The persisted `overallBand` and `AssessmentCompleted.v2` event carry the capped value. The owned `GET /api/assessments/attempts/{id}/placement-result` response includes `pool`, `ceiling`, `reachedCeiling` and `partial`, in addition to `overallBand`, `completedAt`, skill bands and report sections. The pool and ceiling are null for a legacy placement attempt that has no pool.
 
 Learning consumes completed Assessment events. For a placement result it best-effort matches the newest open assignment owned by the learner with the same package version and an assignment time no later than `completedAt`; on a match it records the assignment's completion time and attempt id. An assignment match failure is logged and does not roll back the learner's stored placement band.
+
+## Placement history
+
+`GET /api/assessments/attempts/placement/history?page=0&size=10` (role `CUSTOMER`, owner only) lists the learner's `SUBMITTED` placement attempts, newest first. `size` is 1 to 50; a value out of range returns 400.
+
+```json
+{
+  "items": [
+    {"attemptId":"…","pool":"BAND_3_5","submittedAt":"2026-11-28T09:06:00Z","graded":true,"overallBand":4.5,"partial":false}
+  ],
+  "page":0,
+  "size":10,
+  "hasNext":false
+}
+```
+
+`graded` is false while the attempt has no completed result; `overallBand` is then null. The band and `partial` come from the latest completed result version. `pool` is null for an attempt made before pools. The full report of one graded attempt stays at `GET /api/assessments/attempts/{id}/placement-result`.
 
 ## Errors
 
