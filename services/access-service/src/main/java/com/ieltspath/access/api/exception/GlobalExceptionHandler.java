@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -29,6 +30,12 @@ import java.util.Map;
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    /** The client left before the response was written (reload, navigation, abort): there is nobody to answer. */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    void handleClientAbort(HttpServletRequest request) {
+        log.debug("Client disconnected before response completed path={}", request.getRequestURI());
+    }
 
     @ExceptionHandler(UnknownDeadLetterQueueException.class)
     public ResponseEntity<ErrorResponse> handleUnknownDeadLetterQueue(UnknownDeadLetterQueueException ex, HttpServletRequest request) {

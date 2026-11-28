@@ -25,6 +25,7 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -32,6 +33,12 @@ import java.util.Map;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    /** The client left before the response was written (reload, navigation, abort): there is nobody to answer. */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    void handleClientAbort(HttpServletRequest request) {
+        log.debug("Client disconnected before response completed path={}", request.getRequestURI());
+    }
+
     @ExceptionHandler(UnknownDeadLetterQueueException.class)
     public ResponseEntity<LearningErrorResponse> unknownDeadLetterQueue(UnknownDeadLetterQueueException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)

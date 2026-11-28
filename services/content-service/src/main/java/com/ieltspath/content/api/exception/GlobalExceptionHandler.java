@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -33,6 +34,12 @@ public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
     private static final String PUBLISHED_VERSION_LOCK_MESSAGE = "published_version_content_locked";
+
+    /** The client left before the response was written (reload, navigation, abort): there is nobody to answer. */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    void handleClientAbort(HttpServletRequest request) {
+        log.debug("Client disconnected before response completed path={}", request.getRequestURI());
+    }
 
     @ExceptionHandler(PremiumRequiredException.class)
     public ResponseEntity<ErrorResponse> premiumRequired(PremiumRequiredException ex, HttpServletRequest request) {

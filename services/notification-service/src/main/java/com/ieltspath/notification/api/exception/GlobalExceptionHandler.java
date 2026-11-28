@@ -15,6 +15,9 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
@@ -22,6 +25,14 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    /** The client left before the response was written (reload, navigation, abort): there is nobody to answer. */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    void handleClientAbort(HttpServletRequest request) {
+        log.debug("Client disconnected before response completed path={}", request.getRequestURI());
+    }
 
     @ExceptionHandler({NoResourceFoundException.class, NoHandlerFoundException.class})
     ResponseEntity<ErrorResponse> notFound(Exception e, HttpServletRequest r) {

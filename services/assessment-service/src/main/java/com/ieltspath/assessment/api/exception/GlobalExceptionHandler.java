@@ -21,6 +21,7 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.server.ResponseStatusException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -29,6 +30,12 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    /** The client left before the response was written (reload, navigation, abort): there is nobody to answer. */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    void handleClientAbort(HttpServletRequest request) {
+        log.debug("Client disconnected before response completed path={}", request.getRequestURI());
+    }
 
     @ExceptionHandler(PremiumRequiredException.class)
     public ResponseEntity<ErrorResponse> premiumRequired(PremiumRequiredException exception, HttpServletRequest request) {
