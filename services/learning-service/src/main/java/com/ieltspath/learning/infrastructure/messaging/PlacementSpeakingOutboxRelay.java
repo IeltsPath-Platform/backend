@@ -46,8 +46,11 @@ public class PlacementSpeakingOutboxRelay {
         for(var event:jobs.claimOutbox(50)) {
             OutboxTraceContext.Scope scope=traceContext.openRelay(event.traceContext());
             try {
+                // Placement Writing results leave through the same outbox.
                 String routingKey=SpeakingGradingCompletedV1.EVENT_TYPE.equals(event.eventType())
-                        ? AssessmentMessaging.SPEAKING_GRADING_COMPLETED_ROUTING_KEY : null;
+                        ? AssessmentMessaging.SPEAKING_GRADING_COMPLETED_ROUTING_KEY
+                        : com.ieltspath.events.assessment.PlacementWritingGradingCompletedV1.EVENT_TYPE.equals(event.eventType())
+                        ? AssessmentMessaging.PLACEMENT_WRITING_COMPLETED_ROUTING_KEY : null;
                 if(routingKey==null)throw new IllegalStateException("Unknown placement Speaking event type");
                 var builder=MessageBuilder.withBody(event.payload().getBytes(StandardCharsets.UTF_8))
                         .setContentType(MessageProperties.CONTENT_TYPE_JSON).setContentEncoding("UTF-8")

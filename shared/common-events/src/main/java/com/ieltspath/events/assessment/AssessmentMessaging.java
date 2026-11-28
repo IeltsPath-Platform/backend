@@ -16,6 +16,8 @@ public final class AssessmentMessaging {
     public static final String HUMAN_REVIEW_COMPLETED_ROUTING_KEY = HumanReviewCompletedV1.EVENT_TYPE;
     public static final String SPEAKING_GRADING_REQUESTED_ROUTING_KEY = SpeakingGradingRequestedV1.EVENT_TYPE;
     public static final String SPEAKING_GRADING_COMPLETED_ROUTING_KEY = SpeakingGradingCompletedV1.EVENT_TYPE;
+    public static final String PLACEMENT_WRITING_REQUESTED_ROUTING_KEY = PlacementWritingGradingRequestedV1.EVENT_TYPE;
+    public static final String PLACEMENT_WRITING_COMPLETED_ROUTING_KEY = PlacementWritingGradingCompletedV1.EVENT_TYPE;
 
     private AssessmentMessaging() { }
 }

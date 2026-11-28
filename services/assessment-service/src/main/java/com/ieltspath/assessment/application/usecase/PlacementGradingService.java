@@ -139,7 +139,17 @@ public class PlacementGradingService {
             finish(attempt, items, Map.of(), Set.of(), null);
             return;
         }
-        if (!submitted.isEmpty()) jobs.enqueueAi(submitted, attempt.getUserId());
+        if (!submitted.isEmpty()) {
+            jobs.enqueueAi(submitted, attempt.getUserId());
+            if (writingDelegation != null) writingDelegation.delegate(attempt);
+        }
+    }
+
+    private com.ieltspath.assessment.application.service.PlacementWritingDelegation writingDelegation;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setWritingDelegation(com.ieltspath.assessment.application.service.PlacementWritingDelegation delegation) {
+        this.writingDelegation = delegation;
     }
 
     /** @return true when this call completed the result. */

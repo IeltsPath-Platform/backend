@@ -50,6 +50,7 @@ public class UserDeletionJobWorker {
             "learner_placements",
             "placement_assignments",
             "placement_speaking_jobs",
+            "placement_writing_jobs",
             "xp_ledger",
             "learner_xp",
             "learner_hearts",
