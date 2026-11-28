@@ -12,6 +12,11 @@ public record AttemptStructureResult(List<Section> sections) {
         }
     }
 
+    /** {@code answerSeconds} is how long a spoken answer may last; null for any other kind of question. */
     public record Item(UUID id, UUID questionVersionId, int sortOrder,
-                       String questionSnapshot, String knowledgeSnapshot) {}
+                       String questionSnapshot, String knowledgeSnapshot, Integer answerSeconds) {
+        public Item(UUID id, UUID questionVersionId, int sortOrder, String questionSnapshot, String knowledgeSnapshot) {
+            this(id, questionVersionId, sortOrder, questionSnapshot, knowledgeSnapshot, null);
+        }
+    }
 }

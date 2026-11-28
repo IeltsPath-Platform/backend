@@ -46,7 +46,7 @@ class GetAttemptStructureUseCaseTest {
                 new AttemptItem(itemId, sectionId, questionVersionId, 1,
                         "{\"stem\":\"Question\"}", "{\"correct\":\"A\"}", "{\"kp\":\"KP1\"}")));
 
-        var result = new GetAttemptStructureUseCase(attempts, sections, items).execute(userId, attemptId);
+        var result = new GetAttemptStructureUseCase(attempts, sections, items, new ObjectMapper()).execute(userId, attemptId);
         var item = result.sections().getFirst().items().getFirst();
         assertEquals(itemId, item.id());
         assertEquals(questionVersionId, item.questionVersionId());
@@ -56,11 +56,37 @@ class GetAttemptStructureUseCaseTest {
     }
 
     @Test
+    void givesOnlyTheLengthOfASpokenAnswer() throws Exception {
+        UUID sectionId = UUID.randomUUID();
+        when(attempts.findByIdAndUserId(attemptId, userId))
+                .thenReturn(Optional.of(mock(AssessmentAttempt.class)));
+        when(sections.findByAttemptId(attemptId))
+                .thenReturn(List.of(new AttemptSection(sectionId, attemptId, UUID.randomUUID(), 1, "{}")));
+        when(items.findByAttemptId(attemptId)).thenReturn(List.of(
+                answered(sectionId, 1,
+                        "{\"answerSpec\":{\"type\":\"SPEAKING\",\"durationSeconds\":120,\"secret\":\"x\"}}"),
+                answered(sectionId, 2, "{\"answerSpec\":{\"type\":\"FILL\",\"durationSeconds\":30}}"),
+                answered(sectionId, 3, "{\"answerSpec\":{\"type\":\"SPEAKING\"}}"),
+                answered(sectionId, 4, null)));
+
+        var result = new GetAttemptStructureUseCase(attempts, sections, items, new ObjectMapper())
+                .execute(userId, attemptId);
+
+        assertEquals(java.util.Arrays.asList(120, null, null, null), result.sections().getFirst().items().stream()
+                .map(value -> value.answerSeconds()).toList());
+        assertFalse(new ObjectMapper().findAndRegisterModules().writeValueAsString(result).contains("secret"));
+    }
+
+    private static AttemptItem answered(UUID sectionId, int sortOrder, String answerSnapshot) {
+        return new AttemptItem(UUID.randomUUID(), sectionId, UUID.randomUUID(), sortOrder, "{}", answerSnapshot, "[]");
+    }
+
+    @Test
     void anotherUsersAttemptIsNotVisible() {
         when(attempts.findByIdAndUserId(attemptId, userId)).thenReturn(Optional.empty());
 
         assertThrows(AssessmentNotFoundException.class,
-                () -> new GetAttemptStructureUseCase(attempts, sections, items).execute(userId, attemptId));
+                () -> new GetAttemptStructureUseCase(attempts, sections, items, new ObjectMapper()).execute(userId, attemptId));
         verifyNoInteractions(sections, items);
     }
 }
