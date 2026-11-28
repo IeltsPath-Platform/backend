@@ -45,6 +45,9 @@ assessment:
       timeout-poll-ms: ${ASSESSMENT_PLACEMENT_SPEAKING_GRADING_TIMEOUT_POLL_MS:30000}
       retry-delay-ms: ${ASSESSMENT_PLACEMENT_SPEAKING_GRADING_RETRY_DELAY_MS:30000}
       max-delivery-attempts: ${ASSESSMENT_PLACEMENT_SPEAKING_GRADING_MAX_DELIVERY_ATTEMPTS:5}
+    # Placement essays are graded by Learning; an unanswered or failed one falls back to the local grader.
+    writing-grading:
+      enabled: ${ASSESSMENT_PLACEMENT_WRITING_GRADING_ENABLED:true}
   speaking:
     bucket: ${ASSESSMENT_SPEAKING_BUCKET:speaking-recordings}
     retention-days: ${ASSESSMENT_SPEAKING_RETENTION_DAYS:90}

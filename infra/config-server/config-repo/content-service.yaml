@@ -16,6 +16,12 @@ spring:
     # run on an older developer database then have to be applied out of order.
     out-of-order: true
     locations: classpath:db/migration,classpath:db/callback
+  # Content consumes user.deleted events.
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME}
+    password: ${RABBITMQ_PASSWORD}
   servlet:
     multipart:
       # Audio upload for authors: 25 MB file, a little headroom for the multipart envelope.

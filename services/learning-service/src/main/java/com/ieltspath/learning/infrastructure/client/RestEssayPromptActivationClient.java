@@ -19,6 +19,8 @@ import org.springframework.web.client.RestClientException;
 
 import java.time.Duration;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Supplier;
 
 @Component
 public class RestEssayPromptActivationClient implements EssayPromptActivationProvider {
@@ -30,6 +32,8 @@ public class RestEssayPromptActivationClient implements EssayPromptActivationPro
     private final String llmModel;
     private final String llmReasoningEffort;
     private final MeterRegistry metrics;
+    /** Used only outside any request, e.g. the placement essay grader that runs on a schedule. */
+    private final Supplier<Optional<String>> workerToken;
 
     @Autowired
     public RestEssayPromptActivationClient(RestClient.Builder builder,
@@ -37,7 +41,7 @@ public class RestEssayPromptActivationClient implements EssayPromptActivationPro
             ResilientCall resilientCall,
             @Value("${learning.llm.model:}") String llmModel,
             @Value("${learning.llm.reasoning-effort:}") String llmReasoningEffort,
-            MeterRegistry metrics) {
+            MeterRegistry metrics, LearningWorkerTokenProvider workerTokens) {
         var factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofSeconds(2));
         factory.setReadTimeout(Duration.ofSeconds(5));
@@ -46,6 +50,7 @@ public class RestEssayPromptActivationClient implements EssayPromptActivationPro
         this.llmModel = llmModel;
         this.llmReasoningEffort = llmReasoningEffort;
         this.metrics = metrics;
+        this.workerToken = () -> Optional.of(workerTokens.token());
     }
 
     RestEssayPromptActivationClient(RestClient client) { this(client, defaultResilientCall()); }
@@ -56,11 +61,17 @@ public class RestEssayPromptActivationClient implements EssayPromptActivationPro
 
     RestEssayPromptActivationClient(RestClient client, ResilientCall resilientCall, String llmModel,
             String llmReasoningEffort, MeterRegistry metrics) {
+        this(client, resilientCall, llmModel, llmReasoningEffort, metrics, Optional::empty);
+    }
+
+    RestEssayPromptActivationClient(RestClient client, ResilientCall resilientCall, String llmModel,
+            String llmReasoningEffort, MeterRegistry metrics, Supplier<Optional<String>> workerToken) {
         this.client = client;
         this.resilientCall = resilientCall;
         this.llmModel = llmModel;
         this.llmReasoningEffort = llmReasoningEffort;
         this.metrics = metrics;
+        this.workerToken = workerToken;
     }
 
     @Override
@@ -69,8 +80,12 @@ public class RestEssayPromptActivationClient implements EssayPromptActivationPro
             Activation response = resilientCall.call("assessment", CallKind.READ, () -> client.get()
                     .uri("/internal/assessments/ai-prompt-activations?task={task}", task)
                     .headers(headers -> {
-                        headers.setBearerAuth(GatewayRequestHeaders.bearerToken().orElseThrow(
-                                () -> new LearningRequestException(401, "UNAUTHORIZED", "Yêu cầu cần có phiên đăng nhập hợp lệ.")));
+                        // A request must carry the learner's verified JWT; only work with no request at all uses the
+                        // worker token, as the Content client does.
+                        headers.setBearerAuth(GatewayRequestHeaders.bearerToken()
+                                .or(() -> GatewayRequestHeaders.outsideRequest() ? workerToken.get() : Optional.empty())
+                                .orElseThrow(() -> new LearningRequestException(401, "UNAUTHORIZED",
+                                        "Yêu cầu cần có phiên đăng nhập hợp lệ.")));
                         headers.set(SecurityHeaders.CORRELATION_ID, GatewayRequestHeaders.correlationId());
                     })
                     .retrieve().body(Activation.class));

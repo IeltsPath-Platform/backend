@@ -38,6 +38,6 @@ class DropGradingPointCostsMigrationTest {
             assertTrue(!tables.contains(dropped), dropped + " must be gone");
         }
         assertTrue(tables.containsAll(KEPT), "tables that are still in use must remain");
-        assertEquals(29, tables.size()); // 28 tables plus flyway_schema_history
+        assertEquals(30, tables.size()); // 29 tables plus flyway_schema_history
     }
 }

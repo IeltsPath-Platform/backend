@@ -18,4 +18,6 @@ Learning publishes one result through its transactional outbox for each accepted
 }
 ```
 
+The `band` is the mean of the four criteria, rounded to the nearest half band. Learning also keeps the whole graded result (transcripts, pronunciation, errors) in `placement_speaking_jobs.result` and serves it to the learner with `GET /api/learning/placement-grades/{attemptId}` ([placement-writing-grading-v1](placement-writing-grading-v1.md#learner-read)); it never travels in this event.
+
 Correlation and trace context are carried in AMQP headers and stored with the outbox row. Neither event may contain transcript, recording bytes, or signed URL. See also [SpeakingGradingRequested.v1](speaking-grading-requested-v1.md).

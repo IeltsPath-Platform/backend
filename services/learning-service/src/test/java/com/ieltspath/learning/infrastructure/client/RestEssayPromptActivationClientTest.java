@@ -39,6 +39,22 @@ class RestEssayPromptActivationClientTest {
         server.verify();
     }
 
+    /** The placement essay grader runs on a schedule, with no request and so no learner token. */
+    @Test void usesTheWorkerTokenOutsideAnyRequest() {
+        SecurityContextHolder.clearContext();
+        RestClient.Builder other = RestClient.builder().baseUrl("http://assessment.test");
+        MockRestServiceServer otherServer = MockRestServiceServer.bindTo(other).build();
+        var scheduled = new RestEssayPromptActivationClient(other.build(),
+                com.ieltspath.commonresilience.ResilientCall.isolatedDefault(), "", "",
+                new io.micrometer.core.instrument.simple.SimpleMeterRegistry(), () -> java.util.Optional.of("worker-token"));
+        otherServer.expect(requestTo("http://assessment.test/internal/assessments/ai-prompt-activations?task=TASK_2"))
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer worker-token"))
+                .andRespond(withSuccess("{\"task\":\"TASK_2\",\"promptVersion\":null}", MediaType.APPLICATION_JSON));
+
+        assertNull(scheduled.activatedVersion("TASK_2"));
+        otherServer.verify();
+    }
+
     @Test void confirmedMissingActivationEnablesBootstrap() {
         server.expect(requestTo("http://assessment.test/internal/assessments/ai-prompt-activations?task=TASK_1"))
                 .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer internal-test-token"))

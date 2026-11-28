@@ -52,7 +52,8 @@ public record AttemptStructureResponse(List<Section> sections) {
     public record Group(String groupId, int sortOrder, String formatCode, String instructions) {}
 
     public record Item(UUID id, UUID questionVersionId, int sortOrder,
-                       String questionSnapshot, String knowledgeSnapshot) {}
+                       String questionSnapshot, String knowledgeSnapshot,
+                       @JsonInclude(JsonInclude.Include.NON_NULL) Integer answerSeconds) {}
 
     public static AttemptStructureResponse from(AttemptStructureResult result, ObjectMapper json) {
         return new AttemptStructureResponse(result.sections().stream()
@@ -68,7 +69,8 @@ public record AttemptStructureResponse(List<Section> sections) {
                                         item.questionVersionId(),
                                         item.sortOrder(),
                                         item.questionSnapshot(),
-                                        item.knowledgeSnapshot()))
+                                        item.knowledgeSnapshot(),
+                                        item.answerSeconds()))
                                 .toList(),
                         section.startedAt(),
                         section.completedAt()))

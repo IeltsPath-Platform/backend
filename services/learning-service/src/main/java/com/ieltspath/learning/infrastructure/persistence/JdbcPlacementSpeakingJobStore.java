@@ -57,17 +57,24 @@ public class JdbcPlacementSpeakingJobStore implements PlacementSpeakingJobStore 
 
     @Override
     @Transactional
-    public void complete(UUID eventId, String status, String failureCode, OutboxEvent event) {
+    public void complete(UUID eventId, String status, String failureCode, String result, OutboxEvent event) {
         int updated = jdbc.update("""
-                UPDATE placement_speaking_jobs SET status=?,failure_code=?,completed_at=?,claimed_at=NULL,
+                UPDATE placement_speaking_jobs SET status=?,failure_code=?,result=CAST(? AS JSONB),completed_at=?,claimed_at=NULL,
                     updated_at=CURRENT_TIMESTAMP WHERE event_id=? AND status='PROCESSING'
-                """, status, failureCode, Timestamp.from(event.createdAt()), eventId);
+                """, status, failureCode, result, Timestamp.from(event.createdAt()), eventId);
         if (updated == 0) return;
         jdbc.update("""
                 INSERT INTO placement_speaking_outbox(id,event_type,payload,correlation_id,trace_context,created_at)
                 VALUES (?,?,CAST(? AS JSONB),?,?,?)
                 """, event.id(),event.eventType(),event.payload(),event.correlationId(),event.traceContext(),
                 Timestamp.from(event.createdAt()));
+    }
+
+    @Override
+    public java.util.Optional<Stored> findOwned(UUID attemptId, UUID userId) {
+        return jdbc.query("SELECT status,result::text FROM placement_speaking_jobs WHERE attempt_id=? AND user_id=?",
+                (rs, row) -> new Stored(rs.getString("status"), rs.getString("result")), attemptId, userId)
+                .stream().findFirst();
     }
 
     @Override

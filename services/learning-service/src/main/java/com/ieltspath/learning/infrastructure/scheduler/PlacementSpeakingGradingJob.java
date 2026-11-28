@@ -30,6 +30,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -88,24 +89,27 @@ public class PlacementSpeakingGradingJob {
                     List.of(),settings.maxInputChars());
             var prepared=grader.prepare(rubric,input);
             var result=grader.grade(prepared,input);
-            publish(job,"GRADED",null,result,result.result(),rubric.code(),rubric.version());
+            publish(job,"GRADED",null,result,rubric.code(),rubric.version());
         } catch(Exception failure) {
             String code=failureCode(failure);
             if(job.attempts()<maxAttempts) {
                 jobs.retry(job.eventId(),code,Instant.now().plusSeconds(retrySeconds));
                 log.warn("Placement Speaking job deferred: eventId={}, attempt={}, code={}",job.eventId(),job.attempts(),code);
             } else {
-                publish(job,"FAILED",code,null,Map.of(),null,null);
+                publish(job,"FAILED",code,null,null,null);
             }
         }
     }
 
     private void publish(PlacementSpeakingJobStore.Job job,String status,String failureCode,
-                         SpeakingResultAssembler.Assembled assembled,Map<String,Object> result,String rubricCode,Integer rubricVersion) {
+                         SpeakingResultAssembler.Assembled assembled,String rubricCode,Integer rubricVersion) {
         List<SpeakingGradingCompletedV1.Criterion> criteria=new ArrayList<>();
         BigDecimal band=null; String summary=null;
+        // The learner-facing half of the result, kept so the report can show what Speaking practice shows.
+        Map<String,Object> display=null;
         if(assembled!=null) {
-            JsonNode root=json.valueToTree(result);
+            display=display(assembled);
+            JsonNode root=json.valueToTree(display);
             JsonNode rows=root.path("criteria");
             BigDecimal sum=BigDecimal.ZERO;
             for(JsonNode row:rows) {
@@ -116,16 +120,20 @@ public class PlacementSpeakingGradingJob {
                 criteria.add(new SpeakingGradingCompletedV1.Criterion(code,criterionBand,comment));
             }
             if(criteria.size()!=4 || criteria.stream().anyMatch(row -> row.band()==null || row.code().isBlank())) {
+                log.warn("Placement Speaking result has no band for every criterion: eventId={}, attempt={}, criteria={}",
+                        job.eventId(),job.attempts(),criteria.stream().map(SpeakingGradingCompletedV1.Criterion::code).toList());
                 if(job.attempts()<maxAttempts) {
                     jobs.retry(job.eventId(),"INVALID_RESULT",Instant.now().plusSeconds(retrySeconds));
                 } else {
-                    publish(job,"FAILED","INVALID_RESULT",null,Map.of(),null,null);
+                    publish(job,"FAILED","INVALID_RESULT",null,null,null);
                 }
                 return;
             }
             band=sum.divide(BigDecimal.valueOf(4),4,RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(2))
                     .setScale(0,RoundingMode.HALF_UP).divide(BigDecimal.valueOf(2),1,RoundingMode.HALF_UP);
             summary=root.path("summary").isTextual()?root.path("summary").asText():null;
+            // Practice gives an overall band only for a full test; the placement section always has one.
+            if(display.get("overallBand")==null)display.put("overallBand",band);
         }
         Instant now=Instant.now();
         var event=new SpeakingGradingCompletedV1(UUID.randomUUID(),SpeakingGradingCompletedV1.EVENT_TYPE,now,
@@ -133,12 +141,21 @@ public class PlacementSpeakingGradingJob {
                 status,band,criteria,summary,rubricCode,rubricVersion,failureCode));
         try {
             String payload=json.writeValueAsString(event);
-            jobs.complete(job.eventId(),status,failureCode,new PlacementSpeakingJobStore.OutboxEvent(event.eventId(),
-                    event.eventType(),payload,now,job.correlationId(),job.traceContext()));
+            jobs.complete(job.eventId(),status,failureCode,display==null?null:json.writeValueAsString(display),
+                    new PlacementSpeakingJobStore.OutboxEvent(event.eventId(),
+                            event.eventType(),payload,now,job.correlationId(),job.traceContext()));
         } catch(Exception serializationFailure) {
             jobs.retry(job.eventId(),"EVENT_SERIALIZATION",Instant.now().plusSeconds(retrySeconds));
             log.error("Placement Speaking result event could not be serialized: eventId={}",job.eventId());
         }
+    }
+
+    private static Map<String,Object> display(SpeakingResultAssembler.Assembled assembled) {
+        Map<String,Object> copy=new LinkedHashMap<>();
+        if(assembled.result().get("display") instanceof Map<?,?> display) {
+            display.forEach((key,value) -> copy.put(String.valueOf(key),value));
+        }
+        return copy;
     }
 
     private static String failureCode(Exception failure) {

@@ -15,6 +15,7 @@ import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -22,6 +23,12 @@ import java.util.*;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
     private static final Logger LOG = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    /** The client left before the response was written (reload, navigation, abort): there is nobody to answer. */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    void handleClientAbort(HttpServletRequest request) {
+        LOG.debug("Client disconnected before response completed path={}", request.getRequestURI());
+    }
+
     @ExceptionHandler(CommunityUnavailableException.class)
     ResponseEntity<ErrorResponse> unavailable(Exception e, HttpServletRequest r) {
         return error(HttpStatus.SERVICE_UNAVAILABLE, e.getMessage(), r, null);
