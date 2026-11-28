@@ -17,6 +17,12 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+  # Game consumes user.deleted events.
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME}
+    password: ${RABBITMQ_PASSWORD}
 
 app:
   auth:
